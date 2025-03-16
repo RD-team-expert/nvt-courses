@@ -12,7 +12,7 @@ class AdminUserSeeder extends Seeder
     {
         // Check if the admin user already exists or create a new one
         User::firstOrCreate(
-            [ 'email' => 'admin@example.com' ], // unique field
+            [ 'email' => 'Harry@pneunited.com' ], // unique field
             [
                 'name' => 'Admin User',
                 'password' => Hash::make('password'), // change to a secure password

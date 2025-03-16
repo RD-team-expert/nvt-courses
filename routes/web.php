@@ -12,7 +12,7 @@ use App\Models\Course;
 use App\Http\Controllers\DashboardController;
 
 Route::get('/', function () {
-    return Inertia::render('Welcome');
+    return redirect()->route('dashboard');
 })->name('home');
 
 // Add this route to replace the existing dashboard route
