@@ -1,0 +1,77 @@
+Project Name: **Attendance & Course Management System for NVT Courses**
+
+### Project Overview:
+Develop an attendance and course management system for NVT courses. This system will feature user authentication, a clock-in/out mechanism with ratings and comments, user self-assignment to courses, course management with user-admin interactions, email notifications, analytics, and CSV reporting. Both admin and user interfaces will be responsive and optimized for mobile screens.
+
+### User Roles:
+- **Admin:** Manage courses, users, clocking records, course registrations, ratings, and feedback.
+- **User:** Clock in/out, view and self-register to available courses, and track personal progress.
+
+---
+
+### Features:
+
+#### Authentication System:
+- Secure login/logout with user credentials.
+- Role management (Admin, User).
+
+### Course Management:
+- Admin creates courses with:
+  - Course Name
+  - Description (with HTML Pro Free Editor)
+  - Start Date
+  - End Date
+  - Status (Pending, In Progress, Completed)
+  - Level (Optional)
+  - Course Duration
+- Users see available courses as announcements.
+- Users can self-register to courses by clicking "Count Me In" or similar.
+- Admin can view registered users per course.
+- Admin and users can update course statuses (Pending, In Progress, Completed).
+- Once a course is marked as completed by a user, the admin can provide a rating (1-5) and comments as feedback.
+- Enable notification reminders for users before course start dates.
+
+### Clocking System:
+- Users clock in/out manually (no real-time tracking).
+- Users add ratings (1-5) and comments when clocking out.
+- Admin can manage and view all user clock-in/out records.
+
+### Admin Interface:
+- Dashboard analytics with visual data representation.
+- Tables displaying detailed course registrations, user activities, clocking records.
+- Provide summary views for user and course analytics for quick assessment.
+- CSV export functionality for generating Excel-compatible reports.
+- CRUD operations for users:
+  - Create/Edit/Delete user profiles.
+  - Assign user roles.
+- Manage and monitor course assignments, user feedback, and progress.
+
+### End-User Interface:
+- Responsive design optimized for mobile devices.
+- View courses as announcements.
+- Self-register for courses.
+- Clock-in/out with session-specific ratings and comments.
+- Track personal course progress and feedback.
+
+### Reporting & Analytics:
+- Generate and export detailed CSV reports for:
+  - Course registrations
+  - Attendance records (Clock-in/out)
+  - Course completion and feedback
+- Dashboard analytics for quick insights into user engagement, attendance rates, and course effectiveness.
+
+### Technology Stack:
+- Laravel 12 Vue Starter Kit (backend & frontend)
+- MySQL (database, no real-time tracking)
+- Tailwind CSS (responsive UI)
+- HTML Pro Free Editor (course description editing)
+- Laravel Excel (CSV reporting)
+- SMTP-based email notifications
+- Monolith Module Architecture
+
+### Suggestions for Further Enhancement:
+- Include filter options for detailed analytics and reports.
+- Add calendar views for course schedules.
+
+
+
