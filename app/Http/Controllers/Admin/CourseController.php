@@ -46,7 +46,7 @@ class CourseController extends Controller
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'status' => 'required|in:pending,in_progress,completed',
             'level' => 'nullable|in:beginner,intermediate,advanced',
-            'duration' => 'nullable|integer|min:1',
+            'duration' => 'nullable|numeric|min:0.1', // Changed from integer to numeric
         ]);
         
         // Handle image upload
@@ -91,7 +91,7 @@ class CourseController extends Controller
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'status' => 'required|in:pending,in_progress,completed',
             'level' => 'nullable|in:beginner,intermediate,advanced',
-            'duration' => 'nullable|integer|min:1',
+            'duration' => 'nullable|numeric|min:0.1', // Changed from integer to numeric
         ]);
         
         // Handle image upload

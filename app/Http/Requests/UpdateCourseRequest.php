@@ -21,7 +21,7 @@ class UpdateCourseRequest extends FormRequest
             'end_date'    => 'nullable|date|after_or_equal:start_date',
             'status'      => 'required|in:pending,in_progress,completed',
             'level'       => 'nullable|string|max:50',
-            'duration'    => 'nullable|integer|min:1',
+            'duration'    => 'nullable|numeric|min:0.1', // Changed from integer to numeric
         ];
     }
 }

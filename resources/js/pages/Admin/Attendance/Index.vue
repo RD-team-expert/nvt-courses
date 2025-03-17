@@ -111,6 +111,8 @@ const resetFilters = () => {
         </div>
         
         <!-- Add Course Filter -->
+        <!-- Only showing the relevant part that needs to be changed -->
+        <!-- Course Filter -->
         <div>
           <label for="course_filter" class="block text-sm font-medium text-gray-700 mb-1">Course</label>
           <select
@@ -119,6 +121,7 @@ const resetFilters = () => {
             class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">All Courses</option>
+            <option value="general">General Attendance</option>
             <option v-for="course in courses" :key="course.id" :value="course.id">{{ course.name }}</option>
           </select>
         </div>

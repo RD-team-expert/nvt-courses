@@ -155,7 +155,7 @@ class ReportService
      */
     public function getAttendanceReport($filters = [])
     {
-        $query = Clocking::with('user:id,name,email')
+        $query = Clocking::with(['user:id,name,email', 'course:id,name'])
             ->select('clockings.*');
         
         // Apply filters
@@ -171,6 +171,15 @@ class ReportService
             $query->where('clock_in', '<=', $filters['date_to'] . ' 23:59:59');
         }
         
+        // Handle course filter
+        if (!empty($filters['course_id'])) {
+            if ($filters['course_id'] === 'general') {
+                $query->whereNull('course_id');
+            } else {
+                $query->where('course_id', $filters['course_id']);
+            }
+        }
+        
         $attendance = $query->orderBy('clock_in', 'desc')->get();
         
         return $attendance->map(function ($record) {
@@ -183,7 +192,8 @@ class ReportService
                 'clock_out' => $record->clock_out,
                 'duration_in_minutes' => $record->duration_in_minutes,
                 'rating' => $record->rating,
-                'comment' => $record->comment
+                'comment' => $record->comment,
+                'course_name' => $record->course ? $record->course->name : null
             ];
         });
     }

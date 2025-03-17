@@ -81,10 +81,24 @@ class ReportController extends Controller
             'Duration (minutes)', 'Rating', 'Comment'
         ];
         
+        $data = $attendance->map(function($record) {
+            return [
+                'id' => $record['id'],
+                'user_name' => $record['user_name'],
+                'user_email' => $record['user_email'],
+                'course_name' => $record['course_name'] ?? 'General Attendance',
+                'clock_in' => $record['clock_in'],
+                'clock_out' => $record['clock_out'],
+                'duration_in_minutes' => $record['duration_in_minutes'],
+                'rating' => $record['rating'],
+                'comment' => $record['comment']
+            ];
+        });
+        
         return $this->csvExportService->export(
             'attendance_' . date('Y-m-d') . '.csv',
             $headers,
-            $attendance->toArray()
+            $data->toArray()
         );
     }
 

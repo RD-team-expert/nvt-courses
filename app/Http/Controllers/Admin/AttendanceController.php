@@ -32,7 +32,12 @@ class AttendanceController extends Controller
                 $query->whereDate('clock_in', $request->date);
             })
             ->when($request->course_id, function ($query) use ($request) {
-                $query->where('course_id', $request->course_id);
+                // If 'general' is selected, find records with null course_id
+                if ($request->course_id === 'general') {
+                    $query->whereNull('course_id');
+                } else {
+                    $query->where('course_id', $request->course_id);
+                }
             })
             ->orderByDesc('clock_in')
             ->paginate(10);
