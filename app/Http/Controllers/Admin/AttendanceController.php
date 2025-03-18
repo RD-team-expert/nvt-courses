@@ -6,11 +6,20 @@ use App\Http\Controllers\Controller;
 use App\Models\Clocking;
 use App\Models\User;
 use App\Models\Course;
+use App\Http\Requests\Admin\AttendanceUpdateRequest;
+use App\Services\AttendanceService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class AttendanceController extends Controller
 {
+    protected $attendanceService;
+
+    public function __construct(AttendanceService $attendanceService)
+    {
+        $this->attendanceService = $attendanceService;
+    }
+
     /**
      * Display a listing of attendance records
      */
@@ -58,5 +67,25 @@ class AttendanceController extends Controller
             'courses' => $courses,
             'filters' => $request->only(['user_id', 'date', 'course_id'])
         ]);
+    }
+
+    /**
+     * Update the specified attendance record
+     */
+    public function update(AttendanceUpdateRequest $request, Clocking $attendance)
+    {
+        $this->attendanceService->updateAttendance($attendance, $request->validated());
+        
+        return redirect()->back()->with('success', 'Attendance record updated successfully');
+    }
+
+    /**
+     * Delete the specified attendance record
+     */
+    public function destroy(Clocking $attendance)
+    {
+        $this->attendanceService->deleteAttendance($attendance);
+        
+        return redirect()->back()->with('success', 'Attendance record deleted successfully');
     }
 }

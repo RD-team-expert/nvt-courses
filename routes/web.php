@@ -5,6 +5,7 @@ use Inertia\Inertia;
 use App\Http\Controllers\ClockingController;
 use App\Http\Controllers\Admin\CourseController as AdminCourseController;
 use App\Http\Controllers\CourseController;
+use App\Http\Controllers\Admin\AttendanceController;
 use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\AttendanceController as AdminAttendanceController;
@@ -39,6 +40,8 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     // Admin attendance routes
     Route::get('attendance', [AdminAttendanceController::class, 'index'])->name('attendance.index');
 });
+Route::put('/attendance/{attendance}', [AttendanceController::class, 'update'])->name('admin.attendance.update');
+Route::delete('/attendance/{attendance}', [AttendanceController::class, 'destroy'])->name('admin.attendance.destroy');
 
 // User course routes
 Route::middleware('auth')->group(function () {
