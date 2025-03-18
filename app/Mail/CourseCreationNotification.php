@@ -11,18 +11,12 @@ use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
-class CourseCreatedNotification extends Mailable implements ShouldQueue
+class CourseCreationNotification extends Mailable
 {
     use Queueable, SerializesModels;
 
-    /**
-     * The course instance.
-     */
-    public $course;
 
-    /**
-     * The user receiving the notification.
-     */
+    public $course;
     public $user;
 
     /**

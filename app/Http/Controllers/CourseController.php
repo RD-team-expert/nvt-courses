@@ -55,6 +55,7 @@ class CourseController extends Controller
 
             if ($this->courseService->enrollUser($course, $user)) {
                 //kami
+                event(new \App\Events\CourseEnrolled($course, $user));
 
                 return redirect()->route('courses.show', $course->id)
                     ->with('success', 'Enrolled successfully!');
@@ -88,6 +89,7 @@ class CourseController extends Controller
             if ($completion) {
                 // Redirect to the completion page
                 //kami
+                event(new \App\Events\CourseCompleted($course, $user));
                 return redirect()->route('courses.completion', $course->id);
             }
 

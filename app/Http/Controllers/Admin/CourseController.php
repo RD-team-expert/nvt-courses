@@ -9,15 +9,16 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Storage;
 
+
 class CourseController extends Controller
 {
     protected $emailService;
-    
+
     public function __construct(EmailService $emailService)
     {
         $this->emailService = $emailService;
     }
-    
+
     // In the index method of your CourseController
     public function index()
     {
@@ -25,17 +26,17 @@ class CourseController extends Controller
             ->withCount('users')
             ->orderBy('created_at', 'desc')
             ->paginate(5);
-    
+
         return Inertia::render('Admin/Courses/Index', [
             'courses' => $courses,
         ]);
     }
-    
+
     public function create()
     {
         return Inertia::render('Admin/Courses/Create');
     }
-    
+
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -48,13 +49,13 @@ class CourseController extends Controller
             'level' => 'nullable|in:beginner,intermediate,advanced',
             'duration' => 'nullable|numeric|min:0.1', // Changed from integer to numeric
         ]);
-        
+
         // Handle image upload
         $imagePath = null;
         if ($request->hasFile('image')) {
             $imagePath = $request->file('image')->store('course-images', 'public');
         }
-        
+
         $course = Course::create([
             'name' => $validated['name'],
             'description' => $validated['description'],
@@ -66,23 +67,25 @@ class CourseController extends Controller
             'duration' => $validated['duration'],
         ]);
         //kami
+        event(new \App\Events\CourseCreated($course));
+
         return redirect()->route('admin.courses.index')
             ->with('success', 'Course created successfully!');
     }
-    
+
     public function edit($id)
     {
         $course = Course::findOrFail($id);
-        
+
         return Inertia::render('Admin/Courses/Edit', [
             'course' => $course,
         ]);
     }
-    
+
     public function update(Request $request, $id)
     {
         $course = Course::findOrFail($id);
-        
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -93,18 +96,18 @@ class CourseController extends Controller
             'level' => 'nullable|in:beginner,intermediate,advanced',
             'duration' => 'nullable|numeric|min:0.1', // Changed from integer to numeric
         ]);
-        
+
         // Handle image upload
         if ($request->hasFile('image')) {
             // Delete old image if exists
             if ($course->image_path) {
                 Storage::disk('public')->delete($course->image_path);
             }
-            
+
             $imagePath = $request->file('image')->store('course-images', 'public');
             $course->image_path = $imagePath;
         }
-        
+
         $course->update([
             'name' => $validated['name'],
             'description' => $validated['description'],
@@ -114,26 +117,26 @@ class CourseController extends Controller
             'level' => $validated['level'],
             'duration' => $validated['duration'],
         ]);
-        
+
         return redirect()->route('admin.courses.index')
             ->with('success', 'Course updated successfully!');
     }
-    
+
     public function destroy($id)
     {
         $course = Course::findOrFail($id);
-        
+
         // Delete course image if exists
         if ($course->image_path) {
             Storage::disk('public')->delete($course->image_path);
         }
-        
+
         $course->delete();
-        
+
         return redirect()->route('admin.courses.index')
             ->with('success', 'Course deleted successfully!');
     }
-    
+
     /**
      * Display the specified course.
      *
@@ -144,7 +147,7 @@ class CourseController extends Controller
     {
         // Load the course with its related users
         $course->load('users');
-        
+
         return Inertia::render('Admin/Courses/Show', [
             'course' => $course
         ]);
