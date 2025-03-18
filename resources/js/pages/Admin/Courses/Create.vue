@@ -162,12 +162,10 @@ function submit() {
           <div class="col-span-1">
             <label class="block font-semibold mb-1">Duration (hours)</label>
             <input 
-              type="text" 
+              type="number" 
               v-model="form.duration" 
               min="0.5"
               step="0.5"
-              pattern="[0-9]*\.?[0-9]+"
-              placeholder="e.g. 1.5"
               class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500" 
             />
             <div v-if="form.errors.duration" class="text-red-600 text-sm mt-1">{{ form.errors.duration }}</div>
