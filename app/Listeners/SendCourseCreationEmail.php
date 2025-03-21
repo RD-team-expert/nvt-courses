@@ -24,12 +24,9 @@ class SendCourseCreationEmail
      */
     public function handle(CourseCreated $event): void
     {
-        $users = User::all();
-
-        foreach ($users as $user) {
-            Mail::to($user->email)->queue(
-                new CourseCreationNotification($event->course, $user)
-            );
-        }
+        User::all()->each(function ($user) use ($event) {
+            Mail::to($user->email)
+                ->send(new CourseCreationNotification($event->course, $user));
+        });
     }
 }
