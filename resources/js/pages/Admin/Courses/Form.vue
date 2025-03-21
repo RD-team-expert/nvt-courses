@@ -168,7 +168,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { Link, useForm } from '@inertiajs/vue3'
 import Editor from '@tinymce/tinymce-vue'
 
@@ -180,8 +180,23 @@ const props = defineProps({
   }
 })
 
-// TinyMCE API key - you'll need to get one from https://www.tiny.cloud/
-const tinymceApiKey = 'your-api-key' // Replace with your actual API key or use environment variable
+// Format dates for the form inputs (YYYY-MM-DD format required by date inputs)
+const formatDate = (dateString) => {
+  if (!dateString) return '';
+  
+  // Create a date object without timezone conversion
+  // By using YYYY-MM-DD format directly, we avoid timezone issues
+  const parts = dateString.split('T')[0].split('-');
+  if (parts.length !== 3) {
+    // If the date isn't in the expected format, try to parse it
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return ''; // Invalid date
+    return date.toISOString().split('T')[0]; // Returns YYYY-MM-DD
+  }
+  
+  // Return the date in YYYY-MM-DD format
+  return parts.join('-');
+}
 
 // Initialize form with course data if in edit mode
 const form = useForm({
@@ -189,8 +204,8 @@ const form = useForm({
   description: props.course?.description || '',
   image: null,
   image_path: props.course?.image_path || null,
-  start_date: props.course?.start_date || '',
-  end_date: props.course?.end_date || '',
+  start_date: formatDate(props.course?.start_date) || '',
+  end_date: formatDate(props.course?.end_date) || '',
   status: props.course?.status || 'pending',
   level: props.course?.level || '',
   duration: props.course?.duration || '',
@@ -221,6 +236,14 @@ function removeImage() {
 
 // Submit form
 function submit() {
+  // Ensure dates are properly formatted before submission
+  if (form.start_date) {
+    form.start_date = formatDate(form.start_date);
+  }
+  if (form.end_date) {
+    form.end_date = formatDate(form.end_date);
+  }
+  
   if (props.mode === 'edit') {
     form.post(route('admin.courses.update', props.course.id), {
       onSuccess: () => {

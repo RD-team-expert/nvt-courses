@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\AttendanceController as AdminAttendanceController;
 use App\Models\Course;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\GeminiController;
 
 Route::get('/', function () {
     return redirect()->route('dashboard');
@@ -39,6 +40,9 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     
     // Admin attendance routes
     Route::get('attendance', [AdminAttendanceController::class, 'index'])->name('attendance.index');
+    
+    // Instruction management routes
+    Route::resource('instructions', \App\Http\Controllers\Admin\InstructionController::class);
 });
 Route::put('/attendance/{attendance}', [AttendanceController::class, 'update'])->name('admin.attendance.update');
 Route::delete('/attendance/{attendance}', [AttendanceController::class, 'destroy'])->name('admin.attendance.destroy');
@@ -95,6 +99,14 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         ->name('user.activity');
 });
 
+
+// Gemini API routes
+Route::middleware(['auth'])->group(function () {
+    Route::get('/gemini', [GeminiController::class, 'index'])->name('gemini.index');
+    // Add these routes if they don't exist
+    Route::post('/gemini/generate', [GeminiController::class, 'generate'])->name('gemini.generate');
+    Route::get('/gemini/instructions', [GeminiController::class, 'getInstructionTypes'])->name('gemini.instructions');
+});
 
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';

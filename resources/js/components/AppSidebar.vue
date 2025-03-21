@@ -6,7 +6,7 @@ import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, Sid
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
 // Add the Reports icon import
-import { BookOpen, Folder, LayoutGrid, Clock, BookOpenCheck, Users, Settings, BarChart } from 'lucide-vue-next';
+import { BookOpen, Folder, LayoutGrid, Clock, BookOpenCheck, Users, Settings, BarChart, Bot } from 'lucide-vue-next';
 import { computed } from 'vue';
 import AppLogo from './AppLogo.vue';
 
@@ -56,6 +56,12 @@ const adminNavItems: NavItem[] = [
         title: 'Reports & Analytics',
         href: '/admin/reports',
         icon: BarChart,
+    },
+
+    {
+        title: 'Ai',
+        href: '/gemini',
+        icon: Bot,
     },
     // {
     //     title: 'Settings',

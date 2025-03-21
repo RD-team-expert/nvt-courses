@@ -21,8 +21,20 @@ const formatStatus = (status) => {
 // Format date for display
 const formatDate = (dateString) => {
   if (!dateString) return '—'
-  const date = new Date(dateString)
-  return date.toLocaleDateString()
+  
+  // Create a date object with the date string
+  // Use the split method to ensure we're only using the date part
+  const dateParts = dateString.split('T')[0].split('-');
+  if (dateParts.length !== 3) {
+    // If not in expected format, try standard parsing
+    const date = new Date(dateString);
+    return date.toLocaleDateString();
+  }
+  
+  // Create a date object with the year, month, day
+  // Note: months are 0-indexed in JavaScript Date
+  const date = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
+  return date.toLocaleDateString();
 }
 
 // Define breadcrumbs with proper typing
