@@ -6,23 +6,36 @@
             </h2>
         </template>
 
-        <div class="py-6 md:py-12">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="py-6">
+            <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
                 <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
-                    <div class="p-4 md:p-6 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                    <div class="p-6 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
                         <!-- Model settings panel -->
                         <div class="mb-6">
                             <div class="flex items-center justify-between mb-4">
                                 <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Model Settings</h3>
-                                <button 
-                                    @click="showSettings = !showSettings" 
-                                    class="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 flex items-center"
-                                >
-                                    {{ showSettings ? 'Hide Settings' : 'Show Settings' }}
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1" :class="{'rotate-180': showSettings}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                                    </svg>
-                                </button>
+                                <div class="flex items-center space-x-2">
+                                    <button 
+                                        @click="showSettings = !showSettings" 
+                                        class="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 flex items-center"
+                                    >
+                                        {{ showSettings ? 'Hide Settings' : 'Show Settings' }}
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1" :class="{'rotate-180': showSettings}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </button>
+                                    <Link 
+                                       
+                                        :href="route('admin.instructions.index')" 
+                                        class="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 flex items-center"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        </svg>
+                                        Manage Instructions
+                                    </Link>
+                                </div>
                             </div>
                             
                             <div v-if="showSettings" class="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg shadow-inner transition-all duration-300">
@@ -31,23 +44,47 @@
                                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                         AI Instruction Mode
                                         <span v-if="modelSettings.instructionType !== 'default'" class="ml-2 text-xs text-indigo-600 dark:text-indigo-400">
-                                            ({{ modelSettings.instructionType.charAt(0).toUpperCase() + modelSettings.instructionType.slice(1) }} mode active)
+                                            ({{ formatInstructionType(modelSettings.instructionType) }} mode active)
                                         </span>
                                     </label>
                                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2">
                                         <button 
-                                            v-for="type in instructionTypes" 
-                                            :key="type"
-                                            @click="modelSettings.instructionType = type"
+                                            v-for="instruction in availableInstructions" 
+                                            :key="instruction.type"
+                                            @click="modelSettings.instructionType = instruction.type"
                                             :class="[
                                                 'px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                                                modelSettings.instructionType === type 
+                                                modelSettings.instructionType === instruction.type 
                                                     ? 'bg-indigo-600 text-white' 
                                                     : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
                                             ]"
+                                            :title="instruction.description || ''"
                                         >
-                                            {{ type.charAt(0).toUpperCase() + type.slice(1) }}
+                                            {{ formatInstructionType(instruction.type) }}
+                                            <span v-if="instruction.is_default" class="ml-1 text-xs">
+                                                (Default)
+                                            </span>
                                         </button>
+                                    </div>
+                                </div>
+                                
+                                <!-- Response Style Options -->
+                                <div class="mb-4">
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Response Style
+                                    </label>
+                                    <div class="flex items-center space-x-4">
+                                        <label class="inline-flex items-center">
+                                            <input 
+                                                type="checkbox" 
+                                                v-model="modelSettings.conciseMode"
+                                                class="form-checkbox h-4 w-4 text-indigo-600 transition duration-150 ease-in-out"
+                                            >
+                                            <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Concise Mode</span>
+                                        </label>
+                                        <div class="text-xs text-gray-500">
+                                            (Shorter, more direct responses)
+                                        </div>
                                     </div>
                                 </div>
                                 
@@ -88,7 +125,28 @@
                                         <p class="text-xs text-gray-500 mt-1">Controls randomness: Lower values are more deterministic, higher values more creative.</p>
                                     </div>
                                     
-                                    <!-- Top K -->
+                                    <!-- Typing Speed -->
+                                    <div>
+                                        <label for="typingSpeed" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            Typing Speed: {{ modelSettings.typingSpeed }}ms
+                                        </label>
+                                        <div class="flex items-center">
+                                            <span class="text-xs text-gray-500 mr-2">1</span>
+                                            <input 
+                                                id="typingSpeed" 
+                                                type="range" 
+                                                min="1" 
+                                                max="50" 
+                                                step="1" 
+                                                v-model.number="modelSettings.typingSpeed"
+                                                class="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                            >
+                                            <span class="text-xs text-gray-500 ml-2">50</span>
+                                        </div>
+                                        <p class="text-xs text-gray-500 mt-1">Controls how fast responses appear: Lower values are faster.</p>
+                                    </div>
+                                    
+                                    <!-- Rest of the settings remain unchanged -->
                                     <div>
                                         <label for="topK" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                             Top K: {{ modelSettings.topK }}
@@ -212,7 +270,7 @@
                                         </svg>
                                     </div>
                                 </div>
-                                <h3 class="mt-2 text-lg font-medium text-gray-900 dark:text-gray-100">Welcome to Gemini AI</h3>
+                                <h3 class="mt-2 text-lg font-medium text-gray-900 dark:text-gray-100">Welcome to R&D AI</h3>
                                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Ask anything to get started with your AI assistant.</p>
                             </div>
 
@@ -228,7 +286,7 @@
                                         @keydown.enter.ctrl.prevent="generateContent"
                                     ></textarea>
                                     <button
-                                        @click="generateContent"
+                                        @click="generateContent()"
                                         class="absolute bottom-3 right-3 inline-flex items-center justify-center p-2 bg-indigo-600 border border-transparent rounded-full font-semibold text-white hover:bg-indigo-700 active:bg-indigo-900 focus:outline-none focus:border-indigo-900 focus:ring ring-indigo-300 disabled:opacity-25 transition"
                                         :disabled="isLoading || !prompt.trim()"
                                         title="Send message (Ctrl+Enter)"
@@ -271,10 +329,17 @@ import { defineComponent } from 'vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { marked } from 'marked';
 import axios from 'axios';
+import { Link, usePage } from '@inertiajs/vue3';
 
 export default defineComponent({
     components: {
         AppLayout,
+        Link
+    },
+    setup() {
+        // Get the authenticated user from Inertia shared props
+        const { auth } = usePage().props;
+        return { auth };
     },
     data() {
         return {
@@ -288,13 +353,16 @@ export default defineComponent({
             currentTypingIndex: -1,
             showSettings: false,
             instructionTypes: ['default', 'coding', 'academic', 'creative', 'business'],
+            availableInstructions: [],
             modelSettings: {
                 temperature: 0.7,
                 topK: 20,
                 topP: 0.9,
                 maxOutputTokens: 1024,
                 instructionType: 'default',
-                customInstruction: ''
+                customInstruction: '',
+                conciseMode: false,
+                typingSpeed: 20
             },
             defaultModelSettings: {
                 temperature: 0.7,
@@ -302,11 +370,43 @@ export default defineComponent({
                 topP: 0.9,
                 maxOutputTokens: 1024,
                 instructionType: 'default',
-                customInstruction: ''
+                customInstruction: '',
+                conciseMode: false,
+                typingSpeed: 20
             }
         };
     },
     methods: {
+        formatInstructionType(type) {
+            // Capitalize first letter and replace underscores with spaces
+            return type.charAt(0).toUpperCase() + 
+                   type.slice(1).replace(/_/g, ' ');
+        },
+        
+        async fetchInstructions() {
+            try {
+                const response = await axios.get(route('gemini.instructions'));
+                if (response.data && response.data.instructions) {
+                    this.availableInstructions = response.data.instructions;
+                    
+                    // Set default instruction type if available
+                    const defaultInstruction = this.availableInstructions.find(i => i.is_default);
+                    if (defaultInstruction) {
+                        this.modelSettings.instructionType = defaultInstruction.type;
+                        this.defaultModelSettings.instructionType = defaultInstruction.type;
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching instructions:', error);
+                // Fallback to default instruction types if API call fails
+                this.availableInstructions = this.instructionTypes.map(type => ({
+                    type,
+                    is_default: type === 'default',
+                    is_active: true
+                }));
+            }
+        },
+        
         async generateContent() {
             if (!this.prompt.trim()) return;
             
@@ -326,7 +426,8 @@ export default defineComponent({
                 const response = await axios.post(route('gemini.generate'), {
                     prompt: userPrompt,
                     settings: this.modelSettings,
-                    instructionType: this.modelSettings.instructionType
+                    instructionType: this.modelSettings.instructionType,
+                    includeUserData: true // Add flag to include user data
                 }, {
                     headers: {
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
@@ -395,7 +496,7 @@ export default defineComponent({
                     messageObj.isTyping = false;
                     this.currentTypingIndex = -1;
                 }
-            }, this.typingSpeed);
+            }, this.modelSettings.typingSpeed); // Use the custom typing speed
         },
         
         scrollToBottom() {
@@ -424,8 +525,8 @@ export default defineComponent({
         // Initial scroll to bottom if there are messages
         this.scrollToBottom();
         
-        // Fetch available instruction types
-        this.fetchInstructionTypes();
+        // Fetch available instructions
+        this.fetchInstructions();
     },
     beforeUnmount() {
         // Remove event listener
@@ -435,21 +536,8 @@ export default defineComponent({
         if (this.typingInterval) {
             clearInterval(this.typingInterval);
         }
-    },
-    async fetchInstructionTypes() {
-        try {
-            const response = await axios.get(route('gemini.instructions'));
-            if (response.data && response.data.types) {
-                this.instructionTypes = response.data.types;
-            }
-        } catch (error) {
-            console.error('Error fetching instruction types:', error);
-            // Fallback to default instruction types if API call fails
-        }
     }
 });
-
-
 </script>
 
 
@@ -497,7 +585,7 @@ export default defineComponent({
 }
 
 .prose a {
-    color: #4f46e5;
+    color: #e54646;
     text-decoration: underline;
 }
 

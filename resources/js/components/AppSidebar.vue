@@ -58,11 +58,11 @@ const adminNavItems: NavItem[] = [
         icon: BarChart,
     },
 
-    {
-        title: 'Ai',
-        href: '/gemini',
-        icon: Bot,
-    },
+    // {
+    //     title: 'Ai',
+    //     href: '/gemini',
+    //     icon: Bot,
+    // },
     // {
     //     title: 'Settings',
     //     href: '/admin/settings',
@@ -123,6 +123,10 @@ console.log('Is admin:', isAdmin.value);
         <SidebarFooter>
             <!-- <NavFooter :items="footerNavItems" /> -->
             <NavUser />
+            <!-- <div class="px-3 py-2 text-xs text-center text-gray-500 dark:text-gray-400">
+                Made with ❤️ by R&D team
+            </div> -->
+            
         </SidebarFooter>
     </Sidebar>
     <slot />

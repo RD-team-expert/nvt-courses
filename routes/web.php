@@ -105,7 +105,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/gemini', [GeminiController::class, 'index'])->name('gemini.index');
     // Add these routes if they don't exist
     Route::post('/gemini/generate', [GeminiController::class, 'generate'])->name('gemini.generate');
-    Route::get('/gemini/instructions', [GeminiController::class, 'getInstructionTypes'])->name('gemini.instructions');
+    // Add this with your other Gemini routes
+    Route::get('/gemini/instructions', [App\Http\Controllers\GeminiController::class, 'getInstructions'])->name('gemini.instructions');
 });
 
 require __DIR__.'/settings.php';

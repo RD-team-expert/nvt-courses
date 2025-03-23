@@ -4,6 +4,7 @@ namespace App\Services;
 
 use GuzzleHttp\Client;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 class GeminiService
 {
@@ -35,7 +36,59 @@ class GeminiService
             if (isset($settings['customInstruction']) && !empty($settings['customInstruction'])) {
                 $instruction = $settings['customInstruction'];
             } else {
+                // This will be overridden by the controller if user data is included
                 $instruction = $this->instructions[$instructionType] ?? $this->instructions['default'];
+            }
+            
+            // Add concise mode instruction if enabled
+            if (isset($settings['conciseMode']) && $settings['conciseMode']) {
+                $instruction .= "\n\nPlease provide brief, concise responses.";
+            }
+            
+            // Add user information to the instruction if authenticated
+            if (auth()->check()) {
+                $user = auth()->user();
+                $instruction .= "\n\nYou are talking to " . $user->name . ". Always address them by name in your responses.";
+                
+                // Fetch courses with proper column selection
+                try {
+                    // Get user's enrolled courses with only existing columns
+                    $enrolledCourses = DB::table('course_user')
+                        ->join('courses', 'course_user.course_id', '=', 'courses.id')
+                        ->where('course_user.user_id', $user->id)
+                        ->select('courses.*', 'course_user.created_at as enrolled_at', 'course_user.user_status')
+                        ->get();
+                    
+                    if ($enrolledCourses && $enrolledCourses->count() > 0) {
+                        $instruction .= "\n\nUser's enrolled courses information:";
+                        foreach ($enrolledCourses as $course) {
+                            $instruction .= "\n- " . $course->name; // Using name instead of title based on Course model
+                            if (!empty($course->description)) {
+                                $instruction .= ": " . $course->description;
+                            }
+                            // Include enrollment details if available
+                            if (isset($course->enrolled_at)) {
+                                $enrolledDate = new \DateTime($course->enrolled_at);
+                                $instruction .= " (Enrolled on: " . $enrolledDate->format('Y-m-d') . ")";
+                            }
+                            if (!empty($course->user_status)) {
+                                $instruction .= " (Status: " . $course->user_status . ")";
+                            }
+                            if (!empty($course->level)) {
+                                $instruction .= " (Level: " . $course->level . ")";
+                            }
+                        }
+                        $instruction .= "\n\nYou have " . $enrolledCourses->count() . " enrolled course(s) in total.";
+                    } else {
+                        $instruction .= "\n\nYou currently don't have any enrolled courses.";
+                    }
+                } catch (\Exception $e) {
+                    Log::error('Error accessing course data: ' . $e->getMessage(), [
+                        'exception' => $e,
+                        'trace' => $e->getTraceAsString()
+                    ]);
+                    $instruction .= "\n\nI have access to your basic user information, but I cannot access your course data at this time.";
+                }
             }
             
             // Prepend instruction to the prompt

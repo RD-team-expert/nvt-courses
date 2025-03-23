@@ -105,6 +105,7 @@ function submit() {
             <label class="block font-semibold mb-1">Duration (hours)</label>
             <input 
               type="number" 
+              step="0.1"
               v-model="form.duration" 
               class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500" 
             />
