@@ -7,6 +7,8 @@ use App\Models\User;
 use App\Models\CourseCompletion; // Changed from App\Services\CourseCompletion
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
+
 class CourseService
 {
     /**
@@ -191,6 +193,31 @@ class CourseService
             ]);
             
             return null;
+        }
+    }
+    
+    /**
+     * Format date for consistent display and storage
+     * 
+     * @param string|null $date
+     * @return string|null
+     */
+    public function formatDate(?string $date): ?string
+    {
+        if (empty($date)) {
+            return null;
+        }
+        
+        try {
+            // Parse the date using Carbon and ensure it's in the correct format
+            // This prevents timezone issues by explicitly setting the timezone to UTC
+            return Carbon::parse($date)->startOfDay()->toDateString();
+        } catch (\Exception $e) {
+            Log::error('Error formatting date', [
+                'date' => $date,
+                'error' => $e->getMessage()
+            ]);
+            return $date; // Return original if parsing fails
         }
     }
 }

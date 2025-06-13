@@ -6,7 +6,7 @@ import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, Sid
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
 // Add the Reports icon import
-import { BookOpen, Folder, LayoutGrid, Clock, BookOpenCheck, Users, Settings, BarChart } from 'lucide-vue-next';
+import { BookOpen, Folder, LayoutGrid, Clock, BookOpenCheck, Users, Settings, BarChart, Bot } from 'lucide-vue-next';
 import { computed } from 'vue';
 import AppLogo from './AppLogo.vue';
 
@@ -57,6 +57,12 @@ const adminNavItems: NavItem[] = [
         href: '/admin/reports',
         icon: BarChart,
     },
+
+    // {
+    //     title: 'Ai',
+    //     href: '/gemini',
+    //     icon: Bot,
+    // },
     // {
     //     title: 'Settings',
     //     href: '/admin/settings',
@@ -117,6 +123,10 @@ console.log('Is admin:', isAdmin.value);
         <SidebarFooter>
             <!-- <NavFooter :items="footerNavItems" /> -->
             <NavUser />
+            <!-- <div class="px-3 py-2 text-xs text-center text-gray-500 dark:text-gray-400">
+                Made with ❤️ by R&D team
+            </div> -->
+            
         </SidebarFooter>
     </Sidebar>
     <slot />

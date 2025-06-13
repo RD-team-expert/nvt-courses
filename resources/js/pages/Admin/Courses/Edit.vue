@@ -2,18 +2,36 @@
 import { useForm, Link } from '@inertiajs/vue3'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import Editor from '@tinymce/tinymce-vue'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 
 const props = defineProps({
   course: Object,
 })
 
+// Format dates for the form inputs (YYYY-MM-DD format required by date inputs)
+const formatDate = (dateString) => {
+  if (!dateString) return '';
+  
+  // Create a date object without timezone conversion
+  // By using YYYY-MM-DD format directly, we avoid timezone issues
+  const parts = dateString.split('T')[0].split('-');
+  if (parts.length !== 3) {
+    // If the date isn't in the expected format, try to parse it
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return ''; // Invalid date
+    return date.toISOString().split('T')[0]; // Returns YYYY-MM-DD
+  }
+  
+  // Return the date in YYYY-MM-DD format
+  return parts.join('-');
+}
+
 // Initialize the form with existing course data
 const form = useForm({
   name: props.course.name,
   description: props.course.description,
-  start_date: props.course.start_date,
-  end_date: props.course.end_date,
+  start_date: formatDate(props.course.start_date),
+  end_date: formatDate(props.course.end_date),
   status: props.course.status || 'pending',
   level: props.course.level || '',
   duration: props.course.duration || '',
@@ -21,6 +39,14 @@ const form = useForm({
 })
 
 function submit() {
+  // Ensure dates are properly formatted before submission
+  if (form.start_date) {
+    form.start_date = formatDate(form.start_date);
+  }
+  if (form.end_date) {
+    form.end_date = formatDate(form.end_date);
+  }
+  
   form.post(`/admin/courses/${props.course.id}?_method=PUT`, {
     forceFormData: true,
   })
@@ -79,6 +105,7 @@ function submit() {
             <label class="block font-semibold mb-1">Duration (hours)</label>
             <input 
               type="number" 
+              step="0.1"
               v-model="form.duration" 
               class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500" 
             />

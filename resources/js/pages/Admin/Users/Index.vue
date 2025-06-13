@@ -91,12 +91,42 @@ const handlePageChange = (page) => {
         
         <!-- Pagination -->
         <div class="px-4 sm:px-6 py-3 bg-white border-t border-gray-200">
+          <div class="flex justify-between items-center">
+            <Link
+              v-if="users.prev_page_url"
+              :href="users.prev_page_url"
+              class="px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+              preserve-scroll
+            >
+              « Previous
+            </Link>
+            <span v-else class="px-4 py-2 bg-gray-50 text-gray-400 rounded cursor-not-allowed">
+              « Previous
+            </span>
+
+            <Link
+              v-if="users.next_page_url"
+              :href="users.next_page_url"
+              class="px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+              preserve-scroll
+            >
+              Next »
+            </Link>
+            <span v-else class="px-4 py-2 bg-gray-50 text-gray-400 rounded cursor-not-allowed">
+              Next »
+            </span>
+          </div>
+          
+          <!-- Original pagination component (optional - you can remove if not needed) -->
           <Pagination 
-            v-if="users.data && users.data.length > 0"
+            v-if="false && users.data && users.data.length > 0"
             :links="users.links" 
             @page-changed="handlePageChange" 
             class="mt-4"
           />
+          
+          <!-- Debug pagination data -->
+          <pre v-if="false" class="text-xs mt-2">{{ JSON.stringify(users, null, 2) }}</pre>
         </div>
       </div>
     </div>

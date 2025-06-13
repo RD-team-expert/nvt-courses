@@ -1,11 +1,19 @@
 <script setup lang="ts">
-
 import { useForm, Link } from '@inertiajs/vue3'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import Editor from '@tinymce/tinymce-vue'
 import { ref } from 'vue'
 
 const imagePreview = ref(null)
+
+// Format date to ensure it's in YYYY-MM-DD format
+const formatDate = (date) => {
+  if (!date) return '';
+  // Ensure we're working with a date object
+  const dateObj = new Date(date);
+  // Format as YYYY-MM-DD
+  return dateObj.toISOString().split('T')[0];
+}
 
 const form = useForm({
   name: '',
@@ -36,6 +44,14 @@ function removeImage() {
 }
 
 function submit() {
+  // Ensure dates are properly formatted before submission
+  if (form.start_date) {
+    form.start_date = formatDate(form.start_date);
+  }
+  if (form.end_date) {
+    form.end_date = formatDate(form.end_date);
+  }
+  
   form.post('/admin/courses', {
     forceFormData: true,
   })

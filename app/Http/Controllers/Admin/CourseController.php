@@ -8,6 +8,7 @@ use App\Services\EmailService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Storage;
+use Carbon\Carbon;
 
 
 class CourseController extends Controller
@@ -47,7 +48,7 @@ class CourseController extends Controller
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'status' => 'required|in:pending,in_progress,completed',
             'level' => 'nullable|in:beginner,intermediate,advanced',
-            'duration' => 'nullable|numeric|min:0.1', // Changed from integer to numeric
+            'duration' => 'nullable|numeric|min:0.1',
         ]);
 
         // Handle image upload
@@ -56,30 +57,25 @@ class CourseController extends Controller
             $imagePath = $request->file('image')->store('course-images', 'public');
         }
 
+        // Ensure dates are properly formatted to prevent timezone issues
+        $startDate = !empty($validated['start_date']) ? Carbon::parse($validated['start_date'])->startOfDay()->toDateString() : null;
+        $endDate = !empty($validated['end_date']) ? Carbon::parse($validated['end_date'])->startOfDay()->toDateString() : null;
+
         $course = Course::create([
             'name' => $validated['name'],
             'description' => $validated['description'],
             'image_path' => $imagePath,
-            'start_date' => $validated['start_date'],
-            'end_date' => $validated['end_date'],
+            'start_date' => $startDate,
+            'end_date' => $endDate,
             'status' => $validated['status'],
             'level' => $validated['level'],
             'duration' => $validated['duration'],
         ]);
-        //kami
+        
         event(new \App\Events\CourseCreated($course));
 
         return redirect()->route('admin.courses.index')
             ->with('success', 'Course created successfully!');
-    }
-
-    public function edit($id)
-    {
-        $course = Course::findOrFail($id);
-
-        return Inertia::render('Admin/Courses/Edit', [
-            'course' => $course,
-        ]);
     }
 
     public function update(Request $request, $id)
@@ -94,7 +90,7 @@ class CourseController extends Controller
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'status' => 'required|in:pending,in_progress,completed',
             'level' => 'nullable|in:beginner,intermediate,advanced',
-            'duration' => 'nullable|numeric|min:0.1', // Changed from integer to numeric
+            'duration' => 'nullable|numeric|min:0.1',
         ]);
 
         // Handle image upload
@@ -108,11 +104,15 @@ class CourseController extends Controller
             $course->image_path = $imagePath;
         }
 
+        // Ensure dates are properly formatted to prevent timezone issues
+        $startDate = !empty($validated['start_date']) ? Carbon::parse($validated['start_date'])->startOfDay()->toDateString() : null;
+        $endDate = !empty($validated['end_date']) ? Carbon::parse($validated['end_date'])->startOfDay()->toDateString() : null;
+
         $course->update([
             'name' => $validated['name'],
             'description' => $validated['description'],
-            'start_date' => $validated['start_date'],
-            'end_date' => $validated['end_date'],
+            'start_date' => $startDate,
+            'end_date' => $endDate,
             'status' => $validated['status'],
             'level' => $validated['level'],
             'duration' => $validated['duration'],
@@ -150,6 +150,15 @@ class CourseController extends Controller
 
         return Inertia::render('Admin/Courses/Show', [
             'course' => $course
+        ]);
+    }
+
+    public function edit($id)
+    {
+        $course = Course::findOrFail($id);
+    
+        return Inertia::render('Admin/Courses/Edit', [
+            'course' => $course,
         ]);
     }
 }
