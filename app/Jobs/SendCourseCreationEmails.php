@@ -1,0 +1,33 @@
+<?php
+
+namespace App\Jobs;
+
+use App\Mail\CourseCreationNotification;
+use App\Models\Course;
+use App\Models\User;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\Mail;
+
+class SendCourseCreationEmails implements ShouldQueue
+{
+    use Queueable;
+    protected $course;
+    /**
+     * Create a new job instance.
+     */
+    public function __construct(Course $course)
+    {
+        $this->course = $course;
+    }
+
+    /**
+     * Execute the job.
+     */
+    public function handle(): void
+    {
+        User::all()->each(function ($user) {
+            Mail::to($user->email)->send(new CourseCreationNotification($this->course, $user));
+        });
+    }
+}

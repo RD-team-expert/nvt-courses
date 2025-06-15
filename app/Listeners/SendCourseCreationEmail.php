@@ -3,7 +3,8 @@
 namespace App\Listeners;
 
 use App\Events\CourseCreated;
-use App\Mail\CourseCreatedNotification; // Changed from CourseCreationNotification
+use App\Jobs\SendCourseCreationEmails;
+use App\Mail\CourseCreationNotification;
 use App\Models\User;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
@@ -15,9 +16,6 @@ class SendCourseCreationEmail implements ShouldQueue
 
     public function handle(CourseCreated $event): void
     {
-        User::where('role', '!=', 'admin')->each(function ($user) use ($event) {
-            Mail::to($user->email)
-                ->queue(new CourseCreatedNotification($event->course, $user));
-        });
+        SendCourseCreationEmails::dispatch($event->course);
     }
 }
