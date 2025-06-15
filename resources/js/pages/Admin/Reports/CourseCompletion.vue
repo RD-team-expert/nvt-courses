@@ -147,16 +147,6 @@ const handlePageChange = (page) => {
       
       <!-- Completions Table -->
       <div class="bg-white rounded-lg shadow overflow-hidden overflow-x-auto">
-        <!-- Debug info (temporary) -->
-        <!-- <div v-if="debug" class="p-4 bg-yellow-50 border-b border-yellow-100">
-          <h3 class="font-medium text-yellow-800">Debug Information:</h3>
-          <ul class="mt-2 text-sm text-yellow-700">
-            <li>Active filters: {{ debug.filter_count }}</li>
-            <li>Completion records found: {{ debug.completion_count }}</li>
-            <li>Courses available: {{ debug.has_courses ? 'Yes' : 'No' }}</li>
-          </ul>
-        </div> -->
-        
         <table class="min-w-full divide-y divide-gray-200">
           <thead class="bg-gray-50">
             <tr>
@@ -178,11 +168,14 @@ const handlePageChange = (page) => {
               <th scope="col" class="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">
                 Feedback
               </th>
+              <th scope="col" class="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden xl:table-cell">
+                Comment
+              </th>
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
             <tr v-if="completions.data.length === 0">
-              <td colspan="6" class="px-4 sm:px-6 py-4 text-center text-gray-500">No completion records found</td>
+              <td colspan="7" class="px-4 sm:px-6 py-4 text-center text-gray-500">No completion records found</td>
             </tr>
             <tr v-else v-for="(record, i) in completions.data" :key="i" class="hover:bg-gray-50">
               <td class="px-4 sm:px-6 py-4 whitespace-nowrap">
@@ -210,6 +203,9 @@ const handlePageChange = (page) => {
               </td>
               <td class="px-4 sm:px-6 py-4 text-sm text-gray-900 hidden lg:table-cell">
                 <div class="max-w-xs truncate">{{ record.feedback || '—' }}</div>
+              </td>
+              <td class="px-4 sm:px-6 py-4 text-sm text-gray-900 hidden xl:table-cell">
+                <div class="max-w-xs truncate">{{ record.comment || '—' }}</div>
               </td>
             </tr>
           </tbody>

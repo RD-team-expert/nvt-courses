@@ -117,6 +117,10 @@ class ReportController extends Controller
                 $join->on('course_completions.user_id', '=', 'course_user.user_id')
                      ->on('course_completions.course_id', '=', 'course_user.course_id');
             })
+            ->leftJoin('clockings', function ($join) {
+                $join->on('course_completions.user_id', '=', 'clockings.user_id')
+                     ->on('course_completions.course_id', '=', 'clockings.course_id');
+            })
             ->select([
                 'course_completions.id',
                 'users.name as user_name',
@@ -125,7 +129,8 @@ class ReportController extends Controller
                 'course_user.created_at as registered_at',
                 'course_completions.completed_at',
                 'course_completions.rating',
-                'course_completions.feedback'
+                'course_completions.feedback',
+                'clockings.comment'
             ]);
         
         // Apply filters
@@ -171,7 +176,7 @@ class ReportController extends Controller
     {
         $filters = $request->only(['course_id', 'date_from', 'date_to']);
         
-        // Build the query (same as above)
+        // Build the same query as above
         $query = CourseCompletion::query()
             ->join('users', 'course_completions.user_id', '=', 'users.id')
             ->join('courses', 'course_completions.course_id', '=', 'courses.id')
@@ -179,17 +184,23 @@ class ReportController extends Controller
                 $join->on('course_completions.user_id', '=', 'course_user.user_id')
                      ->on('course_completions.course_id', '=', 'course_user.course_id');
             })
+            ->leftJoin('clockings', function ($join) {
+                $join->on('course_completions.user_id', '=', 'clockings.user_id')
+                     ->on('course_completions.course_id', '=', 'clockings.course_id');
+            })
             ->select([
+                'course_completions.id',
                 'users.name as user_name',
                 'users.email as user_email',
                 'courses.name as course_name',
                 'course_user.created_at as registered_at',
                 'course_completions.completed_at',
                 'course_completions.rating',
-                'course_completions.feedback'
+                'course_completions.feedback',
+                'clockings.comment'
             ]);
         
-        // Apply the same filters
+        // Apply filters (same as existing code)
         if (!empty($filters['course_id'])) {
             $query->where('course_completions.course_id', $filters['course_id']);
         }
@@ -204,43 +215,30 @@ class ReportController extends Controller
         
         $completions = $query->orderBy('course_completions.completed_at', 'desc')->get();
         
-        // Generate CSV
         $headers = [
-            'Content-Type' => 'text/csv',
-            'Content-Disposition' => 'attachment; filename="course_completions.csv"',
+            'ID', 'User Name', 'User Email', 'Course Name', 'Registered At', 
+            'Completed At', 'Rating', 'Feedback', 'Comment'
         ];
         
-        $callback = function() use ($completions) {
-            $file = fopen('php://output', 'w');
-            
-            // Add CSV headers
-            fputcsv($file, [
-                'User Name',
-                'User Email',
-                'Course Name',
-                'Registration Date',
-                'Completion Date',
-                'Rating',
-                'Feedback'
-            ]);
-            
-            // Add data rows
-            foreach ($completions as $completion) {
-                fputcsv($file, [
-                    $completion->user_name,
-                    $completion->user_email,
-                    $completion->course_name,
-                    $completion->registered_at ? date('Y-m-d H:i:s', strtotime($completion->registered_at)) : '',
-                    $completion->completed_at ? date('Y-m-d H:i:s', strtotime($completion->completed_at)) : '',
-                    $completion->rating ?: '',
-                    $completion->feedback ?: ''
-                ]);
-            }
-            
-            fclose($file);
-        };
+        $data = $completions->map(function($record) {
+            return [
+                'id' => $record->id,
+                'user_name' => $record->user_name,
+                'user_email' => $record->user_email,
+                'course_name' => $record->course_name,
+                'registered_at' => $record->registered_at,
+                'completed_at' => $record->completed_at,
+                'rating' => $record->rating,
+                'feedback' => $record->feedback,
+                'comment' => $record->comment
+            ];
+        })->toArray(); // Add ->toArray() to convert Collection to array
         
-        return response()->stream($callback, 200, $headers);
+        return $this->csvExportService->export(
+            'course_completions_' . date('Y-m-d') . '.csv',
+            $headers,
+            $data
+        );
     }
 
     /**

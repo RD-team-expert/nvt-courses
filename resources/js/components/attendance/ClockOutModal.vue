@@ -33,7 +33,7 @@
                 <form @submit.prevent="submitForm">
                   <div class="mb-4">
                     <label class="block font-semibold mb-2">
-                      How was your session?
+                      How was your session? <span class="text-red-500">*</span>
                     </label>
                     <div class="flex items-center justify-center space-x-1">
                       <button 
@@ -55,11 +55,12 @@
                         </svg>
                       </button>
                     </div>
+                    <p v-if="errors.rating" class="text-red-500 text-sm mt-1 text-center">{{ errors.rating }}</p>
                   </div>
                   
                   <div class="mb-4">
                     <label for="comment" class="block font-semibold mb-1">
-                      Comments (optional)
+                      Comments <span class="text-red-500">*</span>
                     </label>
                     <div class="relative">
                       <textarea
@@ -68,11 +69,13 @@
                         rows="4"
                         class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                         placeholder="Share your thoughts about this work session..."
+                        required
                       ></textarea>
                     </div>
                     <p class="mt-1 text-xs text-gray-500">
                       {{ form.comment.length }}/500 characters
                     </p>
+                    <p v-if="errors.comment" class="text-red-500 text-sm mt-1">{{ errors.comment }}</p>
                   </div>
                   
                   <div class="flex gap-2 justify-end">
@@ -117,7 +120,7 @@ const props = defineProps({
   initialForm: {
     type: Object,
     default: () => ({
-      rating: 3,
+      rating: null,
       comment: ''
     })
   },
@@ -132,6 +135,11 @@ const emit = defineEmits(['close', 'submit']);
 const form = ref({
   rating: props.initialForm.rating,
   comment: props.initialForm.comment
+});
+
+const errors = ref({
+  rating: '',
+  comment: ''
 });
 
 // Reset form when initialForm changes
@@ -150,6 +158,28 @@ watch(() => form.value.comment, (newVal) => {
 });
 
 function submitForm() {
+  // Reset errors
+  errors.value = {
+    rating: '',
+    comment: ''
+  };
+  
+  let hasErrors = false;
+  
+  if (!form.value.rating) {
+    errors.value.rating = 'Please select a rating before submitting';
+    hasErrors = true;
+  }
+  
+  if (!form.value.comment || form.value.comment.trim() === '') {
+    errors.value.comment = 'Please provide comments about your session';
+    hasErrors = true;
+  }
+  
+  if (hasErrors) {
+    return;
+  }
+  
   emit('submit', {
     rating: form.value.rating,
     comment: form.value.comment
