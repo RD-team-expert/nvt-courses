@@ -27,6 +27,11 @@ const filters = ref({
   date_to: props.filters?.date_to || ''
 })
 
+// Modal state for feedback and comments
+const showModal = ref(false)
+const modalTitle = ref('')
+const modalContent = ref('')
+
 // Apply filters with debounce
 const applyFilters = debounce(() => {
   router.get(route('admin.reports.course-completion'), filters.value, {
@@ -84,6 +89,37 @@ const handlePageChange = (page) => {
       document.querySelector('.bg-white.rounded-lg.shadow')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   })
+}
+
+// Modal functions
+const showFeedback = (feedback, userName) => {
+  modalTitle.value = `Feedback from ${userName}`
+  modalContent.value = feedback || 'No feedback provided'
+  showModal.value = true
+}
+
+const showComment = (comment, userName) => {
+  modalTitle.value = `Comment from ${userName}`
+  modalContent.value = comment || 'No comment provided'
+  showModal.value = true
+}
+
+const closeModal = () => {
+  showModal.value = false
+  modalTitle.value = ''
+  modalContent.value = ''
+}
+
+// Close modal on escape key
+const handleKeydown = (event) => {
+  if (event.key === 'Escape' && showModal.value) {
+    closeModal()
+  }
+}
+
+// Add event listener for escape key
+if (typeof window !== 'undefined') {
+  window.addEventListener('keydown', handleKeydown)
 }
 </script>
 
@@ -207,10 +243,30 @@ const handlePageChange = (page) => {
                 <span v-else>—</span>
               </td>
               <td class="px-4 sm:px-6 py-4 text-sm text-gray-900 hidden lg:table-cell">
-                <div class="max-w-xs truncate">{{ record.feedback || '—' }}</div>
+                <div class="max-w-xs truncate">
+                  <button 
+                    v-if="record.feedback"
+                    @click="showFeedback(record.feedback, record.user_name)"
+                    class="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 rounded px-1"
+                    :title="'Click to view full feedback from ' + record.user_name"
+                  >
+                    {{ record.feedback.length > 30 ? record.feedback.substring(0, 30) + '...' : record.feedback }}
+                  </button>
+                  <span v-else class="text-gray-400">—</span>
+                </div>
               </td>
               <td class="px-4 sm:px-6 py-4 text-sm text-gray-900 hidden xl:table-cell">
-                <div class="max-w-xs truncate">{{ record.comment || '—' }}</div>
+                <div class="max-w-xs truncate">
+                  <button 
+                    v-if="record.comment"
+                    @click="showComment(record.comment, record.user_name)"
+                    class="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 rounded px-1"
+                    :title="'Click to view full comment from ' + record.user_name"
+                  >
+                    {{ record.comment.length > 30 ? record.comment.substring(0, 30) + '...' : record.comment }}
+                  </button>
+                  <span v-else class="text-gray-400">—</span>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -228,6 +284,50 @@ const handlePageChange = (page) => {
           <!-- Show pagination info -->
           <div v-if="completions.data && completions.data.length > 0" class="text-sm text-gray-600 mt-2">
             Showing {{ completions.from }} to {{ completions.to }} of {{ completions.total }} results
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal for displaying full feedback/comment -->
+    <div v-if="showModal" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+      <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <!-- Background overlay -->
+        <div 
+          class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" 
+          aria-hidden="true"
+          @click="closeModal"
+        ></div>
+
+        <!-- Modal panel -->
+        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+          <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+            <div class="sm:flex sm:items-start">
+              <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10">
+                <svg class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-3.582 8-8 8a8.959 8.959 0 01-4.906-1.476L3 21l2.476-5.094A8.959 8.959 0 013 12c0-4.418 3.582-8 8-8s8 3.582 8 8z" />
+                </svg>
+              </div>
+              <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">
+                  {{ modalTitle }}
+                </h3>
+                <div class="mt-3">
+                  <div class="text-sm text-gray-700 whitespace-pre-wrap break-words max-h-96 overflow-y-auto">
+                    {{ modalContent }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+            <button 
+              type="button" 
+              class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm transition"
+              @click="closeModal"
+            >
+              Close
+            </button>
           </div>
         </div>
       </div>
