@@ -108,8 +108,9 @@ class ReportController extends Controller
     public function courseCompletion(Request $request)
     {
         $filters = $request->only(['course_id', 'date_from', 'date_to']);
+        $page = $request->get('page', 1); // Ensure page parameter is captured
         
-        // Build the query
+        // Build the query without the problematic clockings join
         $query = CourseCompletion::query()
             ->join('users', 'course_completions.user_id', '=', 'users.id')
             ->join('courses', 'course_completions.course_id', '=', 'courses.id')
@@ -117,9 +118,11 @@ class ReportController extends Controller
                 $join->on('course_completions.user_id', '=', 'course_user.user_id')
                      ->on('course_completions.course_id', '=', 'course_user.course_id');
             })
-            ->leftJoin('clockings', function ($join) {
-                $join->on('course_completions.user_id', '=', 'clockings.user_id')
-                     ->on('course_completions.course_id', '=', 'clockings.course_id');
+            // Use a more efficient subquery for latest clocking comment
+            ->leftJoin('clockings as latest_clocking', function ($join) {
+                $join->on('course_completions.user_id', '=', 'latest_clocking.user_id')
+                     ->on('course_completions.course_id', '=', 'latest_clocking.course_id')
+                     ->whereRaw('latest_clocking.id = (SELECT MAX(id) FROM clockings WHERE clockings.user_id = course_completions.user_id AND clockings.course_id = course_completions.course_id)');
             })
             ->select([
                 'course_completions.id',
@@ -130,7 +133,7 @@ class ReportController extends Controller
                 'course_completions.completed_at',
                 'course_completions.rating',
                 'course_completions.feedback',
-                'clockings.comment'
+                'latest_clocking.comment'
             ]);
         
         // Apply filters
@@ -146,10 +149,10 @@ class ReportController extends Controller
             $query->whereDate('course_completions.completed_at', '<=', $filters['date_to']);
         }
         
-        // Get the results with pagination
+        // Get the results with pagination (15 items per page for better UX)
         $completions = $query->orderBy('course_completions.completed_at', 'desc')
-            ->paginate(10)
-            ->withQueryString();
+            ->paginate(15)
+            ->withQueryString(); // This ensures filters are preserved in pagination links
         
         // Get all courses for the filter dropdown
         $courses = Course::select('id', 'name')->orderBy('name')->get();
@@ -158,7 +161,10 @@ class ReportController extends Controller
         $debug = [
             'filter_count' => count(array_filter($filters)),
             'completion_count' => $completions->total(),
-            'has_courses' => $courses->count() > 0
+            'has_courses' => $courses->count() > 0,
+            'current_page' => $completions->currentPage(),
+            'per_page' => $completions->perPage(),
+            'total_pages' => $completions->lastPage()
         ];
         
         return Inertia::render('Admin/Reports/CourseCompletion', [
@@ -176,7 +182,7 @@ class ReportController extends Controller
     {
         $filters = $request->only(['course_id', 'date_from', 'date_to']);
         
-        // Build the same query as above
+        // Build the same query as above (without duplicates)
         $query = CourseCompletion::query()
             ->join('users', 'course_completions.user_id', '=', 'users.id')
             ->join('courses', 'course_completions.course_id', '=', 'courses.id')
@@ -184,9 +190,10 @@ class ReportController extends Controller
                 $join->on('course_completions.user_id', '=', 'course_user.user_id')
                      ->on('course_completions.course_id', '=', 'course_user.course_id');
             })
-            ->leftJoin('clockings', function ($join) {
-                $join->on('course_completions.user_id', '=', 'clockings.user_id')
-                     ->on('course_completions.course_id', '=', 'clockings.course_id');
+            ->leftJoin('clockings as latest_clocking', function ($join) {
+                $join->on('course_completions.user_id', '=', 'latest_clocking.user_id')
+                     ->on('course_completions.course_id', '=', 'latest_clocking.course_id')
+                     ->whereRaw('latest_clocking.id = (SELECT MAX(id) FROM clockings WHERE clockings.user_id = course_completions.user_id AND clockings.course_id = course_completions.course_id)');
             })
             ->select([
                 'course_completions.id',
@@ -197,7 +204,7 @@ class ReportController extends Controller
                 'course_completions.completed_at',
                 'course_completions.rating',
                 'course_completions.feedback',
-                'clockings.comment'
+                'latest_clocking.comment'
             ]);
         
         // Apply filters (same as existing code)
@@ -232,7 +239,7 @@ class ReportController extends Controller
                 'feedback' => $record->feedback,
                 'comment' => $record->comment
             ];
-        })->toArray(); // Add ->toArray() to convert Collection to array
+        })->toArray();
         
         return $this->csvExportService->export(
             'course_completions_' . date('Y-m-d') . '.csv',

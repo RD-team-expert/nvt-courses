@@ -71,13 +71,18 @@ const formatDate = (dateString) => {
 
 // Handle pagination
 const handlePageChange = (page) => {
+  // Ensure we're passing the page parameter correctly
   router.get(route('admin.reports.course-completion'), {
     ...filters.value,
-    page
+    page: page
   }, {
     preserveState: true,
     replace: true,
-    preserveScroll: true
+    preserveScroll: true,
+    onSuccess: () => {
+      // Optional: scroll to top of table after page change
+      document.querySelector('.bg-white.rounded-lg.shadow')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   })
 }
 </script>
@@ -214,11 +219,16 @@ const handlePageChange = (page) => {
         <!-- Pagination -->
         <div class="px-4 sm:px-6 py-3 bg-white border-t border-gray-200">
           <Pagination 
-            v-if="completions.data.length > 0"
+            v-if="completions.data && completions.data.length > 0 && completions.last_page > 1"
             :links="completions.links" 
             @page-changed="handlePageChange" 
             class="mt-4"
           />
+          
+          <!-- Show pagination info -->
+          <div v-if="completions.data && completions.data.length > 0" class="text-sm text-gray-600 mt-2">
+            Showing {{ completions.from }} to {{ completions.to }} of {{ completions.total }} results
+          </div>
         </div>
       </div>
     </div>
