@@ -2,7 +2,7 @@
 import { useForm, Link } from '@inertiajs/vue3'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import { ref } from 'vue'
-import { type BreadcrumbItemType } from '@/types'
+import { type BreadcrumbItemType } from '@/types/index'
 
 const props = defineProps({
     existingLevels: Array,

@@ -97,40 +97,39 @@
             border-radius: 10px;
             padding: 25px;
             margin: 30px 0;
+            text-align: center;
         }
         .login-section h4 {
             color: #7c3aed;
             margin: 0 0 20px 0;
             font-size: 18px;
         }
-        .credential-box {
-            background-color: white;
-            border: 1px solid #c4b5fd;
-            border-radius: 8px;
-            padding: 15px;
-            margin: 12px 0;
-            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, monospace;
-            font-size: 14px;
-            color: #4c1d95;
-        }
-        .cta-section {
-            text-align: center;
-            margin: 35px 0;
-        }
-        .button {
+        .login-button {
             display: inline-block;
             background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-            color: white;
+            color: white !important;
             padding: 18px 35px;
             text-decoration: none;
             border-radius: 10px;
             font-weight: 700;
             font-size: 16px;
             box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
-            transition: transform 0.2s;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin: 15px 0;
         }
-        .button:hover {
+        .login-button:hover {
             transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+        }
+        .security-note {
+            background-color: white;
+            border: 1px solid #c4b5fd;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            font-size: 12px;
+            color: #4c1d95;
+            text-align: left;
         }
         .help-section {
             background-color: #f1f5f9;
@@ -167,6 +166,15 @@
             color: #3b82f6;
             text-decoration: none;
         }
+        @media (max-width: 600px) {
+            .content {
+                padding: 20px 15px;
+            }
+            .login-button {
+                padding: 15px 25px;
+                font-size: 14px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -195,11 +203,11 @@
                 <div style="margin-left: 15px; color: #4b5563;">{!! $description !!}</div>
             @endif
 
-            @if($course->level)
+            @if($course && $course->level)
                 <p><strong>Skill Level:</strong> {{ ucfirst($course->level) }}</p>
             @endif
 
-            @if($course->duration)
+            @if($course && $course->duration)
                 <p><strong>Time Investment:</strong> {{ $course->duration }} hours</p>
             @endif
 
@@ -208,10 +216,10 @@
 
         @if($availabilities && $availabilities->count() > 0)
             <div class="date-section">
-                <h4>📅 Choose Your Preferred Schedule</h4>
-                <p>We've arranged flexible options to fit your busy schedule. Please select the time that works best for you:</p>
+                <h4>📅 Choose Your Preferred Session Schedule</h4>
+                <p>We've arranged flexible session schedules to fit your busy schedule. Please select the time that works best for you:</p>
 
-                @foreach($availabilities->take(2) as $index => $availability)
+                @foreach($availabilities->take(3) as $index => $availability)
                     <div class="date-option">
                         <strong>Schedule {{ $index + 1 }}:</strong>
                         {{ \Carbon\Carbon::parse($availability->start_date)->format('l, F j, Y') }}
@@ -219,7 +227,14 @@
                         <small>{{ \Carbon\Carbon::parse($availability->start_date)->format('g:i A') }}
                             @if($availability->end_date && $availability->start_date != $availability->end_date)
                                 - {{ \Carbon\Carbon::parse($availability->end_date)->format('g:i A') }}
-                            @endif</small>
+                            @endif
+                            @if($availability->capacity)
+                                • {{ $availability->capacity }} sessions available
+                            @endif
+                        </small>
+                        @if($availability->notes)
+                            <br><em style="color: #78716c; font-size: 12px;">{{ $availability->notes }}</em>
+                        @endif
                     </div>
                 @endforeach
 
@@ -230,37 +245,36 @@
         @endif
 
         <div class="login-section">
-            <h4>🔐 Your Personal Access Details</h4>
-            <p>Everything you need to get started right away:</p>
+            <h4>🔐 Secure Access to Your Course</h4>
+            <p>We've made it simple for you! No need to remember passwords - just click the button below to access your course instantly:</p>
 
-            <div class="credential-box">
-                <strong>🌐 Course Platform:</strong><br>
-                {{ config('app.url') }}/courses/{{ $course->id }}
-            </div>
-            <div class="credential-box">
-                <strong>👤 Username:</strong><br>
-                {{ $userEmail }}
-            </div>
-            <div class="credential-box">
-                <strong>🔑 Password:</strong><br>
-                {{ $userPassword }}
-            </div>
-        </div>
-
-        <div class="cta-section">
-            <a href="{{ url('/courses/' . $course->id) }}" class="button">
-                🚀 Start Learning Now
+            <a href="{{ $loginLink }}" class="login-button">
+                🚀 Access Your Course Now
             </a>
+
+            <div class="security-note">
+                <strong>🛡️ Security Information:</strong><br>
+                • This is a secure, personalized login link<br>
+                • The link expires after 24 hours for your protection<br>
+                • It can only be used once and will log you in automatically<br>
+                • No password required - just click and start learning!
+            </div>
+
+            <p style="color: #6366f1; font-size: 14px; margin-top: 20px;">
+                <strong>Email:</strong> {{ $userEmail }}<br>
+                <strong>Course Platform:</strong> {{ config('app.url') }}
+            </p>
         </div>
 
         <div class="help-section">
-            <p><strong>Need help?</strong> 🤝</p>
-            <p>Our support team is here for you! If you have any questions or run into any issues, just reach out to <a href="mailto:harry@pneunited.com" style="color: #3b82f6; font-weight: 600;">harry@pneunited.com</a></p>
+            <p><strong>Need assistance? 🤝</strong></p>
+            <p>Our support team is here to help! If you have any questions or experience any issues, please reach out to:</p>
+            <p><a href="mailto:harry@pneunited.com" style="color: #3b82f6; font-weight: 600;">harry@pneunited.com</a></p>
             <p><small>We typically respond within 2 hours during business hours</small></p>
         </div>
 
-        <p style="color: #374151; font-size: 16px;">
-            We're excited to support your learning journey and can't wait to see the amazing things you'll accomplish! 🌟
+        <p style="color: #374151; font-size: 16px; line-height: 1.6;">
+            We're excited to support your learning journey and can't wait to see the amazing progress you'll make! Your growth is our priority, and this course is another step toward achieving your professional goals. 🌟
         </p>
 
         <div class="signature">

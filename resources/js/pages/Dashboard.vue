@@ -59,11 +59,11 @@ const formatDate = (dateString) => {
 // Format time ago for activity feed
 const timeAgo = (dateString) => {
   if (!dateString) return '';
-  
+
   const date = new Date(dateString);
   const now = new Date();
   const diffInSeconds = Math.floor((now - date) / 1000);
-  
+
   if (diffInSeconds < 60) {
     return 'just now';
   } else if (diffInSeconds < 3600) {
@@ -109,7 +109,7 @@ const timeAgo = (dateString) => {
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="bg-white rounded-xl border border-sidebar-border/70 p-4 shadow-sm">
                         <div class="flex items-center">
                             <div class="p-3 rounded-full bg-purple-100 text-purple-600 mr-4">
@@ -121,7 +121,7 @@ const timeAgo = (dateString) => {
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="bg-white rounded-xl border border-sidebar-border/70 p-4 shadow-sm">
                         <div class="flex items-center">
                             <div class="p-3 rounded-full bg-green-100 text-green-600 mr-4">
@@ -133,7 +133,7 @@ const timeAgo = (dateString) => {
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="bg-white rounded-xl border border-sidebar-border/70 p-4 shadow-sm">
                         <div class="flex items-center">
                             <div class="p-3 rounded-full bg-amber-100 text-amber-600 mr-4">
@@ -146,9 +146,9 @@ const timeAgo = (dateString) => {
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- Quick Actions section remains unchanged -->
-                
+
                 <!-- Update the Recent Activity section in Dashboard.vue -->
                 <!-- Recent Activity -->
                 <div class="bg-white rounded-xl border border-sidebar-border/70 p-4 sm:p-6 shadow-sm">
@@ -162,9 +162,9 @@ const timeAgo = (dateString) => {
                       <h3 class="text-base font-medium text-gray-900">No recent activity</h3>
                       <p class="text-sm text-gray-500">Activity will appear here as users interact with the system</p>
                     </div>
-                    <div 
-                      v-for="(activity, index) in recentActivity" 
-                      :key="activity.id || index" 
+                    <div
+                      v-for="(activity, index) in recentActivity"
+                      :key="activity.id || index"
                       class="flex items-start p-3 border-b border-gray-100 last:border-0 hover:bg-gray-50 rounded-lg transition-colors"
                     >
                       <div class="w-10 h-10 rounded-full bg-gray-200 flex-shrink-0 mr-3 overflow-hidden">
@@ -176,8 +176,8 @@ const timeAgo = (dateString) => {
                       <div class="flex-1 min-w-0">
                         <p class="text-sm font-medium text-gray-900 break-words">{{ activity.description }}</p>
                         <div class="flex items-center mt-1">
-                          <span 
-                            v-if="activity.action" 
+                          <span
+                            v-if="activity.action"
                             class="px-2 py-0.5 text-xs rounded-full mr-2"
                             :class="{
                               'bg-blue-100 text-blue-800': activity.action === 'create',
@@ -212,7 +212,7 @@ const timeAgo = (dateString) => {
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="bg-white rounded-xl border border-sidebar-border/70 p-4 shadow-sm">
                         <div class="flex items-center">
                             <div class="p-3 rounded-full bg-green-100 text-green-600 mr-4">
@@ -224,7 +224,7 @@ const timeAgo = (dateString) => {
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="bg-white rounded-xl border border-sidebar-border/70 p-4 shadow-sm">
                         <div class="flex items-center">
                             <div class="p-3 rounded-full bg-amber-100 text-amber-600 mr-4">
@@ -239,7 +239,7 @@ const timeAgo = (dateString) => {
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- My Courses section in Dashboard.vue -->
                 <div class="bg-white rounded-xl border border-sidebar-border/70 p-4 sm:p-6 shadow-sm">
                     <div class="flex justify-between items-center mb-4">
@@ -250,17 +250,17 @@ const timeAgo = (dateString) => {
                         <div v-if="userCourses.length === 0" class="col-span-full text-center py-4 text-gray-500">
                             You are not enrolled in any courses yet
                         </div>
-                        <div 
-                            v-for="(course, index) in userCourses" 
-                            :key="course.id || index" 
+                        <div
+                            v-for="(course, index) in userCourses"
+                            :key="course.id || index"
                             class="border border-gray-200 rounded-lg overflow-hidden"
                         >
                             <div class="h-32 bg-gray-200">
-                                <img 
-                                    v-if="course.image_path" 
-                                    :src="`/storage/${course.image_path}`" 
+                                <img
+                                    v-if="course.image_path"
+                                    :src="`/storage/${course.image_path}`"
                                     :alt="course.name"
-                                    class="w-full h-full object-cover"
+                                    class="w-full h-full object-contain"
                                     @error="$event.target.src = '/images/course-placeholder.jpg'"
                                 />
                                 <div v-else class="w-full h-full flex items-center justify-center bg-gray-100">
@@ -271,7 +271,7 @@ const timeAgo = (dateString) => {
                                 <h3 class="font-medium">{{ course.name || 'Course Name' }}</h3>
                                 <!-- Description removed as requested -->
                                 <div class="flex justify-between items-center mt-2">
-                                    <span 
+                                    <span
                                         class="text-xs px-2 py-1 rounded-full"
                                         :class="{
                                             'bg-blue-100 text-blue-800': course.status === 'in_progress' || course.status === 'enrolled',
@@ -289,7 +289,7 @@ const timeAgo = (dateString) => {
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- Recent Attendance -->
                 <div class="bg-white rounded-xl border border-sidebar-border/70 p-4 sm:p-6 shadow-sm">
                     <div class="flex justify-between items-center mb-4">
@@ -319,7 +319,7 @@ const timeAgo = (dateString) => {
                                         {{ record.course_name || 'General Attendance' }}
                                     </td>
                                     <td class="px-4 py-3 whitespace-nowrap text-sm">
-                                        <span 
+                                        <span
                                             class="px-2 py-1 text-xs rounded-full"
                                             :class="{
                                                 'bg-green-100 text-green-800': record.status === 'completed',
@@ -335,7 +335,7 @@ const timeAgo = (dateString) => {
                         </table>
                     </div>
                 </div>
-                
+
                 <!-- Upcoming Sessions -->
                 <div v-if="stats.upcomingSessions > 0" class="bg-white rounded-xl border border-sidebar-border/70 p-4 sm:p-6 shadow-sm">
                     <div class="flex justify-between items-center mb-4">
@@ -344,7 +344,7 @@ const timeAgo = (dateString) => {
                     </div>
                     <div class="p-4 bg-blue-50 rounded-lg border border-blue-100">
                         <p class="text-sm text-blue-800">
-                            You have {{ stats.upcomingSessions }} upcoming session{{ stats.upcomingSessions > 1 ? 's' : '' }}. 
+                            You have {{ stats.upcomingSessions }} upcoming session{{ stats.upcomingSessions > 1 ? 's' : '' }}.
                             Check your course schedule for details.
                         </p>
                         <Link href="/courses" class="mt-2 inline-flex items-center text-sm font-medium text-blue-600 hover:underline">

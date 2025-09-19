@@ -1,0 +1,260 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Quiz;
+use App\Models\QuizAttempt;
+use App\Models\QuizAnswer;
+use App\Models\QuizQuestion;
+use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
+
+class QuizController extends Controller
+{
+    public function index()
+    {
+        $quizzes = Quiz::with(['course'])
+            ->where('status', 'published')
+            ->whereHas('course', function ($query) {
+                $query->whereHas('registrations', function ($q) {
+                    $q->where('user_id', auth()->id());
+                });
+            })
+            ->orderBy('created_at', 'desc')
+            ->paginate(10);
+
+        $quizzes->getCollection()->transform(function ($quiz) {
+            $userAttempts = $quiz->attempts()->where('user_id', auth()->id())->get();
+            $attemptCount = $userAttempts->count();
+
+            // ✅ Check if user has already passed
+            $hasPassed = $userAttempts->contains('passed', true);
+
+            return [
+                'id' => $quiz->id,
+                'title' => $quiz->title,
+                'description' => $quiz->description,
+                'total_points' => $quiz->total_points,
+                'pass_threshold' => $quiz->pass_threshold ?? 80.00,
+                'course' => [
+                    'id' => $quiz->course->id,
+                    'name' => $quiz->course->name,
+                ],
+                'attempts' => $attemptCount,
+                'has_passed' => $hasPassed, // ✅ Add passed status
+            ];
+        });
+
+        return Inertia::render('Quizzes/Index', [
+            'quizzes' => $quizzes,
+        ]);
+    }
+
+    /**
+     * Display the specified quiz for the user to take.
+     */
+    public function show(Quiz $quiz)
+    {
+        $user = Auth::user();
+
+        if (!$user->courses()->where('courses.id', $quiz->course_id)->exists()) {
+            return redirect()->back()->withErrors(['error' => 'You are not enrolled in this course.']);
+        }
+
+        $userAttempts = $quiz->attempts()->where('user_id', $user->id)->get();
+        $attemptCount = $userAttempts->count();
+
+        // ✅ Check if user has already passed
+        $hasPassed = $userAttempts->contains('passed', true);
+
+        if ($hasPassed) {
+            return redirect()->route('quizzes.index')
+                ->with('info', 'You have already passed this quiz and cannot retake it.');
+        }
+
+        // Check maximum attempts
+        if ($attemptCount >= 3) {
+            return redirect()->back()->withErrors(['error' => 'You have reached the maximum number of attempts.']);
+        }
+
+        $quiz->load(['course', 'questions']);
+
+        // Process questions with shuffling for random order
+        $questions = $quiz->questions->shuffle()->map(function ($question) {
+            // Safely handle options field
+            $options = [];
+
+            if (!empty($question->options)) {
+                if (is_array($question->options)) {
+                    $options = $question->options;
+                } elseif (is_string($question->options)) {
+                    // Try to decode JSON string
+                    $decoded = json_decode($question->options, true);
+                    if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                        $options = $decoded;
+                    }
+                }
+            }
+
+            return [
+                'id' => $question->id,
+                'question_text' => $question->question_text ?? '',
+                'type' => $question->type ?? 'radio',
+                'options' => $options,
+                'points' => $question->points ?? 0,
+                'order' => $question->order ?? 0,
+                'correct_answer_explanation' => $question->correct_answer_explanation ?? '',
+            ];
+        });
+
+        return Inertia::render('Quizzes/Show', [
+            'quiz' => [
+                'id' => $quiz->id,
+                'title' => $quiz->title ?? '',
+                'description' => $quiz->description ?? '',
+                'pass_threshold' => $quiz->pass_threshold ?? 80.00,
+                'total_points' => $quiz->total_points ?? 0,
+                'course' => $quiz->course ? [
+                    'id' => $quiz->course->id,
+                    'name' => $quiz->course->name ?? ''
+                ] : null,
+                'attempt_count' => $attemptCount,
+                'has_passed' => $hasPassed, // ✅ Include passed status
+            ],
+            'questions' => $questions,
+        ]);
+    }
+
+    /**
+     * Store the user's quiz attempt.
+     */
+    public function store(Request $request, Quiz $quiz)
+    {
+        $request->validate([
+            'answers.*.question_id' => 'required|exists:quiz_questions,id',
+            'answers.*.answer' => 'required',
+        ]);
+
+        $user = auth()->user();
+        $userAttempts = $quiz->attempts()->where('user_id', $user->id)->get();
+        $attemptCount = $userAttempts->count();
+
+        // Check if user has already passed
+        $hasPassed = $userAttempts->contains('passed', true);
+
+        if ($hasPassed) {
+            return redirect()->route('quizzes.index')
+                ->with('info', 'You have already passed this quiz and cannot submit another attempt.');
+        }
+
+        if ($attemptCount >= 3) {
+            return redirect()->back()->with('error', 'You have exceeded the maximum number of attempts (3).');
+        }
+
+        $attempt = $quiz->attempts()->create([
+            'user_id' => $user->id,
+            'attempt_number' => $attemptCount + 1,
+            'completed_at' => now(),
+        ]);
+
+        $totalAutoScore = 0;
+        foreach ($request->input('answers', []) as $answerData) {
+            $question = QuizQuestion::find($answerData['question_id']);
+            $isCorrect = $question->isCorrect($answerData['answer']);
+            $pointsEarned = $isCorrect ? ($question->type !== 'text' ? $question->points : 0) : 0;
+
+            QuizAnswer::create([
+                'quiz_attempt_id' => $attempt->id,
+                'quiz_question_id' => $answerData['question_id'],
+                'answer' => is_array($answerData['answer']) ? json_encode($answerData['answer']) : $answerData['answer'],
+                'is_correct' => $isCorrect,
+                'points_earned' => $pointsEarned,
+            ]);
+
+            if ($question->type !== 'text' && $isCorrect) {
+                $totalAutoScore += $pointsEarned;
+            }
+        }
+
+        // ✅ Calculate total score properly BEFORE checking if passed
+        $manualScore = $attempt->manual_score ?? 0;
+        $totalScore = $totalAutoScore + $manualScore;
+
+        // ✅ Update attempt with scores first
+        $attempt->update([
+            'score' => $totalAutoScore,
+            'total_score' => $totalScore,
+            'manual_score' => $manualScore,
+        ]);
+
+        // ✅ Now check if passed using the updated scores
+        $isPassed = $attempt->fresh()->isPassed(); // Use fresh() to get updated data
+
+        // ✅ Update the passed status
+        $attempt->update([
+            'passed' => $isPassed
+        ]);
+
+        return redirect()->route('quiz-attempts.results', $attempt->id);
+    }
+
+
+    public function results(QuizAttempt $attempt)
+    {
+        $attempt->load(['user', 'quiz', 'answers.question']);
+
+        $responses = $attempt->answers->map(function ($answer) {
+            if (!$answer->question) {
+                return null;
+            }
+
+            // Safe JSON decode function
+            $safeJsonDecode = function ($value) {
+                if (is_string($value)) {
+                    return json_decode($value, true) ?? [];
+                }
+                return is_array($value) ? $value : [];
+            };
+
+            return [
+                'id' => $answer->id,
+                'question' => [
+                    'id' => $answer->question->id,
+                    'question_text' => $answer->question->question_text,
+                    'points' => $answer->question->points ?? 0,
+                    'type' => $answer->question->type,
+                    'correct_answer' => $safeJsonDecode($answer->question->correct_answer),
+                    'correct_answer_explanation' => $answer->question->correct_answer_explanation ?? '',
+                ],
+                'answer' => $safeJsonDecode($answer->answer),
+                'is_correct' => $answer->is_correct,
+                'points_earned' => $answer->points_earned ?? 0,
+            ];
+        })->filter();
+
+        return Inertia::render('Quizzes/Results', [
+            'attempt' => [
+                'id' => $attempt->id,
+                'score' => $attempt->score,
+                'total_score' => $attempt->total_score,
+                'passed' => $attempt->isPassed(),
+                'completed_at' => $attempt->completed_at ? $attempt->completed_at->format('Y-m-d H:i:s') : null,
+                'quiz' => [
+                    'id' => $attempt->quiz->id,
+                    'title' => $attempt->quiz->title,
+                    'pass_threshold' => $attempt->quiz->pass_threshold ?? 80.00,
+                    'total_points' => $attempt->quiz->total_points ?? 0,
+                ],
+                'attempt_number' => $attempt->attempt_number,
+                'responses' => $responses,
+            ],
+            'userAttempts' => QuizAttempt::where('user_id', $attempt->user_id)
+                ->where('quiz_id', $attempt->quiz_id)
+                ->orderBy('created_at', 'desc')
+                ->get(),
+        ]);
+    }
+}
