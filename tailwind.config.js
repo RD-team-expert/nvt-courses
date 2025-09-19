@@ -2,52 +2,43 @@ import defaultTheme from 'tailwindcss/defaultTheme';
 
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: [
-    './resources/**/*.blade.php',
-    './resources/**/*.js',
-    './resources/**/*.vue',
-  ],
-  darkMode: 'class',
-  theme: {
-    extend: {
-      colors: {
-        dark: {
-          50: '#f8fafc',
-          100: '#f1f5f9',
-          200: '#e2e8f0',
-          300: '#cbd5e1',
-          400: '#94a3b8',
-          500: '#64748b',
-          600: '#475569',
-          700: '#334155',
-          800: '#1e293b',
-          900: '#0f172a',
-          950: '#020617'
-        }
-      }
-    }
-  },
-  plugins: [],
-}
-
-/** @type {import('tailwindcss').Config} */
-export default {
     darkMode: ['class'],
     content: [
         './vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php',
         './storage/framework/views/*.php',
         './resources/views/**/*.blade.php',
         './resources/js/**/*.{vue,js,ts,jsx,tsx}',
+        './resources/**/*.blade.php',
+        './resources/**/*.js',
+        './resources/**/*.vue',
     ],
     theme: {
         extend: {
             fontFamily: {
-                sans: ['Instrument Sans', ...defaultTheme.fontFamily.sans],
+                sans: ['Inter', ...defaultTheme.fontFamily.sans],
+                serif: ['Georgia', ...defaultTheme.fontFamily.serif],
+                mono: ['monospace', ...defaultTheme.fontFamily.mono],
             },
             borderRadius: {
                 lg: 'var(--radius)',
                 md: 'calc(var(--radius) - 2px)',
                 sm: 'calc(var(--radius) - 4px)',
+            },
+            boxShadow: {
+                '2xs': 'var(--shadow-2xs)',
+                'xs': 'var(--shadow-xs)',
+                'sm': 'var(--shadow-sm)',
+                'DEFAULT': 'var(--shadow)',
+                'md': 'var(--shadow-md)',
+                'lg': 'var(--shadow-lg)',
+                'xl': 'var(--shadow-xl)',
+                '2xl': 'var(--shadow-2xl)',
+            },
+            letterSpacing: {
+                normal: 'var(--tracking-normal)',
+            },
+            spacing: {
+                'custom': 'var(--spacing)',
             },
             colors: {
                 background: 'hsl(var(--background))',
@@ -91,7 +82,7 @@ export default {
                     5: 'hsl(var(--chart-5))',
                 },
                 sidebar: {
-                    DEFAULT: 'hsl(var(--sidebar-background))',
+                    DEFAULT: 'hsl(var(--sidebar))',
                     foreground: 'hsl(var(--sidebar-foreground))',
                     primary: 'hsl(var(--sidebar-primary))',
                     'primary-foreground': 'hsl(var(--sidebar-primary-foreground))',

@@ -16,6 +16,7 @@ class CourseRegistration extends Model
         'registered_at',
         'completed_at',
         'rating',
+        'course_availability_id',
         'feedback'
     ];
 
@@ -39,5 +40,21 @@ class CourseRegistration extends Model
     public function course()
     {
         return $this->belongsTo(Course::class);
+    }
+
+    /**
+     * Get the course availability this registration belongs to
+     */
+    public function courseAvailability()
+    {
+        return $this->belongsTo(CourseAvailability::class);
+    }
+
+    /**
+     * Get the selected date range for this registration
+     */
+    public function getSelectedDateRangeAttribute()
+    {
+        return $this->courseAvailability ? $this->courseAvailability->formatted_date_range : null;
     }
 }

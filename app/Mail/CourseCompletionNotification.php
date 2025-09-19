@@ -11,7 +11,7 @@ use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
-class CourseCompletionNotification extends Mailable
+class CourseCompletionNotification extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
 
@@ -33,7 +33,7 @@ class CourseCompletionNotification extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Course Completion Notification',
+            subject: '🎉 Congratulations! Course Completed: ' . $this->course->name,
         );
     }
 
@@ -45,8 +45,9 @@ class CourseCompletionNotification extends Mailable
         return new Content(
             view: 'emails.course_completed',
             with: [
+                'course' => $this->course,
                 'courseName' => $this->course->name,
-                'userName' => $this->user->name,
+                'userName' => $this->user->name,  // ✅ Fixed: removed extra $
             ]
         );
     }

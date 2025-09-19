@@ -16,6 +16,7 @@ class Course extends Model
         'start_date',
         'end_date',
         'status',
+        'privacy',
         'level',
         'duration'
     ];
@@ -24,6 +25,30 @@ class Course extends Model
         'start_date' => 'date',
         'end_date' => 'date'
     ];
+
+    /**
+     * Get all availabilities for this course
+     */
+    public function availabilities()
+    {
+        return $this->hasMany(CourseAvailability::class);
+    }
+
+    /**
+     * Get only active availabilities
+     */
+    public function activeAvailabilities()
+    {
+        return $this->availabilities()->active();
+    }
+
+    /**
+     * Get only available availabilities (not full, not expired)
+     */
+    public function availableAvailabilities()
+    {
+        return $this->availabilities()->available();
+    }
 
     /**
      * Get the registrations for the course.
@@ -36,11 +61,55 @@ class Course extends Model
     /**
      * Get the users registered for this course.
      */
-    // Check if this relationship exists in your Course model
     public function users()
     {
-        return $this->belongsToMany(User::class, 'course_user')
-            ->withPivot('user_status')
+        return $this->belongsToMany(User::class, 'course_registrations')
+            ->withPivot(['status', 'course_availability_id', 'registered_at', 'completed_at', 'rating', 'feedback'])
             ->withTimestamps();
+    }
+
+    /**
+     * Check if course is public
+     */
+    public function isPublic()
+    {
+        return $this->privacy === 'public';
+    }
+
+    /**
+     * Check if course is private
+     */
+    public function isPrivate()
+    {
+        return $this->privacy === 'private';
+    }
+
+    /**
+     * Scope to get only public courses
+     */
+    public function scopePublic($query)
+    {
+        return $query->where('privacy', 'public');
+    }
+
+    /**
+     * Check if course has available spots
+     */
+    public function getHasAvailableSpotsAttribute()
+    {
+        return $this->availableAvailabilities()->exists();
+    }
+
+    /**
+     * Get total enrollment across all availabilities
+     */
+    public function getTotalEnrollmentAttribute()
+    {
+        return $this->registrations()->count();
+    }
+
+    public function assignments()
+    {
+        return $this->hasMany(CourseAssignment::class);
     }
 }
