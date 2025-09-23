@@ -146,9 +146,8 @@ class User extends Authenticatable
      */
     public function userLevel()
     {
-        return $this->belongsTo(UserLevel::class);
+        return $this->belongsTo(UserLevel::class, 'user_level_id');
     }
-
     /**
      * Manager roles this user has
      */
@@ -203,10 +202,7 @@ class User extends Authenticatable
     /**
      * Evaluation assignments for this user
      */
-    public function evaluationAssignments()
-    {
-        return $this->hasMany(EvaluationAssignment::class);
-    }
+
 
     /**
      * Evaluations created by this user
@@ -258,4 +254,110 @@ class User extends Authenticatable
     {
         return $this->hasMany(UserDepartmentRole::class, 'manages_user_id');
     }
+    public function evaluations()
+    {
+        return $this->hasMany(Evaluation::class, 'user_id');
+    }
+    /**
+     * User's organizational level
+     */
+
+    /**
+     * Departments this user has relationships with (many-to-many)
+     */
+    public function departments()
+    {
+        // Return the single department as a collection for compatibility
+        return collect($this->department ? [$this->department] : []);
+    }
+
+    /**
+     * Active departments only (where relationship hasn't ended)
+     */
+    public function activeDepartments()
+    {
+        return $this->belongsToMany(Department::class, 'user_department_roles')
+            ->withPivot('role_type', 'is_primary', 'start_date', 'end_date')
+            ->wherePivot(function($query) {
+                $query->whereNull('end_date')
+                    ->orWhere('end_date', '>', now());
+            })
+            ->withTimestamps();
+    }
+
+    /**
+     * Primary department for this user
+     */
+    public function primaryDepartment()
+    {
+        return $this->belongsToMany(Department::class, 'user_department_roles')
+            ->withPivot('role_type', 'is_primary', 'start_date', 'end_date')
+            ->wherePivot('is_primary', true)
+            ->wherePivot(function($query) {
+                $query->whereNull('end_date')
+                    ->orWhere('end_date', '>', now());
+            })
+            ->withTimestamps()
+            ->limit(1);
+    }
+
+    /**
+     * Department roles this user has
+     */
+    public function departmentRoles()
+    {
+        return $this->hasMany(UserDepartmentRole::class, 'user_id');
+    }
+
+    /**
+     * Active department roles only
+     */
+    public function activeDepartmentRoles()
+    {
+        return $this->hasMany(UserDepartmentRole::class, 'user_id')
+            ->where(function($query) {
+                $query->whereNull('end_date')
+                    ->orWhere('end_date', '>', now());
+            });
+    }
+
+    // ... your existing relationships (courses, clockings, etc.) ...
+
+    /**
+     * Courses the user is enrolled in
+     */
+
+
+    /**
+     * Clock records for this user
+     */
+
+
+    /**
+     * Course assignments for this user
+     */
+
+
+    /**
+     * Assignments created by this user (admin)
+     */
+
+
+    /**
+     * Notifications sent by this user
+     */
+    public function sentNotifications()
+    {
+        return $this->hasMany(NotificationTemplate::class, 'sent_by');
+    }
+
+    public function level()
+    {
+        return $this->belongsTo(UserLevel::class, 'user_level_id');
+    }
+
+    /**
+     * User's organizational level (original method)
+     */
+
 }

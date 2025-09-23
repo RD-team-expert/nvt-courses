@@ -7,6 +7,8 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\UserLevel;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -164,16 +166,26 @@ class UserLevelController extends Controller
      */
     public function destroy(UserLevel $userLevel)
     {
-        // Check if level has users assigned
-        if ($userLevel->users()->count() > 0) {
-            return back()->withErrors(['delete' => 'Cannot delete user level with assigned users.']);
+        try {
+            // Check if level has users assigned
+            if ($userLevel->users()->count() > 0) {
+                return back()->withErrors([
+                    'delete' => 'Cannot delete user level with assigned users. Please reassign users first.'
+                ]);
+            }
+
+            $userLevel->delete();
+
+            return redirect()
+                ->route('admin.user-levels.index')
+                ->with('success', 'User level deleted successfully.');
+        } catch (\Exception $e) {
+            Log::error('Failed to delete user level: ' . $e->getMessage());
+
+            return back()->withErrors([
+                'delete' => 'Failed to delete user level. Please try again.'
+            ]);
         }
-
-        $userLevel->delete();
-
-        return redirect()
-            ->route('admin.user-levels.index')
-            ->with('success', 'User level deleted successfully.');
     }
 
     public function bulkAssign(Request $request)
@@ -190,5 +202,55 @@ class UserLevelController extends Controller
 
         return redirect()->back()->with('success', 'Users assigned to level successfully.');
     }
+    public function removeUserFromLevel(Request $request)
+    {
+        $validated = $request->validate([
+            'user_id' => 'required|exists:users,id',
+        ]);
 
-}
+        try {
+            $user = User::findOrFail($validated['user_id']);
+            $previousLevel = $user->userLevel?->name ?? 'No Level';
+
+            // ✅ FIXED: Use direct database update instead of model update
+            $affected = DB::table('users')
+                ->where('id', $validated['user_id'])
+                ->update([
+                    'user_level_id' => null,
+                    'updated_at' => now()
+                ]);
+
+            // ✅ Get fresh user data to verify the update
+            $updatedUser = User::find($validated['user_id']);
+
+            Log::info('Remove user from level - After DB update', [
+                'user_id' => $validated['user_id'],
+                'affected_rows' => $affected,
+                'previous_level' => $previousLevel,
+                'new_level_id' => $updatedUser->user_level_id,
+                'verification' => $updatedUser->user_level_id === null ? 'SUCCESS' : 'FAILED'
+            ]);
+
+            if ($affected === 0) {
+                throw new \Exception('No rows were affected by the update');
+            }
+
+            if ($updatedUser->user_level_id !== null) {
+                throw new \Exception('User level was not properly removed');
+            }
+
+            return redirect()
+                ->back()
+                ->with('success', "User {$user->name} removed from {$previousLevel} level successfully.");
+
+        } catch (\Exception $e) {
+            Log::error('Failed to remove user from level: ' . $e->getMessage(), [
+                'user_id' => $validated['user_id'] ?? null,
+                'error' => $e->getMessage()
+            ]);
+
+            return back()->withErrors([
+                'remove_user' => 'Failed to remove user from level. Please try again.'
+            ]);
+        }
+    }}

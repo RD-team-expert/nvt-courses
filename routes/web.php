@@ -7,6 +7,8 @@ use App\Http\Controllers\Admin\CourseController as AdminCourseController;
 use App\Http\Controllers\Admin\DepartmentController;
 use App\Http\Controllers\Admin\EvaluationAssignmentController;
 use App\Http\Controllers\Admin\EvaluationController;
+use App\Http\Controllers\Admin\EvaluationNotificationController;
+use App\Http\Controllers\Admin\HistoryController;
 use App\Http\Controllers\Admin\OrganizationalController;
 use App\Http\Controllers\Admin\QuizController;
 use App\Http\Controllers\Admin\ReportController;
@@ -14,12 +16,15 @@ use App\Http\Controllers\Admin\ResendLoginController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\UserDepartmentRoleController;
+use App\Http\Controllers\Admin\UserEvaluationController;
 use App\Http\Controllers\Admin\UserLevelController;
 use App\Http\Controllers\AuthVaiEmailController;
 use App\Http\Controllers\ClockingController;
 use App\Http\Controllers\CourseController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GeminiController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\UserTeamController;
 use App\Models\Course;
 use Illuminate\Support\Facades\Route;
 
@@ -116,6 +121,21 @@ Route::middleware('auth')->group(function () {
 
 // Add these routes to your web.php file
 Route::middleware(['auth'])->group(function () {
+
+
+
+    Route::get('/profile', [ProfileController::class, 'index'])
+        ->name('user.profile.index');
+
+    Route::get('/evaluations', [App\Http\Controllers\User\UserEvaluationController::class, 'index'])
+        ->name('user.evaluations.index');
+
+    Route::get('/evaluations/{id}', [App\Http\Controllers\User\UserEvaluationController::class, 'show'])
+        ->name('user.evaluations.show');
+
+    Route::get('/my-team', [UserTeamController::class, 'index'])
+        ->name('user.team.index');
+
     // Course completion routes
     Route::get('/courses/{id}/completion', [CourseController::class, 'showCompletionPage'])->name('courses.completion');
     Route::post('/courses/{id}/rating', [CourseController::class, 'submitRating'])->name('courses.rating.submit');
@@ -126,6 +146,10 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/reports/course-registrations', [App\Http\Controllers\Admin\ReportController::class, 'courseRegistrations'])->name('reports.course-registrations');
     Route::get('/reports/attendance', [App\Http\Controllers\Admin\ReportController::class, 'attendance'])->name('reports.attendance');
     Route::get('/reports/course-completion', [App\Http\Controllers\Admin\ReportController::class, 'courseCompletion'])->name('reports.course-completion');
+    Route::get('/reports/export-monthly-kpi-csv', [App\Http\Controllers\Admin\ReportController::class, 'exportMonthlyKpiCsv'])
+        ->name('reports.export-monthly-kpi-csv');
+    Route::get('/reports/monthly-kpi-screenshot', [App\Http\Controllers\Admin\ReportController::class, 'monthlyKpiScreenshot'])
+        ->name('reports.monthly-kpi-screenshot');
 
     // CSV Export routes
     Route::get('/reports/quiz-attempts', [ReportController::class, 'quizAttempts'])->name('reports.quiz-attempts');
@@ -172,6 +196,89 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/organizational/overview', [OrganizationalController::class, 'overview'])->name('organizational.overview');
 
 
+    // Evaluation Configuration Routes
+    Route::get('/evaluations', [EvaluationController::class, 'index'])->name('evaluations.index');
+
+    Route::post('/evaluations/notifications/preview', [EvaluationNotificationController::class, 'previewNotification'])
+        ->name('evaluations.notifications.preview');
+
+    Route::post('/evaluations', [EvaluationController::class, 'store'])->name('evaluations.store');
+    Route::put('/evaluations/{evaluationConfig}', [EvaluationController::class, 'update'])->name('evaluations.update');
+    Route::delete('/evaluations/{evaluationConfig}', [EvaluationController::class, 'destroy'])->name('evaluations.destroy');
+    Route::post('/evaluations/{evaluationConfig}/types', [EvaluationController::class, 'configureTypes'])->name('evaluations.types.store');
+    Route::post('/evaluations/set-total-score', [EvaluationController::class, 'setTotalScore'])->name('evaluations.set-total-score');
+    Route::post('/evaluations/set-incentives', [EvaluationController::class, 'setIncentives'])->name('evaluations.set-incentives');
+    Route::get('/evaluations/users-by-department', [UserEvaluationController::class, 'getUsersByDepartment'])
+        ->name('evaluations.users-by-department');
+    Route::get('/evaluations/user-courses', [UserEvaluationController::class, 'getUserCourses'])
+        ->name('evaluations.user-courses');
+    Route::post('/evaluations/{evaluationConfig}/types', [EvaluationController::class, 'configureTypes'])->name('evaluations.types.store');
+    Route::delete('/evaluations/types/{evaluationType}', [EvaluationController::class, 'destroyType'])->name('evaluations.types.destroy');
+    // User Evaluation Routes
+    Route::get('/evaluations/user-evaluation', [UserEvaluationController::class, 'index'])->name('evaluations.user-evaluation');
+    Route::get('/evaluations/user-evaluation/{userId}', [UserEvaluationController::class, 'show'])->name('evaluations.user-evaluation.show');
+    Route::post('/evaluations/user-evaluation', [UserEvaluationController::class, 'store'])->name('evaluations.user-evaluation.store');
+    Route::post('/evaluations/user-evaluation/bulk', [UserEvaluationController::class, 'bulkStore'])->name('evaluations.user-evaluation.bulk-store');
+    Route::post('/evaluations/user-evaluation/filter', [UserEvaluationController::class, 'filterUsers'])->name('evaluations.user-evaluation.filter');
+    Route::get('/evaluations/history/export-summary', [HistoryController::class, 'exportSummary'])->name('evaluations.history.export-summary');
+
+    // Evaluation History Routes
+    Route::get('/evaluations/history', [HistoryController::class, 'index'])->name('evaluations.history');
+    Route::get('/evaluations/history/export', [HistoryController::class, 'export'])->name('evaluations.history.export');
+    Route::get('/evaluations/history/{evaluationId}', [HistoryController::class, 'details'])->name('evaluations.history.details');
+
+
+    // Main notification dashboard
+    Route::get('/evaluations/notifications', [EvaluationNotificationController::class, 'index'])
+        ->name('evaluations.notifications');
+
+    // Filter employees (Inertia POST)
+    Route::post('/evaluations/notifications/filter', [EvaluationNotificationController::class, 'filterEmployees'])
+        ->name('evaluations.notifications.filter');
+
+    // Preview notification (Inertia POST)
+
+    // Send notifications (Inertia POST)
+    Route::post('/evaluations/notifications/send', [EvaluationNotificationController::class, 'sendNotifications'])
+        ->name('evaluations.notifications.send');
+
+    // Notification history
+    Route::get('/evaluations/notifications/history', [EvaluationNotificationController::class, 'history'])
+        ->name('evaluations.notifications.history');
+
+    // View notification details
+    Route::get('/evaluations/notifications/{id}', [EvaluationNotificationController::class, 'show'])
+        ->name('evaluations.notifications.show');
+
+
+    Route::get('/reports/monthly-kpi', [ReportController::class, 'monthlyKpiDashboard'])
+        ->name('admin.reports.monthly-kpi');
+
+    // AJAX Endpoints for KPI Dashboard
+    Route::get('/reports/kpi-data', [ReportController::class, 'getKpiData'])
+        ->name('admin.reports.kpi-data');
+
+    Route::get('/reports/kpi-comparison', [ReportController::class, 'getKpiComparison'])
+        ->name('admin.reports.kpi-comparison');
+
+    Route::get('/reports/kpi-section/{section}', [ReportController::class, 'getKpiSection'])
+        ->name('admin.reports.kpi-section');
+
+    Route::get('/reports/kpi-trends', [ReportController::class, 'getKpiTrends'])
+        ->name('admin.reports.kpi-trends');
+
+    Route::get('/reports/live-kpi-stats', [ReportController::class, 'getLiveKpiStats'])
+        ->name('admin.reports.live-kpi-stats');
+
+    // Export Endpoints
+    Route::post('/reports/export-monthly-kpi', [ReportController::class, 'exportMonthlyKpiReport'])
+        ->name('admin.reports.export-monthly-kpi');
+
+
+
+
+    // Notification Routes
+
 //    Route::get('/api/departments/{department}/employees', [DepartmentController::class, 'getEmployees'])->name('api.departments.employees');
 
     // ==========================================
@@ -200,18 +307,17 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     // ==========================================
     // MANAGER ROLES ASSIGNMENT
     // ==========================================
-    Route::resource('manager-roles', UserDepartmentRoleController::class, [
-        'names' => [
-            'index' => 'manager-roles.index',
-            'create' => 'manager-roles.create',
-            'store' => 'manager-roles.store',
-            'show' => 'manager-roles.show',
-            'edit' => 'manager-roles.edit',
-            'update' => 'manager-roles.update',
-            'destroy' => 'manager-roles.destroy',
-        ]
-    ]);
 
+    Route::get('/admin/manager-roles/{userDepartmentRole}/edit', [UserDepartmentRoleController::class, 'edit'])
+        ->name('admin.manager-roles.edit');
+
+    Route::get('/manager-roles', [UserDepartmentRoleController::class, 'index'])->name('manager-roles.index');
+    Route::get('/manager-roles/create', [UserDepartmentRoleController::class, 'create'])->name('manager-roles.create');
+    Route::post('/manager-roles', [UserDepartmentRoleController::class, 'store'])->name('manager-roles.store');
+    Route::get('/manager-roles/{userDepartmentRole}', [UserDepartmentRoleController::class, 'show'])->name('manager-roles.show');
+    Route::get('/manager-roles/{userDepartmentRole}/edit', [UserDepartmentRoleController::class, 'edit'])->name('manager-roles.edit');
+    Route::put('/manager-roles/{userDepartmentRole}', [UserDepartmentRoleController::class, 'update'])->name('manager-roles.update');
+    Route::delete('/manager-roles/{userDepartmentRole}', [UserDepartmentRoleController::class, 'destroy'])->name('manager-roles.destroy');
     // Additional manager role routes
     Route::get('/manager-roles/matrix/view', [UserDepartmentRoleController::class, 'matrix'])->name('manager-roles.matrix');
     Route::get('/departments/{department}/employees', [UserDepartmentRoleController::class, 'getDepartmentEmployees'])->name('departments.employees');
@@ -234,6 +340,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/users/import', [UserController::class, 'importForm'])->name('users.import');
     Route::post('/users/import', [UserController::class, 'import'])->name('users.import.process');
     Route::get('/users/export', [UserController::class, 'export'])->name('users.export');
+    Route::post('/user-levels/remove-user', [UserLevelController::class, 'removeUserFromLevel'])->name('user-levels.remove-user');
 
     // User organizational info
     Route::get('/users/{user}/organizational', [UserController::class, 'organizationalInfo'])->name('users.organizational');

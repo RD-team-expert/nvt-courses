@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Events\CourseAssigned;
 use App\Http\Controllers\Controller;
 use App\Mail\CourseCreatedNotification;
+use App\Mail\CourseAssignmentManagerNotification; // 🎯 NEW IMPORT
 use App\Models\CourseAssignment;
 use App\Models\Course;
 use App\Models\CourseRegistration;
@@ -53,6 +54,9 @@ class AssignmentController extends Controller
 
     /**
      * Store a newly created assignment
+     */
+    /**
+     * Store a newly created assignment - FIXED VERSION
      */
     public function store(Request $request)
     {
@@ -175,13 +179,42 @@ class AssignmentController extends Controller
             }
         }
 
-        // ✅ Send different notifications based on enrollment type
-        if ($enrolledUsers->isNotEmpty()) {
-            $this->notifyUsersOnCourseAssignment($course, $enrolledUsers, auth()->user());
-        }
+        // 🎯 FIXED: Combine all assigned users and send notifications ONCE
+        $allAssignedUsers = $enrolledUsers->merge($assignedUsers)->unique('id');
 
-        if ($assignedUsers->isNotEmpty()) {
-            $this->notifyUsersOnCourseAssignment($course, $assignedUsers, auth()->user());
+        if ($allAssignedUsers->isNotEmpty()) {
+            Log::info('📬 Sending notifications to all assigned users', [
+                'course_id' => $course->id,
+                'course_name' => $course->name,
+                'total_users' => $allAssignedUsers->count(),
+                'enrolled_users_count' => $enrolledUsers->count(),
+                'assigned_users_count' => $assignedUsers->count(),
+                'all_user_emails' => $allAssignedUsers->pluck('email')->toArray(),
+                'enrolled_emails' => $enrolledUsers->pluck('email')->toArray(),
+                'assigned_emails' => $assignedUsers->pluck('email')->toArray()
+            ]);
+
+            // Send user notifications (only once per user)
+            $this->notifyUsersOnCourseAssignment($course, $allAssignedUsers, auth()->user());
+
+            // Send manager notifications for private courses (only once per user)
+            if ($course->privacy === 'private') {
+                Log::info('🎯 Course is private, sending manager notifications', [
+                    'course_privacy' => $course->privacy,
+                    'users_for_manager_notification' => $allAssignedUsers->pluck('email')->toArray()
+                ]);
+
+                $this->notifyManagersOnCourseAssignment($course, $allAssignedUsers, auth()->user());
+            } else {
+                Log::info('ℹ️ Course is public, skipping manager notifications', [
+                    'course_privacy' => $course->privacy
+                ]);
+            }
+        } else {
+            Log::info('ℹ️ No users to notify', [
+                'enrolled_users_count' => $enrolledUsers->count(),
+                'assigned_users_count' => $assignedUsers->count()
+            ]);
         }
 
         // ✅ Enhanced messaging system with different messages
@@ -233,13 +266,18 @@ class AssignmentController extends Controller
             }
         }
 
+        Log::info('🏁 Assignment process completed', [
+            'course_id' => $course->id,
+            'course_name' => $course->name,
+            'assignments_created' => $assignmentCount,
+            'enrollments_created' => $enrollmentCount,
+            'users_skipped' => $skippedCount,
+            'notifications_sent_to' => $allAssignedUsers->count(),
+            'manager_notifications' => $course->privacy === 'private' ? 'sent' : 'skipped'
+        ]);
+
         return redirect()->route('admin.assignments.index');
     }
-
-
-    /**
-     * ✅ Notify users about automatic enrollment
-     */
 
     public function show(CourseAssignment $assignment)
     {
@@ -400,11 +438,20 @@ class AssignmentController extends Controller
 
             // ✅ Send notifications for each course assignment
             $this->notifyUsersOnCourseAssignment($course, $assignedUsers, auth()->user());
+
+            // 🎯 NEW: Notify managers for private courses
+            if ($course->privacy === 'private') {
+                $this->notifyManagersOnCourseAssignment($course, $assignedUsers, auth()->user());
+            }
         }
 
         return redirect()->route('admin.assignments.index')
             ->with('success', "Successfully created {$assignmentCount} assignments.");
     }
+
+    /**
+     * 🎯 EXISTING: Notify users about course assignments
+     */
     private function notifyUsersOnCourseAssignment(Course $course, $assignedUsers, $assignedBy)
     {
         try {
@@ -438,5 +485,255 @@ class AssignmentController extends Controller
         }
     }
 
+    /**
+     * 🎯 NEW: Notify managers about course assignments to their team members
+     */
+    /**
+     * 🎯 FIXED: Notify managers with proper User models
+     */
+    private function notifyManagersOnCourseAssignment(Course $course, $assignedUsers, $assignedBy)
+    {
+        try {
+            Log::info('🎯 Starting manager notifications for course assignment', [
+                'course_id' => $course->id,
+                'course_name' => $course->name,
+                'assigned_users_count' => $assignedUsers->count(),
+                'assigned_by_id' => $assignedBy->id,
+                'assigned_by_name' => $assignedBy->name,
+                'assigned_users' => $assignedUsers->map(function($user) {
+                    return [
+                        'id' => $user->id,
+                        'name' => $user->name,
+                        'email' => $user->email,
+                        'department' => $user->department?->name ?? 'No Department'
+                    ];
+                })->toArray()
+            ]);
 
-}
+            $managerService = new \App\Services\ManagerHierarchyService();
+            $managersData = [];
+
+            foreach ($assignedUsers as $user) {
+                Log::info('🔍 Processing user for manager notification', [
+                    'user_id' => $user->id,
+                    'user_name' => $user->name,
+                    'user_email' => $user->email,
+                    'user_department' => $user->department?->name ?? 'No Department'
+                ]);
+
+                if (!$user->department) {
+                    Log::warning('⚠️ User has no department, skipping manager notification', [
+                        'user_id' => $user->id,
+                        'user_name' => $user->name,
+                        'user_email' => $user->email
+                    ]);
+                    continue;
+                }
+
+                $departmentName = $user->department->name;
+
+                Log::info('🏢 Getting managers for department', [
+                    'department_name' => $departmentName,
+                    'user_id' => $user->id,
+                    'user_name' => $user->name
+                ]);
+
+                $managers = $managerService->getManagersForDepartment($departmentName, ['L2']);
+
+                Log::info('👔 Managers found for department', [
+                    'department_name' => $departmentName,
+                    'managers_count' => count($managers['L2']),
+                    'managers_found' => array_map(function($manager) {
+                        return $manager ? [
+                            'id' => $manager['id'],
+                            'name' => $manager['name'],
+                            'email' => $manager['email']
+                        ] : null;
+                    }, $managers['L2'])
+                ]);
+
+                foreach ($managers['L2'] as $manager) {
+                    if (!$manager) {
+                        Log::warning('⚠️ Null manager found, skipping');
+                        continue;
+                    }
+
+                    $managerId = $manager['id'];
+
+                    Log::info('📝 Processing manager for user', [
+                        'manager_id' => $managerId,
+                        'manager_name' => $manager['name'],
+                        'manager_email' => $manager['email'],
+                        'user_id' => $user->id,
+                        'user_name' => $user->name,
+                        'department' => $departmentName
+                    ]);
+
+                    // Get actual User model instead of creating stdClass
+                    if (!isset($managersData[$managerId])) {
+                        $managerUser = User::find($managerId);
+
+                        if (!$managerUser) {
+                            Log::error('❌ Manager user not found in database', [
+                                'manager_id' => $managerId,
+                                'expected_name' => $manager['name'],
+                                'expected_email' => $manager['email']
+                            ]);
+                            continue;
+                        }
+
+                        Log::info('✅ Manager user loaded from database', [
+                            'manager_id' => $managerUser->id,
+                            'manager_name' => $managerUser->name,
+                            'manager_email' => $managerUser->email,
+                            'manager_department' => $managerUser->department?->name ?? 'No Department'
+                        ]);
+
+                        $managersData[$managerId] = [
+                            'manager' => $managerUser,
+                            'users' => collect()
+                        ];
+                    }
+
+                    $managersData[$managerId]['users']->push($user);
+
+                    Log::info('👥 User added to manager team', [
+                        'user_id' => $user->id,
+                        'user_name' => $user->name,
+                        'user_email' => $user->email,
+                        'manager_id' => $managerId,
+                        'manager_name' => $managersData[$managerId]['manager']->name,
+                        'manager_email' => $managersData[$managerId]['manager']->email,
+                        'total_team_members' => $managersData[$managerId]['users']->count()
+                    ]);
+                }
+            }
+
+            Log::info('📊 Manager notifications data prepared', [
+                'total_managers' => count($managersData),
+                'managers_overview' => collect($managersData)->map(function($data, $managerId) {
+                    return [
+                        'manager_id' => $managerId,
+                        'manager_name' => $data['manager']->name,
+                        'manager_email' => $data['manager']->email,
+                        'team_members_count' => $data['users']->count(),
+                        'team_members' => $data['users']->map(function($user) {
+                            return [
+                                'id' => $user->id,
+                                'name' => $user->name,
+                                'email' => $user->email
+                            ];
+                        })->toArray()
+                    ];
+                })->toArray()
+            ]);
+
+            // Send notifications to each manager
+            $successCount = 0;
+            $failureCount = 0;
+
+            foreach ($managersData as $managerId => $managerData) {
+                $manager = $managerData['manager'];
+                $teamMembers = $managerData['users'];
+
+                Log::info('📧 Preparing to send email to manager', [
+                    'manager_id' => $manager->id,
+                    'manager_name' => $manager->name,
+                    'manager_email' => $manager->email,
+                    'team_members_count' => $teamMembers->count(),
+                    'course_name' => $course->name,
+                    'course_privacy' => $course->privacy
+                ]);
+
+                if ($teamMembers->count() === 0) {
+                    Log::warning('⚠️ Manager has no team members assigned, skipping email', [
+                        'manager_id' => $manager->id,
+                        'manager_name' => $manager->name,
+                        'manager_email' => $manager->email
+                    ]);
+                    continue;
+                }
+
+                try {
+                    Log::info('📤 Sending manager notification email', [
+                        'to_email' => $manager->email,
+                        'to_name' => $manager->name,
+                        'from_admin' => $assignedBy->name,
+                        'course_name' => $course->name,
+                        'team_members' => $teamMembers->pluck('email')->toArray(),
+                        'mail_class' => 'CourseAssignmentManagerNotification'
+                    ]);
+                    Mail::to($manager->email)
+                        ->send(new CourseAssignmentManagerNotification(
+                            $course,
+                            $teamMembers,
+                            $assignedBy,
+                            $manager,
+                            [
+                                'assignment_type' => $course->privacy,
+                                'total_assignments' => $assignedUsers->count()
+                            ]
+                        ));
+
+                    $successCount++;
+
+                    Log::info('✅ Manager notification email sent successfully', [
+                        'manager_id' => $manager->id,
+                        'manager_name' => $manager->name,
+                        'manager_email' => $manager->email,
+                        'team_members_count' => $teamMembers->count(),
+                        'team_member_ids' => $teamMembers->pluck('id')->toArray(),
+                        'team_member_emails' => $teamMembers->pluck('email')->toArray(),
+                        'course_id' => $course->id,
+                        'course_name' => $course->name
+                    ]);
+
+                } catch (\Exception $e) {
+                    $failureCount++;
+                    Log::error('❌ Failed to send manager notification email', [
+                        'manager_id' => $manager->id ?? 'unknown',
+                        'manager_name' => $manager->name ?? 'unknown',
+                        'manager_email' => $manager->email ?? 'unknown',
+                        'error_message' => $e->getMessage(),
+                        'error_code' => $e->getCode(),
+                        'error_file' => $e->getFile(),
+                        'error_line' => $e->getLine(),
+                        'full_trace' => $e->getTraceAsString()
+                    ]);
+                }
+
+                // Rate limiting
+                Log::debug('⏱️ Rate limiting - waiting 0.5 seconds before next email');
+                usleep(500000); // 0.5 second delay
+            }
+
+            Log::info('🏁 Manager notifications process completed', [
+                'course_id' => $course->id,
+                'course_name' => $course->name,
+                'successful_notifications' => $successCount,
+                'failed_notifications' => $failureCount,
+                'total_managers_processed' => count($managersData),
+                'assigned_users_count' => $assignedUsers->count(),
+                'summary' => [
+                    'success_rate' => count($managersData) > 0 ? round(($successCount / count($managersData)) * 100, 2) . '%' : '0%',
+                    'emails_sent' => $successCount,
+                    'emails_failed' => $failureCount
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('💥 Manager notification process failed completely', [
+                'course_id' => $course->id,
+                'course_name' => $course->name,
+                'error_message' => $e->getMessage(),
+                'error_code' => $e->getCode(),
+                'error_file' => $e->getFile(),
+                'error_line' => $e->getLine(),
+                'full_trace' => $e->getTraceAsString(),
+                'assigned_users_count' => $assignedUsers->count()
+            ]);
+        }
+    }
+
+
+    }

@@ -1,0 +1,110 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Auth;
+
+class ProfileController extends Controller
+{
+    public function index()
+    {
+        $user = Auth::user()->load([
+            'department',
+            'level',
+            'managerRoles.department',
+            'directReports.department',
+            'directReports.level',
+            'managers.department',
+            'managers.level'
+        ]);
+
+        // Get user's evaluations
+        $evaluations = $user->evaluations()
+            ->with('course')
+            ->orderBy('created_at', 'desc')
+            ->limit(5)
+            ->get()
+            ->map(function ($evaluation) {
+                return [
+                    'id' => $evaluation->id,
+                    'course_name' => $evaluation->course->name ?? 'Unknown Course',
+                    'total_score' => $evaluation->total_score,
+                    'incentive_amount' => $evaluation->incentive_amount,
+                    'created_at' => $evaluation->created_at->toISOString(),
+                ];
+            });
+
+        // Get user's courses
+        $courses = $user->courseRegistrations()
+            ->with('course')
+            ->orderBy('created_at', 'desc')
+            ->limit(5)
+            ->get()
+            ->map(function ($registration) {
+                return [
+                    'id' => $registration->course->id,
+                    'name' => $registration->course->name,
+                    'status' => $registration->status,
+                    'progress' => $registration->progress ?? 0,
+                    'enrolled_at' => $registration->created_at->toISOString(),
+                ];
+            });
+
+        return Inertia::render('User/Profile', [
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'employee_code' => $user->employee_code,
+                'status' => $user->status,
+                'created_at' => $user->created_at->toISOString(),
+                'department' => $user->department ? [
+                    'id' => $user->department->id,
+                    'name' => $user->department->name,
+                    'code' => $user->department->code,
+                ] : null,
+                'level' => $user->level ? [
+                    'id' => $user->level->id,
+                    'code' => $user->level->code,
+                    'name' => $user->level->name,
+                    'hierarchy_level' => $user->level->hierarchy_level,
+                ] : null,
+            ],
+            'managerRoles' => $user->managerRoles->map(function ($role) {
+                return [
+                    'id' => $role->id,
+                    'role_type' => $role->role_type,
+                    'role_display' => $role->role_display,
+                    'department' => $role->department->name ?? 'Unknown',
+                    'authority_level' => $role->authority_level,
+                    'is_primary' => $role->is_primary,
+                    'is_active' => $role->is_active,
+                    'start_date' => $role->start_date?->toDateString(),
+                ];
+            }),
+            'directReports' => $user->directReports->map(function ($report) {
+                return [
+                    'id' => $report->id,
+                    'name' => $report->name,
+                    'email' => $report->email,
+                    'level' => $report->level->code ?? null,
+                    'department' => $report->department->name ?? null,
+                ];
+            }),
+            'managers' => $user->managers->map(function ($manager) {
+                return [
+                    'id' => $manager->id,
+                    'name' => $manager->name,
+                    'email' => $manager->email,
+                    'level' => $manager->level->code ?? null,
+                    'department' => $manager->department->name ?? null,
+                ];
+            }),
+            'evaluations' => $evaluations,
+            'courses' => $courses,
+        ]);
+    }
+}

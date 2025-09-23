@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Department;
 use App\Models\User;
+use App\Models\UserDepartmentRole;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
@@ -229,7 +230,6 @@ class DepartmentController extends Controller
     }
     public function getEmployees(Department $department)
     {
-        dd();
         Log::info('Getting employees for department: ' . $department->name . ' (ID: ' . $department->id . ')');
 
         // Get all L1 users in this department
@@ -263,5 +263,78 @@ class DepartmentController extends Controller
         }
 
         return response()->json($employees);
+    }
+
+    public function assignManager(Request $request, Department $department)
+    {
+        $validated = $request->validate([
+            'user_id' => 'required|exists:users,id',
+            'role_type' => 'required|string|in:department_head,senior_manager,direct_manager,project_manager,team_lead',
+            'is_primary' => 'boolean',
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date|after_or_equal:start_date',
+        ]);
+
+        try {
+            // Check if user already has a role in this department
+            $existingRole = UserDepartmentRole::where('user_id', $validated['user_id'])
+                ->where('department_id', $department->id)
+                ->where('role_type', $validated['role_type'])
+                ->whereNull('end_date')
+                ->first();
+
+            if ($existingRole) {
+                return back()->withErrors(['error' => 'User already has this role in this department.']);
+            }
+
+            // If this is a primary role, remove existing primary roles
+            if ($validated['is_primary'] ?? false) {
+                UserDepartmentRole::where('department_id', $department->id)
+                    ->where('is_primary', true)
+                    ->update(['is_primary' => false]);
+            }
+
+            // Create the manager role with created_by field
+            UserDepartmentRole::create([
+                'user_id' => $validated['user_id'],
+                'department_id' => $department->id,
+                'role_type' => $validated['role_type'],
+                'is_primary' => $validated['is_primary'] ?? false,
+                'start_date' => $validated['start_date'] ?? now(),
+                'end_date' => $validated['end_date']?? null,
+                'created_by' => auth()->id(), // Add the authenticated user's ID
+            ]);
+
+            return redirect()
+                ->route('admin.departments.show', $department)
+                ->with('success', 'Manager assigned successfully.');
+
+        } catch (\Exception $e) {\Log::error('Failed to assign manager: ' . $e->getMessage());
+            return back()->withErrors(['error' => 'Failed to assign manager. Please try again.']);
+        }
+    }
+    public function removeManager(Department $department, UserDepartmentRole $role)
+    {
+        try {
+            // Verify that the role belongs to the department
+            if ($role->department_id !== $department->id) {
+                return back()->withErrors(['error' => 'Invalid role for this department.']);
+            }
+
+            // Terminate the role by setting end_date to now
+            $role->terminate(); // This uses the terminate() method from your model
+
+            return redirect()
+                ->route('admin.departments.show', $department)
+                ->with('success', 'Manager role removed successfully.');
+
+        } catch (\Exception $e) {
+            Log::error('Failed to remove manager: ' . $e->getMessage(), [
+                'department_id' => $department->id,
+                'role_id' => $role->id,
+            ]);
+
+            return back()->withErrors(['error' => 'Failed to remove manager role. Please try again.']);
+        }
     }
 }
