@@ -20,7 +20,7 @@ class ManagerHierarchyService
      */
     public function getManagersForEmployees(array $employeeIds, array $targetLevels = ['L2', 'L3', 'L4']): array
     {
-        $employees = User::with(['userLevel', 'departments'])
+        $employees = User::with(['userLevel', 'department'])
             ->whereIn('id', $employeeIds)
             ->get();
 
@@ -31,17 +31,15 @@ class ManagerHierarchyService
         ];
 
         foreach ($employees as $employee) {
-            $employeeDepartments = $employee->departments->pluck('name')->toArray();
+            $departmentName = $employee->department?->name ?? 'Unknown Department';
 
-            foreach ($employeeDepartments as $departmentName) {
-                $managers = $this->getManagersForDepartment($departmentName, $targetLevels);
+            $managers = $this->getManagersForDepartment($departmentName, $targetLevels);
 
-                foreach ($managers as $level => $levelManagers) {
-                    if (in_array($level, $targetLevels) || in_array('all', $targetLevels)) {
-                        foreach ($levelManagers as $manager) {
-                            // Avoid duplicates using manager ID as key
-                            $managersByLevel[$level][$manager['id']] = $manager;
-                        }
+            foreach ($managers as $level => $levelManagers) {
+                if (in_array($level, $targetLevels) || in_array('all', $targetLevels)) {
+                    foreach ($levelManagers as $manager) {
+                        // Avoid duplicates using manager ID as key
+                        $managersByLevel[$level][$manager['id']] = $manager;
                     }
                 }
             }
@@ -54,7 +52,6 @@ class ManagerHierarchyService
 
         return $managersByLevel;
     }
-
     /**
      * Get managers for a specific department based on your hierarchy
      *
@@ -85,7 +82,6 @@ class ManagerHierarchyService
                 if (in_array('L2', $targetLevels) || in_array('all', $targetLevels)) {
                     $managers['L2'][] = $this->getManagerByName('Hannah');
                 }
-                // Add L3/L4 if they report up to Real Estate
                 if (in_array('L3', $targetLevels) || in_array('all', $targetLevels)) {
                     $managers['L3'][] = $this->getManagerByName('Batool');
                 }
@@ -121,10 +117,10 @@ class ManagerHierarchyService
 
             case 'marketing':
                 if (in_array('L2', $targetLevels) || in_array('all', $targetLevels)) {
-                    $managers['L2'][] = $this->getManagerByName('Alina'); // Project Manager
+                    $managers['L2'][] = $this->getManagerByName('Alina');
                 }
                 if (in_array('L3', $targetLevels) || in_array('all', $targetLevels)) {
-                    $managers['L3'][] = $this->getManagerByName('David'); // Head of Department
+                    $managers['L3'][] = $this->getManagerByName('David');
                 }
                 if (in_array('L4', $targetLevels) || in_array('all', $targetLevels)) {
                     $managers['L4'][] = $this->getManagerByName('Moe');
@@ -141,7 +137,6 @@ class ManagerHierarchyService
 
         return $managers;
     }
-
     /**
      * Get manager information by name
      *
@@ -151,7 +146,7 @@ class ManagerHierarchyService
     private function getManagerByName(string $name): ?array
     {
         $user = User::where('name', 'like', '%' . $name . '%')
-            ->with(['userLevel', 'departments'])
+            ->with(['userLevel', 'department'])
             ->first();
 
         if (!$user) {
@@ -162,11 +157,10 @@ class ManagerHierarchyService
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
-            'level' => $user->userLevel->level_name ?? 'Unknown',
-            'departments' => $user->departments->pluck('name')->toArray()
+            'level' => $user->userLevel->name ?? 'Unknown',
+            'departments' => [$user->department?->name ?? 'No Department']
         ];
     }
-
     /**
      * Get all L1 employees with completed evaluations for filtering
      *
@@ -175,17 +169,13 @@ class ManagerHierarchyService
      */
     public function getL1EmployeesWithEvaluations(array $filters = []): Collection
     {
-        $query = User::with(['userLevel', 'departments', 'evaluations.course', 'evaluations.evaluationHistory'])
-            ->whereHas('userLevel', function($q) {
-                $q->where('level_name', 'L1');
-            })
+        $query = User::with(['userLevel', 'department', 'evaluations.course', 'evaluations.history']) // FIXED: Changed evaluationHistory to history
+        ->where('user_level_id', 1)
             ->whereHas('evaluations');
 
         // Apply filters
         if (!empty($filters['department_id'])) {
-            $query->whereHas('departments', function($q) use ($filters) {
-                $q->where('departments.id', $filters['department_id']);
-            });
+            $query->where('department_id', $filters['department_id']);
         }
 
         if (!empty($filters['course_id'])) {
@@ -208,7 +198,6 @@ class ManagerHierarchyService
 
         return $query->get();
     }
-
     /**
      * Preview notification - show which managers will receive emails
      *
@@ -218,8 +207,8 @@ class ManagerHierarchyService
      */
     public function previewNotification(array $employeeIds, array $targetLevels): array
     {
-        $employees = User::with(['userLevel', 'departments', 'evaluations'])
-            ->whereIn('id', $employeeIds)
+        $employees = User::with(['userLevel', 'department', 'evaluations.history']) // FIXED: Changed evaluationHistory to history
+        ->whereIn('id', $employeeIds)
             ->get();
 
         $managers = $this->getManagersForEmployees($employeeIds, $targetLevels);
@@ -230,8 +219,8 @@ class ManagerHierarchyService
                     'id' => $employee->id,
                     'name' => $employee->name,
                     'email' => $employee->email,
-                    'department' => $employee->departments->first()->name ?? 'No Department',
-                    'level' => $employee->userLevel->level_name ?? 'Unknown',
+                    'department' => $employee->department?->name ?? 'No Department',
+                    'level' => $employee->userLevel?->name ?? 'Unknown',
                     'evaluation_count' => $employee->evaluations->count()
                 ];
             })->toArray(),
@@ -239,15 +228,13 @@ class ManagerHierarchyService
             'summary' => [
                 'total_employees' => count($employeeIds),
                 'total_managers' => array_sum(array_map('count', $managers)),
-                'departments' => $employees->pluck('departments')->flatten()->pluck('name')->unique()->values()->toArray(),
+                'departments' => $employees->pluck('department.name')->filter()->unique()->values()->toArray(),
                 'target_levels' => $targetLevels
             ]
         ];
 
         return $preview;
-    }
-
-    /**
+    }    /**
      * Validate that employees are L1 level
      *
      * @param array $employeeIds
@@ -263,13 +250,13 @@ class ManagerHierarchyService
         $invalid = [];
 
         foreach ($employees as $employee) {
-            if ($employee->userLevel && $employee->userLevel->level_name === 'L1') {
+            if ($employee->user_level_id == 1) { // Check user_level_id directly
                 $valid[] = $employee->id;
             } else {
                 $invalid[] = [
                     'id' => $employee->id,
                     'name' => $employee->name,
-                    'level' => $employee->userLevel->level_name ?? 'Unknown'
+                    'level' => $employee->userLevel?->name ?? 'Unknown'
                 ];
             }
         }
@@ -279,7 +266,6 @@ class ManagerHierarchyService
             'invalid' => $invalid
         ];
     }
-
     /**
      * Get department hierarchy chain for display
      *
@@ -336,5 +322,122 @@ class ManagerHierarchyService
         }
 
         return $hierarchy;
+    }
+
+    public function getManagersForUser(int $userId, array $targetLevels = ['L2', 'L3', 'L4']): array
+    {
+        $user = User::with(['userLevel', 'department'])
+            ->find($userId);
+
+        if (!$user) {
+            return [];
+        }
+
+        $departmentName = $user->department?->name ?? 'Unknown Department';
+        $managers = $this->getManagersForDepartment($departmentName, $targetLevels);
+
+        // Convert to the format expected by the controller
+        $result = [];
+        foreach ($managers as $level => $levelManagers) {
+            foreach ($levelManagers as $manager) {
+                if ($manager) {
+                    $result[] = [
+                        'manager' => (object) [
+                            'id' => $manager['id'],
+                            'name' => $manager['name'],
+                            'email' => $manager['email'],
+                            'level' => $manager['level'],
+                            'departments' => $manager['departments']
+                        ],
+                        'level' => $level,
+                        'relationship' => 'department_hierarchy'
+                    ];
+                }
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * 🎯 ALTERNATIVE: Get direct managers for a user (simpler approach)
+     *
+     * @param int $userId
+     * @return array
+     */
+    public function getDirectManagersForUser(int $userId): array
+    {
+        $user = User::with(['department'])->find($userId);
+
+        if (!$user) {
+            return [];
+        }
+
+        // Get L2 managers only (direct managers)
+        $departmentName = $user->department?->name ?? 'Unknown Department';
+        $managers = $this->getManagersForDepartment($departmentName, ['L2']);
+
+        $result = [];
+        foreach ($managers['L2'] as $manager) {
+            if ($manager) {
+                $result[] = [
+                    'manager' => (object) [
+                        'id' => $manager['id'],
+                        'name' => $manager['name'],
+                        'email' => $manager['email'],
+                        'level' => $manager['level'],
+                        'departments' => $manager['departments']
+                    ],
+                    'level' => 'L2',
+                    'relationship' => 'direct_manager'
+                ];
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * 🎯 BULK VERSION: Get managers for multiple users (optimized)
+     *
+     * @param array $userIds
+     * @param array $targetLevels
+     * @return array
+     */
+    public function getManagersForMultipleUsers(array $userIds, array $targetLevels = ['L2']): array
+    {
+        $users = User::with(['department'])
+            ->whereIn('id', $userIds)
+            ->get();
+
+        $managersByUser = [];
+
+        foreach ($users as $user) {
+            $departmentName = $user->department?->name ?? 'Unknown Department';
+            $managers = $this->getManagersForDepartment($departmentName, $targetLevels);
+
+            $userManagers = [];
+            foreach ($managers as $level => $levelManagers) {
+                foreach ($levelManagers as $manager) {
+                    if ($manager) {
+                        $userManagers[] = [
+                            'manager' => (object) [
+                                'id' => $manager['id'],
+                                'name' => $manager['name'],
+                                'email' => $manager['email'],
+                                'level' => $manager['level'],
+                                'departments' => $manager['departments']
+                            ],
+                            'level' => $level,
+                            'relationship' => 'department_hierarchy'
+                        ];
+                    }
+                }
+            }
+
+            $managersByUser[$user->id] = $userManagers;
+        }
+
+        return $managersByUser;
     }
 }

@@ -3,6 +3,9 @@ import { Link, router } from '@inertiajs/vue3'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import { ref } from 'vue'
 import { type BreadcrumbItemType } from '@/types'
+import NotificationModal from '@/components/modals/NotificationModal.vue'
+import ConfirmationModal from '@/components/modals/ConfirmationModal.vue'
+import LoadingModal from '@/components/modals/LoadingModal.vue'
 
 const props = defineProps({
     department: Object,
@@ -10,50 +13,102 @@ const props = defineProps({
     users: Array,
 })
 
+// Modal states
 const showAddManagerModal = ref(false)
+const showNotification = ref(false)
+const showConfirmation = ref(false)
+const showLoading = ref(false)
+
+// Form states
 const selectedManagerType = ref('')
 const selectedManager = ref('')
 const availableManagers = ref([])
 
-// Remove manager role
-const removeManagerRole = (roleId: number) => {
-    if (!confirm('Are you sure you want to remove this manager role?')) {
-        return;
-    }
+// Notification states
+const notification = ref({
+    type: 'info',
+    title: '',
+    message: ''
+})
 
-    router.delete(route('admin.departments.remove-manager', {
-        department: props.department.id,
-        role: roleId
-    }), {
-        preserveState: true,
-        onSuccess: () => {
-            alert('Manager role removed successfully!');
-        },
-        onError: (errors) => {
-            console.error('Remove failed:', errors);
-            alert('Failed to remove manager role. Please try again.');
+// Confirmation states
+const confirmation = ref({
+    title: '',
+    message: '',
+    action: null as (() => void) | null
+})
+
+const loading = ref({
+    message: 'Loading...'
+})
+
+// Helper function to show notifications
+const showNotificationModal = (type: string, title: string, message: string) => {
+    notification.value = { type, title, message }
+    showNotification.value = true
+}
+
+// Helper function to show confirmations
+const showConfirmationModal = (title: string, message: string, action: () => void) => {
+    confirmation.value = { title, message, action }
+    showConfirmation.value = true
+}
+
+// Remove manager role with confirmation
+const removeManagerRole = (roleId: number) => {
+    showConfirmationModal(
+        'Remove Manager Role',
+        'Are you sure you want to remove this manager role? This action cannot be undone.',
+        () => {
+            showLoading.value = true
+            loading.value.message = 'Removing manager role...'
+
+            router.delete(route('admin.departments.remove-manager', {
+                department: props.department.id,
+                role: roleId
+            }), {
+                preserveState: true,
+                onSuccess: () => {
+                    showLoading.value = false
+                    showNotificationModal('success', 'Success', 'Manager role removed successfully!')
+                },
+                onError: (errors) => {
+                    showLoading.value = false
+                    console.error('Remove failed:', errors)
+                    showNotificationModal('error', 'Error', 'Failed to remove manager role. Please try again.')
+                }
+            })
         }
-    });
+    )
 }
 
 // Load manager candidates
 const loadManagerCandidates = async () => {
     try {
+        showLoading.value = true
+        loading.value.message = 'Loading available managers...'
+
         const response = await fetch(route('admin.departments.manager-candidates', props.department.id))
         availableManagers.value = await response.json()
+
+        showLoading.value = false
         showAddManagerModal.value = true
     } catch (error) {
+        showLoading.value = false
         console.error('Failed to load manager candidates:', error)
-        alert('Failed to load manager candidates')
+        showNotificationModal('error', 'Error', 'Failed to load manager candidates. Please try again.')
     }
 }
 
 // Assign new manager
 const assignManager = () => {
     if (!selectedManager.value || !selectedManagerType.value) {
-        alert('Please select both manager and role type')
+        showNotificationModal('warning', 'Validation Error', 'Please select both manager and role type.')
         return
     }
+
+    showLoading.value = true
+    loading.value.message = 'Assigning manager...'
 
     router.post(route('admin.departments.assign-manager', props.department.id), {
         user_id: selectedManager.value,
@@ -62,16 +117,41 @@ const assignManager = () => {
     }, {
         preserveState: true,
         onSuccess: () => {
-            alert('Manager assigned successfully!')
+            showLoading.value = false
             showAddManagerModal.value = false
             selectedManager.value = ''
             selectedManagerType.value = ''
+            showNotificationModal('success', 'Success', 'Manager assigned successfully!')
         },
         onError: (errors) => {
+            showLoading.value = false
             console.error('Assign failed:', errors)
-            alert('Failed to assign manager. Please try again.')
+            showNotificationModal('error', 'Error', 'Failed to assign manager. Please try again.')
         }
     })
+}
+
+// Handle confirmation
+const handleConfirmation = () => {
+    showConfirmation.value = false
+    if (confirmation.value.action) {
+        confirmation.value.action()
+    }
+}
+
+// Close modals
+const closeNotification = () => {
+    showNotification.value = false
+}
+
+const closeConfirmation = () => {
+    showConfirmation.value = false
+}
+
+const closeAddManagerModal = () => {
+    showAddManagerModal.value = false
+    selectedManager.value = ''
+    selectedManagerType.value = ''
 }
 
 // Get role type badge color
@@ -288,7 +368,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                                 <div class="flex-shrink-0">
                                     <button
                                         @click="removeManagerRole(role.id)"
-                                        class="text-red-600 hover:text-red-900 text-sm"
+                                        class="text-red-600 hover:text-red-900 text-sm font-medium transition-colors"
                                     >
                                         Remove
                                     </button>
@@ -306,7 +386,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                             <div class="mt-6">
                                 <button
                                     @click="loadManagerCandidates"
-                                    class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                                    class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
                                 >
                                     Add Manager
                                 </button>
@@ -351,7 +431,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                                 <div class="flex-shrink-0">
                                     <Link
                                         :href="route('admin.users.organizational', user.id)"
-                                        class="text-blue-600 hover:text-blue-900 text-sm"
+                                        class="text-blue-600 hover:text-blue-900 text-sm font-medium transition-colors"
                                     >
                                         View
                                     </Link>
@@ -369,7 +449,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                             <div class="mt-6">
                                 <Link
                                     :href="route('admin.users.assignment')"
-                                    class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                                    class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
                                 >
                                     Assign Users
                                 </Link>
@@ -412,7 +492,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                                 <div class="flex-shrink-0">
                                     <Link
                                         :href="route('admin.departments.show', child.id)"
-                                        class="text-blue-600 hover:text-blue-900 text-sm"
+                                        class="text-blue-600 hover:text-blue-900 text-sm font-medium transition-colors"
                                     >
                                         View Details
                                     </Link>
@@ -427,20 +507,27 @@ const breadcrumbs: BreadcrumbItemType[] = [
         <!-- Add Manager Modal -->
         <div v-if="showAddManagerModal" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
             <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-                <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" @click="showAddManagerModal = false"></div>
+                <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" @click="closeAddManagerModal"></div>
 
                 <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
                     <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
-                            Add Manager to {{ department.name }}
-                        </h3>
+                        <div class="flex items-center mb-4">
+                            <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10">
+                                <svg class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                </svg>
+                            </div>
+                            <h3 class="ml-4 text-lg leading-6 font-medium text-gray-900">
+                                Add Manager to {{ department.name }}
+                            </h3>
+                        </div>
 
                         <div class="space-y-4">
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Manager</label>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Manager</label>
                                 <select
                                     v-model="selectedManager"
-                                    class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                                 >
                                     <option value="">Select Manager</option>
                                     <option v-for="manager in availableManagers" :key="manager.id" :value="manager.id">
@@ -450,10 +537,10 @@ const breadcrumbs: BreadcrumbItemType[] = [
                             </div>
 
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Role Type</label>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Role Type</label>
                                 <select
                                     v-model="selectedManagerType"
-                                    class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                                 >
                                     <option value="">Select Role Type</option>
                                     <option value="department_head">Department Head</option>
@@ -470,14 +557,16 @@ const breadcrumbs: BreadcrumbItemType[] = [
                         <button
                             @click="assignManager"
                             type="button"
-                            class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm"
+                            class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm transition-colors"
+                            :disabled="!selectedManager || !selectedManagerType"
+                            :class="{ 'opacity-50 cursor-not-allowed': !selectedManager || !selectedManagerType }"
                         >
                             Assign Manager
                         </button>
                         <button
-                            @click="showAddManagerModal = false"
+                            @click="closeAddManagerModal"
                             type="button"
-                            class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                            class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm transition-colors"
                         >
                             Cancel
                         </button>
@@ -485,5 +574,32 @@ const breadcrumbs: BreadcrumbItemType[] = [
                 </div>
             </div>
         </div>
+
+        <!-- Modal Components -->
+        <NotificationModal
+            :show="showNotification"
+            :type="notification.type"
+            :title="notification.title"
+            :message="notification.message"
+            :auto-close="true"
+            :duration="4000"
+            @close="closeNotification"
+        />
+
+        <ConfirmationModal
+            :show="showConfirmation"
+            :title="confirmation.title"
+            :message="confirmation.message"
+            confirm-text="Yes, Remove"
+            cancel-text="Cancel"
+            type="danger"
+            @confirm="handleConfirmation"
+            @cancel="closeConfirmation"
+        />
+
+        <LoadingModal
+            :show="showLoading"
+            :message="loading.message"
+        />
     </AdminLayout>
 </template>

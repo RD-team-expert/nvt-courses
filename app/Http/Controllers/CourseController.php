@@ -7,11 +7,13 @@ use App\Models\CourseCompletion;
 use App\Models\CourseRegistration;
 use App\Models\CourseAvailability;
 use App\Models\CourseAssignment;
+use App\Models\User;
 use App\Services\CourseService;
 use App\Events\CourseEnrolled;
 use App\Events\CourseCompleted;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Log;
 
@@ -96,11 +98,23 @@ class CourseController extends Controller
     /**
      * Enhanced enroll method with course availability selection
      */
+    /**
+     * Enhanced enroll method with course availability selection and manager notifications
+     */
     public function enroll(Request $request, Course $course)
     {
         try {
-
             $user = auth()->user();
+
+            Log::info('🎯 Starting enrollment process', [
+                'user_id' => $user->id,
+                'user_name' => $user->name,
+                'user_email' => $user->email,
+                'course_id' => $course->id,
+                'course_name' => $course->name,
+                'course_privacy' => $course->privacy,
+                'user_department' => $user->department?->name ?? 'No Department'
+            ]);
 
             // Validate course availability selection
             $validated = $request->validate([
@@ -117,24 +131,42 @@ class CourseController extends Controller
                     ->first();
 
                 if (!$availability) {
+                    Log::warning('❌ Invalid availability selection', [
+                        'user_id' => $user->id,
+                        'course_id' => $course->id,
+                        'requested_availability_id' => $validated['course_availability_id']
+                    ]);
                     return back()->withErrors(['message' => 'Invalid availability selection.']);
                 }
 
                 // ✅ Check if availability is still available
                 if (!$availability->is_available) {
+                    Log::warning('❌ Availability no longer available', [
+                        'user_id' => $user->id,
+                        'course_id' => $course->id,
+                        'availability_id' => $availability->id
+                    ]);
                     return back()->withErrors(['message' => 'This date range is no longer available.']);
                 }
+
                 // ✅ Check if there are available sessions (capacity)
                 if ($availability->sessions <= 0) {
+                    Log::warning('❌ No sessions available', [
+                        'user_id' => $user->id,
+                        'course_id' => $course->id,
+                        'availability_id' => $availability->id,
+                        'sessions_remaining' => $availability->sessions
+                    ]);
                     return back()->withErrors(['message' => 'No sessions available for this schedule. Fully booked!']);
                 }
 
                 // Log the enrollment attempt
-                Log::info('Enrollment attempt', [
+                Log::info('📝 Proceeding with enrollment', [
                     'user_id' => $user->id,
                     'course_id' => $course->id,
                     'availability_id' => $availability->id,
-                    'sessions_before' => $availability->sessions
+                    'sessions_before' => $availability->sessions,
+                    'capacity_before' => $availability->capacity
                 ]);
 
                 // Check if already enrolled
@@ -143,12 +175,16 @@ class CourseController extends Controller
                     ->exists();
 
                 if ($existingEnrollment) {
+                    Log::info('ℹ️ User already enrolled', [
+                        'user_id' => $user->id,
+                        'course_id' => $course->id
+                    ]);
                     return redirect()->route('courses.show', $course->id)
                         ->with('info', 'You are already enrolled in this course.');
                 }
 
                 // ✅ Create enrollment record
-                CourseRegistration::create([
+                $enrollment = CourseRegistration::create([
                     'course_id' => $course->id,
                     'user_id' => $user->id,
                     'course_availability_id' => $availability->id,
@@ -156,14 +192,40 @@ class CourseController extends Controller
                     'registered_at' => now()
                 ]);
 
-                // ✅ DECREASE SESSIONS BY 1 (This is what you wanted!)
+                // ✅ DECREASE CAPACITY BY 1 (This reduces available spots)
                 $availability->decrement('capacity');
 
-                Log::info('User enrolled successfully', [
+                Log::info('✅ User enrolled successfully - database updated', [
+                    'user_id' => $user->id,
+                    'user_name' => $user->name,
+                    'course_id' => $course->id,
+                    'course_name' => $course->name,
+                    'availability_id' => $availability->id,
+                    'enrollment_id' => $enrollment->id,
+                    'sessions_after' => $availability->sessions,
+                    'capacity_after' => $availability->capacity - 1
+                ]);
+
+                // 🎯 NEW: Send manager notification for public course enrollment
+                if ($course->privacy === 'public') {
+                    Log::info('📧 Course is public, sending manager notifications', [
+                        'course_privacy' => $course->privacy,
+                        'user_department' => $user->department?->name ?? 'No Department'
+                    ]);
+
+                    $this->notifyManagersOnPublicEnrollment($course, $user);
+                } else {
+                    Log::info('ℹ️ Course is private, skipping public enrollment manager notifications', [
+                        'course_privacy' => $course->privacy
+                    ]);
+                }
+
+                Log::info('🏁 Enrollment process completed successfully', [
                     'user_id' => $user->id,
                     'course_id' => $course->id,
-                    'availability_id' => $availability->id,
-                    'sessions_after' => $availability->sessions - 1
+                    'enrollment_id' => $enrollment->id,
+                    'manager_notification' => $course->privacy === 'public' ? 'sent' : 'skipped',
+                    'redirect_to' => 'courses.show'
                 ]);
 
                 return redirect()->route('courses.show', $course->id)
@@ -171,16 +233,23 @@ class CourseController extends Controller
             });
 
         } catch (\Exception $e) {
-            Log::error('Enrollment error', [
-                'message' => $e->getMessage(),
-                'course_id' => $course->id,
-                'user_id' => auth()->id()
+            Log::error('💥 Enrollment process failed', [
+                'user_id' => $user->id ?? 'unknown',
+                'course_id' => $course->id ?? 'unknown',
+                'error_message' => $e->getMessage(),
+                'error_file' => $e->getFile(),
+                'error_line' => $e->getLine(),
+                'stack_trace' => $e->getTraceAsString()
             ]);
 
             return redirect()->route('courses.show', $course->id)
                 ->with('error', 'An error occurred while enrolling. Please try again.');
         }
     }
+
+    /**
+     * 🎯 NEW: Notify managers about public course enrollments
+     */
 
 
     /**
@@ -410,6 +479,115 @@ class CourseController extends Controller
         return redirect()->route('courses.show', $id)
             ->with('success', 'Thank you for your rating!');
     }
+    private function notifyManagersOnPublicEnrollment(Course $course, User $enrolledUser)
+    {
+        try {
+            Log::info('🎯 Starting manager notifications for public course enrollment', [
+                'course_id' => $course->id,
+                'course_name' => $course->name,
+                'enrolled_user_id' => $enrolledUser->id,
+                'enrolled_user_name' => $enrolledUser->name,
+                'enrolled_user_department' => $enrolledUser->department?->name ?? 'No Department'
+            ]);
 
+            if (!$enrolledUser->department) {
+                Log::warning('⚠️ User has no department, skipping manager notification', [
+                    'user_id' => $enrolledUser->id,
+                    'user_name' => $enrolledUser->name,
+                    'user_email' => $enrolledUser->email
+                ]);
+                return;
+            }
+
+            $managerService = new \App\Services\ManagerHierarchyService();
+            $departmentName = $enrolledUser->department->name;
+            $managers = $managerService->getManagersForDepartment($departmentName, ['L2']);
+
+            Log::info('👔 Managers found for public enrollment', [
+                'department_name' => $departmentName,
+                'managers_count' => count($managers['L2']),
+                'managers_found' => array_map(function($manager) {
+                    return $manager ? [
+                        'id' => $manager['id'],
+                        'name' => $manager['name'],
+                        'email' => $manager['email']
+                    ] : null;
+                }, $managers['L2'])
+            ]);
+
+            $successCount = 0;
+            $failureCount = 0;
+
+            foreach ($managers['L2'] as $manager) {
+                if (!$manager) continue;
+
+                try {
+                    $managerUser = User::find($manager['id']);
+
+                    if (!$managerUser) {
+                        Log::error('❌ Manager user not found in database', [
+                            'manager_id' => $manager['id'],
+                            'expected_name' => $manager['name']
+                        ]);
+                        continue;
+                    }
+
+                    Log::info('📤 Sending public enrollment notification to manager', [
+                        'to_email' => $managerUser->email,
+                        'to_name' => $managerUser->name,
+                        'enrolled_user' => $enrolledUser->name,
+                        'course_name' => $course->name
+                    ]);
+
+                    Mail::to($managerUser->email)
+                        ->send(new \App\Mail\PublicCourseEnrollmentNotification(
+                            $course,
+                            $enrolledUser,
+                            $managerUser,
+                            [
+                                'enrollment_type' => 'self_enrollment',
+                                'course_type' => 'public'
+                            ]
+                        ));
+
+                    $successCount++;
+
+                    Log::info('✅ Public enrollment notification sent successfully', [
+                        'manager_id' => $managerUser->id,
+                        'manager_email' => $managerUser->email,
+                        'enrolled_user_id' => $enrolledUser->id,
+                        'enrolled_user_name' => $enrolledUser->name,
+                        'course_id' => $course->id,
+                        'course_name' => $course->name
+                    ]);
+
+                } catch (\Exception $e) {
+                    $failureCount++;
+                    Log::error('❌ Failed to send public enrollment notification', [
+                        'manager_id' => $manager['id'] ?? 'unknown',
+                        'manager_email' => $manager['email'] ?? 'unknown',
+                        'error_message' => $e->getMessage()
+                    ]);
+                }
+
+                // Rate limiting
+                usleep(500000); // 0.5 second delay
+            }
+
+            Log::info('🏁 Public enrollment notifications completed', [
+                'course_id' => $course->id,
+                'enrolled_user_id' => $enrolledUser->id,
+                'successful_notifications' => $successCount,
+                'failed_notifications' => $failureCount
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('💥 Public enrollment notification process failed', [
+                'course_id' => $course->id,
+                'enrolled_user_id' => $enrolledUser->id,
+                'error_message' => $e->getMessage()
+            ]);
+        }
+    }
 
 }

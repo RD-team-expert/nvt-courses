@@ -110,8 +110,8 @@ class UserDepartmentRoleController extends Controller
                 ];
             });
 
-        \Log::info('Controller data:');
-        \Log::info('Employees count: ' . $employees->count());
+        Log::info('Controller data:');
+        Log::info('Employees count: ' . $employees->count());
 
         foreach ($employees as $emp) {
             \Log::info("Employee: {$emp['name']} | Level: {$emp['level']} | Department: {$emp['department']}");
@@ -238,7 +238,17 @@ class UserDepartmentRoleController extends Controller
      */
     public function edit(UserDepartmentRole $userDepartmentRole): Response
     {
-        $employees = User::where('status', 'active')
+        $userDepartmentRole->load([
+            'manager.userLevel',
+            'department',
+            'managedUser.userLevel',
+        ]);
+
+        // Get managers who can be assigned roles (L2, L3, L4)
+        $managers = User::whereHas('userLevel', function ($query) {
+            $query->where('hierarchy_level', '>=', 2);
+        })
+            ->where('status', 'active')
             ->with('userLevel', 'department')
             ->get()
             ->map(function ($user) {
@@ -247,11 +257,69 @@ class UserDepartmentRoleController extends Controller
                     'name' => $user->name,
                     'email' => $user->email,
                     'level' => $user->userLevel?->name,
+                    'department' => $user->department?->name,
+                ];
+            });
+
+        // Get all active departments
+        $departments = Department::where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'department_code']);
+
+        // Get employees who can be managed (L1 users)
+        $employees = User::where('status', 'active')
+            ->whereHas('userLevel', function ($query) {
+                $query->where('code', 'L1');
+            })
+            ->with(['userLevel', 'department'])
+            ->get()
+            ->map(function ($user) {
+                return [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'level' => $user->userLevel?->name,
+                    'levelcode' => $user->userLevel?->code,
+                    'department' => $user->department?->name,
+                    'department_id' => $user->department_id,
+                    'employee_code' => $user->employee_code,
                 ];
             });
 
         return Inertia::render('Admin/ManagerRoles/Edit', [
-            'role' => $userDepartmentRole,
+            'role' => [
+                'id' => $userDepartmentRole->id,
+                'user_id' => $userDepartmentRole->user_id,
+                'department_id' => $userDepartmentRole->department_id,
+                'role_type' => $userDepartmentRole->role_type,
+                'manages_user_id' => $userDepartmentRole->manages_user_id,
+                'is_primary' => $userDepartmentRole->is_primary,
+                'authority_level' => $userDepartmentRole->authority_level,
+                // ✅ FIXED: Safe date formatting with null checks
+                'start_date' => $userDepartmentRole->start_date ? $userDepartmentRole->start_date->format('Y-m-d') : now()->format('Y-m-d'),
+                'end_date' => $userDepartmentRole->end_date?->format('Y-m-d'),
+                'notes' => $userDepartmentRole->notes,
+                // Current assignments for display
+                'manager' => $userDepartmentRole->manager ? [
+                    'id' => $userDepartmentRole->manager->id,
+                    'name' => $userDepartmentRole->manager->name,
+                    'email' => $userDepartmentRole->manager->email,
+                    'level' => $userDepartmentRole->manager->userLevel?->name,
+                ] : null,
+                'department' => $userDepartmentRole->department ? [
+                    'id' => $userDepartmentRole->department->id,
+                    'name' => $userDepartmentRole->department->name,
+                    'code' => $userDepartmentRole->department->department_code,
+                ] : null,
+                'managed_user' => $userDepartmentRole->managedUser ? [
+                    'id' => $userDepartmentRole->managedUser->id,
+                    'name' => $userDepartmentRole->managedUser->name,
+                    'email' => $userDepartmentRole->managedUser->email,
+                    'level' => $userDepartmentRole->managedUser->userLevel?->name,
+                ] : null,
+            ],
+            'managers' => $managers,
+            'departments' => $departments,
             'employees' => $employees,
             'roleTypes' => [
                 'direct_manager' => 'Direct Manager',
@@ -262,27 +330,61 @@ class UserDepartmentRoleController extends Controller
             ]
         ]);
     }
-
     /**
      * Update role assignment
      */
     public function update(Request $request, UserDepartmentRole $userDepartmentRole)
     {
         $validated = $request->validate([
+            'user_id' => 'required|exists:users,id',
+            'department_id' => 'required|exists:departments,id',
+            'role_type' => 'required|in:direct_manager,project_manager,department_head,senior_manager,team_lead',
             'manages_user_id' => 'nullable|exists:users,id',
             'is_primary' => 'boolean',
             'authority_level' => 'required|integer|min:1|max:3',
+            'start_date' => 'required|date',
             'end_date' => 'nullable|date|after:start_date',
             'notes' => 'nullable|string',
         ]);
 
-        $userDepartmentRole->update($validated);
+        // Check for conflicts (excluding current role)
+        $existingRole = UserDepartmentRole::where('user_id', $validated['user_id'])
+            ->where('department_id', $validated['department_id'])
+            ->where('role_type', $validated['role_type'])
+            ->where('id', '!=', $userDepartmentRole->id)
+            ->active()
+            ->first();
 
-        return redirect()
-            ->route('admin.manager-roles.show', $userDepartmentRole)
-            ->with('success', 'Manager role updated successfully.');
+        if ($existingRole) {
+            return back()->withErrors([
+                'role_conflict' => 'User already has this role in the department.'
+            ]);
+        }
+
+        // Clear manages_user_id if not managing specific user
+        if (!$validated['manages_user_id']) {
+            $validated['manages_user_id'] = null;
+        }
+
+        // ✅ FIXED: Ensure start_date is not null
+        if (!$validated['start_date']) {
+            $validated['start_date'] = now()->format('Y-m-d');
+        }
+
+        try {
+            $userDepartmentRole->update($validated);
+
+            return redirect()
+                ->route('admin.manager-roles.show', $userDepartmentRole)
+                ->with('success', 'Manager role updated successfully.');
+        } catch (\Exception $e) {
+            \Log::error('Failed to update manager role: ' . $e->getMessage());
+
+            return back()->withErrors([
+                'update_error' => 'Failed to update manager role. Please try again.'
+            ]);
+        }
     }
-
     /**
      * Terminate role assignment
      */

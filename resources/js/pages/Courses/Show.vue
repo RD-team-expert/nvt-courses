@@ -14,6 +14,27 @@ const props = defineProps({
     completion: Object,
 })
 
+// ✅ ERROR ALERT SYSTEM
+const showErrorAlert = ref(false)
+const errorMessage = ref('')
+const errorTitle = ref('')
+
+// Function to show user-friendly error alerts
+const showAlert = (title: string, message: string) => {
+    errorTitle.value = title
+    errorMessage.value = message
+    showErrorAlert.value = true
+
+    // Auto-hide after 6 seconds
+    setTimeout(() => {
+        showErrorAlert.value = false
+    }, 6000)
+}
+
+const closeAlert = () => {
+    showErrorAlert.value = false
+}
+
 // Reactive key for forcing re-render
 const componentKey = ref(0)
 
@@ -61,6 +82,15 @@ function submitRating() {
         },
         onError: (errors) => {
             console.error('❌ Rating submission failed:', errors);
+
+            // Show user-friendly error alert
+            if (errors.message) {
+                showAlert('Rating Submission Failed', errors.message)
+            } else if (errors.feedback) {
+                showAlert('Feedback Required', errors.feedback)
+            } else {
+                showAlert('Rating Error', 'There was an error submitting your rating. Please try again.')
+            }
         }
     });
 }
@@ -70,12 +100,12 @@ const enrollForm = useForm({
     course_availability_id: null
 })
 
-// Function to handle enrollment
+// ✅ ENHANCED ENROLLMENT FUNCTION WITH USER-FRIENDLY ERROR HANDLING
 function enroll() {
     console.log('=== ENROLLMENT DEBUG START ===');
 
     if (props.availabilities && props.availabilities.length > 0 && !enrollForm.course_availability_id) {
-        alert('Please select a date range before enrolling.');
+        showAlert('Session Selection Required', 'Please select a session schedule before enrolling in this course.')
         return;
     }
 
@@ -87,6 +117,41 @@ function enroll() {
         },
         onError: (errors) => {
             console.error('❌ Enrollment FAILED!', errors);
+
+            // ✅ USER-FRIENDLY ERROR HANDLING
+            if (errors.message) {
+                // Handle specific server messages
+                if (errors.message.includes('no longer available')) {
+                    showAlert(
+                        '📅 Session No Longer Available',
+                        'Sorry, the selected session schedule is no longer available. Please choose a different session or refresh the page to see updated availability.'
+                    )
+                } else if (errors.message.includes('fully booked')) {
+                    showAlert(
+                        '📋 Session Fully Booked',
+                        'This session is now fully booked. Please select a different session schedule with available spots.'
+                    )
+                } else if (errors.message.includes('already enrolled')) {
+                    showAlert(
+                        '✅ Already Enrolled',
+                        'You are already enrolled in this course. Please refresh the page to see your current enrollment status.'
+                    )
+                } else {
+                    showAlert('Enrollment Error', errors.message)
+                }
+            } else if (errors.course_availability_id) {
+                showAlert('Session Selection Error', errors.course_availability_id)
+            } else {
+                showAlert(
+                    '⚠️ Enrollment Failed',
+                    'We encountered an issue while processing your enrollment. Please refresh the page and try again, or contact support if the problem persists.'
+                )
+            }
+
+            // Refresh the page data to show updated availability
+            setTimeout(() => {
+                router.reload({ only: ['availabilities', 'isEnrolled', 'userStatus'] });
+            }, 3000);
         }
     });
 }
@@ -103,6 +168,12 @@ function markCompleted() {
         },
         onError: (errors) => {
             console.error('❌ Failed to mark course as completed:', errors);
+
+            if (errors.message) {
+                showAlert('Completion Error', errors.message)
+            } else {
+                showAlert('Unable to Complete', 'There was an error marking this course as completed. Please try again.')
+            }
         }
     });
 }
@@ -242,6 +313,78 @@ const breadcrumbs: BreadcrumbItemType[] = [
     @apply text-xs text-gray-600 space-y-1;
 }
 
+/* ✅ ERROR ALERT STYLES */
+.error-alert {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 50;
+    max-width: 400px;
+    background: white;
+    border-left: 4px solid #ef4444;
+    border-radius: 8px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    transform: translateX(100%);
+    transition: transform 0.3s ease-in-out;
+}
+
+.error-alert.show {
+    transform: translateX(0);
+}
+
+.alert-content {
+    padding: 16px;
+}
+
+.alert-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.alert-title {
+    font-weight: 600;
+    color: #dc2626;
+    font-size: 14px;
+    line-height: 20px;
+}
+
+.close-button {
+    background: none;
+    border: none;
+    color: #6b7280;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    padding: 0;
+    margin-left: 12px;
+}
+
+.close-button:hover {
+    color: #374151;
+}
+
+.alert-message {
+    color: #374151;
+    font-size: 13px;
+    line-height: 18px;
+}
+
+.alert-progress {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    background: #ef4444;
+    animation: progress 6s linear forwards;
+}
+
+@keyframes progress {
+    from { width: 100%; }
+    to { width: 0%; }
+}
+
 @media (max-width: 768px) {
     .course-details-grid {
         grid-template-columns: 1fr;
@@ -249,11 +392,38 @@ const breadcrumbs: BreadcrumbItemType[] = [
     .course-image-container {
         padding-top: 75%; /* 4:3 Aspect Ratio for mobile */
     }
+
+    .error-alert {
+        top: 10px;
+        right: 10px;
+        left: 10px;
+        max-width: none;
+        transform: translateY(-100%);
+    }
+
+    .error-alert.show {
+        transform: translateY(0);
+    }
 }
 </style>
 
 <template>
     <AppLayout :breadcrumbs="breadcrumbs">
+        <!-- ✅ ERROR ALERT POPUP -->
+        <div
+            :class="['error-alert', { 'show': showErrorAlert }]"
+            v-if="showErrorAlert"
+        >
+            <div class="alert-content">
+                <div class="alert-header">
+                    <div class="alert-title">{{ errorTitle }}</div>
+                    <button @click="closeAlert" class="close-button">×</button>
+                </div>
+                <div class="alert-message">{{ errorMessage }}</div>
+            </div>
+            <div class="alert-progress"></div>
+        </div>
+
         <div class="container px-4 mx-auto py-6 sm:py-8 max-w-7xl">
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 sm:mb-8">
                 <h1 class="text-2xl sm:text-3xl font-bold text-gray-800">{{ course.name }}</h1>

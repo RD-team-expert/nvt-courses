@@ -3,37 +3,74 @@ import { Link, router } from '@inertiajs/vue3'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import { ref, computed, watch } from 'vue'
 import { type BreadcrumbItemType } from '@/types'
+import NotificationModal from '@/components/modals/NotificationModal.vue'
+import ConfirmationModal from '@/components/modals/ConfirmationModal.vue'
+import LoadingModal from '@/components/modals/LoadingModal.vue'
 
 const props = defineProps({
     userLevel: Object,
     users: Array,
-    availableUsers: Array,  // ✅ Available users from controller
+    availableUsers: Array, // Available users from controller
 })
 
+// Modal states
+const showNotification = ref(false)
+const showConfirmation = ref(false)
+const showLoading = ref(false)
 const showAssignUserModal = ref(false)
-const availableUsers = ref(props.availableUsers || [])
+
+// Notification states
+const notification = ref({
+    type: 'info',
+    title: '',
+    message: ''
+})
+
+// Confirmation states
+const confirmation = ref({
+    title: '',
+    message: '',
+    action: null as (() => void) | null
+})
+
+const loading = ref({
+    message: 'Loading...'
+})
+
+const availableUsers = ref(props.availableUsers)
 const selectedUsers = ref([])
 
-// ✅ Enhanced filtering and search
+// Enhanced filtering and search
 const searchQuery = ref('')
 const selectedDepartment = ref('')
 const selectedStatus = ref('')
 const currentPage = ref(1)
 const usersPerPage = 10
 
-// ✅ Get unique departments for filter
+// Helper functions
+const showNotificationModal = (type: string, title: string, message: string) => {
+    notification.value = { type, title, message }
+    showNotification.value = true
+}
+
+const showConfirmationModal = (title: string, message: string, action: () => void) => {
+    confirmation.value = { title, message, action }
+    showConfirmation.value = true
+}
+
+// Get unique departments for filter
 const departments = computed(() => {
     const depts = [...new Set(availableUsers.value.map(user => user.department).filter(Boolean))]
     return depts.sort()
 })
 
-// ✅ Get unique statuses for filter
+// Get unique statuses for filter
 const statuses = computed(() => {
     const statuses = [...new Set(availableUsers.value.map(user => user.status).filter(Boolean))]
     return statuses.sort()
 })
 
-// ✅ Filtered and searched users
+// Filtered and searched users
 const filteredUsers = computed(() => {
     let filtered = availableUsers.value
 
@@ -60,24 +97,24 @@ const filteredUsers = computed(() => {
     return filtered
 })
 
-// ✅ Paginated users
+// Paginated users
 const paginatedUsers = computed(() => {
     const start = (currentPage.value - 1) * usersPerPage
     const end = start + usersPerPage
     return filteredUsers.value.slice(start, end)
 })
 
-// ✅ Pagination info
+// Pagination info
 const totalPages = computed(() => Math.ceil(filteredUsers.value.length / usersPerPage))
 const showingFrom = computed(() => (currentPage.value - 1) * usersPerPage + 1)
 const showingTo = computed(() => Math.min(currentPage.value * usersPerPage, filteredUsers.value.length))
 
-// ✅ Reset pagination when filters change
+// Reset pagination when filters change
 watch([searchQuery, selectedDepartment, selectedStatus], () => {
     currentPage.value = 1
 })
 
-// ✅ Select/Deselect all on current page
+// Select/Deselect all on current page
 const selectAllOnPage = ref(false)
 const toggleSelectAllOnPage = () => {
     if (selectAllOnPage.value) {
@@ -94,18 +131,18 @@ const toggleSelectAllOnPage = () => {
     }
 }
 
-// ✅ Check if all users on current page are selected
+// Check if all users on current page are selected
 const allPageUsersSelected = computed(() => {
     return paginatedUsers.value.length > 0 &&
         paginatedUsers.value.every(user => selectedUsers.value.includes(user.id))
 })
 
-// ✅ Update selectAllOnPage when selection changes
+// Update selectAllOnPage when selection changes
 watch([selectedUsers, paginatedUsers], () => {
     selectAllOnPage.value = allPageUsersSelected.value
 }, { deep: true })
 
-// ✅ Clear all filters
+// Clear all filters
 const clearFilters = () => {
     searchQuery.value = ''
     selectedDepartment.value = ''
@@ -113,30 +150,39 @@ const clearFilters = () => {
     currentPage.value = 1
 }
 
-// Remove user from level
-const removeUserFromLevel = (userId: number) => {
-    if (!confirm('Are you sure you want to remove this user from the level?')) {
-        return;
-    }
+// Remove user from level with confirmation
+const removeUserFromLevel = (userId: number, userName: string) => {
+    showConfirmationModal(
+        'Remove User from Level',
+        `Are you sure you want to remove "${userName}" from the ${props.userLevel.name} level? This will unassign their current level.`,
+        () => {
+            showLoading.value = true
+            loading.value.message = 'Removing user from level...'
 
-    router.post(route('admin.users.assign-level', userId), {
-        user_level_id: null
-    }, {
-        preserveState: true,
-        onSuccess: () => {
-            alert('User removed from level successfully!');
-        },
-        onError: (errors) => {
-            console.error('Remove failed:', errors);
-            alert('Failed to remove user from level. Please try again.');
+            router.post(route('admin.user-levels.remove-user'), {
+                user_id: userId
+            }, {
+                preserveState: true,
+                onSuccess: () => {
+                    showLoading.value = false
+                    showNotificationModal('success', 'Success', 'User removed from level successfully!')
+                },
+                onError: (errors) => {
+                    showLoading.value = false
+                    console.error('Remove failed:', errors)
+                    const errorMessage = errors.remove_user || 'Failed to remove user from level. Please try again.'
+                    showNotificationModal('error', 'Error', errorMessage)
+                }
+            })
         }
-    });
+    )
 }
 
-// ✅ Enhanced loadAvailableUsers function
+// Enhanced loadAvailableUsers function
 const loadAvailableUsers = () => {
-    availableUsers.value = props.availableUsers || []
+    availableUsers.value = props.availableUsers
     showAssignUserModal.value = true
+
     // Reset modal state
     searchQuery.value = ''
     selectedDepartment.value = ''
@@ -145,7 +191,7 @@ const loadAvailableUsers = () => {
     currentPage.value = 1
 }
 
-// ✅ Close modal and reset state
+// Close modal and reset state
 const closeModal = () => {
     showAssignUserModal.value = false
     selectedUsers.value = []
@@ -158,24 +204,53 @@ const closeModal = () => {
 // Assign selected users to this level
 const assignUsersToLevel = () => {
     if (selectedUsers.value.length === 0) {
-        alert('Please select at least one user')
+        showNotificationModal('warning', 'No Selection', 'Please select at least one user to assign.')
         return
     }
 
-    router.post(route('admin.user-levels.bulk-assign'), {
-        user_ids: selectedUsers.value,
-        user_level_id: props.userLevel.id
-    }, {
-        preserveState: true,
-        onSuccess: () => {
-            alert('Users assigned to level successfully!')
-            closeModal()
-        },
-        onError: (errors) => {
-            console.error('Assign failed:', errors)
-            alert('Failed to assign users. Please try again.')
+    showConfirmationModal(
+        'Assign Users to Level',
+        `Are you sure you want to assign ${selectedUsers.value.length} user(s) to the ${props.userLevel.name} level?`,
+        () => {
+            showLoading.value = true
+            loading.value.message = 'Assigning users to level...'
+
+            router.post(route('admin.user-levels.bulk-assign'), {
+                user_ids: selectedUsers.value,
+                user_level_id: props.userLevel.id
+            }, {
+                preserveState: true,
+                onSuccess: () => {
+                    showLoading.value = false
+                    showNotificationModal('success', 'Success', 'Users assigned to level successfully!')
+                    closeModal()
+                },
+                onError: (errors) => {
+                    showLoading.value = false
+                    console.error('Assign failed:', errors)
+                    const errorMessage = errors.bulk_assign || 'Failed to assign users. Please try again.'
+                    showNotificationModal('error', 'Error', errorMessage)
+                }
+            })
         }
-    })
+    )
+}
+
+// Handle confirmation
+const handleConfirmation = () => {
+    showConfirmation.value = false
+    if (confirmation.value.action) {
+        confirmation.value.action()
+    }
+}
+
+// Close modals
+const closeNotification = () => {
+    showNotification.value = false
+}
+
+const closeConfirmation = () => {
+    showConfirmation.value = false
 }
 
 // Get level badge color
@@ -185,8 +260,8 @@ const getLevelColor = (levelCode: string) => {
         'L2': 'bg-green-100 text-green-800',
         'L3': 'bg-orange-100 text-orange-800',
         'L4': 'bg-red-100 text-red-800',
-    };
-    return colors[levelCode] || 'bg-gray-100 text-gray-800';
+    }
+    return colors[levelCode] || 'bg-gray-100 text-gray-800'
 }
 
 // Breadcrumbs
@@ -199,16 +274,16 @@ const breadcrumbs: BreadcrumbItemType[] = [
 
 <template>
     <AdminLayout :breadcrumbs="breadcrumbs">
-        <!-- Keep all your existing template content exactly the same until the modal -->
         <div class="px-4 sm:px-0">
             <!-- User Level Header -->
             <div class="bg-white rounded-lg shadow p-6 mb-6">
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
                     <div class="flex items-center space-x-4">
                         <div class="flex-shrink-0 h-16 w-16">
-                            <div class="h-16 w-16 rounded-full flex items-center justify-center"
-                                 :class="getLevelColor(userLevel.code)">
-                                <span class="text-xl font-bold">{{ userLevel.code }}</span>
+                            <div class="h-16 w-16 rounded-full flex items-center justify-center" :class="getLevelColor(userLevel.code)">
+                                <span class="text-xl font-bold">
+                                    {{ userLevel.code }}
+                                </span>
                             </div>
                         </div>
                         <div>
@@ -250,8 +325,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                         <strong>Can Manage:</strong>
                     </div>
                     <div class="flex flex-wrap gap-2">
-                        <span v-for="level in userLevel.manageable_levels" :key="level.code"
-                              class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                        <span v-for="level in userLevel.manageable_levels" :key="level.code" class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
                             {{ level.code }} - {{ level.name }}
                         </span>
                     </div>
@@ -265,7 +339,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                         <div class="flex-shrink-0">
                             <div class="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center">
                                 <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 515 0z"></path>
                                 </svg>
                             </div>
                         </div>
@@ -360,14 +434,14 @@ const breadcrumbs: BreadcrumbItemType[] = [
                         </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
-                        <tr v-for="user in users" :key="user.id">
+                        <tr v-for="user in users" :key="user.id" class="hover:bg-gray-50 transition-colors">
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="flex items-center">
                                     <div class="flex-shrink-0 h-10 w-10">
                                         <div class="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
-                                            <span class="text-sm font-medium text-gray-600">
-                                                {{ user.name.charAt(0).toUpperCase() }}
-                                            </span>
+                                                <span class="text-sm font-medium text-gray-600">
+                                                    {{ user.name.charAt(0).toUpperCase() }}
+                                                </span>
                                         </div>
                                     </div>
                                     <div class="ml-4">
@@ -378,41 +452,39 @@ const breadcrumbs: BreadcrumbItemType[] = [
                                 </div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <div v-if="user.department" class="text-sm text-gray-900">
-                                    {{ user.department }}
-                                </div>
-                                <div v-else class="text-sm text-gray-400 italic">
-                                    No department assigned
-                                </div>
+                                <div v-if="user.department" class="text-sm text-gray-900">{{ user.department }}</div>
+                                <div v-else class="text-sm text-gray-400 italic">No department assigned</div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <span
-                                    class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
-                                    :class="{
-                                        'bg-green-100 text-green-800': user.status === 'active',
-                                        'bg-red-100 text-red-800': user.status === 'inactive',
-                                        'bg-yellow-100 text-yellow-800': user.status === 'on_leave'
-                                    }"
-                                >
-                                    {{ user.status }}
-                                </span>
+                                    <span
+                                        class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                                        :class="{
+                                            'bg-green-100 text-green-800': user.status === 'active',
+                                            'bg-red-100 text-red-800': user.status === 'inactive',
+                                            'bg-yellow-100 text-yellow-800': user.status === 'on_leave'
+                                        }"
+                                    >
+                                        {{ user.status }}
+                                    </span>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                 {{ user.created_at || 'N/A' }}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                <Link
-                                    :href="route('admin.users.organizational', user.id)"
-                                    class="text-blue-600 hover:text-blue-900 mr-3 transition-colors"
-                                >
-                                    View
-                                </Link>
-                                <button
-                                    @click="removeUserFromLevel(user.id)"
-                                    class="text-red-600 hover:text-red-900 transition-colors"
-                                >
-                                    Remove
-                                </button>
+                                <div class="flex items-center justify-end space-x-2">
+                                    <Link
+                                        :href="route('admin.users.organizational', user.id)"
+                                        class="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-600 hover:bg-blue-200 rounded text-xs font-medium transition-colors"
+                                    >
+                                        View
+                                    </Link>
+                                    <button
+                                        @click="removeUserFromLevel(user.id, user.name)"
+                                        class="inline-flex items-center px-2 py-1 bg-red-100 text-red-600 hover:bg-red-200 rounded text-xs font-medium transition-colors"
+                                    >
+                                        Remove
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                         </tbody>
@@ -429,7 +501,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                             <div class="mt-6">
                                 <button
                                     @click="loadAvailableUsers"
-                                    class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                                    class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
                                 >
                                     Assign Users
                                 </button>
@@ -440,15 +512,15 @@ const breadcrumbs: BreadcrumbItemType[] = [
             </div>
         </div>
 
-        <!-- ✅ ENHANCED Assign Users Modal -->
+        <!-- Enhanced Assign Users Modal -->
         <div v-if="showAssignUserModal" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
             <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
                 <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" @click="closeModal"></div>
 
-                <!-- ✅ Larger modal for better user experience -->
+                <!-- Larger modal for better user experience -->
                 <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
                     <div class="bg-white px-4 pt-5 pb-4 sm:p-6">
-                        <!-- ✅ Modal Header -->
+                        <!-- Modal Header -->
                         <div class="flex items-center justify-between mb-4">
                             <h3 class="text-lg leading-6 font-medium text-gray-900">
                                 Assign Users to {{ userLevel.name }} Level
@@ -460,7 +532,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                             </button>
                         </div>
 
-                        <!-- ✅ Search and Filters -->
+                        <!-- Search and Filters -->
                         <div class="mb-4 space-y-4">
                             <div class="flex flex-col sm:flex-row gap-4">
                                 <!-- Search Input -->
@@ -482,43 +554,30 @@ const breadcrumbs: BreadcrumbItemType[] = [
 
                                 <!-- Department Filter -->
                                 <div class="sm:w-48">
-                                    <select
-                                        v-model="selectedDepartment"
-                                        class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-                                    >
+                                    <select v-model="selectedDepartment" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500">
                                         <option value="">All Departments</option>
-                                        <option v-for="dept in departments" :key="dept" :value="dept">
-                                            {{ dept }}
-                                        </option>
+                                        <option v-for="dept in departments" :key="dept" :value="dept">{{ dept }}</option>
                                     </select>
                                 </div>
 
                                 <!-- Status Filter -->
                                 <div class="sm:w-32">
-                                    <select
-                                        v-model="selectedStatus"
-                                        class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-                                    >
+                                    <select v-model="selectedStatus" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500">
                                         <option value="">All Status</option>
-                                        <option v-for="status in statuses" :key="status" :value="status">
-                                            {{ status }}
-                                        </option>
+                                        <option v-for="status in statuses" :key="status" :value="status">{{ status }}</option>
                                     </select>
                                 </div>
 
                                 <!-- Clear Filters -->
-                                <button
-                                    @click="clearFilters"
-                                    class="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
-                                >
+                                <button @click="clearFilters" class="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors">
                                     Clear
                                 </button>
                             </div>
 
-                            <!-- ✅ Results Summary -->
+                            <!-- Results Summary -->
                             <div class="flex items-center justify-between text-sm text-gray-600">
                                 <div>
-                                    Showing {{ showingFrom }}-{{ showingTo }} of {{ filteredUsers.length }} users
+                                    Showing {{ showingFrom }} - {{ showingTo }} of {{ filteredUsers.length }} users
                                     <span v-if="selectedUsers.length > 0" class="ml-2 text-blue-600 font-medium">
                                         ({{ selectedUsers.length }} selected)
                                     </span>
@@ -529,7 +588,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                             </div>
                         </div>
 
-                        <!-- ✅ Users List with Pagination -->
+                        <!-- Users List with Pagination -->
                         <div class="border rounded-lg">
                             <!-- Select All Header -->
                             <div class="px-4 py-3 bg-gray-50 border-b flex items-center">
@@ -552,10 +611,10 @@ const breadcrumbs: BreadcrumbItemType[] = [
                                             type="checkbox"
                                             v-model="selectedUsers"
                                             :value="user.id"
-                                            :id="`user_${user.id}`"
+                                            :id="`user-${user.id}`"
                                             class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                                         />
-                                        <label :for="`user_${user.id}`" class="ml-3 flex items-center flex-1 cursor-pointer">
+                                        <label :for="`user-${user.id}`" class="ml-3 flex items-center flex-1 cursor-pointer">
                                             <div class="flex-shrink-0 h-8 w-8">
                                                 <div class="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center">
                                                     <span class="text-xs font-medium text-gray-600">
@@ -567,12 +626,8 @@ const breadcrumbs: BreadcrumbItemType[] = [
                                                 <div class="text-sm font-medium text-gray-900">{{ user.name }}</div>
                                                 <div class="text-sm text-gray-500">{{ user.email }}</div>
                                                 <div class="flex items-center space-x-4 mt-1">
-                                                    <span v-if="user.employee_code" class="text-xs text-gray-400">
-                                                        ID: {{ user.employee_code }}
-                                                    </span>
-                                                    <span v-if="user.department" class="text-xs text-gray-400">
-                                                        {{ user.department }}
-                                                    </span>
+                                                    <span v-if="user.employee_code" class="text-xs text-gray-400">ID: {{ user.employee_code }}</span>
+                                                    <span v-if="user.department" class="text-xs text-gray-400">{{ user.department }}</span>
                                                     <span class="px-2 py-0.5 rounded-full text-xs font-medium"
                                                           :class="{
                                                               'bg-green-100 text-green-700': user.status === 'active',
@@ -588,7 +643,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                                 </div>
                             </div>
 
-                            <!-- ✅ No Results -->
+                            <!-- No Results -->
                             <div v-if="filteredUsers.length === 0" class="px-4 py-8 text-center text-gray-500">
                                 <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 515 0z" />
@@ -598,7 +653,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                             </div>
                         </div>
 
-                        <!-- ✅ Pagination -->
+                        <!-- Pagination -->
                         <div v-if="totalPages > 1" class="mt-4 flex items-center justify-between">
                             <button
                                 @click="currentPage = Math.max(1, currentPage - 1)"
@@ -634,12 +689,12 @@ const breadcrumbs: BreadcrumbItemType[] = [
                         </div>
                     </div>
 
-                    <!-- ✅ Modal Footer -->
+                    <!-- Modal Footer -->
                     <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                         <button
                             @click="assignUsersToLevel"
                             type="button"
-                            class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none sm:ml-3 sm:w-auto sm:text-sm"
+                            class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm transition-colors"
                             :disabled="selectedUsers.length === 0"
                             :class="{ 'opacity-50 cursor-not-allowed': selectedUsers.length === 0 }"
                         >
@@ -648,7 +703,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                         <button
                             @click="closeModal"
                             type="button"
-                            class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                            class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm transition-colors"
                         >
                             Cancel
                         </button>
@@ -656,5 +711,32 @@ const breadcrumbs: BreadcrumbItemType[] = [
                 </div>
             </div>
         </div>
+
+        <!-- Modal Components -->
+        <NotificationModal
+            :show="showNotification"
+            :type="notification.type"
+            :title="notification.title"
+            :message="notification.message"
+            :auto-close="notification.type === 'success'"
+            :duration="4000"
+            @close="closeNotification"
+        />
+
+        <ConfirmationModal
+            :show="showConfirmation"
+            :title="confirmation.title"
+            :message="confirmation.message"
+            confirm-text="Yes, Continue"
+            cancel-text="Cancel"
+            type="warning"
+            @confirm="handleConfirmation"
+            @cancel="closeConfirmation"
+        />
+
+        <LoadingModal
+            :show="showLoading"
+            :message="loading.message"
+        />
     </AdminLayout>
 </template>
