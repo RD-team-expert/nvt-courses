@@ -165,7 +165,7 @@ const clearFilters = () => {
                 v-model="searchQuery"
                 type="text"
                 placeholder="Search activities..."
-                class="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                class="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-md focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
               <button 
                 v-if="searchQuery" 
@@ -200,7 +200,7 @@ const clearFilters = () => {
               <label class="block text-sm font-medium text-gray-700 mb-1">Action Type</label>
               <select 
                 v-model="selectedAction"
-                class="w-full border border-gray-300 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                class="w-full border border-gray-300 rounded-md p-2 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option v-for="option in actionOptions" :key="option.value" :value="option.value">
                   {{ option.label }}
@@ -212,7 +212,7 @@ const clearFilters = () => {
               <label class="block text-sm font-medium text-gray-700 mb-1">Date Range</label>
               <select 
                 v-model="dateRange"
-                class="w-full border border-gray-300 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                class="w-full border border-gray-300 rounded-md p-2 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option v-for="option in dateRangeOptions" :key="option.value" :value="option.value">
                   {{ option.label }}
@@ -247,7 +247,7 @@ const clearFilters = () => {
             class="flex flex-col sm:flex-row sm:items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
           >
             <div class="flex items-start flex-1">
-              <div class="w-10 h-10 rounded-full bg-gray-200 flex-shrink-0 mr-3 overflow-hidden">
+              <div class="w-10 h-10 rounded-full bg-gray-200 shrink-0 mr-3 overflow-hidden">
                 <img v-if="activity.user?.avatar" :src="activity.user.avatar" class="w-full h-full object-cover" alt="User avatar" />
                 <div v-else class="w-full h-full flex items-center justify-center text-gray-500 font-medium text-sm">
                   {{ activity.user?.name ? activity.user.name.charAt(0).toUpperCase() : 'S' }}

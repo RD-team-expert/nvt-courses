@@ -442,7 +442,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
             <!-- Course Assignment Notification -->
             <div v-if="userAssignment" class="mb-6">
                 <div
-                    class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 shadow-sm"
+                    class="bg-linear-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 shadow-sm"
                     :class="{
                         'from-yellow-50 to-orange-50 border-yellow-200': userAssignment.status === 'pending',
                         'from-green-50 to-emerald-50 border-green-200': userAssignment.status === 'accepted',
@@ -451,7 +451,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                 >
                     <div class="flex items-start justify-between">
                         <div class="flex">
-                            <div class="flex-shrink-0">
+                            <div class="shrink-0">
                                 <svg
                                     class="h-5 w-5 mt-0.5"
                                     :class="{
@@ -743,7 +743,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                                         <textarea
                                             v-model="ratingForm.feedback"
                                             rows="3"
-                                            class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                                             :class="{ 'border-red-500': ratingForm.errors.feedback }"
                                             placeholder="Please share your thoughts about this course... (required)"
                                             required

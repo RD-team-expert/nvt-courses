@@ -73,7 +73,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                     <!-- Current User (Bottom of Chain) -->
                     <div class="flex items-center">
                         <div class="flex items-center space-x-4 bg-blue-50 rounded-lg p-4 flex-1">
-                            <div class="flex-shrink-0">
+                            <div class="shrink-0">
                                 <div class="w-12 h-12 bg-blue-200 rounded-full flex items-center justify-center">
                                     <span class="text-lg font-medium text-blue-600">
                                         {{ user?.name?.charAt(0).toUpperCase() || '?' }}
@@ -110,7 +110,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                         <div class="flex items-center">
                             <div class="flex items-center space-x-4 bg-gray-50 rounded-lg p-4 flex-1"
                                  :class="{ 'bg-red-50': index === reportingChain.length - 1 }">
-                                <div class="flex-shrink-0">
+                                <div class="shrink-0">
                                     <div class="w-12 h-12 rounded-full flex items-center justify-center"
                                          :class="index === reportingChain.length - 1 ? 'bg-red-200' : 'bg-gray-200'">
                                         <span class="text-lg font-medium"

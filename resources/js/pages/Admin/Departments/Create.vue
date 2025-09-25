@@ -58,7 +58,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                             type="text"
                             v-model="form.name"
                             @input="generateCode"
-                            class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                             :disabled="form.processing"
                             required
                         />
@@ -71,7 +71,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                         <input
                             type="text"
                             v-model="form.department_code"
-                            class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                             :disabled="form.processing"
                             maxlength="20"
                             required
@@ -85,7 +85,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                         <label class="block font-semibold mb-1">Parent Department</label>
                         <select
                             v-model="form.parent_id"
-                            class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                             :disabled="form.processing"
                         >
                             <option value="">None (Top Level)</option>
@@ -102,7 +102,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                         <textarea
                             v-model="form.description"
                             rows="3"
-                            class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                             :disabled="form.processing"
                         ></textarea>
                         <div v-if="form.errors.description" class="text-red-600 text-sm mt-1">{{ form.errors.description }}</div>

@@ -76,7 +76,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
       <div class="mt-4 sm:mt-6 flex flex-col sm:flex-row gap-2 sm:space-x-3">
         <Link 
           :href="`/admin/users/${user.id}/edit`" 
-          class="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          class="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
         >
           Edit
         </Link>
@@ -84,7 +84,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
           :href="`/admin/users/${user.id}`"
           method="delete"
           as="button"
-          class="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+          class="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
           @click="e => !confirm('Are you sure you want to delete this user?') && e.preventDefault()"
         >
           Delete

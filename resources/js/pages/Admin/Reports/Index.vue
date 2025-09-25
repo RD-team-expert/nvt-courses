@@ -104,14 +104,14 @@
                     <div class="flex items-end space-x-2 sm:col-span-2 lg:col-span-5">
                         <button
                             type="submit"
-                            class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-medium transition-colors duration-200"
+                            class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 text-sm font-medium transition-colors duration-200"
                         >
                             Apply Filters
                         </button>
                         <button
                             type="button"
                             @click="clearFilters"
-                            class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-300 text-sm font-medium transition-colors duration-200"
+                            class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 focus:outline-hidden focus:ring-2 focus:ring-gray-300 text-sm font-medium transition-colors duration-200"
                         >
                             Clear Filters
                         </button>

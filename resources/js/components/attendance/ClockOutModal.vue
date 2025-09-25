@@ -41,7 +41,7 @@
                         :key="rating"
                         type="button"
                         @click="form.rating = rating"
-                        class="p-1 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full transition-all"
+                        class="p-1 focus:outline-hidden focus:ring-2 focus:ring-blue-500 rounded-full transition-all"
                       >
                         <svg 
                           :class="[
@@ -67,7 +67,7 @@
                         id="comment"
                         v-model="form.comment"
                         rows="4"
-                        class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                        class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500 resize-none"
                         placeholder="Share your thoughts about this work session..."
                         required
                       ></textarea>

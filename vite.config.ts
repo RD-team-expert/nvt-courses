@@ -2,7 +2,7 @@ import vue from '@vitejs/plugin-vue';
 import autoprefixer from 'autoprefixer';
 import laravel from 'laravel-vite-plugin';
 import path from 'path';
-import tailwindcss from 'tailwindcss';
+import tailwindcss from '@tailwindcss/postcss';
 import { resolve } from 'node:path';
 import { defineConfig } from 'vite';
 

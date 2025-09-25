@@ -202,7 +202,7 @@ if (typeof window !== 'undefined') {
                         <select
                             id="course_filter"
                             v-model="filters.course_id"
-                            class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                         >
                             <option value="">All Courses</option>
                             <option v-for="course in courses" :key="course.id" :value="course.id">{{ course.name }}</option>
@@ -215,7 +215,7 @@ if (typeof window !== 'undefined') {
                             id="date_from"
                             type="date"
                             v-model="filters.date_from"
-                            class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                         />
                     </div>
 
@@ -225,14 +225,14 @@ if (typeof window !== 'undefined') {
                             id="date_to"
                             type="date"
                             v-model="filters.date_to"
-                            class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                         />
                     </div>
 
                     <div class="flex items-end md:col-span-3">
                         <button
                             @click="resetFilters"
-                            class="inline-flex items-center px-4 py-2 bg-gray-100 border border-transparent rounded-md font-medium text-gray-700 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition"
+                            class="inline-flex items-center px-4 py-2 bg-gray-100 border border-transparent rounded-md font-medium text-gray-700 hover:bg-gray-200 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition"
                         >
                             Reset Filters
                         </button>
@@ -314,7 +314,7 @@ if (typeof window !== 'undefined') {
                                 <button
                                     v-if="record.feedback"
                                     @click="showFeedback(record.feedback, record.user_name)"
-                                    class="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 rounded px-1"
+                                    class="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 rounded px-1"
                                     :title="'Click to view full feedback from ' + record.user_name"
                                 >
                                     {{ record.feedback.length > 30 ? record.feedback.substring(0, 30) + '...' : record.feedback }}
@@ -327,7 +327,7 @@ if (typeof window !== 'undefined') {
                                 <button
                                     v-if="record.comment"
                                     @click="showComment(record.comment, record.user_name)"
-                                    class="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 rounded px-1"
+                                    class="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 rounded px-1"
                                     :title="'Click to view full comment from ' + record.user_name"
                                 >
                                     {{ record.comment.length > 30 ? record.comment.substring(0, 30) + '...' : record.comment }}
@@ -369,7 +369,7 @@ if (typeof window !== 'undefined') {
                 <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
                     <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                         <div class="sm:flex sm:items-start">
-                            <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10">
+                            <div class="mx-auto shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10">
                                 <svg class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-3.582 8-8 8a8.959 8.959 0 01-4.906-1.476L3 21l2.476-5.094A8.959 8.959 0 013 12c0-4.418 3.582-8 8-8s8 3.582 8 8z" />
                                 </svg>
@@ -389,7 +389,7 @@ if (typeof window !== 'undefined') {
                     <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                         <button
                             type="button"
-                            class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm transition"
+                            class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm transition"
                             @click="closeModal"
                         >
                             Close

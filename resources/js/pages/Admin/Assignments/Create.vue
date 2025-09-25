@@ -234,7 +234,7 @@ function closeProgressModal() {
                             <label class="block text-sm font-semibold text-gray-700 mb-3">Select Course *</label>
                             <select
                                 v-model="form.course_id"
-                                class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                                 required
                                 :disabled="form.processing"
                             >
@@ -304,7 +304,7 @@ function closeProgressModal() {
                         <!-- Info Notice -->
                         <div class="mb-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
                             <div class="flex">
-                                <div class="flex-shrink-0">
+                                <div class="shrink-0">
                                     <svg class="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
                                         <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
                                     </svg>
@@ -327,7 +327,7 @@ function closeProgressModal() {
                         <div class="flex flex-col sm:flex-row gap-4 pt-6 border-t border-gray-200">
                             <button
                                 type="submit"
-                                class="flex-1 sm:flex-none bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors duration-200 font-medium flex items-center justify-center gap-3"
+                                class="flex-1 sm:flex-none bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors duration-200 font-medium flex items-center justify-center gap-3"
                                 :disabled="form.processing || form.user_ids.length === 0"
                             >
                                 <!-- Loading spinner -->
@@ -351,7 +351,7 @@ function closeProgressModal() {
 
                             <Link
                                 href="/admin/assignments"
-                                class="flex-1 sm:flex-none bg-gray-100 text-gray-700 px-8 py-3 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors duration-200 font-medium text-center flex items-center justify-center gap-2"
+                                class="flex-1 sm:flex-none bg-gray-100 text-gray-700 px-8 py-3 rounded-lg hover:bg-gray-200 focus:outline-hidden focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors duration-200 font-medium text-center flex items-center justify-center gap-2"
                                 :class="{ 'pointer-events-none opacity-50': form.processing }"
                             >
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -38,7 +38,7 @@ function submit() {
               id="name"
               type="text" 
               v-model="form.name" 
-              class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500" 
+              class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500" 
             />
             <div v-if="form.errors.name" class="text-red-600 text-sm mt-1">{{ form.errors.name }}</div>
           </div>
@@ -49,7 +49,7 @@ function submit() {
               id="email"
               type="email" 
               v-model="form.email" 
-              class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500" 
+              class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500" 
             />
             <div v-if="form.errors.email" class="text-red-600 text-sm mt-1">{{ form.errors.email }}</div>
           </div>
@@ -59,7 +59,7 @@ function submit() {
             <select 
               id="role"
               v-model="form.role" 
-              class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
             >
               <option value="user">User</option>
               <option value="admin">Admin</option>
@@ -73,7 +73,7 @@ function submit() {
               id="password"
               type="password" 
               v-model="form.password" 
-              class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500" 
+              class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500" 
             />
             <div v-if="form.errors.password" class="text-red-600 text-sm mt-1">{{ form.errors.password }}</div>
           </div>
@@ -84,7 +84,7 @@ function submit() {
               id="password_confirmation"
               type="password" 
               v-model="form.password_confirmation" 
-              class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500" 
+              class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500" 
             />
           </div>
 

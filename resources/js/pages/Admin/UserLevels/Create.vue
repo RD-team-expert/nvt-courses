@@ -87,7 +87,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                         <select
                             v-model="form.hierarchy_level"
                             @change="generateSuggestions"
-                            class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                             :disabled="form.processing"
                             required
                         >
@@ -108,7 +108,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                         <input
                             type="text"
                             v-model="form.code"
-                            class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                             :disabled="form.processing"
                             maxlength="10"
                             placeholder="e.g., L1, L2, MGR"
@@ -124,7 +124,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                         <input
                             type="text"
                             v-model="form.name"
-                            class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                             :disabled="form.processing"
                             placeholder="e.g., Employee, Direct Manager, Senior Manager"
                             required
@@ -138,7 +138,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                         <textarea
                             v-model="form.description"
                             rows="3"
-                            class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                             :disabled="form.processing"
                             placeholder="Describe the responsibilities and scope of this level"
                         ></textarea>
@@ -176,7 +176,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                 <div v-if="form.code" class="bg-gray-50 border rounded-lg p-4 mb-6">
                     <h3 class="text-sm font-medium text-gray-900 mb-2">Preview</h3>
                     <div class="flex items-center space-x-4">
-                        <div class="flex-shrink-0 h-12 w-12 rounded-full flex items-center justify-center"
+                        <div class="shrink-0 h-12 w-12 rounded-full flex items-center justify-center"
                              :class="{
                                  'bg-blue-100 text-blue-600': form.hierarchy_level == 1,
                                  'bg-green-100 text-green-600': form.hierarchy_level == 2,

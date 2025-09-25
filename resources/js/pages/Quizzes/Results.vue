@@ -1,6 +1,6 @@
 <template>
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+        <div class="min-h-screen bg-linear-to-br from-slate-50 to-blue-50">
             <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 <!-- Header Section -->
                 <div class="text-center mb-8">
@@ -157,7 +157,7 @@
                     <button
                         v-if="canRetry"
                         @click="retryQuiz"
-                        class="inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-medium transition-all duration-200 shadow-lg hover:shadow-xl"
+                        class="inline-flex items-center justify-center px-6 py-3 bg-linear-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 text-sm font-medium transition-all duration-200 shadow-lg hover:shadow-xl"
                     >
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.001 8.001 0 01-15.356-2m15.356 2H15" />
@@ -167,7 +167,7 @@
 
                     <Link
                         :href="route('quizzes.index')"
-                        class="inline-flex items-center justify-center px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300 text-sm font-medium transition-all duration-200"
+                        class="inline-flex items-center justify-center px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 focus:outline-hidden focus:ring-2 focus:ring-gray-300 text-sm font-medium transition-all duration-200"
                     >
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -178,7 +178,7 @@
 
                 <!-- Questions Review Section -->
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                    <div class="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
+                    <div class="bg-linear-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
                         <div class="flex items-center justify-between">
                             <h2 class="text-xl font-semibold text-gray-900">Question Review</h2>
                             <div class="flex items-center space-x-2">
@@ -475,7 +475,7 @@ circle {
 
 /* Print styles */
 @media print {
-    .bg-gradient-to-br {
+    .bg-linear-to-br {
         background: white !important;
     }
 

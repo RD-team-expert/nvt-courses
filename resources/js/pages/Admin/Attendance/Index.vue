@@ -159,7 +159,7 @@ const submitForm = () => {
           <select
             id="user_filter"
             v-model="filters.user_id"
-            class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+            class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
           >
             <option value="">All Users</option>
             <option v-for="user in users" :key="user.id" :value="user.id">{{ user.name }}</option>
@@ -172,7 +172,7 @@ const submitForm = () => {
             id="date_filter"
             type="date"
             v-model="filters.date"
-            class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+            class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
           />
         </div>
         
@@ -181,7 +181,7 @@ const submitForm = () => {
           <select
             id="course_filter"
             v-model="filters.course_id"
-            class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+            class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
           >
             <option value="">All Courses</option>
             <option value="general">General Attendance</option>
@@ -192,7 +192,7 @@ const submitForm = () => {
         <div class="flex items-end">
           <button
             @click="resetFilters"
-            class="inline-flex items-center px-4 py-2 bg-gray-100 border border-transparent rounded-md font-medium text-gray-700 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition"
+            class="inline-flex items-center px-4 py-2 bg-gray-100 border border-transparent rounded-md font-medium text-gray-700 hover:bg-gray-200 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition"
           >
             Reset Filters
           </button>
@@ -437,7 +437,7 @@ const submitForm = () => {
                     <select
                       id="user_id"
                       v-model="form.user_id"
-                      class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-hidden focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                     >
                       <option v-for="user in users" :key="user.id" :value="user.id">{{ user.name }}</option>
                     </select>
@@ -450,7 +450,7 @@ const submitForm = () => {
                     <select
                       id="course_id"
                       v-model="form.course_id"
-                      class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-hidden focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                     >
                       <option :value="null">General Attendance</option>
                       <option v-for="course in courses" :key="course.id" :value="course.id">{{ course.name }}</option>
@@ -465,7 +465,7 @@ const submitForm = () => {
                       type="datetime-local"
                       id="clock_in"
                       v-model="form.clock_in"
-                      class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-hidden focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                     />
                     <div v-if="errors.clock_in" class="text-red-500 text-sm mt-1">{{ errors.clock_in }}</div>
                   </div>
@@ -477,7 +477,7 @@ const submitForm = () => {
                       type="datetime-local"
                       id="clock_out"
                       v-model="form.clock_out"
-                      class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-hidden focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                     />
                     <div v-if="errors.clock_out" class="text-red-500 text-sm mt-1">{{ errors.clock_out }}</div>
                   </div>
@@ -488,7 +488,7 @@ const submitForm = () => {
                     <select
                       id="rating"
                       v-model="form.rating"
-                      class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-hidden focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                     >
                       <option :value="null">No Rating</option>
                       <option v-for="i in 5" :key="i" :value="i">{{ i }}</option>
@@ -503,7 +503,7 @@ const submitForm = () => {
                       id="comment"
                       v-model="form.comment"
                       rows="3"
-                      class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-hidden focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                     ></textarea>
                     <div v-if="errors.comment" class="text-red-500 text-sm mt-1">{{ errors.comment }}</div>
                   </div>
@@ -515,7 +515,7 @@ const submitForm = () => {
             <button 
               type="button" 
               @click="submitForm" 
-              class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm"
+              class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm"
               :disabled="processing"
             >
               <span v-if="processing">Saving...</span>
@@ -524,7 +524,7 @@ const submitForm = () => {
             <button 
               type="button" 
               @click="closeModal" 
-              class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+              class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
             >
               Cancel
             </button>

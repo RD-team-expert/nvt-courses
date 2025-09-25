@@ -1,6 +1,6 @@
 <template>
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+        <div class="min-h-screen bg-linear-to-br from-slate-50 to-blue-50">
             <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 <!-- Quiz Header -->
                 <div class="bg-white rounded-xl shadow-sm p-6 mb-6 border border-gray-100">
@@ -72,7 +72,7 @@
                 <!-- Warning for existing attempt -->
                 <div v-if="hasExistingAttempt" class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
                     <div class="flex items-start">
-                        <svg class="w-6 h-6 text-amber-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <svg class="w-6 h-6 text-amber-500 mr-3 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
                             <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
                         </svg>
                         <div>
@@ -94,7 +94,7 @@
                     </div>
                     <div class="w-full bg-gray-200 rounded-full h-2">
                         <div
-                            class="bg-gradient-to-r from-green-400 to-green-600 h-2 rounded-full transition-all duration-300"
+                            class="bg-linear-to-r from-green-400 to-green-600 h-2 rounded-full transition-all duration-300"
                             :style="{ width: `${progressPercentage}%` }"
                         ></div>
                     </div>
@@ -105,7 +105,7 @@
                     <form @submit.prevent="submitAttempt">
                         <div v-for="(question, index) in questions" :key="question.id" class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                             <!-- Question Header -->
-                            <div class="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
+                            <div class="bg-linear-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
                                 <div class="flex items-center justify-between">
                                     <div class="flex items-center">
                                         <div class="w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center text-sm font-bold mr-3">
@@ -214,7 +214,7 @@
                                         type="button"
                                         @click="saveDraft"
                                         :disabled="submitting || savingDraft"
-                                        class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         <span v-if="savingDraft" class="flex items-center">
                                             <svg class="animate-spin h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24">
@@ -230,7 +230,7 @@
                                     <button
                                         type="submit"
                                         :disabled="submitting || !allQuestionsAnswered"
-                                        class="px-6 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                                        class="px-6 py-2 bg-linear-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 text-sm font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                                     >
                                         <span v-if="submitting" class="flex items-center">
                                             <svg class="animate-spin h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24">
@@ -252,7 +252,7 @@
                             <!-- Warning if not all questions answered -->
                             <div v-if="!allQuestionsAnswered" class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                                 <div class="flex items-start">
-                                    <svg class="w-5 h-5 text-yellow-500 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                    <svg class="w-5 h-5 text-yellow-500 mr-2 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
                                         <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
                                     </svg>
                                     <div>
@@ -489,7 +489,7 @@ input[type="checkbox"]:focus {
 
 /* Print styles */
 @media print {
-    .bg-gradient-to-br {
+    .bg-linear-to-br {
         background: white !important;
     }
 

@@ -1,243 +1,257 @@
 <template>
     <AdminLayout :breadcrumbs="breadcrumbs">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 py-12">
+        <div class="container mx-auto px-4 py-6 sm:px-6 lg:px-8">
             <!-- Header with Add Button -->
-            <div class="flex justify-between items-center mb-8">
-                <h1 class="text-3xl font-bold text-gray-900">Quiz Attempts</h1>
-                <div class="flex space-x-3">
-                    <Link
-                        :href="route('admin.quizzes.create')"
-                        class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors duration-200"
-                    >
-                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                        </svg>
-                        Create Quiz
-                    </Link>
-                    <Link
-                        :href="route('admin.quiz-attempts.index')"
-                        class="inline-flex items-center px-4 py-2 bg-gray-100 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-300 transition-colors duration-200"
-                    >
-                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                        </svg>
-                        Quiz-attempts
-                    </Link>
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
+                <h1 class="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">Quiz Attempts</h1>
+                <div class="flex flex-col gap-2 sm:flex-row sm:gap-3">
+                    <Button as-child>
+                        <Link :href="route('admin.quizzes.create')">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                            </svg>
+                            Create Quiz
+                        </Link>
+                    </Button>
+                    <Button variant="outline" as-child>
+                        <Link :href="route('admin.quiz-attempts.index')">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                            </svg>
+                            Quiz-attempts
+                        </Link>
+                    </Button>
                 </div>
             </div>
 
             <!-- Filters -->
-            <div class="mb-8 bg-white rounded-xl shadow-sm p-6">
-                <h2 class="text-lg font-semibold text-gray-800 mb-4">Filter Quizzes</h2>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    <div>
-                        <label for="course_id" class="block text-sm font-medium text-gray-700 mb-1">Course</label>
-                        <select
-                            id="course_id"
-                            v-model="filters.course_id"
-                            class="block w-full border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm py-2 px-3 transition-colors duration-200"
-                            :disabled="isLoading"
-                            @change="applyFilters"
-                        >
-                            <option value="">All Courses</option>
-                            <option v-for="course in courses" :key="course.id" :value="course.id">
-                                {{ course.name }}
-                            </option>
-                        </select>
-                    </div>
-                    <div>
-                        <label for="status" class="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                        <select
-                            id="status"
-                            v-model="filters.status"
-                            class="block w-full border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm py-2 px-3 transition-colors duration-200"
-                            :disabled="isLoading"
-                            @change="applyFilters"
-                        >
-                            <option value="">All Statuses</option>
-                            <option value="draft">Draft</option>
-                            <option value="published">Published</option>
-                            <option value="archived">Archived</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- ✅ Clear Filters Button -->
-                <div class="mt-4 flex justify-end">
-                    <button
-                        v-if="hasActiveFilters"
-                        @click="clearFilters"
-                        class="inline-flex items-center px-3 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-300 transition-colors duration-200"
-                        :disabled="isLoading"
-                    >
-                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                        Clear Filters
-                    </button>
-                </div>
-            </div>
-
-            <!-- ✅ Quizzes Table or Empty State -->
-            <div class="bg-white rounded-xl shadow-sm overflow-hidden">
-                <!-- Show table when quizzes exist -->
-                <div v-if="quizzes.data && quizzes.data.length > 0">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-100">
-                        <tr>
-                            <th scope="col" class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                Title
-                            </th>
-                            <th scope="col" class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                Course
-                            </th>
-                            <th scope="col" class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                Status
-                            </th>
-                            <th scope="col" class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                Questions
-                            </th>
-                            <th scope="col" class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                Attempts
-                            </th>
-                            <th scope="col" class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                Total Points
-                            </th>
-                            <th scope="col" class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                Actions
-                            </th>
-                        </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-200">
-                        <tr
-                            v-for="quiz in quizzes.data"
-                            :key="quiz.id"
-                            class="hover:bg-gray-50 transition-colors duration-150"
-                        >
-                            <td class="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap">
-                                {{ quiz.title }}
-                            </td>
-                            <td class="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
-                                {{ quiz.course ? quiz.course.name : 'N/A' }}
-                            </td>
-                            <td class="px-6 py-4 text-sm whitespace-nowrap">
-                                <span
-                                    class="px-2.5 py-1 text-xs font-semibold rounded-full"
-                                    :class="{
-                                        'bg-green-100 text-green-800': quiz.status === 'published',
-                                        'bg-yellow-100 text-yellow-800': quiz.status === 'draft',
-                                        'bg-red-100 text-red-800': quiz.status === 'archived',
-                                    }"
-                                >
-                                    {{ quiz.status.charAt(0).toUpperCase() + quiz.status.slice(1) }}
-                                </span>
-                            </td>
-                            <td class="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
-                                {{ quiz.questions_count }}
-                            </td>
-                            <td class="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
-                                {{ quiz.attempts_count }}
-                            </td>
-                            <td class="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
-                                {{ quiz.total_points }}
-                            </td>
-                            <td class="px-6 py-4 text-sm font-medium whitespace-nowrap space-x-3">
-                                <Link
-                                    :href="route('admin.quizzes.show', quiz.id)"
-                                    class="text-indigo-600 hover:text-indigo-800 font-semibold transition-colors duration-200"
-                                >
-                                    View
-                                </Link>
-                                <Link
-                                    :href="route('admin.quizzes.edit', quiz.id)"
-                                    class="text-indigo-600 hover:text-indigo-800 font-semibold transition-colors duration-200"
-                                >
-                                    Edit
-                                </Link>
-                                <button
-                                    v-if="!quiz.attempts_count"
-                                    @click="confirmDelete(quiz.id)"
-                                    class="text-red-600 hover:text-red-800 font-semibold transition-colors duration-200"
-                                    :disabled="isLoading"
-                                >
-                                    Delete
-                                </button>
-                            </td>
-                        </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- ✅ Empty State - Show when no quizzes found -->
-                <div v-else class="text-center py-12">
-                    <div class="mx-auto flex items-center justify-center h-24 w-24 rounded-full bg-gray-100 mb-6">
-                        <svg class="h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
+            <Card class="mb-6">
+                <CardHeader>
+                    <CardTitle>Filter Quizzes</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:gap-6">
+                        <div class="space-y-2">
+                            <Label for="course_id">Course</Label>
+                            <Select v-model="filters.course_id" :disabled="isLoading" @update:model-value="applyFilters">
+                                <SelectTrigger id="course_id">
+                                    <SelectValue placeholder="All Courses" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Courses</SelectItem>
+                                    <SelectItem v-for="course in courses" :key="course.id" :value="course.id.toString()">
+                                        {{ course.name }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div class="space-y-2">
+                            <Label for="status">Status</Label>
+                            <Select v-model="filters.status" :disabled="isLoading" @update:model-value="applyFilters">
+                                <SelectTrigger id="status">
+                                    <SelectValue placeholder="All Statuses" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Statuses</SelectItem>
+                                    <SelectItem value="draft">Draft</SelectItem>
+                                    <SelectItem value="published">Published</SelectItem>
+                                    <SelectItem value="archived">Archived</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </div>
 
-                    <!-- Dynamic message based on filter state -->
-                    <h3 class="text-lg font-semibold text-gray-900 mb-2">
-                        {{ hasActiveFilters ? 'No Quizzes Match Your Filters' : 'No Quizzes Available' }}
-                    </h3>
-
-                    <p class="text-gray-600 mb-6 max-w-sm mx-auto">
-                        <span v-if="hasActiveFilters">
-                            {{ getFilteredEmptyMessage() }}
-                        </span>
-                        <span v-else>
-                            Get started by creating your first quiz to assess student knowledge and engagement.
-                        </span>
-                    </p>
-
-                    <!-- Action buttons -->
-                    <div class="flex justify-center space-x-4">
-                        <Link
-                            :href="route('admin.quizzes.create')"
-                            class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors duration-200"
-                        >
-                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                            </svg>
-                            Create First Quiz
-                        </Link>
-
-                        <button
+                    <!-- Clear Filters Button -->
+                    <div class="mt-4 flex justify-end">
+                        <Button
                             v-if="hasActiveFilters"
                             @click="clearFilters"
-                            class="inline-flex items-center px-4 py-2 bg-gray-100 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-300 transition-colors duration-200"
+                            variant="outline"
+                            size="sm"
+                            :disabled="isLoading"
                         >
-                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                             </svg>
                             Clear Filters
-                        </button>
+                        </Button>
                     </div>
-                </div>
-            </div>
+                </CardContent>
+            </Card>
+
+            <!-- Quizzes Table or Empty State -->
+            <Card>
+                <CardContent class="p-0">
+                    <!-- Show table when quizzes exist -->
+                    <div v-if="quizzes.data && quizzes.data.length > 0" class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="border-b bg-muted/50">
+                            <tr>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider sm:px-6">
+                                    Title
+                                </th>
+                                <th scope="col" class="hidden sm:table-cell px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider sm:px-6">
+                                    Course
+                                </th>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider sm:px-6">
+                                    Status
+                                </th>
+                                <th scope="col" class="hidden md:table-cell px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider sm:px-6">
+                                    Questions
+                                </th>
+                                <th scope="col" class="hidden md:table-cell px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider sm:px-6">
+                                    Attempts
+                                </th>
+                                <th scope="col" class="hidden lg:table-cell px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider sm:px-6">
+                                    Total Points
+                                </th>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider sm:px-6">
+                                    Actions
+                                </th>
+                            </tr>
+                            </thead>
+                            <tbody class="divide-y divide-border">
+                            <tr
+                                v-for="quiz in quizzes.data"
+                                :key="quiz.id"
+                                class="hover:bg-muted/50 transition-colors duration-150"
+                            >
+                                <td class="px-4 py-4 text-sm font-medium text-foreground sm:px-6">
+                                    <div class="max-w-xs truncate">{{ quiz.title }}</div>
+                                    <!-- Mobile: Show course name below title -->
+                                    <div class="sm:hidden text-xs text-muted-foreground mt-1">
+                                        {{ quiz.course ? quiz.course.name : 'N/A' }}
+                                    </div>
+                                </td>
+                                <td class="hidden sm:table-cell px-4 py-4 text-sm text-muted-foreground sm:px-6">
+                                    <div class="max-w-xs truncate">{{ quiz.course ? quiz.course.name : 'N/A' }}</div>
+                                </td>
+                                <td class="px-4 py-4 text-sm sm:px-6">
+                                    <span
+                                        class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full"
+                                        :class="{
+                                            'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400': quiz.status === 'published',
+                                            'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400': quiz.status === 'draft',
+                                            'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400': quiz.status === 'archived',
+                                        }"
+                                    >
+                                        {{ quiz.status.charAt(0).toUpperCase() + quiz.status.slice(1) }}
+                                    </span>
+                                </td>
+                                <td class="hidden md:table-cell px-4 py-4 text-sm text-muted-foreground sm:px-6">
+                                    {{ quiz.questions_count }}
+                                </td>
+                                <td class="hidden md:table-cell px-4 py-4 text-sm text-muted-foreground sm:px-6">
+                                    {{ quiz.attempts_count }}
+                                </td>
+                                <td class="hidden lg:table-cell px-4 py-4 text-sm text-muted-foreground sm:px-6">
+                                    {{ quiz.total_points }}
+                                </td>
+                                <td class="px-4 py-4 text-sm font-medium sm:px-6">
+                                    <div class="flex items-center gap-1 sm:gap-2">
+                                        <Button variant="outline" size="sm" as-child>
+                                            <Link :href="route('admin.quizzes.show', quiz.id)">
+                                                <svg class="w-4 h-4 sm:mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                </svg>
+                                                <span class="hidden sm:inline">View</span>
+                                            </Link>
+                                        </Button>
+                                        <Button variant="outline" size="sm" as-child>
+                                            <Link :href="route('admin.quizzes.edit', quiz.id)">
+                                                <svg class="w-4 h-4 sm:mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                </svg>
+                                                <span class="hidden sm:inline">Edit</span>
+                                            </Link>
+                                        </Button>
+                                        <Button
+                                            v-if="!quiz.attempts_count"
+                                            @click="confirmDelete(quiz.id)"
+                                            variant="outline"
+                                            size="sm"
+                                            class="text-destructive hover:text-destructive"
+                                            :disabled="isLoading"
+                                        >
+                                            <svg class="w-4 h-4 sm:mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                            <span class="hidden sm:inline">Delete</span>
+                                        </Button>
+                                    </div>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Empty State - Show when no quizzes found -->
+                    <div v-else class="text-center py-12 px-4">
+                        <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-muted mb-4">
+                            <svg class="h-8 w-8 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                        </div>
+
+                        <!-- Dynamic message based on filter state -->
+                        <h3 class="text-lg font-semibold text-foreground mb-2">
+                            {{ hasActiveFilters ? 'No Quizzes Match Your Filters' : 'No Quizzes Available' }}
+                        </h3>
+
+                        <p class="text-muted-foreground mb-6 max-w-sm mx-auto text-sm">
+                            <span v-if="hasActiveFilters">
+                                {{ getFilteredEmptyMessage() }}
+                            </span>
+                            <span v-else>
+                                Get started by creating your first quiz to assess student knowledge and engagement.
+                            </span>
+                        </p>
+
+                        <!-- Action buttons -->
+                        <div class="flex flex-col gap-3 sm:flex-row sm:justify-center">
+                            <Button as-child>
+                                <Link :href="route('admin.quizzes.create')">
+                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                                    </svg>
+                                    Create First Quiz
+                                </Link>
+                            </Button>
+
+                            <Button
+                                v-if="hasActiveFilters"
+                                @click="clearFilters"
+                                variant="outline"
+                            >
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                                Clear Filters
+                            </Button>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
 
             <!-- Pagination - Only show when there are quizzes -->
-            <div v-if="quizzes.data && quizzes.data.length > 0 && quizzes.meta" class="mt-8">
-                <div class="flex justify-between items-center">
-                    <div class="text-sm text-gray-600">
-                        Showing <span class="font-medium">{{ quizzes.meta.from || 0 }}</span> to
-                        <span class="font-medium">{{ quizzes.meta.to || 0 }}</span> of
-                        <span class="font-medium">{{ quizzes.meta.total || 0 }}</span> quizzes
+            <div v-if="quizzes.data && quizzes.data.length > 0 && quizzes.meta" class="mt-6">
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="text-sm text-muted-foreground">
+                        Showing <span class="font-medium text-foreground">{{ quizzes.meta.from || 0 }}</span> to
+                        <span class="font-medium text-foreground">{{ quizzes.meta.to || 0 }}</span> of
+                        <span class="font-medium text-foreground">{{ quizzes.meta.total || 0 }}</span> quizzes
                     </div>
-                    <div class="flex space-x-2">
-                        <button
+                    <div class="flex flex-wrap gap-1 justify-center sm:justify-end">
+                        <Button
                             v-for="link in quizzes.meta.links"
                             :key="link.label"
                             :disabled="!link.url || isLoading"
                             @click="goToPage(link.url)"
-                            class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-medium transition-colors duration-200"
-                            :class="{
-                                'bg-indigo-600 text-white border-indigo-600': link.active,
-                                'bg-white text-gray-700 hover:bg-gray-100': !link.active && link.url,
-                                'cursor-not-allowed opacity-50': !link.url || isLoading,
-                            }"
+                            :variant="link.active ? 'default' : 'outline-solid'"
+                            size="sm"
                             v-html="link.label"
-                        ></button>
+                        ></Button>
                     </div>
                 </div>
             </div>
@@ -245,32 +259,32 @@
             <!-- Delete Confirmation Modal -->
             <Modal :show="showDeleteModal" @close="showDeleteModal = false">
                 <div class="p-6 sm:p-8">
-                    <h2 class="text-xl font-semibold text-gray-900 mb-3">Confirm Deletion</h2>
-                    <p class="text-sm text-gray-600 mb-6">
+                    <h2 class="text-xl font-semibold text-foreground mb-3">Confirm Deletion</h2>
+                    <p class="text-sm text-muted-foreground mb-6">
                         Are you sure you want to delete this quiz? This action cannot be undone.
                     </p>
-                    <div class="flex justify-end space-x-3">
-                        <button
+                    <div class="flex flex-col gap-3 sm:flex-row sm:justify-end">
+                        <Button
                             @click="showDeleteModal = false"
-                            class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-300 text-sm font-medium transition-colors duration-200"
+                            variant="outline"
                             :disabled="isLoading"
                         >
                             Cancel
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                             @click="deleteQuiz"
-                            class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 text-sm font-medium transition-colors duration-200"
+                            variant="destructive"
                             :disabled="isLoading"
                         >
                             <span v-if="isLoading" class="flex items-center">
-                                <svg class="animate-spin h-5 w-5 mr-2 text-white" fill="none" viewBox="0 0 24 24">
+                                <svg class="animate-spin h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24">
                                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8h-8z" />
                                 </svg>
                                 Deleting...
                             </span>
                             <span v-else>Delete</span>
-                        </button>
+                        </Button>
                     </div>
                 </div>
             </Modal>
@@ -285,12 +299,27 @@ import { router } from '@inertiajs/vue3';
 import { ref, watch, computed } from 'vue';
 import { debounce } from 'lodash';
 import AdminLayout from "@/layouts/AdminLayout.vue";
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default {
     components: {
         AdminLayout,
         Link,
         Modal,
+        Button,
+        Card,
+        CardContent,
+        CardHeader,
+        CardTitle,
+        Label,
+        Select,
+        SelectContent,
+        SelectItem,
+        SelectTrigger,
+        SelectValue,
     },
     props: {
         quizzes: {
@@ -363,9 +392,15 @@ export default {
         // Debounced filter application
         const applyFilters = debounce(() => {
             isLoading.value = true;
+            
+            // Filter out "all" values before sending to server
+            const filteredParams = Object.fromEntries(
+                Object.entries(filters.value).filter(([key, value]) => value && value !== 'all')
+            );
+            
             router.get(
                 route('admin.quizzes.index'),
-                filters.value,
+                filteredParams,
                 {
                     preserveState: true,
                     preserveScroll: true,

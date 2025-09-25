@@ -16,7 +16,7 @@
                                 <Input
                                     id="name"
                                     type="text"
-                                    class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                                     v-model="form.name"
                                     required
                                     autofocus
@@ -29,7 +29,7 @@
                                 <Input
                                     id="type"
                                     type="text"
-                                    class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                                     v-model="form.type"
                                     required
                                 />
@@ -43,7 +43,7 @@
                                 <Label for="content" value="Instruction Content" />
                                 <textarea
                                     id="content"
-                                    class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-indigo-500 dark:focus:border-indigo-600 focus:ring-indigo-500 dark:focus:ring-indigo-600 rounded-md shadow-sm"
+                                    class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500 border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-indigo-500 dark:focus:border-indigo-600 focus:ring-indigo-500 dark:focus:ring-indigo-600 rounded-md shadow-sm"
                                     v-model="form.content"
                                     rows="6"
                                     required
@@ -69,7 +69,7 @@
                             <div class="flex items-center justify-end mt-4">
                                 <Link
                                     :href="route('admin.instructions.index')"
-                                    class="mr-4 px-4 py-2 bg-gray-200 dark:bg-gray-700 border border-transparent rounded-md font-semibold text-xs text-gray-700 dark:text-gray-300 uppercase tracking-widest hover:bg-gray-300 dark:hover:bg-gray-600 active:bg-gray-400 dark:active:bg-gray-500 focus:outline-none focus:border-gray-900 focus:ring ring-gray-300 disabled:opacity-25 transition"
+                                    class="mr-4 px-4 py-2 bg-gray-200 dark:bg-gray-700 border border-transparent rounded-md font-semibold text-xs text-gray-700 dark:text-gray-300 uppercase tracking-widest hover:bg-gray-300 dark:hover:bg-gray-600 active:bg-gray-400 dark:active:bg-gray-500 focus:outline-hidden focus:border-gray-900 focus:ring-3 ring-gray-300 disabled:opacity-25 transition"
                                 >
                                     Cancel
                                 </Link>

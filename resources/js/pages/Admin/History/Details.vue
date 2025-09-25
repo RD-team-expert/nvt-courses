@@ -101,7 +101,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                 <!-- Evaluation Summary -->
                 <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                     <div class="flex items-center mb-6">
-                        <div class="flex-shrink-0">
+                        <div class="shrink-0">
                             <div class="flex items-center justify-center h-10 w-10 rounded-lg bg-blue-100">
                                 <svg class="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -188,7 +188,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                 <!-- Category Details -->
                 <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                     <div class="flex items-center mb-6">
-                        <div class="flex-shrink-0">
+                        <div class="shrink-0">
                             <div class="flex items-center justify-center h-10 w-10 rounded-lg bg-purple-100">
                                 <svg class="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v6a2 2 0 002 2h2m2-8H9m0 0V3m0 4v6m0-6h2a2 2 0 012 2v6a2 2 0 01-2 2H9" />

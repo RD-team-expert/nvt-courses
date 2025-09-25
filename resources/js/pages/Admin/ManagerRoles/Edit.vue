@@ -198,7 +198,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
             <!-- Current Assignment Info -->
             <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8">
                 <div class="flex items-start space-x-3">
-                    <div class="flex-shrink-0">
+                    <div class="shrink-0">
                         <svg class="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
@@ -235,7 +235,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                         <label class="block font-semibold mb-2">Manager</label>
                         <select
                             v-model="form.user_id"
-                            class="border border-gray-300 px-3 py-2 rounded-md w-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            class="border border-gray-300 px-3 py-2 rounded-md w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             :disabled="form.processing"
                             required
                         >
@@ -254,7 +254,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                         <label class="block font-semibold mb-2">Department</label>
                         <select
                             v-model="form.department_id"
-                            class="border border-gray-300 px-3 py-2 rounded-md w-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            class="border border-gray-300 px-3 py-2 rounded-md w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             :disabled="form.processing"
                             required
                         >
@@ -273,7 +273,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                         <label class="block font-semibold mb-2">Role Type</label>
                         <select
                             v-model="form.role_type"
-                            class="border border-gray-300 px-3 py-2 rounded-md w-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            class="border border-gray-300 px-3 py-2 rounded-md w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             :disabled="form.processing"
                             required
                         >
@@ -292,7 +292,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                         <label class="block font-semibold mb-2">Authority Level</label>
                         <select
                             v-model="form.authority_level"
-                            class="border border-gray-300 px-3 py-2 rounded-md w-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            class="border border-gray-300 px-3 py-2 rounded-md w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             :disabled="form.processing"
                             required
                         >
@@ -323,7 +323,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                             @click="form.management_type = type.value"
                         >
                             <div class="flex items-start space-x-3">
-                                <div class="flex-shrink-0 mt-1">
+                                <div class="shrink-0 mt-1">
                                     <input
                                         type="radio"
                                         :value="type.value"
@@ -371,7 +371,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                 <div v-if="form.management_type === 'specific_user'" class="mb-8">
                     <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
                         <div class="flex items-start space-x-3 mb-4">
-                            <div class="flex-shrink-0">
+                            <div class="shrink-0">
                                 <svg class="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                                 </svg>
@@ -386,7 +386,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                             <label class="block font-semibold mb-2 text-blue-900">Select L1 Employee to Manage</label>
                             <select
                                 v-model="form.manages_user_id"
-                                class="border border-blue-300 px-3 py-2 rounded-md w-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                                class="border border-blue-300 px-3 py-2 rounded-md w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
                                 :disabled="form.processing || !form.department_id"
                             >
                                 <option value="">Choose an L1 employee</option>
@@ -415,7 +415,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                         <input
                             type="date"
                             v-model="form.start_date"
-                            class="border border-gray-300 px-3 py-2 rounded-md w-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            class="border border-gray-300 px-3 py-2 rounded-md w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             :disabled="form.processing"
                             required
                         />
@@ -430,7 +430,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                         <input
                             type="date"
                             v-model="form.end_date"
-                            class="border border-gray-300 px-3 py-2 rounded-md w-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            class="border border-gray-300 px-3 py-2 rounded-md w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             :disabled="form.processing"
                         />
                         <p class="text-sm text-gray-500 mt-1">Leave empty for permanent assignment</p>
@@ -463,7 +463,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                         <textarea
                             v-model="form.notes"
                             rows="4"
-                            class="border border-gray-300 px-3 py-2 rounded-md w-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            class="border border-gray-300 px-3 py-2 rounded-md w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             :disabled="form.processing"
                             placeholder="Additional notes about this role assignment, responsibilities, special conditions, or expectations..."
                         ></textarea>

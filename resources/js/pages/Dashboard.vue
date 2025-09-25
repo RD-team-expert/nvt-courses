@@ -167,7 +167,7 @@ const timeAgo = (dateString) => {
                       :key="activity.id || index"
                       class="flex items-start p-3 border-b border-gray-100 last:border-0 hover:bg-gray-50 rounded-lg transition-colors"
                     >
-                      <div class="w-10 h-10 rounded-full bg-gray-200 flex-shrink-0 mr-3 overflow-hidden">
+                      <div class="w-10 h-10 rounded-full bg-gray-200 shrink-0 mr-3 overflow-hidden">
                         <img v-if="activity.user?.avatar" :src="activity.user.avatar" class="w-full h-full object-cover" alt="User avatar" />
                         <div v-else class="w-full h-full flex items-center justify-center text-gray-500 font-medium text-sm">
                           {{ activity.user?.name ? activity.user.name.charAt(0).toUpperCase() : 'S' }}

@@ -59,7 +59,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                         <label class="block font-semibold mb-1">Hierarchy Level</label>
                         <select
                             v-model="form.hierarchy_level"
-                            class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                             :disabled="form.processing"
                             required
                         >
@@ -79,7 +79,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                         <input
                             type="text"
                             v-model="form.code"
-                            class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                             :disabled="form.processing"
                             maxlength="10"
                             placeholder="e.g., L1, L2, MGR"
@@ -94,7 +94,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                         <input
                             type="text"
                             v-model="form.name"
-                            class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                             :disabled="form.processing"
                             placeholder="e.g., Employee, Direct Manager, Senior Manager"
                             required
@@ -108,7 +108,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                         <textarea
                             v-model="form.description"
                             rows="3"
-                            class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                             :disabled="form.processing"
                             placeholder="Describe the responsibilities and scope of this level"
                         ></textarea>

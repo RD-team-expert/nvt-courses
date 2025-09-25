@@ -105,7 +105,7 @@ const formatDate = (dateString) => {
         <select
           id="course_filter"
           v-model="filters.course_id"
-          class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+          class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
         >
           <option value="">All Courses</option>
           <option v-for="course in courses" :key="course.id" :value="course.id">{{ course.name }}</option>
@@ -117,7 +117,7 @@ const formatDate = (dateString) => {
         <select
           id="status_filter"
           v-model="filters.status"
-          class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+          class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
         >
           <option value="">All Statuses</option>
           <option value="pending">Pending</option>
@@ -132,7 +132,7 @@ const formatDate = (dateString) => {
           id="date_from"
           type="date"
           v-model="filters.date_from"
-          class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+          class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
         />
       </div>
       
@@ -142,14 +142,14 @@ const formatDate = (dateString) => {
           id="date_to"
           type="date"
           v-model="filters.date_to"
-          class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+          class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
         />
       </div>
       
       <div class="flex items-end md:col-span-4">
         <button
           @click="resetFilters"
-          class="inline-flex items-center px-4 py-2 bg-gray-100 border border-transparent rounded-md font-medium text-gray-700 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition"
+          class="inline-flex items-center px-4 py-2 bg-gray-100 border border-transparent rounded-md font-medium text-gray-700 hover:bg-gray-200 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition"
         >
           Reset Filters
         </button>

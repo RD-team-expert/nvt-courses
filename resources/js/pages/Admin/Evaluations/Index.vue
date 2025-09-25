@@ -6,7 +6,7 @@
                 <h1 class="text-3xl font-bold text-gray-900">Evaluation Configurations</h1>
                 <button
                     @click="showCreateModal = true"
-                    class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-200 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-200 hover:bg-indigo-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
                 >
                     <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -78,7 +78,7 @@
                                 </div>
                                 <button
                                     @click="confirmDeleteType(type)"
-                                    class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-red-100 text-red-600 hover:bg-red-200 hover:text-red-800 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-red-500"
+                                    class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-red-100 text-red-600 hover:bg-red-200 hover:text-red-800 transition-colors duration-200 focus:outline-hidden focus:ring-2 focus:ring-red-500"
                                     title="Delete type"
                                 >
                                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -114,7 +114,7 @@
                 <p class="text-gray-600 mb-6">Get started by creating your first evaluation category to organize your assessment criteria.</p>
                 <button
                     @click="showCreateModal = true"
-                    class="inline-flex items-center rounded-lg bg-indigo-600 px-6 py-3 text-sm font-semibold text-white transition-colors duration-200 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                    class="inline-flex items-center rounded-lg bg-indigo-600 px-6 py-3 text-sm font-semibold text-white transition-colors duration-200 hover:bg-indigo-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 shadow-sm"
                 >
                     <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -126,7 +126,7 @@
             <!-- Total Score Configuration -->
             <div v-if="hasConfigs" class="mt-8 rounded-xl bg-white p-6 shadow-sm border border-gray-200">
                 <div class="flex items-center mb-4">
-                    <div class="flex-shrink-0">
+                    <div class="shrink-0">
                         <div class="flex items-center justify-center h-10 w-10 rounded-lg bg-blue-100">
                             <svg class="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -173,7 +173,7 @@
                     <div class="flex justify-end pt-4">
                         <button
                             type="submit"
-                            class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-200 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                            class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-200 hover:bg-indigo-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 shadow-sm"
                             :disabled="totalScoreForm.processing"
                         >
                             <span v-if="totalScoreForm.processing" class="flex items-center">
@@ -192,7 +192,7 @@
             <!-- Incentives Configuration -->
             <div class="mt-8 rounded-xl bg-white p-6 shadow-sm border border-gray-200">
                 <div class="flex items-center mb-4">
-                    <div class="flex-shrink-0">
+                    <div class="shrink-0">
                         <div class="flex items-center justify-center h-10 w-10 rounded-lg bg-green-100">
                             <svg class="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
@@ -209,7 +209,7 @@
                         <div
                             v-for="(incentive, index) in incentiveForm.incentives"
                             :key="index"
-                            class="relative flex flex-col sm:flex-row sm:items-end space-y-3 sm:space-y-0 sm:space-x-4 p-4 border border-gray-200 rounded-lg bg-gradient-to-r from-gray-50 to-white hover:from-gray-100 hover:to-gray-50 transition-all duration-200"
+                            class="relative flex flex-col sm:flex-row sm:items-end space-y-3 sm:space-y-0 sm:space-x-4 p-4 border border-gray-200 rounded-lg bg-linear-to-r from-gray-50 to-white hover:from-gray-100 hover:to-gray-50 transition-all duration-200"
                         >
                             <div class="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
                                 <div>
@@ -250,7 +250,7 @@
                             <button
                                 @click.prevent="confirmRemoveIncentive(index)"
                                 type="button"
-                                class="inline-flex items-center rounded-lg bg-red-100 px-3 py-2 text-sm font-semibold text-red-700 transition-colors duration-200 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-red-500 shadow-sm"
+                                class="inline-flex items-center rounded-lg bg-red-100 px-3 py-2 text-sm font-semibold text-red-700 transition-colors duration-200 hover:bg-red-200 focus:outline-hidden focus:ring-2 focus:ring-red-500 shadow-sm"
                                 :disabled="incentiveForm.incentives.length <= 1"
                                 :class="{ 'opacity-50 cursor-not-allowed': incentiveForm.incentives.length <= 1 }"
                             >
@@ -266,7 +266,7 @@
                         <button
                             @click.prevent="addIncentive"
                             type="button"
-                            class="inline-flex items-center rounded-lg bg-green-100 px-4 py-2 text-sm font-semibold text-green-700 transition-colors duration-200 hover:bg-green-200 focus:outline-none focus:ring-2 focus:ring-green-500 shadow-sm"
+                            class="inline-flex items-center rounded-lg bg-green-100 px-4 py-2 text-sm font-semibold text-green-700 transition-colors duration-200 hover:bg-green-200 focus:outline-hidden focus:ring-2 focus:ring-green-500 shadow-sm"
                         >
                             <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -275,7 +275,7 @@
                         </button>
                         <button
                             type="submit"
-                            class="inline-flex items-center rounded-lg bg-indigo-600 px-6 py-2 text-sm font-medium text-white transition-colors duration-200 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                            class="inline-flex items-center rounded-lg bg-indigo-600 px-6 py-2 text-sm font-medium text-white transition-colors duration-200 hover:bg-indigo-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 shadow-sm"
                             :disabled="incentiveForm.processing"
                         >
                             <span v-if="incentiveForm.processing" class="flex items-center">
@@ -296,7 +296,7 @@
         <Modal :show="showCreateModal || showEditModal" @close="closeModals" max-width="md">
             <div class="p-6 sm:p-8">
                 <div class="flex items-center mb-6">
-                    <div class="flex-shrink-0">
+                    <div class="shrink-0">
                         <div class="flex items-center justify-center h-12 w-12 rounded-full bg-indigo-100">
                             <svg class="h-6 w-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -357,14 +357,14 @@
                         <button
                             @click="closeModals"
                             type="button"
-                            class="inline-flex items-center rounded-lg bg-white px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 transition-colors duration-200 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                            class="inline-flex items-center rounded-lg bg-white px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 transition-colors duration-200 hover:bg-gray-50 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 shadow-sm"
                             :disabled="categoryForm.processing"
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
-                            class="inline-flex items-center rounded-lg bg-indigo-600 px-6 py-2 text-sm font-medium text-white transition-colors duration-200 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                            class="inline-flex items-center rounded-lg bg-indigo-600 px-6 py-2 text-sm font-medium text-white transition-colors duration-200 hover:bg-indigo-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 shadow-sm"
                             :disabled="categoryForm.processing"
                         >
                             <span v-if="categoryForm.processing" class="flex items-center">
@@ -390,7 +390,7 @@
         <Modal :show="showAddTypeModal" @close="closeTypeModal" max-width="md">
             <div class="p-6 sm:p-8">
                 <div class="flex items-center mb-6">
-                    <div class="flex-shrink-0">
+                    <div class="shrink-0">
                         <div class="flex items-center justify-center h-12 w-12 rounded-full bg-blue-100">
                             <svg class="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
@@ -452,14 +452,14 @@
                         <button
                             @click="closeTypeModal"
                             type="button"
-                            class="inline-flex items-center rounded-lg bg-white px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 transition-colors duration-200 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                            class="inline-flex items-center rounded-lg bg-white px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 transition-colors duration-200 hover:bg-gray-50 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 shadow-sm"
                             :disabled="typeForm.processing"
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
-                            class="inline-flex items-center rounded-lg bg-blue-600 px-6 py-2 text-sm font-medium text-white transition-colors duration-200 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+                            class="inline-flex items-center rounded-lg bg-blue-600 px-6 py-2 text-sm font-medium text-white transition-colors duration-200 hover:bg-blue-700 focus:outline-hidden focus:ring-2 focus:ring-blue-500 shadow-sm"
                             :disabled="typeForm.processing"
                         >
                             <span v-if="typeForm.processing" class="flex items-center">
@@ -485,7 +485,7 @@
         <Modal :show="showDeleteCategoryModal" @close="showDeleteCategoryModal = false" max-width="md">
             <div class="p-6 sm:p-8">
                 <div class="flex items-start">
-                    <div class="flex-shrink-0">
+                    <div class="shrink-0">
                         <div class="flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
                             <svg class="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z" />
@@ -517,13 +517,13 @@
                         <div class="flex justify-end space-x-3">
                             <button
                                 @click="showDeleteCategoryModal = false"
-                                class="inline-flex items-center rounded-lg bg-white px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 transition-colors duration-200 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                                class="inline-flex items-center rounded-lg bg-white px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 transition-colors duration-200 hover:bg-gray-50 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 shadow-sm"
                             >
                                 Cancel
                             </button>
                             <button
                                 @click="deleteCategory"
-                                class="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors duration-200 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 shadow-sm"
+                                class="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors duration-200 hover:bg-red-700 focus:outline-hidden focus:ring-2 focus:ring-red-500 shadow-sm"
                             >
                                 <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -554,13 +554,13 @@
                     <div class="flex justify-center space-x-3">
                         <button
                             @click="showDeleteTypeModal = false"
-                            class="inline-flex items-center rounded-lg bg-white px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 transition-colors duration-200 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                            class="inline-flex items-center rounded-lg bg-white px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 transition-colors duration-200 hover:bg-gray-50 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 shadow-sm"
                         >
                             Cancel
                         </button>
                         <button
                             @click="deleteType"
-                            class="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors duration-200 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 shadow-sm"
+                            class="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors duration-200 hover:bg-red-700 focus:outline-hidden focus:ring-2 focus:ring-red-500 shadow-sm"
                         >
                             <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -588,13 +588,13 @@
                     <div class="flex justify-center space-x-3">
                         <button
                             @click="showRemoveIncentiveModal = false"
-                            class="inline-flex items-center rounded-lg bg-white px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 transition-colors duration-200 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                            class="inline-flex items-center rounded-lg bg-white px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 transition-colors duration-200 hover:bg-gray-50 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 shadow-sm"
                         >
                             Cancel
                         </button>
                         <button
                             @click="removeIncentive"
-                            class="inline-flex items-center rounded-lg bg-yellow-600 px-4 py-2 text-sm font-medium text-white transition-colors duration-200 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-yellow-500 shadow-sm"
+                            class="inline-flex items-center rounded-lg bg-yellow-600 px-4 py-2 text-sm font-medium text-white transition-colors duration-200 hover:bg-yellow-700 focus:outline-hidden focus:ring-2 focus:ring-yellow-500 shadow-sm"
                         >
                             Remove Tier
                         </button>

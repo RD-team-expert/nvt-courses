@@ -279,7 +279,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
             <div class="bg-white rounded-lg shadow p-6 mb-6">
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
                     <div class="flex items-center space-x-4">
-                        <div class="flex-shrink-0 h-16 w-16">
+                        <div class="shrink-0 h-16 w-16">
                             <div class="h-16 w-16 rounded-full flex items-center justify-center" :class="getLevelColor(userLevel.code)">
                                 <span class="text-xl font-bold">
                                     {{ userLevel.code }}
@@ -336,7 +336,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                 <div class="bg-white rounded-lg shadow p-6">
                     <div class="flex items-center">
-                        <div class="flex-shrink-0">
+                        <div class="shrink-0">
                             <div class="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center">
                                 <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 515 0z"></path>
@@ -354,7 +354,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
 
                 <div class="bg-white rounded-lg shadow p-6">
                     <div class="flex items-center">
-                        <div class="flex-shrink-0">
+                        <div class="shrink-0">
                             <div class="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center">
                                 <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -372,7 +372,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
 
                 <div class="bg-white rounded-lg shadow p-6">
                     <div class="flex items-center">
-                        <div class="flex-shrink-0">
+                        <div class="shrink-0">
                             <div class="w-8 h-8 bg-purple-500 rounded-md flex items-center justify-center">
                                 <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
@@ -390,7 +390,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
 
                 <div class="bg-white rounded-lg shadow p-6">
                     <div class="flex items-center">
-                        <div class="flex-shrink-0">
+                        <div class="shrink-0">
                             <div class="w-8 h-8 bg-orange-500 rounded-md flex items-center justify-center">
                                 <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
@@ -437,7 +437,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                         <tr v-for="user in users" :key="user.id" class="hover:bg-gray-50 transition-colors">
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="flex items-center">
-                                    <div class="flex-shrink-0 h-10 w-10">
+                                    <div class="shrink-0 h-10 w-10">
                                         <div class="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
                                                 <span class="text-sm font-medium text-gray-600">
                                                     {{ user.name.charAt(0).toUpperCase() }}
@@ -501,7 +501,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                             <div class="mt-6">
                                 <button
                                     @click="loadAvailableUsers"
-                                    class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                                    class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
                                 >
                                     Assign Users
                                 </button>
@@ -615,7 +615,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                                             class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                                         />
                                         <label :for="`user-${user.id}`" class="ml-3 flex items-center flex-1 cursor-pointer">
-                                            <div class="flex-shrink-0 h-8 w-8">
+                                            <div class="shrink-0 h-8 w-8">
                                                 <div class="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center">
                                                     <span class="text-xs font-medium text-gray-600">
                                                         {{ user.name.charAt(0).toUpperCase() }}
@@ -694,7 +694,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                         <button
                             @click="assignUsersToLevel"
                             type="button"
-                            class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm transition-colors"
+                            class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm transition-colors"
                             :disabled="selectedUsers.length === 0"
                             :class="{ 'opacity-50 cursor-not-allowed': selectedUsers.length === 0 }"
                         >
@@ -703,7 +703,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                         <button
                             @click="closeModal"
                             type="button"
-                            class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm transition-colors"
+                            class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm transition-colors"
                         >
                             Cancel
                         </button>

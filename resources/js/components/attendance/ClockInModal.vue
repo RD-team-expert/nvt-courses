@@ -39,7 +39,7 @@
                       <select
                         id="course_id"
                         v-model="form.course_id"
-                        class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="">General Attendance (No Course)</option>
                         <option v-for="course in courses" :key="course.id" :value="course.id">

@@ -1,6 +1,6 @@
 <template>
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+        <div class="min-h-screen bg-linear-to-br from-slate-50 to-blue-50">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 <!-- Header Section -->
                 <div class="mb-8 text-center lg:text-left">
@@ -110,7 +110,7 @@
                             <!-- Quiz Status Indicator -->
                             <div class="flex">
                                 <div :class="[
-                                    'w-1 flex-shrink-0',
+                                    'w-1 shrink-0',
                                     getQuizStatusColor(quiz)
                                 ]"></div>
 
@@ -126,7 +126,7 @@
                                             </p>
                                         </div>
                                         <div :class="[
-        'px-3 py-1 rounded-full text-xs font-medium flex-shrink-0',
+        'px-3 py-1 rounded-full text-xs font-medium shrink-0',
         getQuizStatusBadge(quiz)
     ]">
                                             {{ getQuizStatus(quiz) }}
@@ -155,7 +155,7 @@
                                             <div
                                                 :class="[
                                                     'h-2 rounded-full transition-all duration-300',
-                                                    quiz.has_passed ? 'bg-green-500' : 'bg-gradient-to-r from-indigo-500 to-purple-600'
+                                                    quiz.has_passed ? 'bg-green-500' : 'bg-linear-to-r from-indigo-500 to-purple-600'
                                                 ]"
                                                 :style="{ width: quiz.has_passed ? '100%' : `${(quiz.attempts / 3) * 100}%` }"
                                             ></div>
@@ -172,9 +172,9 @@
                                     <Link
                                         :href="route('quizzes.show', quiz.id)"
                                         :class="[
-                                            'w-full inline-flex items-center justify-center px-4 py-3 rounded-lg font-medium text-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2',
+                                            'w-full inline-flex items-center justify-center px-4 py-3 rounded-lg font-medium text-sm transition-all duration-200 focus:outline-hidden focus:ring-2 focus:ring-offset-2',
                                             canTakeQuiz(quiz)
-                                                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white focus:ring-indigo-500'
+                                                ? 'bg-linear-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white focus:ring-indigo-500'
                                                 : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                                         ]"
                                     >
