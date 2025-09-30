@@ -2,7 +2,7 @@
 
 namespace App\Jobs;
 
-use App\Mail\CourseCreationNotification;
+use App\Mail\CourseCreatedNotification;
 use App\Models\Course;
 use App\Models\User;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -27,7 +27,7 @@ class SendCourseCreationEmails implements ShouldQueue
     public function handle(): void
     {
         User::all()->each(function ($user) {
-            Mail::to($user->email)->send(new CourseCreationNotification($this->course, $user));
+            Mail::to($user->email)->send(new CourseCreatedNotification($this->course, $user));
         });
     }
 }

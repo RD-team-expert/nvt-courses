@@ -2,12 +2,14 @@
 
 namespace App\Providers;
 
+use App\Events\CourseAssigned;
 use App\Events\CourseCreated;
 use App\Events\CourseEnrolled;
 use App\Events\CourseCompleted;
 use App\Listeners\SendCourseCreationEmail;
 use App\Listeners\SendCourseEnrollmentEmail;
 use App\Listeners\SendCourseCompletionEmail;
+use App\Listeners\SendCourseNotification;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 
 class EventServiceProvider extends ServiceProvider
@@ -26,6 +28,9 @@ class EventServiceProvider extends ServiceProvider
         ],
         CourseCompleted::class => [
             SendCourseCompletionEmail::class,
+        ],
+        CourseAssigned::class => [
+            SendCourseNotification::class,
         ],
     ];
 

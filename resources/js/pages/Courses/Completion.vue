@@ -21,11 +21,11 @@
                 <div class="flex items-center">
                   <span class="text-gray-700 mr-2">Your rating:</span>
                   <div class="flex">
-                    <StarIcon v-for="i in 5" :key="i" 
+                    <StarIcon v-for="i in 5" :key="i"
                       :class="[
-                        'h-5 w-5', 
+                        'h-5 w-5',
                         i <= completion.rating ? 'text-yellow-400' : 'text-gray-300'
-                      ]" 
+                      ]"
                     />
                   </div>
                 </div>
@@ -47,15 +47,15 @@
                   How would you rate this course? <span class="text-red-500">*</span>
                 </label>
                 <div class="mt-1 flex items-center">
-                  <button 
-                    v-for="star in 5" 
+                  <button
+                    v-for="star in 5"
                     :key="star"
                     type="button"
                     @click="rating = star"
-                    class="focus:outline-none hover:scale-110 transition-transform"
+                    class="focus:outline-hidden hover:scale-110 transition-transform"
                   >
-                    <StarIcon 
-                      class="h-8 w-8" 
+                    <StarIcon
+                      class="h-8 w-8"
                       :class="star <= rating ? 'text-yellow-400' : 'text-gray-300'"
                     />
                   </button>
@@ -74,7 +74,7 @@
                     id="feedback"
                     v-model="feedback"
                     rows="4"
-                    class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                     :class="{
                       'border-red-300 focus:ring-red-500': errors.feedback,
                       'border-gray-300': !errors.feedback
@@ -94,7 +94,7 @@
                 </Link>
                 <button
                   type="submit"
-                  class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   :disabled="processing || !isFormValid"
                 >
                   {{ processing ? 'Submitting...' : 'Submit Feedback' }}
@@ -137,17 +137,17 @@ const isFormValid = computed(() => {
 // Client-side validation
 const validateForm = () => {
   const newErrors = {};
-  
+
   if (!rating.value || rating.value === 0) {
     newErrors.rating = 'Please provide a rating for this course.';
   }
-  
+
   if (!feedback.value || feedback.value.trim().length === 0) {
     newErrors.feedback = 'Please provide your feedback about this course.';
   } else if (feedback.value.trim().length < 10) {
     newErrors.feedback = 'Feedback must be at least 10 characters long.';
   }
-  
+
   errors.value = newErrors;
   return Object.keys(newErrors).length === 0;
 };
@@ -157,11 +157,11 @@ const submitRating = () => {
   if (!validateForm()) {
     return;
   }
-  
+
   form.rating = rating.value;
   form.feedback = feedback.value.trim();
   processing.value = true;
-  
+
   form.post(route('courses.rating.submit', props.course.id), {
     onSuccess: () => {
       processing.value = false;

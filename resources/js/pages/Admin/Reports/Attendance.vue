@@ -1,237 +1,342 @@
+<!--
+  Attendance Records Report Page
+  Comprehensive reporting interface for tracking and analyzing attendance records
+-->
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { router } from '@inertiajs/vue3'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import { type BreadcrumbItemType } from '@/types'
 import { debounce } from 'lodash'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select'
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
+import {
+    Download,
+    Filter,
+    RotateCcw,
+    Clock,
+    User,
+    GraduationCap,
+    Star,
+    StarHalf,
+    MessageSquare
+} from 'lucide-vue-next'
 
 const props = defineProps({
-  attendance: Array,
-  users: Array,
-  courses: Array, // Add courses prop
-  filters: Object
+    attendance: Array,
+    users: Array,
+    courses: Array, // Add courses prop
+    filters: Object
 })
 
 // Define breadcrumbs
 const breadcrumbs: BreadcrumbItemType[] = [
-  { name: 'Dashboard', href: route('dashboard') },
-  { name: 'Reports & Analytics', href: route('admin.reports.index') },
-  { name: 'Attendance Records', href: route('admin.reports.attendance') }
+    { name: 'Dashboard', href: route('dashboard') },
+    { name: 'Reports & Analytics', href: route('admin.reports.index') },
+    { name: 'Attendance Records', href: route('admin.reports.attendance') }
 ]
 
 // Filter state
 const filters = ref({
-  user_id: props.filters?.user_id || '',
-  date_from: props.filters?.date_from || '',
-  date_to: props.filters?.date_to || '',
-  course_id: props.filters?.course_id || '' // Add course_id filter
+    user_id: props.filters?.user_id || '',
+    date_from: props.filters?.date_from || '',
+    date_to: props.filters?.date_to || '',
+    course_id: props.filters?.course_id || '' // Add course_id filter
 })
+
+// Handle select changes
+const handleUserChange = (value: string) => {
+    filters.value.user_id = value === 'all' ? '' : value
+}
+
+const handleCourseChange = (value: string) => {
+    filters.value.course_id = value === 'all' ? '' : value
+}
 
 // Apply filters with debounce
 const applyFilters = debounce(() => {
-  router.get(route('admin.reports.attendance'), filters.value, {
-    preserveState: true,
-    replace: true
-  })
+    router.get(route('admin.reports.attendance'), filters.value, {
+        preserveState: true,
+        replace: true
+    })
 }, 500)
 
 // Watch for filter changes
 watch(filters, () => {
-  applyFilters()
+    applyFilters()
 }, { deep: true })
 
 // Reset filters
 const resetFilters = () => {
-  filters.value = {
-    user_id: '',
-    date_from: '',
-    date_to: '',
-    course_id: '' // Reset course_id filter
-  }
-  applyFilters()
+    filters.value = {
+        user_id: '',
+        date_from: '',
+        date_to: '',
+        course_id: '' // Reset course_id filter
+    }
+    applyFilters()
 }
 
 // Export to CSV
 const exportToCsv = () => {
-  const queryParams = new URLSearchParams(filters.value).toString();
-  window.location.href = route('admin.reports.export.attendance') + '?' + queryParams;
+    const queryParams = new URLSearchParams(filters.value).toString()
+    window.location.href = route('admin.reports.export.attendance') + '?' + queryParams
 }
 
 // Format date for display
 const formatDate = (dateString) => {
-  if (!dateString) return '—'
-  const date = new Date(dateString)
-  return date.toLocaleString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
+    if (!dateString) return '—'
+    const date = new Date(dateString)
+    return date.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    })
 }
 
 // Format duration in minutes to human-readable format
 const formatHumanDuration = (minutes) => {
-  if (!minutes || isNaN(minutes) || minutes < 0) return '—'
-  
-  // Round to nearest integer to avoid decimal values
-  minutes = Math.round(minutes)
-  
-  const hours = Math.floor(minutes / 60)
-  const remainingMinutes = minutes % 60
-  
-  if (hours > 0) {
-    return `${hours} ${hours === 1 ? 'hour' : 'hours'}${remainingMinutes > 0 ? ` ${remainingMinutes} ${remainingMinutes === 1 ? 'minute' : 'minutes'}` : ''}`
-  }
-  return `${remainingMinutes} ${remainingMinutes === 1 ? 'minute' : 'minutes'}`
+    if (!minutes || isNaN(minutes) || minutes < 0) return '—'
+
+    // Round to nearest integer to avoid decimal values
+    minutes = Math.round(minutes)
+
+    const hours = Math.floor(minutes / 60)
+    const remainingMinutes = minutes % 60
+
+    if (hours > 0) {
+        return `${hours} ${hours === 1 ? 'hour' : 'hours'}${remainingMinutes > 0 ? ` ${remainingMinutes} ${remainingMinutes === 1 ? 'minute' : 'minutes'}` : ''}`
+    }
+    return `${remainingMinutes} ${remainingMinutes === 1 ? 'minute' : 'minutes'}`
+}
+
+// Generate stars for rating display
+const generateStars = (rating: number) => {
+    const stars = []
+    for (let i = 1; i <= 5; i++) {
+        if (i <= rating) {
+            stars.push('full')
+        } else if (i - 0.5 <= rating) {
+            stars.push('half')
+        } else {
+            stars.push('empty')
+        }
+    }
+    return stars
 }
 </script>
 
 <template>
-  <AdminLayout :breadcrumbs="breadcrumbs">
-    <div class="px-4 sm:px-0">
-      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 gap-4 sm:gap-0">
-        <h1 class="text-xl sm:text-2xl font-bold">Attendance Records Report</h1>
-        <button 
-          @click="exportToCsv" 
-          class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition flex items-center w-full sm:w-auto justify-center sm:justify-start"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-          Export to CSV
-        </button>
-      </div>
-      
-      <!-- Filters -->
-      <div class="bg-white p-4 sm:p-6 rounded-lg shadow mb-4 sm:mb-6">
-        <h2 class="text-lg font-medium text-gray-900 mb-4">Filter Attendance Records</h2>
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 sm:gap-6">
-          <div>
-            <label for="user_filter" class="block text-sm font-medium text-gray-700 mb-1">User</label>
-            <select
-              id="user_filter"
-              v-model="filters.user_id"
-              class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All Users</option>
-              <option v-for="user in users" :key="user.id" :value="user.id">{{ user.name }}</option>
-            </select>
-          </div>
-          <!-- Add Course Filter -->
-          <div>
-            <label for="course_filter" class="block text-sm font-medium text-gray-700 mb-1">Course</label>
-            <select
-              id="course_filter"
-              v-model="filters.course_id"
-              class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All Courses</option>
-              <option value="general">General Attendance</option>
-              <option v-for="course in courses" :key="course.id" :value="course.id">{{ course.name }}</option>
-            </select>
-          </div>
-          
-          <div>
-            <label for="date_from" class="block text-sm font-medium text-gray-700 mb-1">Date From</label>
-            <input
-              id="date_from"
-              type="date"
-              v-model="filters.date_from"
-              class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          
-          <div>
-            <label for="date_to" class="block text-sm font-medium text-gray-700 mb-1">Date To</label>
-            <input
-              id="date_to"
-              type="date"
-              v-model="filters.date_to"
-              class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          
-          <div class="flex items-end md:col-span-4">
-            <button
-              @click="resetFilters"
-              class="inline-flex items-center px-4 py-2 bg-gray-100 border border-transparent rounded-md font-medium text-gray-700 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition"
-            >
-              Reset Filters
-            </button>
-          </div>
+    <AdminLayout :breadcrumbs="breadcrumbs">
+        <div class="px-4 sm:px-0 space-y-6">
+            <!-- Header -->
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h1 class="text-xl sm:text-2xl font-bold text-foreground">Attendance Records Report</h1>
+                    <p class="text-sm text-muted-foreground mt-1">Comprehensive reporting interface for tracking and analyzing attendance records</p>
+                </div>
+                <Button @click="exportToCsv" class="w-full sm:w-auto">
+                    <Download class="mr-2 h-4 w-4" />
+                    Export to CSV
+                </Button>
+            </div>
+
+            <!-- Filters -->
+            <Card>
+                <CardHeader>
+                    <div class="flex items-center">
+                        <Filter class="mr-2 h-5 w-5 text-primary" />
+                        <div>
+                            <CardTitle>Filter Attendance Records</CardTitle>
+                            <CardDescription>Use the filters below to narrow down the attendance records</CardDescription>
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="space-y-2">
+                            <Label for="user_filter">User</Label>
+                            <Select
+                                :model-value="filters.user_id || 'all'"
+                                @update:model-value="handleUserChange"
+                            >
+                                <SelectTrigger id="user_filter">
+                                    <SelectValue placeholder="All Users" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Users</SelectItem>
+                                    <SelectItem v-for="user in users" :key="user.id" :value="user.id.toString()">
+                                        {{ user.name }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div class="space-y-2">
+                            <Label for="course_filter">Course</Label>
+                            <Select
+                                :model-value="filters.course_id || 'all'"
+                                @update:model-value="handleCourseChange"
+                            >
+                                <SelectTrigger id="course_filter">
+                                    <SelectValue placeholder="All Courses" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Courses</SelectItem>
+                                    <SelectItem value="general">General Attendance</SelectItem>
+                                    <SelectItem v-for="course in courses" :key="course.id" :value="course.id.toString()">
+                                        {{ course.name }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div class="space-y-2">
+                            <Label for="date_from">Date From</Label>
+                            <Input
+                                id="date_from"
+                                type="date"
+                                v-model="filters.date_from"
+                            />
+                        </div>
+
+                        <div class="space-y-2">
+                            <Label for="date_to">Date To</Label>
+                            <Input
+                                id="date_to"
+                                type="date"
+                                v-model="filters.date_to"
+                            />
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end mt-4">
+                        <Button @click="resetFilters" variant="outline">
+                            <RotateCcw class="mr-2 h-4 w-4" />
+                            Reset Filters
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <!-- Attendance Records Table -->
+            <Card>
+                <div class="overflow-x-auto">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>
+                                    <div class="flex items-center">
+                                        <User class="mr-2 h-4 w-4" />
+                                        User
+                                    </div>
+                                </TableHead>
+                                <TableHead>
+                                    <div class="flex items-center">
+                                        <GraduationCap class="mr-2 h-4 w-4" />
+                                        Course
+                                    </div>
+                                </TableHead>
+                                <TableHead>Clock In</TableHead>
+                                <TableHead class="hidden sm:table-cell">Clock Out</TableHead>
+                                <TableHead>
+                                    <div class="flex items-center">
+                                        <Clock class="mr-2 h-4 w-4" />
+                                        Duration
+                                    </div>
+                                </TableHead>
+                                <TableHead class="hidden md:table-cell">
+                                    <div class="flex items-center">
+                                        <Star class="mr-2 h-4 w-4" />
+                                        Rating
+                                    </div>
+                                </TableHead>
+                                <TableHead class="hidden lg:table-cell">
+                                    <div class="flex items-center">
+                                        <MessageSquare class="mr-2 h-4 w-4" />
+                                        Comment
+                                    </div>
+                                </TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            <TableRow v-if="attendance.length === 0">
+                                <TableCell colspan="7" class="text-center text-muted-foreground py-8">
+                                    <div class="flex flex-col items-center">
+                                        <Clock class="h-12 w-12 text-muted-foreground mb-2" />
+                                        No attendance records found
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                            <TableRow v-else v-for="(record, i) in attendance" :key="i" class="hover:bg-muted/50">
+                                <TableCell>
+                                    <div class="space-y-1">
+                                        <div class="font-medium text-foreground">{{ record.user_name }}</div>
+                                        <div class="text-xs text-muted-foreground hidden sm:block">{{ record.user_email }}</div>
+                                    </div>
+                                </TableCell>
+                                <TableCell>
+                                    <Badge variant="outline">
+                                        {{ record.course_name || 'General Attendance' }}
+                                    </Badge>
+                                </TableCell>
+                                <TableCell>
+                                    <div class="text-sm text-foreground">{{ formatDate(record.clock_in) }}</div>
+                                </TableCell>
+                                <TableCell class="hidden sm:table-cell">
+                                    <div class="text-sm text-foreground">{{ record.clock_out ? formatDate(record.clock_out) : '—' }}</div>
+                                </TableCell>
+                                <TableCell>
+                                    <Badge variant="secondary" class="font-mono">
+                                        {{ formatHumanDuration(record.duration_in_minutes) }}
+                                    </Badge>
+                                </TableCell>
+                                <TableCell class="hidden md:table-cell">
+                                    <div v-if="record.rating" class="flex items-center space-x-2">
+                                        <span class="text-sm font-medium">{{ record.rating }}/5</span>
+                                        <div class="flex">
+                                            <template v-for="(star, index) in generateStars(record.rating)" :key="index">
+                                                <Star v-if="star === 'full'" class="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                                                <StarHalf v-else-if="star === 'half'" class="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                                                <Star v-else class="h-4 w-4 text-muted-foreground" />
+                                            </template>
+                                        </div>
+                                    </div>
+                                    <span v-else class="text-muted-foreground">—</span>
+                                </TableCell>
+                                <TableCell class="hidden lg:table-cell">
+                                    <div class="max-w-xs">
+                                        <div v-if="record.comment" class="text-sm text-muted-foreground truncate">
+                                            {{ record.comment }}
+                                        </div>
+                                        <span v-else class="text-muted-foreground">—</span>
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                        </TableBody>
+                    </Table>
+                </div>
+            </Card>
         </div>
-      </div>
-      
-      <!-- Attendance Records Table -->
-      <div class="bg-white rounded-lg shadow overflow-hidden overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200">
-          <thead class="bg-gray-50">
-            <tr>
-              <th scope="col" class="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                User
-              </th>
-              <!-- Add Course Column -->
-              <th scope="col" class="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Course
-              </th>
-              <th scope="col" class="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Clock In
-              </th>
-              <th scope="col" class="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
-                Clock Out
-              </th>
-              <th scope="col" class="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Duration
-              </th>
-              <th scope="col" class="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">
-                Rating
-              </th>
-              <th scope="col" class="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">
-                Comment
-              </th>
-            </tr>
-          </thead>
-          <tbody class="bg-white divide-y divide-gray-200">
-            <tr v-if="attendance.length === 0">
-              <td colspan="7" class="px-4 sm:px-6 py-4 text-center text-gray-500">No attendance records found</td>
-            </tr>
-            <tr v-else v-for="(record, i) in attendance" :key="i" class="hover:bg-gray-50">
-              <td class="px-4 sm:px-6 py-4 whitespace-nowrap">
-                <div class="flex items-center">
-                  <div>
-                    <div class="text-sm font-medium text-gray-900">{{ record.user_name }}</div>
-                    <div class="text-xs text-gray-500 hidden sm:block">{{ record.user_email }}</div>
-                  </div>
-                </div>
-              </td>
-              <!-- Add Course Column Data -->
-              <td class="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                {{ record.course_name || 'General Attendance' }}
-              </td>
-              <td class="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatDate(record.clock_in) }}</td>
-              <td class="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900 hidden sm:table-cell">{{ record.clock_out ? formatDate(record.clock_out) : '—' }}</td>
-              <td class="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                {{ formatHumanDuration(record.duration_in_minutes) }}
-              </td>
-              <td class="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900 hidden md:table-cell">
-                <div v-if="record.rating" class="flex items-center">
-                  <span>{{ record.rating }}/5</span>
-                  <div class="ml-1 flex">
-                    <svg v-for="i in 5" :key="i" class="h-4 w-4" :class="i <= record.rating ? 'text-yellow-400' : 'text-gray-300'" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
-                  </div>
-                </div>
-                <span v-else>—</span>
-              </td>
-              <td class="px-4 sm:px-6 py-4 text-sm text-gray-900 hidden lg:table-cell">
-                <div class="max-w-xs truncate">{{ record.comment || '—' }}</div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </AdminLayout>
+    </AdminLayout>
 </template>

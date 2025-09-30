@@ -4,7 +4,7 @@ namespace App\Listeners;
 
 use App\Events\CourseCreated;
 use App\Jobs\SendCourseCreationEmails;
-use App\Mail\CourseCreationNotification;
+use App\Mail\CourseCreatedNotification;
 use App\Models\User;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;

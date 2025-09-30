@@ -15,7 +15,7 @@ defineProps<{
                 <div class="flex flex-col items-center gap-4">
                     <Link :href="route('home')" class="flex flex-col items-center gap-2 font-medium">
                         <div class="mb-1 flex h-32 w-32 items-center justify-center rounded-md">
-                            <AppLogoIcon class="size-32 fill-current text-[var(--foreground)] dark:text-white" />
+                            <AppLogoIcon class="size-32 fill-current text-(--foreground) dark:text-white" />
                         </div>
                         <span class="sr-only">{{ title }}</span>
                     </Link>

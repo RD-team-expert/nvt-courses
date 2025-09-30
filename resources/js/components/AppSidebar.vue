@@ -6,7 +6,7 @@ import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, Sid
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
 // Add the Reports icon import
-import { BookOpen, Folder, LayoutGrid, Clock, BookOpenCheck, Users, Settings, BarChart, Bot } from 'lucide-vue-next';
+import { BookOpen, Folder, LayoutGrid, Clock, BookOpenCheck, Users, Settings, BarChart, Bot , LayoutList  } from 'lucide-vue-next';
 import { computed } from 'vue';
 import AppLogo from './AppLogo.vue';
 
@@ -27,9 +27,27 @@ const mainNavItems: NavItem[] = [
         href: '/courses',
         icon: BookOpenCheck,
     },
+
     {
         title: 'Attendance',
         href: '/attendance',
+        icon: Clock,
+    },
+    {
+        title: 'Quizzes',
+        href: '/quizzes',
+        icon: LayoutList
+
+    },
+    {
+        title: 'Profile',
+        href: '/profile',
+        icon: LayoutList
+
+    },
+    {
+        title: ' audio',
+        href: '/audio',
         icon: Clock,
     },
 ];
@@ -57,6 +75,33 @@ const adminNavItems: NavItem[] = [
         href: '/admin/reports',
         icon: BarChart,
     },
+    {
+        title: 'Resend Login Links',
+        href: '/admin/resend-login-links',
+        icon: Clock,
+    },
+    {
+        title: 'Evaluations',
+        href: '/admin/evaluations',
+        icon: Clock,
+    },
+    {
+        title: 'Evaluations Notifications',
+        href: '/admin/evaluations/notifications',
+        icon: Clock,
+    },
+    {
+        title: ' User Evaluation',
+        href: '/admin/evaluations/user-evaluation',
+        icon: Clock,
+    },
+    {
+        title: 'Admin audio',
+        href: '/admin/audio',
+        icon: Clock,
+    },
+
+
 
     // {
     //     title: 'Ai',
@@ -108,7 +153,7 @@ console.log('Is admin:', isAdmin.value);
         <SidebarContent>
             <!-- User Navigation -->
             <NavMain :items="mainNavItems" />
-            
+
             <!-- Admin Navigation (only shown to admins) -->
             <template v-if="isAdmin">
                 <!-- <div class="px-3 pt-2 pb-1">
@@ -126,7 +171,7 @@ console.log('Is admin:', isAdmin.value);
             <!-- <div class="px-3 py-2 text-xs text-center text-gray-500 dark:text-gray-400">
                 Made with ❤️ by R&D team
             </div> -->
-            
+
         </SidebarFooter>
     </Sidebar>
     <slot />

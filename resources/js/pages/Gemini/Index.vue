@@ -97,7 +97,7 @@
                                         id="customInstruction"
                                         v-model="modelSettings.customInstruction"
                                         rows="2"
-                                        class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white dark:border-gray-600 text-sm"
+                                        class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white dark:border-gray-600 text-sm"
                                         placeholder="E.g., You are an expert in Laravel and Vue.js. Focus on providing practical code examples..."
                                     ></textarea>
                                     <p class="text-xs text-gray-500 mt-1">Leave empty to use the selected instruction mode above.</p>
@@ -281,13 +281,13 @@
                                         id="prompt"
                                         v-model="prompt"
                                         rows="3"
-                                        class="border px-3 py-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                                         placeholder="Ask Gemini something..."
                                         @keydown.enter.ctrl.prevent="generateContent"
                                     ></textarea>
                                     <button
                                         @click="generateContent()"
-                                        class="absolute bottom-3 right-3 inline-flex items-center justify-center p-2 bg-indigo-600 border border-transparent rounded-full font-semibold text-white hover:bg-indigo-700 active:bg-indigo-900 focus:outline-none focus:border-indigo-900 focus:ring ring-indigo-300 disabled:opacity-25 transition"
+                                        class="absolute bottom-3 right-3 inline-flex items-center justify-center p-2 bg-indigo-600 border border-transparent rounded-full font-semibold text-white hover:bg-indigo-700 active:bg-indigo-900 focus:outline-hidden focus:border-indigo-900 focus:ring-3 ring-indigo-300 disabled:opacity-25 transition"
                                         :disabled="isLoading || !prompt.trim()"
                                         title="Send message (Ctrl+Enter)"
                                     >
