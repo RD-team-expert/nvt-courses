@@ -1,12 +1,12 @@
 <template>
     <AdminLayout :breadcrumbs="breadcrumbs">
-        <div class="mx-auto max-w-3xl py-12 sm:px-6 lg:px-8">
+        <div class="mx-auto max-w-3xl py-12 sm:px-6 lg:px-8 bg-white dark:bg-gray-900 text-gray-900 dark:text-white">
             <!-- Header -->
             <div class="mb-8 flex items-center justify-between">
-                <h1 class="text-3xl font-bold text-gray-900">Attempt Details</h1>
+                <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Attempt Details</h1>
                 <Link
                     :href="route('admin.quiz-attempts.index')"
-                    class="inline-flex items-center rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors duration-200 hover:bg-gray-200 focus:outline-hidden focus:ring-2 focus:ring-gray-300"
+                    class="inline-flex items-center rounded-lg bg-gray-100 dark:bg-gray-700 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-200 transition-colors duration-200 hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-hidden focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-500"
                 >
                     <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -16,89 +16,89 @@
             </div>
 
             <!-- Attempt Summary -->
-            <div class="mb-6 rounded-xl bg-white p-6 shadow-sm">
-                <h2 class="mb-4 text-lg font-semibold text-gray-800">Summary</h2>
+            <div class="mb-6 rounded-xl bg-white dark:bg-gray-800 p-6 shadow-sm dark:shadow-lg dark:shadow-gray-900/50 border border-gray-200 dark:border-gray-700">
+                <h2 class="mb-4 text-lg font-semibold text-gray-800 dark:text-gray-200">Summary</h2>
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
-                        <p class="text-sm text-gray-700">User:</p>
-                        <p class="text-sm text-gray-900">{{ attempt.user.name }} ({{ attempt.user.email }})</p>
+                        <p class="text-sm text-gray-700 dark:text-gray-300">User:</p>
+                        <p class="text-sm text-gray-900 dark:text-gray-100">{{ attempt.user.name }} ({{ attempt.user.email }})</p>
                     </div>
                     <div>
-                        <p class="text-sm text-gray-700">Quiz:</p>
-                        <p class="text-sm text-gray-900">{{ attempt.quiz.title }}</p>
+                        <p class="text-sm text-gray-700 dark:text-gray-300">Quiz:</p>
+                        <p class="text-sm text-gray-900 dark:text-gray-100">{{ attempt.quiz.title }}</p>
                     </div>
                     <div>
-                        <p class="text-sm text-gray-700">Auto Score:</p>
-                        <p class="text-sm text-gray-900">{{ attempt.score }}</p>
+                        <p class="text-sm text-gray-700 dark:text-gray-300">Auto Score:</p>
+                        <p class="text-sm text-gray-900 dark:text-gray-100">{{ attempt.score }}</p>
                     </div>
                     <div>
-                        <p class="text-sm text-gray-700">Manual Score:</p>
-                        <p class="text-sm text-gray-900">{{ attempt.manual_score ?? 0 }}</p>
+                        <p class="text-sm text-gray-700 dark:text-gray-300">Manual Score:</p>
+                        <p class="text-sm text-gray-900 dark:text-gray-100">{{ attempt.manual_score ?? 0 }}</p>
                     </div>
                     <div>
-                        <p class="text-sm text-gray-700">Total Score:</p>
-                        <p class="text-sm text-gray-900">{{ attempt.total_score }}</p>
+                        <p class="text-sm text-gray-700 dark:text-gray-300">Total Score:</p>
+                        <p class="text-sm text-gray-900 dark:text-gray-100">{{ attempt.total_score }}</p>
                     </div>
                     <div>
-                        <p class="text-sm text-gray-700">Pass Threshold:</p>
-                        <p class="text-sm text-gray-900">{{ attempt.quiz.pass_threshold }}%</p>
+                        <p class="text-sm text-gray-700 dark:text-gray-300">Pass Threshold:</p>
+                        <p class="text-sm text-gray-900 dark:text-gray-100">{{ attempt.quiz.pass_threshold }}%</p>
                     </div>
                     <div>
-                        <p class="text-sm text-gray-700">Status:</p>
+                        <p class="text-sm text-gray-700 dark:text-gray-300">Status:</p>
                         <span
                             :class="{
                                 'inline-flex rounded-full px-2 text-xs font-semibold leading-5': true,
-                                'bg-green-100 text-green-800': attempt.passed,
-                                'bg-red-100 text-red-800': !attempt.passed,
+                                'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200': attempt.passed,
+                                'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200': !attempt.passed,
                             }"
                         >
                             {{ attempt.passed ? 'Passed' : 'Failed' }}
                         </span>
                     </div>
                     <div>
-                        <p class="text-sm text-gray-700">Completed At:</p>
-                        <p class="text-sm text-gray-900">{{ attempt.completed_at }}</p>
+                        <p class="text-sm text-gray-700 dark:text-gray-300">Completed At:</p>
+                        <p class="text-sm text-gray-900 dark:text-gray-100">{{ attempt.completed_at }}</p>
                     </div>
                 </div>
             </div>
 
             <!-- Questions Review -->
-            <div class="rounded-xl bg-white p-6 shadow-sm">
-                <h2 class="mb-4 text-lg font-semibold text-gray-800">Question Review</h2>
-                <div v-for="(response, index) in attempt.responses" :key="index" class="mb-6 rounded-lg bg-gray-50 p-4">
-                    <h3 class="mb-2 text-sm font-medium text-gray-700">Question {{ index + 1 }} ({{ response.question.points || 'N/A' }} points)</h3>
-                    <p class="mb-2 text-sm text-gray-900">{{ response.question.question_text }}</p>
+            <div class="rounded-xl bg-white dark:bg-gray-800 p-6 shadow-sm dark:shadow-lg dark:shadow-gray-900/50 border border-gray-200 dark:border-gray-700">
+                <h2 class="mb-4 text-lg font-semibold text-gray-800 dark:text-gray-200">Question Review</h2>
+                <div v-for="(response, index) in attempt.responses" :key="index" class="mb-6 rounded-lg bg-gray-50 dark:bg-gray-700 p-4 border border-gray-200 dark:border-gray-600">
+                    <h3 class="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Question {{ index + 1 }} ({{ response.question.points || 'N/A' }} points)</h3>
+                    <p class="mb-2 text-sm text-gray-900 dark:text-gray-100">{{ response.question.question_text }}</p>
                     <div class="space-y-2">
-                        <p class="text-sm text-gray-700">Your Answer:</p>
-                        <p class="text-sm text-gray-900">{{ response.answer || 'No answer' }}</p>
-                        <p class="text-sm text-gray-700">Correct Answer(s):</p>
+                        <p class="text-sm text-gray-700 dark:text-gray-300">Your Answer:</p>
+                        <p class="text-sm text-gray-900 dark:text-gray-100">{{ response.answer || 'No answer' }}</p>
+                        <p class="text-sm text-gray-700 dark:text-gray-300">Correct Answer(s):</p>
                         <!-- ✅ Fixed: Safe rendering of correct_answer -->
-                        <p class="text-sm text-gray-900">{{ formatCorrectAnswer(response.question.correct_answer) }}</p>
-                        <p v-if="response.question.correct_answer_explanation" class="text-sm text-gray-600">
+                        <p class="text-sm text-gray-900 dark:text-gray-100">{{ formatCorrectAnswer(response.question.correct_answer) }}</p>
+                        <p v-if="response.question.correct_answer_explanation" class="text-sm text-gray-600 dark:text-gray-400">
                             Explanation: {{ response.question.correct_answer_explanation }}
                         </p>
                         <p
                             class="text-sm"
                             :class="{
-                                'text-green-700': response.is_correct,
-                                'text-red-700': !response.is_correct && response.is_correct !== null,
+                                'text-green-700 dark:text-green-400': response.is_correct,
+                                'text-red-700 dark:text-red-400': !response.is_correct && response.is_correct !== null,
                             }"
                         >
                             Status: {{ response.is_correct !== null ? (response.is_correct ? 'Correct' : 'Incorrect') : 'Pending (Text)' }}
                         </p>
                         <div v-if="response.question.type === 'text' && !response.is_correct">
-                            <label for="manualScore" class="mt-2 block text-sm font-medium text-gray-700">Manual Score (0-100):</label>
+                            <label for="manualScore" class="mt-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Manual Score (0-100):</label>
                             <input
                                 v-model.number="manualScores[response.id]"
                                 type="number"
                                 id="manualScore"
                                 min="0"
                                 max="100"
-                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 shadow-sm focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400 sm:text-sm"
                                 placeholder="Enter points"
                                 @change="updateManualScore(response.id, $event.target.value)"
                             />
-                            <p v-if="manualScoreErrors[response.id]" class="mt-1 text-sm text-red-600">{{ manualScoreErrors[response.id] }}</p>
+                            <p v-if="manualScoreErrors[response.id]" class="mt-1 text-sm text-red-600 dark:text-red-400">{{ manualScoreErrors[response.id] }}</p>
                         </div>
                     </div>
                 </div>
@@ -108,7 +108,7 @@
                     <button
                         @click="saveManualScores"
                         :disabled="saving || hasErrors"
-                        class="w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors duration-200 hover:bg-indigo-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
+                        class="w-full rounded-lg bg-indigo-600 dark:bg-indigo-500 px-4 py-2 text-sm font-medium text-white transition-colors duration-200 hover:bg-indigo-700 dark:hover:bg-indigo-600 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 disabled:bg-gray-400 dark:disabled:bg-gray-600 disabled:cursor-not-allowed"
                     >
                         <span v-if="saving" class="flex items-center justify-center">
                             <svg class="mr-2 h-5 w-5 animate-spin text-white" fill="none" viewBox="0 0 24 24">
@@ -119,8 +119,8 @@
                         </span>
                         <span v-else>Save Manual Scores</span>
                     </button>
-                    <div v-if="success" class="mt-2 text-sm text-green-600">Scores saved successfully!</div>
-                    <div v-if="hasErrors" class="mt-2 text-sm text-red-600">Please fix the errors before saving.</div>
+                    <div v-if="success" class="mt-2 text-sm text-green-600 dark:text-green-400">Scores saved successfully!</div>
+                    <div v-if="hasErrors" class="mt-2 text-sm text-red-600 dark:text-red-400">Please fix the errors before saving.</div>
                 </div>
             </div>
         </div>

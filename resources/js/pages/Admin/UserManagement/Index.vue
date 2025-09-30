@@ -1,8 +1,50 @@
+<!--
+  User Management & Assignment Page
+  Interface for bulk user management, department/level assignments with comprehensive filtering
+-->
 <script setup lang="ts">
 import { Link, router } from '@inertiajs/vue3'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import { ref } from 'vue'
 import { type BreadcrumbItemType } from '@/types'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select'
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Checkbox } from '@/components/ui/checkbox'
+import {
+    Alert,
+    AlertDescription,
+} from '@/components/ui/alert'
+import {
+    Import,
+    Download,
+    Users,
+    Building2,
+    Tag,
+    Crown,
+    AlertTriangle,
+    X,
+    Eye,
+    Settings,
+    ChevronLeft,
+    ChevronRight
+} from 'lucide-vue-next'
 
 const props = defineProps({
     users: Object, // Paginated users
@@ -73,25 +115,48 @@ const bulkAssignLevel = () => {
 }
 
 // Toggle all users selection
-const toggleAll = (event) => {
-    if (event.target.checked) {
+const toggleAll = (checked: boolean) => {
+    if (checked) {
         selectedUsers.value = props.users.data.map(user => user.id);
     } else {
         selectedUsers.value = [];
     }
 }
 
-// Get level badge color
-const getLevelColor = (level) => {
-    if (!level) return 'bg-gray-100 text-gray-800';
-
+// Get level badge color scheme
+const getLevelColorScheme = (level: string) => {
     const colors = {
-        'L1': 'bg-blue-100 text-blue-800',
-        'L2': 'bg-green-100 text-green-800',
-        'L3': 'bg-orange-100 text-orange-800',
-        'L4': 'bg-red-100 text-red-800',
+        'L1': 'secondary',
+        'L2': 'default',
+        'L3': 'outline',
+        'L4': 'destructive',
     };
-    return colors[level] || 'bg-gray-100 text-gray-800';
+    return colors[level] || 'secondary';
+}
+
+// Get user status variant
+const getUserStatusVariant = (status: string) => {
+    switch (status) {
+        case 'active': return 'default'
+        case 'inactive': return 'destructive'
+        case 'on_leave': return 'secondary'
+        default: return 'outline'
+    }
+}
+
+// Clear selection
+const clearSelection = () => {
+    selectedUsers.value = []
+}
+
+// Handle department selection
+const handleDepartmentChange = (value: string) => {
+    selectedDepartment.value = value === 'select' ? '' : value
+}
+
+// Handle level selection
+const handleLevelChange = (value: string) => {
+    selectedLevel.value = value === 'select' ? '' : value
 }
 
 // Breadcrumbs
@@ -104,340 +169,324 @@ const breadcrumbs: BreadcrumbItemType[] = [
 
 <template>
     <AdminLayout :breadcrumbs="breadcrumbs">
-        <div class="px-4 sm:px-0">
-            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 gap-4">
-                <h1 class="text-xl sm:text-2xl font-bold">User Management & Assignment</h1>
+        <div class="px-4 sm:px-0 space-y-6">
+            <!-- Header -->
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h1 class="text-xl sm:text-2xl font-bold text-foreground">User Management & Assignment</h1>
+                    <p class="text-sm text-muted-foreground mt-1">Manage user assignments, departments, and organizational levels</p>
+                </div>
 
                 <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                    <Link
-                        :href="route('admin.users.import')"
-                        class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition w-full sm:w-auto text-center"
-                    >
+                    <Button :as="Link" :href="route('admin.users.import')" variant="outline">
+                        <Import class="mr-2 h-4 w-4" />
                         Import Users
-                    </Link>
-                    <Link
-                        :href="route('admin.users.export')"
-                        class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition w-full sm:w-auto text-center"
-                    >
+                    </Button>
+                    <Button :as="Link" :href="route('admin.users.export')">
+                        <Download class="mr-2 h-4 w-4" />
                         Export Users
-                    </Link>
+                    </Button>
                 </div>
             </div>
 
             <!-- Stats Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                <div class="bg-white rounded-lg shadow p-6">
-                    <div class="flex items-center">
-                        <div class="shrink-0">
-                            <div class="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center">
-                                <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
-                                </svg>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <Card>
+                    <CardContent class="p-6">
+                        <div class="flex items-center">
+                            <div class="shrink-0">
+                                <div class="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+                                    <Users class="h-5 w-5 text-primary-foreground" />
+                                </div>
+                            </div>
+                            <div class="ml-4 flex-1">
+                                <div class="text-sm font-medium text-muted-foreground">Total Users</div>
+                                <div class="text-2xl font-bold text-foreground">{{ stats.total_users || 0 }}</div>
                             </div>
                         </div>
-                        <div class="ml-5 w-0 flex-1">
-                            <dl>
-                                <dt class="text-sm font-medium text-gray-500 truncate">Total Users</dt>
-                                <dd class="text-lg font-medium text-gray-900">{{ stats.total_users || 0 }}</dd>
-                            </dl>
-                        </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
-                <div class="bg-white rounded-lg shadow p-6">
-                    <div class="flex items-center">
-                        <div class="shrink-0">
-                            <div class="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center">
-                                <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
-                                </svg>
+                <Card>
+                    <CardContent class="p-6">
+                        <div class="flex items-center">
+                            <div class="shrink-0">
+                                <div class="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center">
+                                    <Building2 class="h-5 w-5 text-white" />
+                                </div>
+                            </div>
+                            <div class="ml-4 flex-1">
+                                <div class="text-sm font-medium text-muted-foreground">With Departments</div>
+                                <div class="text-2xl font-bold text-foreground">{{ stats.users_with_departments || 0 }}</div>
                             </div>
                         </div>
-                        <div class="ml-5 w-0 flex-1">
-                            <dl>
-                                <dt class="text-sm font-medium text-gray-500 truncate">With Departments</dt>
-                                <dd class="text-lg font-medium text-gray-900">{{ stats.users_with_departments || 0 }}</dd>
-                            </dl>
-                        </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
-                <div class="bg-white rounded-lg shadow p-6">
-                    <div class="flex items-center">
-                        <div class="shrink-0">
-                            <div class="w-8 h-8 bg-purple-500 rounded-md flex items-center justify-center">
-                                <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
-                                </svg>
+                <Card>
+                    <CardContent class="p-6">
+                        <div class="flex items-center">
+                            <div class="shrink-0">
+                                <div class="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                                    <Tag class="h-5 w-5 text-white" />
+                                </div>
+                            </div>
+                            <div class="ml-4 flex-1">
+                                <div class="text-sm font-medium text-muted-foreground">With Levels</div>
+                                <div class="text-2xl font-bold text-foreground">{{ stats.users_with_levels || 0 }}</div>
                             </div>
                         </div>
-                        <div class="ml-5 w-0 flex-1">
-                            <dl>
-                                <dt class="text-sm font-medium text-gray-500 truncate">With Levels</dt>
-                                <dd class="text-lg font-medium text-gray-900">{{ stats.users_with_levels || 0 }}</dd>
-                            </dl>
-                        </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
-                <div class="bg-white rounded-lg shadow p-6">
-                    <div class="flex items-center">
-                        <div class="shrink-0">
-                            <div class="w-8 h-8 bg-orange-500 rounded-md flex items-center justify-center">
-                                <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                                </svg>
+                <Card>
+                    <CardContent class="p-6">
+                        <div class="flex items-center">
+                            <div class="shrink-0">
+                                <div class="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center">
+                                    <Crown class="h-5 w-5 text-white" />
+                                </div>
+                            </div>
+                            <div class="ml-4 flex-1">
+                                <div class="text-sm font-medium text-muted-foreground">With Managers</div>
+                                <div class="text-2xl font-bold text-foreground">{{ stats.users_with_managers || 0 }}</div>
                             </div>
                         </div>
-                        <div class="ml-5 w-0 flex-1">
-                            <dl>
-                                <dt class="text-sm font-medium text-gray-500 truncate">With Managers</dt>
-                                <dd class="text-lg font-medium text-gray-900">{{ stats.users_with_managers || 0 }}</dd>
-                            </dl>
-                        </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
             </div>
 
             <!-- Bulk Actions -->
-            <div v-if="selectedUsers.length > 0" class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-                <div class="flex items-center justify-between mb-4">
-                    <div class="flex items-center">
-                        <svg class="h-5 w-5 text-yellow-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
-                        </svg>
-                        <span class="text-yellow-800 font-medium">{{ selectedUsers.length }} user(s) selected</span>
-                    </div>
-                    <button
-                        @click="selectedUsers = []"
-                        class="text-yellow-600 hover:text-yellow-800"
-                    >
-                        Clear Selection
-                    </button>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <!-- Bulk Assign Department -->
-                    <div class="flex gap-2">
-                        <select
-                            v-model="selectedDepartment"
-                            class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-                        >
-                            <option value="">Select Department</option>
-                            <option v-for="dept in departments" :key="dept.id" :value="dept.id">
-                                {{ dept.name }}
-                            </option>
-                        </select>
-                        <button
-                            @click="bulkAssignDepartment"
-                            class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition"
-                        >
-                            Assign Dept
-                        </button>
+            <Alert v-if="selectedUsers.length > 0" class="border-amber-200 bg-amber-50">
+                <AlertTriangle class="h-4 w-4 text-amber-600" />
+                <AlertDescription>
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="text-amber-800 font-medium">{{ selectedUsers.length }} user(s) selected</span>
+                        <Button @click="clearSelection" variant="ghost" size="sm" class="text-amber-600 hover:text-amber-800">
+                            <X class="mr-1 h-3 w-3" />
+                            Clear Selection
+                        </Button>
                     </div>
 
-                    <!-- Bulk Assign Level -->
-                    <div class="flex gap-2">
-                        <select
-                            v-model="selectedLevel"
-                            class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-                        >
-                            <option value="">Select Level</option>
-                            <option v-for="level in userLevels" :key="level.id" :value="level.id">
-                                {{ level.code }} - {{ level.name }}
-                            </option>
-                        </select>
-                        <button
-                            @click="bulkAssignLevel"
-                            class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition"
-                        >
-                            Assign Level
-                        </button>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Bulk Assign Department -->
+                        <div class="flex gap-2">
+                            <Select :model-value="selectedDepartment || 'select'" @update:model-value="handleDepartmentChange">
+                                <SelectTrigger class="flex-1">
+                                    <SelectValue placeholder="Select Department" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="select">Select Department</SelectItem>
+                                    <SelectItem v-for="dept in departments" :key="dept.id" :value="dept.id.toString()">
+                                        {{ dept.name }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <Button @click="bulkAssignDepartment" variant="outline">
+                                <Building2 class="mr-2 h-4 w-4" />
+                                Assign Dept
+                            </Button>
+                        </div>
+
+                        <!-- Bulk Assign Level -->
+                        <div class="flex gap-2">
+                            <Select :model-value="selectedLevel || 'select'" @update:model-value="handleLevelChange">
+                                <SelectTrigger class="flex-1">
+                                    <SelectValue placeholder="Select Level" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="select">Select Level</SelectItem>
+                                    <SelectItem v-for="level in userLevels" :key="level.id" :value="level.id.toString()">
+                                        {{ level.code }} - {{ level.name }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <Button @click="bulkAssignLevel" variant="outline">
+                                <Tag class="mr-2 h-4 w-4" />
+                                Assign Level
+                            </Button>
+                        </div>
                     </div>
-                </div>
-            </div>
+                </AlertDescription>
+            </Alert>
 
             <!-- Users Table -->
-            <div class="bg-white rounded-lg shadow overflow-hidden overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            <input
-                                type="checkbox"
-                                @change="toggleAll"
-                                :checked="selectedUsers.length === users.data.length && users.data.length > 0"
-                                class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                            />
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            User
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Department
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Level
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Manager
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Status
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Actions
-                        </th>
-                    </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
-                    <tr v-for="user in users.data" :key="user.id" :class="{ 'bg-blue-50': selectedUsers.includes(user.id) }">
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <input
-                                type="checkbox"
-                                v-model="selectedUsers"
-                                :value="user.id"
-                                class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                            />
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="flex items-center">
-                                <div class="shrink-0 h-10 w-10">
-                                    <div class="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
-                                        <span class="text-sm font-medium text-gray-600">
-                                            {{ user.name.charAt(0).toUpperCase() }}
+            <Card>
+                <CardHeader>
+                    <CardTitle class="flex items-center">
+                        <Users class="mr-2 h-5 w-5" />
+                        User Management
+                    </CardTitle>
+                    <CardDescription>Manage user assignments and organizational structure</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div class="overflow-x-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead class="w-12">
+                                        <Checkbox
+                                            @update:checked="toggleAll"
+                                            :checked="selectedUsers.length === users.data.length && users.data.length > 0"
+                                            :indeterminate="selectedUsers.length > 0 && selectedUsers.length < users.data.length"
+                                        />
+                                    </TableHead>
+                                    <TableHead>User</TableHead>
+                                    <TableHead>Department</TableHead>
+                                    <TableHead>Level</TableHead>
+                                    <TableHead>Manager</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead class="text-right">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                <TableRow
+                                    v-for="user in users.data"
+                                    :key="user.id"
+                                    :class="{ 'bg-primary/5': selectedUsers.includes(user.id) }"
+                                    class="hover:bg-muted/50"
+                                >
+                                    <TableCell>
+                                        <Checkbox
+                                            v-model:checked="selectedUsers"
+                                            :value="user.id"
+                                        />
+                                    </TableCell>
+                                    <TableCell>
+                                        <div class="flex items-center space-x-3">
+                                            <Avatar>
+                                                <AvatarFallback class="bg-muted text-muted-foreground">
+                                                    {{ user.name.charAt(0).toUpperCase() }}
+                                                </AvatarFallback>
+                                            </Avatar>
+                                            <div>
+                                                <div class="font-medium text-foreground">{{ user.name }}</div>
+                                                <div class="text-sm text-muted-foreground">{{ user.email }}</div>
+                                                <div v-if="user.employee_code" class="text-xs text-muted-foreground">ID: {{ user.employee_code }}</div>
+                                            </div>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <div v-if="user.department">
+                                            <div class="font-medium text-foreground">{{ user.department.name }}</div>
+                                            <div class="text-sm text-muted-foreground">{{ user.department.department_code }}</div>
+                                        </div>
+                                        <div v-else class="text-sm text-muted-foreground italic">
+                                            No department assigned
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge v-if="user.user_level" :variant="getLevelColorScheme(user.user_level.code)">
+                                            {{ user.user_level.code }} - {{ user.user_level.name }}
+                                        </Badge>
+                                        <span v-else class="text-sm text-muted-foreground italic">
+                                            No level assigned
                                         </span>
-                                    </div>
-                                </div>
-                                <div class="ml-4">
-                                    <div class="text-sm font-medium text-gray-900">{{ user.name }}</div>
-                                    <div class="text-sm text-gray-500">{{ user.email }}</div>
-                                    <div v-if="user.employee_code" class="text-xs text-gray-400">ID: {{ user.employee_code }}</div>
-                                </div>
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div v-if="user.department" class="text-sm">
-                                <div class="font-medium text-gray-900">{{ user.department.name }}</div>
-                                <div class="text-gray-500">{{ user.department.department_code }}</div>
-                            </div>
-                            <div v-else class="text-sm text-gray-400 italic">
-                                No department assigned
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span v-if="user.user_level"
-                                  class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
-                                  :class="getLevelColor(user.user_level.code)">
-                                {{ user.user_level.code }} - {{ user.user_level.name }}
-                            </span>
-                            <span v-else class="text-sm text-gray-400 italic">
-                                No level assigned
-                            </span>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div v-if="user.managers && user.managers.length > 0" class="text-sm">
-                                <div v-for="manager in user.managers.slice(0, 2)" :key="manager.id" class="mb-1">
-                                    <span class="font-medium text-gray-900">{{ manager.name }}</span>
-                                    <span class="text-xs text-gray-500 ml-1">({{ manager.pivot.role_type }})</span>
-                                </div>
-                                <div v-if="user.managers.length > 2" class="text-xs text-gray-400">
-                                    +{{ user.managers.length - 2 }} more
-                                </div>
-                            </div>
-                            <div v-else class="text-sm text-gray-400 italic">
-                                No manager assigned
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span
-                                class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
-                                :class="{
-                                    'bg-green-100 text-green-800': user.status === 'active',
-                                    'bg-red-100 text-red-800': user.status === 'inactive',
-                                    'bg-yellow-100 text-yellow-800': user.status === 'on_leave'
-                                }"
-                            >
-                                {{ user.status }}
-                            </span>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <Link
-                                :href="route('admin.users.organizational', user.id)"
-                                class="text-blue-600 hover:text-blue-900 mr-3 transition-colors"
-                            >
-                                View
-                            </Link>
-                            <Link
-                                :href="route('admin.users.assign-form', user.id)"
-                                class="text-indigo-600 hover:text-indigo-900 transition-colors"
-                            >
-                                Assign
-                            </Link>
-                        </td>
-                    </tr>
-                    </tbody>
-                </table>
+                                    </TableCell>
+                                    <TableCell>
+                                        <div v-if="user.managers && user.managers.length > 0" class="space-y-1">
+                                            <div v-for="manager in user.managers.slice(0, 2)" :key="manager.id" class="text-sm">
+                                                <span class="font-medium text-foreground">{{ manager.name }}</span>
+                                                <Badge variant="outline" class="ml-1 text-xs">{{ manager.pivot.role_type }}</Badge>
+                                            </div>
+                                            <div v-if="user.managers.length > 2" class="text-xs text-muted-foreground">
+                                                +{{ user.managers.length - 2 }} more
+                                            </div>
+                                        </div>
+                                        <div v-else class="text-sm text-muted-foreground italic">
+                                            No manager assigned
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge :variant="getUserStatusVariant(user.status)">
+                                            {{ user.status }}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell class="text-right">
+                                        <div class="flex items-center justify-end space-x-2">
+                                            <Button
+                                                :as="Link"
+                                                :href="route('admin.users.organizational', user.id)"
+                                                variant="ghost"
+                                                size="sm"
+                                            >
+                                                <Eye class="h-4 w-4" />
+                                            </Button>
+                                            <Button
+                                                :as="Link"
+                                                :href="route('admin.users.assign-form', user.id)"
+                                                variant="ghost"
+                                                size="sm"
+                                            >
+                                                <Settings class="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            </TableBody>
+                        </Table>
 
-                <!-- Pagination -->
-                <div v-if="users.links && users.links.length > 3" class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-                    <div class="flex-1 flex justify-between sm:hidden">
-                        <Link
-                            v-if="users.prev_page_url"
-                            :href="users.prev_page_url"
-                            class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                        >
-                            Previous
-                        </Link>
-                        <Link
-                            v-if="users.next_page_url"
-                            :href="users.next_page_url"
-                            class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                        >
-                            Next
-                        </Link>
-                    </div>
-                    <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                        <div>
-                            <p class="text-sm text-gray-700">
-                                Showing {{ users.from }} to {{ users.to }} of {{ users.total }} results
-                            </p>
+                        <!-- Pagination -->
+                        <div v-if="users.links && users.links.length > 3" class="flex items-center justify-between pt-4">
+                            <div class="flex-1 flex justify-between sm:hidden">
+                                <Button
+                                    v-if="users.prev_page_url"
+                                    :as="Link"
+                                    :href="users.prev_page_url"
+                                    variant="outline"
+                                >
+                                    <ChevronLeft class="mr-2 h-4 w-4" />
+                                    Previous
+                                </Button>
+                                <Button
+                                    v-if="users.next_page_url"
+                                    :as="Link"
+                                    :href="users.next_page_url"
+                                    variant="outline"
+                                >
+                                    Next
+                                    <ChevronRight class="ml-2 h-4 w-4" />
+                                </Button>
+                            </div>
+                            <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                                <div class="text-sm text-muted-foreground">
+                                    Showing {{ users.from }} to {{ users.to }} of {{ users.total }} results
+                                </div>
+                                <div class="flex space-x-1">
+                                    <template v-for="link in users.links" :key="link.label">
+                                        <Button
+                                            v-if="link.url"
+                                            :as="Link"
+                                            :href="link.url"
+                                            :variant="link.active ? 'default' : 'outline'"
+                                            size="sm"
+                                            v-html="link.label"
+                                        />
+                                        <Button
+                                            v-else
+                                            variant="outline"
+                                            size="sm"
+                                            disabled
+                                            v-html="link.label"
+                                        />
+                                    </template>
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
-                                <template v-for="link in users.links" :key="link.label">
-                                    <Link
-                                        v-if="link.url"
-                                        :href="link.url"
-                                        class="relative inline-flex items-center px-2 py-2 border text-sm font-medium"
-                                        :class="{
-                                            'z-10 bg-blue-50 border-blue-500 text-blue-600': link.active,
-                                            'bg-white border-gray-300 text-gray-500 hover:bg-gray-50': !link.active
-                                        }"
-                                        v-html="link.label"
-                                    />
-                                    <span
-                                        v-else
-                                        class="relative inline-flex items-center px-2 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-300"
-                                        v-html="link.label"
-                                    />
-                                </template>
-                            </nav>
+
+                        <!-- Empty state -->
+                        <div v-if="!users.data || users.data.length === 0" class="text-center py-12">
+                            <Users class="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                            <h3 class="text-lg font-medium text-foreground mb-2">No users found</h3>
+                            <p class="text-sm text-muted-foreground mb-6">Start by importing users or check your filters.</p>
+                            <Button :as="Link" :href="route('admin.users.import')">
+                                <Import class="mr-2 h-4 w-4" />
+                                Import Users
+                            </Button>
                         </div>
                     </div>
-                </div>
-
-                <!-- Empty state -->
-                <div v-if="!users.data || users.data.length === 0" class="text-center py-12">
-                    <div class="text-gray-500">
-                        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-                        </svg>
-                        <h3 class="mt-2 text-sm font-medium text-gray-900">No users found</h3>
-                        <p class="mt-1 text-sm text-gray-500">Start by importing users or check your filters.</p>
-                    </div>
-                </div>
-            </div>
+                </CardContent>
+            </Card>
         </div>
     </AdminLayout>
 </template>

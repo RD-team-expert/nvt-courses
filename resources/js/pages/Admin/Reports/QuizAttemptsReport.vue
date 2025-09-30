@@ -1,3 +1,7 @@
+<!--
+  Quiz Attempts Report Page
+  Comprehensive reporting interface for tracking quiz attempts, scores, and performance analytics
+-->
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { router } from '@inertiajs/vue3'
@@ -5,6 +9,40 @@ import AdminLayout from '@/layouts/AdminLayout.vue'
 import { type BreadcrumbItemType } from '@/types'
 import { debounce } from 'lodash'
 import Pagination from '@/components/Pagination.vue'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select'
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
+import {
+    Download,
+    Filter,
+    RotateCcw,
+    User,
+    FileText,
+    Calendar,
+    CheckCircle,
+    XCircle,
+    Clock,
+    Target,
+    Trophy
+} from 'lucide-vue-next'
 
 const props = defineProps({
     attempts: Object,
@@ -26,6 +64,15 @@ const filters = ref({
     date_from: props.filters?.date_from || '',
     date_to: props.filters?.date_to || '',
 })
+
+// Handle select changes
+const handleQuizChange = (value: string) => {
+    filters.value.quiz_id = value === 'all' ? '' : value
+}
+
+const handleStatusChange = (value: string) => {
+    filters.value.status = value === 'all' ? '' : value
+}
 
 // Apply filters with debounce
 const applyFilters = debounce(() => {
@@ -84,168 +131,229 @@ const handlePageChange = (page) => {
         },
     })
 }
+
+// Get status badge variant and icon
+const getStatusInfo = (attempt) => {
+    if (!attempt.completed_at) {
+        return { variant: 'secondary', icon: Clock, label: 'Pending' }
+    }
+    if (attempt.passed) {
+        return { variant: 'default', icon: CheckCircle, label: 'Passed' }
+    }
+    return { variant: 'destructive', icon: XCircle, label: 'Failed' }
+}
+
+// Calculate score percentage
+const getScorePercentage = (attempt) => {
+    if (!attempt.quiz_total_points || attempt.quiz_total_points === 0) return 0
+    return Math.round((attempt.total_score / attempt.quiz_total_points) * 100)
+}
+
+// Get score color based on performance
+const getScoreColor = (percentage) => {
+    if (percentage >= 80) return 'text-green-600'
+    if (percentage >= 60) return 'text-yellow-600'
+    return 'text-red-600'
+}
 </script>
 
 <template>
     <AdminLayout :breadcrumbs="breadcrumbs">
-        <div class="px-4 sm:px-0">
-            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 gap-4 sm:gap-0">
-                <h1 class="text-xl sm:text-2xl font-bold">Quiz Attempts Report</h1>
-                <button
-                    @click="exportToCsv"
-                    class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition flex items-center w-full sm:w-auto justify-center sm:justify-start"
-                >
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        class="h-5 w-5 mr-2"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                        />
-                    </svg>
+        <div class="px-4 sm:px-0 space-y-6">
+            <!-- Header -->
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h1 class="text-xl sm:text-2xl font-bold text-foreground">Quiz Attempts Report</h1>
+                    <p class="text-sm text-muted-foreground mt-1">Comprehensive reporting interface for tracking quiz attempts, scores, and performance analytics</p>
+                </div>
+                <Button @click="exportToCsv" class="w-full sm:w-auto">
+                    <Download class="mr-2 h-4 w-4" />
                     Export to CSV
-                </button>
+                </Button>
             </div>
 
             <!-- Filters -->
-            <div class="bg-white p-4 sm:p-6 rounded-lg shadow mb-4 sm:mb-6">
-                <h2 class="text-lg font-medium text-gray-900 mb-4">Filter Attempts</h2>
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 sm:gap-6">
-                    <div>
-                        <label for="quiz_filter" class="block text-sm font-medium text-gray-700 mb-1">Quiz</label>
-                        <select
-                            id="quiz_filter"
-                            v-model="filters.quiz_id"
-                            class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-                        >
-                            <option value="">All Quizzes</option>
-                            <option v-for="quiz in quizzes" :key="quiz.id" :value="quiz.id">{{ quiz.title }}</option>
-                        </select>
+            <Card>
+                <CardHeader>
+                    <div class="flex items-center">
+                        <Filter class="mr-2 h-5 w-5 text-primary" />
+                        <div>
+                            <CardTitle>Filter Attempts</CardTitle>
+                            <CardDescription>Use the filters below to narrow down the quiz attempt records</CardDescription>
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="space-y-2">
+                            <Label for="quiz_filter">Quiz</Label>
+                            <Select
+                                :model-value="filters.quiz_id || 'all'"
+                                @update:model-value="handleQuizChange"
+                            >
+                                <SelectTrigger id="quiz_filter">
+                                    <SelectValue placeholder="All Quizzes" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Quizzes</SelectItem>
+                                    <SelectItem v-for="quiz in quizzes" :key="quiz.id" :value="quiz.id.toString()">
+                                        {{ quiz.title }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div class="space-y-2">
+                            <Label for="status_filter">Status</Label>
+                            <Select
+                                :model-value="filters.status || 'all'"
+                                @update:model-value="handleStatusChange"
+                            >
+                                <SelectTrigger id="status_filter">
+                                    <SelectValue placeholder="All Statuses" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Statuses</SelectItem>
+                                    <SelectItem value="passed">Passed</SelectItem>
+                                    <SelectItem value="failed">Failed</SelectItem>
+                                    <SelectItem value="pending">Pending</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div class="space-y-2">
+                            <Label for="date_from">Date From</Label>
+                            <Input
+                                id="date_from"
+                                type="date"
+                                v-model="filters.date_from"
+                            />
+                        </div>
+
+                        <div class="space-y-2">
+                            <Label for="date_to">Date To</Label>
+                            <Input
+                                id="date_to"
+                                type="date"
+                                v-model="filters.date_to"
+                            />
+                        </div>
                     </div>
 
-                    <div>
-                        <label for="status_filter" class="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                        <select
-                            id="status_filter"
-                            v-model="filters.status"
-                            class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-                        >
-                            <option value="">All Statuses</option>
-                            <option value="passed">Passed</option>
-                            <option value="failed">Failed</option>
-                            <option value="pending">Pending</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label for="date_from" class="block text-sm font-medium text-gray-700 mb-1">Date From</label>
-                        <input
-                            id="date_from"
-                            type="date"
-                            v-model="filters.date_from"
-                            class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-                        />
-                    </div>
-
-                    <div>
-                        <label for="date_to" class="block text-sm font-medium text-gray-700 mb-1">Date To</label>
-                        <input
-                            id="date_to"
-                            type="date"
-                            v-model="filters.date_to"
-                            class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-                        />
-                    </div>
-
-                    <div class="flex items-end md:col-span-4">
-                        <button
-                            @click="resetFilters"
-                            class="inline-flex items-center px-4 py-2 bg-gray-100 border border-transparent rounded-md font-medium text-gray-700 hover:bg-gray-200 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition"
-                        >
+                    <div class="flex justify-end mt-4">
+                        <Button @click="resetFilters" variant="outline">
+                            <RotateCcw class="mr-2 h-4 w-4" />
                             Reset Filters
-                        </button>
+                        </Button>
                     </div>
-                </div>
-            </div>
+                </CardContent>
+            </Card>
 
             <!-- Attempts Table -->
-            <div class="bg-white rounded-lg shadow overflow-hidden overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                    <tr>
-                        <th scope="col" class="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            User
-                        </th>
-                        <th scope="col" class="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
-                            Quiz
-                        </th>
-                        <th scope="col" class="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">
-                            Score
-                        </th>
-                        <th scope="col" class="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Status
-                        </th>
-                        <th scope="col" class="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">
-                            Attempt
-                        </th>
-                        <th scope="col" class="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Completed
-                        </th>
-                    </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
-                    <tr v-if="attempts.data.length === 0">
-                        <td colspan="6" class="px-4 sm:px-6 py-4 text-center text-gray-500">No attempt records found</td>
-                    </tr>
-                    <tr v-else v-for="(attempt, i) in attempts.data" :key="i" class="hover:bg-gray-50">
-                        <td class="px-4 sm:px-6 py-4 whitespace-nowrap">
-                            <div class="flex items-center">
-                                <div>
-                                    <div class="text-sm font-medium text-gray-900">{{ attempt.user_name }}</div>
-                                    <div class="text-xs text-gray-500 hidden sm:block">{{ attempt.user_email }}</div>
-                                    <div class="text-xs text-gray-500 sm:hidden mt-1">{{ attempt.quiz_title }}</div>
-                                </div>
-                            </div>
-                        </td>
-                        <td class="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900 hidden sm:table-cell">{{ attempt.quiz_title }}</td>
-                        <td class="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900 hidden md:table-cell">{{ attempt.total_score }} / {{ attempt.quiz_total_points }} ({{ Math.round((attempt.total_score / attempt.quiz_total_points) * 100) }}%)</td>
-                        <td class="px-4 sm:px-6 py-4 whitespace-nowrap">
-                <span
-                    class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
-                    :class="{
-                    'bg-green-100 text-green-800': attempt.passed,
-                    'bg-red-100 text-red-800': !attempt.passed && attempt.completed_at,
-                    'bg-yellow-100 text-yellow-800': !attempt.completed_at,
-                  }"
-                >
-                  {{ attempt.completed_at ? (attempt.passed ? 'Passed' : 'Failed') : 'Pending' }}
-                </span>
-                        </td>
-                        <td class="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900 hidden md:table-cell">{{ attempt.attempt_number }}</td>
-                        <td class="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatDate(attempt.completed_at) }}</td>
-                    </tr>
-                    </tbody>
-                </table>
+            <Card>
+                <div class="overflow-x-auto">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>
+                                    <div class="flex items-center">
+                                        <User class="mr-2 h-4 w-4" />
+                                        User
+                                    </div>
+                                </TableHead>
+                                <TableHead class="hidden sm:table-cell">
+                                    <div class="flex items-center">
+                                        <FileText class="mr-2 h-4 w-4" />
+                                        Quiz
+                                    </div>
+                                </TableHead>
+                                <TableHead class="hidden md:table-cell">
+                                    <div class="flex items-center">
+                                        <Target class="mr-2 h-4 w-4" />
+                                        Score
+                                    </div>
+                                </TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead class="hidden md:table-cell">
+                                    <div class="flex items-center">
+                                        <Trophy class="mr-2 h-4 w-4" />
+                                        Attempt
+                                    </div>
+                                </TableHead>
+                                <TableHead>
+                                    <div class="flex items-center">
+                                        <Calendar class="mr-2 h-4 w-4" />
+                                        Completed
+                                    </div>
+                                </TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            <TableRow v-if="attempts.data.length === 0">
+                                <TableCell colspan="6" class="text-center text-muted-foreground py-8">
+                                    <div class="flex flex-col items-center">
+                                        <FileText class="h-12 w-12 text-muted-foreground mb-2" />
+                                        No attempt records found
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                            <TableRow v-else v-for="(attempt, i) in attempts.data" :key="i" class="hover:bg-muted/50">
+                                <TableCell>
+                                    <div class="space-y-1">
+                                        <div class="font-medium text-foreground">{{ attempt.user_name }}</div>
+                                        <div class="text-xs text-muted-foreground hidden sm:block">{{ attempt.user_email }}</div>
+                                        <div class="text-xs text-muted-foreground sm:hidden">{{ attempt.quiz_title }}</div>
+                                    </div>
+                                </TableCell>
+                                <TableCell class="hidden sm:table-cell">
+                                    <Badge variant="outline">{{ attempt.quiz_title }}</Badge>
+                                </TableCell>
+                                <TableCell class="hidden md:table-cell">
+                                    <div class="space-y-2">
+                                        <div class="flex items-center justify-between text-sm">
+                                            <span class="font-mono">{{ attempt.total_score }}/{{ attempt.quiz_total_points }}</span>
+                                            <span class="font-semibold" :class="getScoreColor(getScorePercentage(attempt))">
+                                                {{ getScorePercentage(attempt) }}%
+                                            </span>
+                                        </div>
+                                        <Progress
+                                            :value="getScorePercentage(attempt)"
+                                            class="h-2"
+                                        />
+                                    </div>
+                                </TableCell>
+                                <TableCell>
+                                    <Badge :variant="getStatusInfo(attempt).variant" class="flex items-center w-fit">
+                                        <component :is="getStatusInfo(attempt).icon" class="mr-1 h-3 w-3" />
+                                        {{ getStatusInfo(attempt).label }}
+                                    </Badge>
+                                </TableCell>
+                                <TableCell class="hidden md:table-cell">
+                                    <Badge variant="secondary" class="font-mono">
+                                        #{{ attempt.attempt_number }}
+                                    </Badge>
+                                </TableCell>
+                                <TableCell>
+                                    <div class="text-sm text-foreground">{{ formatDate(attempt.completed_at) }}</div>
+                                </TableCell>
+                            </TableRow>
+                        </TableBody>
+                    </Table>
+                </div>
 
                 <!-- Pagination -->
-                <div class="px-4 sm:px-6 py-3 bg-white border-t border-gray-200">
+                <div class="px-4 sm:px-6 py-3 border-t">
                     <Pagination
                         v-if="attempts.data && attempts.data.length > 0 && attempts.last_page > 1"
                         :links="attempts.links"
                         @page-changed="handlePageChange"
                         class="mt-4"
                     />
-                    <div v-if="attempts.data && attempts.data.length > 0" class="text-sm text-gray-600 mt-2">
+                    <div v-if="attempts.data && attempts.data.length > 0" class="text-sm text-muted-foreground mt-2">
                         Showing {{ attempts.from }} to {{ attempts.to }} of {{ attempts.total }} results
                     </div>
                 </div>
-            </div>
+            </Card>
         </div>
     </AdminLayout>
 </template>

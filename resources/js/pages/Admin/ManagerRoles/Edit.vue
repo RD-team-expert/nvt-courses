@@ -1,11 +1,58 @@
+<!--
+  Edit Manager Role Assignment Page
+  Update existing management role assignments and responsibilities
+-->
 <script setup lang="ts">
 import { useForm, Link, router } from '@inertiajs/vue3'
 import AdminLayout from '@/layouts/AdminLayout.vue'
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, onUnmounted } from 'vue'
 import { type BreadcrumbItemType } from '@/types'
-import NotificationModal from '@/components/modals/NotificationModal.vue'
-import ConfirmationModal from '@/components/modals/ConfirmationModal.vue'
-import LoadingModal from '@/components/modals/LoadingModal.vue'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Badge } from '@/components/ui/badge'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Separator } from '@/components/ui/separator'
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog'
+import {
+    User,
+    Building,
+    Star,
+    CheckCircle,
+    Info,
+    Loader2,
+    ArrowLeft,
+    Users,
+    Shield,
+    Save
+} from 'lucide-vue-next'
 
 const props = defineProps({
     role: Object,
@@ -14,6 +61,9 @@ const props = defineProps({
     employees: Array,
     roleTypes: Object,
 })
+
+// Add a mounted flag to prevent operations on unmounted component
+const isMounted = ref(true)
 
 // Modal states
 const showNotification = ref(false)
@@ -58,24 +108,60 @@ const managementTypes = [
         value: 'specific_user',
         label: 'Manages Specific User',
         description: 'Direct 1:1 management relationship with selected employee',
-        icon: 'user',
+        icon: User,
         color: 'blue'
     },
     {
         value: 'department_wide',
         label: 'Department-wide Management',
         description: 'Oversees entire department operations and policies',
-        icon: 'building',
+        icon: Building,
         color: 'green'
     },
     {
         value: 'no_management',
         label: 'No Management Responsibilities',
         description: 'Individual contributor, specialist, or advisory role',
-        icon: 'star',
+        icon: Star,
         color: 'gray'
     }
 ]
+
+// Handle select changes
+const handleManagerChange = (value: string) => {
+    if (!isMounted.value) return
+    form.user_id = value === 'none' ? '' : parseInt(value)
+}
+
+const handleDepartmentChange = (value: string) => {
+    if (!isMounted.value) return
+    form.department_id = value === 'none' ? '' : parseInt(value)
+}
+
+const handleRoleTypeChange = (value: string) => {
+    if (!isMounted.value) return
+    form.role_type = value === 'none' ? '' : value
+}
+
+const handleAuthorityLevelChange = (value: string) => {
+    if (!isMounted.value) return
+    form.authority_level = parseInt(value)
+}
+
+const handleEmployeeChange = (value: string) => {
+    if (!isMounted.value) return
+    form.manages_user_id = value === 'none' ? null : parseInt(value)
+}
+
+const handleManagementTypeChange = (value: string) => {
+    if (!isMounted.value) return
+    form.management_type = value
+}
+
+const handlePrimaryRoleChange = (checked: boolean) => {
+    if (!isMounted.value) return
+    form.is_primary = checked
+}
 
 // Helper functions
 const showNotificationModal = (type: string, title: string, message: string) => {
@@ -91,7 +177,7 @@ const showConfirmationModal = (title: string, message: string, action: () => voi
 // Filter employees by selected department
 const departmentEmployees = computed(() => {
     if (!form.department_id) return []
-    return props.employees.filter(emp => emp.department_id === form.department_id)
+    return props.employees?.filter(emp => emp.department_id === form.department_id) || []
 })
 
 // Available employees for management (excluding self)
@@ -101,6 +187,8 @@ const availableEmployees = computed(() => {
 
 // Watch for department changes
 watch(() => form.department_id, (newDeptId) => {
+    if (!isMounted.value) return
+
     if (newDeptId && form.manages_user_id) {
         // Check if currently managed user is still in the new department
         const currentManagedUser = departmentEmployees.value.find(emp => emp.id === form.manages_user_id)
@@ -112,6 +200,8 @@ watch(() => form.department_id, (newDeptId) => {
 
 // Watch for management type changes
 watch(() => form.management_type, (newType) => {
+    if (!isMounted.value) return
+
     if (newType !== 'specific_user') {
         form.manages_user_id = null
     }
@@ -119,6 +209,8 @@ watch(() => form.management_type, (newType) => {
 
 // Submit form with confirmation
 const submitForm = () => {
+    if (!isMounted.value) return
+
     showConfirmationModal(
         'Update Manager Role',
         'Are you sure you want to update this manager role assignment? This will change the current management structure.',
@@ -172,7 +264,7 @@ const closeConfirmation = () => {
 
 // Helper function to get selected department name
 const getDepartmentName = (departmentId) => {
-    const dept = props.departments.find(d => d.id === departmentId)
+    const dept = props.departments?.find(d => d.id === departmentId)
     return dept ? dept.name : ''
 }
 
@@ -182,348 +274,396 @@ const breadcrumbs: BreadcrumbItemType[] = [
     { name: 'Manager Roles', href: route('admin.manager-roles.index') },
     { name: 'Edit Role', href: route('admin.manager-roles.edit', props.role.id) }
 ]
+
+// Cleanup on unmount
+onUnmounted(() => {
+    isMounted.value = false
+})
 </script>
 
 <template>
     <AdminLayout :breadcrumbs="breadcrumbs">
-        <div class="px-4 sm:px-0">
+        <div class="px-4 sm:px-0 space-y-6">
             <!-- Page Header -->
-            <div class="mb-6">
-                <h1 class="text-xl sm:text-2xl font-bold">Edit Manager Role Assignment</h1>
-                <p class="mt-2 text-sm text-gray-600">
+            <div>
+                <h1 class="text-xl sm:text-2xl font-bold text-foreground">Edit Manager Role Assignment</h1>
+                <p class="mt-2 text-sm text-muted-foreground">
                     Update the management role for {{ role.manager?.name }} in {{ role.department?.name }}
                 </p>
             </div>
 
             <!-- Current Assignment Info -->
-            <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8">
-                <div class="flex items-start space-x-3">
-                    <div class="shrink-0">
-                        <svg class="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
+            <Alert>
+                <Info class="h-4 w-4" />
+                <AlertDescription>
+                    <h3 class="font-semibold mb-2">Current Assignment</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                        <div>
+                            <span class="font-medium">Manager:</span>
+                            <span class="ml-1">{{ role.manager?.name }} ({{ role.manager?.level }})</span>
+                        </div>
+                        <div>
+                            <span class="font-medium">Department:</span>
+                            <span class="ml-1">{{ role.department?.name }}</span>
+                        </div>
+                        <div>
+                            <span class="font-medium">Role:</span>
+                            <span class="ml-1">{{ roleTypes[role.role_type] }}</span>
+                        </div>
                     </div>
-                    <div>
-                        <h3 class="font-semibold text-blue-900 mb-2">Current Assignment</h3>
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                            <div>
-                                <span class="font-medium text-blue-800">Manager:</span>
-                                <span class="text-blue-700">{{ role.manager?.name }} ({{ role.manager?.level }})</span>
+                    <div v-if="role.managed_user" class="mt-2 text-sm">
+                        <span class="font-medium">Currently Manages:</span>
+                        <span class="ml-1">{{ role.managed_user.name }} ({{ role.managed_user.email }})</span>
+                    </div>
+                </AlertDescription>
+            </Alert>
+
+            <form @submit.prevent="submitForm" class="max-w-6xl mx-auto space-y-8">
+                <!-- Basic Information -->
+                <Card>
+                    <CardHeader>
+                        <div class="flex items-center">
+                            <div class="shrink-0 mr-4">
+                                <div class="flex items-center justify-center h-10 w-10 rounded-lg bg-primary/10">
+                                    <Shield class="h-6 w-6 text-primary" />
+                                </div>
                             </div>
                             <div>
-                                <span class="font-medium text-blue-800">Department:</span>
-                                <span class="text-blue-700">{{ role.department?.name }}</span>
-                            </div>
-                            <div>
-                                <span class="font-medium text-blue-800">Role:</span>
-                                <span class="text-blue-700">{{ roleTypes[role.role_type] }}</span>
+                                <CardTitle>Basic Assignment Information</CardTitle>
+                                <CardDescription>Update the manager, department, and role details</CardDescription>
                             </div>
                         </div>
-                        <div v-if="role.managed_user" class="mt-2 text-sm">
-                            <span class="font-medium text-blue-800">Currently Manages:</span>
-                            <span class="text-blue-700">{{ role.managed_user.name }} ({{ role.managed_user.email }})</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
+                    </CardHeader>
+                    <CardContent>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <!-- Manager Selection -->
+                            <div class="space-y-2">
+                                <Label for="manager">Manager *</Label>
+                                <Select
+                                    :model-value="form.user_id?.toString() || 'none'"
+                                    @update:model-value="handleManagerChange"
+                                    :disabled="form.processing"
+                                >
+                                    <SelectTrigger id="manager">
+                                        <SelectValue placeholder="Select Manager" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">Select Manager</SelectItem>
+                                        <SelectItem v-for="manager in managers" :key="manager.id" :value="manager.id.toString()">
+                                            {{ manager.name }} ({{ manager.level }}) - {{ manager.department }}
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <div v-if="form.errors.user_id" class="text-destructive text-sm">{{ form.errors.user_id }}</div>
+                            </div>
 
-            <form @submit.prevent="submitForm" class="max-w-6xl mx-auto">
-                <!-- Basic Information Grid -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-8">
-                    <!-- Manager Selection -->
-                    <div class="col-span-1">
-                        <label class="block font-semibold mb-2">Manager</label>
-                        <select
-                            v-model="form.user_id"
-                            class="border border-gray-300 px-3 py-2 rounded-md w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            :disabled="form.processing"
-                            required
-                        >
-                            <option value="">Select Manager</option>
-                            <option v-for="manager in managers" :key="manager.id" :value="manager.id">
-                                {{ manager.name }} ({{ manager.level }}) - {{ manager.department }}
-                            </option>
-                        </select>
-                        <div v-if="form.errors.user_id" class="text-red-600 text-sm mt-1">
-                            {{ form.errors.user_id }}
-                        </div>
-                    </div>
+                            <!-- Department Selection -->
+                            <div class="space-y-2">
+                                <Label for="department">Department *</Label>
+                                <Select
+                                    :model-value="form.department_id?.toString() || 'none'"
+                                    @update:model-value="handleDepartmentChange"
+                                    :disabled="form.processing"
+                                >
+                                    <SelectTrigger id="department">
+                                        <SelectValue placeholder="Select Department" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">Select Department</SelectItem>
+                                        <SelectItem v-for="dept in departments" :key="dept.id" :value="dept.id.toString()">
+                                            {{ dept.name }} ({{ dept.department_code }})
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <div v-if="form.errors.department_id" class="text-destructive text-sm">{{ form.errors.department_id }}</div>
+                            </div>
 
-                    <!-- Department Selection -->
-                    <div class="col-span-1">
-                        <label class="block font-semibold mb-2">Department</label>
-                        <select
-                            v-model="form.department_id"
-                            class="border border-gray-300 px-3 py-2 rounded-md w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            :disabled="form.processing"
-                            required
-                        >
-                            <option value="">Select Department</option>
-                            <option v-for="dept in departments" :key="dept.id" :value="dept.id">
-                                {{ dept.name }} ({{ dept.department_code }})
-                            </option>
-                        </select>
-                        <div v-if="form.errors.department_id" class="text-red-600 text-sm mt-1">
-                            {{ form.errors.department_id }}
-                        </div>
-                    </div>
+                            <!-- Role Type -->
+                            <div class="space-y-2">
+                                <Label for="role-type">Role Type *</Label>
+                                <Select
+                                    :model-value="form.role_type || 'none'"
+                                    @update:model-value="handleRoleTypeChange"
+                                    :disabled="form.processing"
+                                >
+                                    <SelectTrigger id="role-type">
+                                        <SelectValue placeholder="Select Role Type" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">Select Role Type</SelectItem>
+                                        <SelectItem v-for="(label, value) in roleTypes" :key="value" :value="value">
+                                            {{ label }}
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <div v-if="form.errors.role_type" class="text-destructive text-sm">{{ form.errors.role_type }}</div>
+                            </div>
 
-                    <!-- Role Type -->
-                    <div class="col-span-1">
-                        <label class="block font-semibold mb-2">Role Type</label>
-                        <select
-                            v-model="form.role_type"
-                            class="border border-gray-300 px-3 py-2 rounded-md w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            :disabled="form.processing"
-                            required
-                        >
-                            <option value="">Select Role Type</option>
-                            <option v-for="(label, value) in roleTypes" :key="value" :value="value">
-                                {{ label }}
-                            </option>
-                        </select>
-                        <div v-if="form.errors.role_type" class="text-red-600 text-sm mt-1">
-                            {{ form.errors.role_type }}
+                            <!-- Authority Level -->
+                            <div class="space-y-2">
+                                <Label for="authority-level">Authority Level *</Label>
+                                <Select
+                                    :model-value="form.authority_level?.toString()"
+                                    @update:model-value="handleAuthorityLevelChange"
+                                    :disabled="form.processing"
+                                >
+                                    <SelectTrigger id="authority-level">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="1">High Authority</SelectItem>
+                                        <SelectItem value="2">Medium Authority</SelectItem>
+                                        <SelectItem value="3">Low Authority</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <div v-if="form.errors.authority_level" class="text-destructive text-sm">{{ form.errors.authority_level }}</div>
+                            </div>
                         </div>
-                    </div>
-
-                    <!-- Authority Level -->
-                    <div class="col-span-1">
-                        <label class="block font-semibold mb-2">Authority Level</label>
-                        <select
-                            v-model="form.authority_level"
-                            class="border border-gray-300 px-3 py-2 rounded-md w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            :disabled="form.processing"
-                            required
-                        >
-                            <option value="1">High Authority</option>
-                            <option value="2">Medium Authority</option>
-                            <option value="3">Low Authority</option>
-                        </select>
-                        <div v-if="form.errors.authority_level" class="text-red-600 text-sm mt-1">
-                            {{ form.errors.authority_level }}
-                        </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
                 <!-- Management Type Selection -->
-                <div class="mb-8">
-                    <label class="block font-semibold mb-4 text-lg">Management Responsibilities</label>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div
-                            v-for="type in managementTypes"
-                            :key="type.value"
-                            class="relative border-2 rounded-lg p-6 cursor-pointer transition-all hover:shadow-md"
-                            :class="{
-                                'border-blue-500 bg-blue-50 shadow-md': form.management_type === type.value && type.color === 'blue',
-                                'border-green-500 bg-green-50 shadow-md': form.management_type === type.value && type.color === 'green',
-                                'border-gray-500 bg-gray-50 shadow-md': form.management_type === type.value && type.color === 'gray',
-                                'border-gray-200 hover:border-gray-300': form.management_type !== type.value
-                            }"
-                            @click="form.management_type = type.value"
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Management Responsibilities</CardTitle>
+                        <CardDescription>Choose the type of management responsibilities for this role</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <RadioGroup
+                            :model-value="form.management_type"
+                            @update:model-value="handleManagementTypeChange"
+                            class="grid grid-cols-1 md:grid-cols-3 gap-4"
                         >
-                            <div class="flex items-start space-x-3">
-                                <div class="shrink-0 mt-1">
-                                    <input
-                                        type="radio"
-                                        :value="type.value"
-                                        v-model="form.management_type"
-                                        class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                                    />
-                                </div>
-                                <div class="flex-1">
-                                    <div class="flex items-center space-x-2 mb-2">
-                                        <!-- Icons -->
-                                        <svg v-if="type.icon === 'user'" class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                                        </svg>
-                                        <svg v-else-if="type.icon === 'building'" class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
-                                        </svg>
-                                        <svg v-else class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path>
-                                        </svg>
-
-                                        <h3 class="font-semibold text-gray-900 cursor-pointer">{{ type.label }}</h3>
+                            <Card
+                                v-for="type in managementTypes"
+                                :key="type.value"
+                                class="relative cursor-pointer transition-all hover:shadow-md"
+                                :class="{
+                                    'border-primary bg-primary/5 shadow-md': form.management_type === type.value,
+                                    'hover:border-primary/50': form.management_type !== type.value
+                                }"
+                                @click="handleManagementTypeChange(type.value)"
+                            >
+                                <CardContent class="p-6">
+                                    <div class="flex items-start space-x-3">
+                                        <RadioGroupItem
+                                            :value="type.value"
+                                            :id="`type-${type.value}`"
+                                            class="mt-1"
+                                        />
+                                        <div class="flex-1">
+                                            <div class="flex items-center space-x-2 mb-2">
+                                                <component
+                                                    :is="type.icon"
+                                                    class="w-5 h-5"
+                                                    :class="{
+                                                        'text-blue-500': type.color === 'blue',
+                                                        'text-green-500': type.color === 'green',
+                                                        'text-muted-foreground': type.color === 'gray'
+                                                    }"
+                                                />
+                                                <Label :for="`type-${type.value}`" class="font-semibold cursor-pointer">
+                                                    {{ type.label }}
+                                                </Label>
+                                            </div>
+                                            <p class="text-sm text-muted-foreground cursor-pointer">{{ type.description }}</p>
+                                        </div>
                                     </div>
-                                    <p class="text-sm text-gray-600 cursor-pointer">{{ type.description }}</p>
-                                </div>
-                            </div>
 
-                            <!-- Selected indicator -->
-                            <div v-if="form.management_type === type.value" class="absolute top-2 right-2">
-                                <div class="w-6 h-6 rounded-full flex items-center justify-center"
-                                     :class="{
-                                         'bg-blue-500': type.color === 'blue',
-                                         'bg-green-500': type.color === 'green',
-                                         'bg-gray-500': type.color === 'gray'
-                                     }">
-                                    <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                                    </svg>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                                    <!-- Selected indicator -->
+                                    <div v-if="form.management_type === type.value" class="absolute top-2 right-2">
+                                        <div class="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
+                                            <CheckCircle class="w-4 h-4 text-primary-foreground" />
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </RadioGroup>
+                    </CardContent>
+                </Card>
 
                 <!-- Conditional Specific User Selection -->
-                <div v-if="form.management_type === 'specific_user'" class="mb-8">
-                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
-                        <div class="flex items-start space-x-3 mb-4">
-                            <div class="shrink-0">
-                                <svg class="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                                </svg>
-                            </div>
-                            <div>
-                                <h4 class="font-semibold text-blue-900 mb-1">Direct Management Assignment</h4>
-                                <p class="text-sm text-blue-700">Select a specific L1 employee who will report directly to this manager for daily tasks, performance reviews, and career development.</p>
-                            </div>
-                        </div>
+                <Card v-if="form.management_type === 'specific_user'">
+                    <CardContent class="p-6">
+                        <Alert class="mb-6">
+                            <User class="h-4 w-4" />
+                            <AlertDescription>
+                                <h4 class="font-semibold mb-1">Direct Management Assignment</h4>
+                                <p class="text-sm">Select a specific L1 employee who will report directly to this manager for daily tasks, performance reviews, and career development.</p>
+                            </AlertDescription>
+                        </Alert>
 
-                        <div>
-                            <label class="block font-semibold mb-2 text-blue-900">Select L1 Employee to Manage</label>
-                            <select
-                                v-model="form.manages_user_id"
-                                class="border border-blue-300 px-3 py-2 rounded-md w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                        <div class="space-y-2">
+                            <Label for="employee">Select L1 Employee to Manage *</Label>
+
+                            <Select
+                                :model-value="form.manages_user_id?.toString() || 'none'"
+                                @update:model-value="handleEmployeeChange"
                                 :disabled="form.processing || !form.department_id"
                             >
-                                <option value="">Choose an L1 employee</option>
-                                <option v-for="employee in availableEmployees" :key="employee.id" :value="employee.id">
-                                    {{ employee.name }} ({{ employee.level }}) - {{ employee.email }}
-                                </option>
-                            </select>
-                            <p class="text-sm text-blue-600 mt-2" v-if="!form.department_id">
+                                <SelectTrigger id="employee">
+                                    <SelectValue placeholder="Choose an L1 employee" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">Choose an L1 employee</SelectItem>
+                                    <SelectItem v-for="employee in availableEmployees" :key="employee.id" :value="employee.id.toString()">
+                                        {{ employee.name }} ({{ employee.level }}) - {{ employee.email }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+
+                            <p v-if="!form.department_id" class="text-sm text-muted-foreground">
                                 Please select a department first to see available L1 employees
                             </p>
-                            <p class="text-sm text-blue-600 mt-2" v-else-if="availableEmployees.length === 0">
+                            <p v-else-if="availableEmployees.length === 0" class="text-sm text-muted-foreground">
                                 No L1 employees available in this department
                             </p>
+                            <div v-if="form.errors.manages_user_id" class="text-destructive text-sm">{{ form.errors.manages_user_id }}</div>
                         </div>
-                        <div v-if="form.errors.manages_user_id" class="text-red-600 text-sm mt-1">
-                            {{ form.errors.manages_user_id }}
-                        </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
                 <!-- Dates and Settings -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-8">
-                    <!-- Start Date -->
-                    <div class="col-span-1">
-                        <label class="block font-semibold mb-2">Start Date</label>
-                        <input
-                            type="date"
-                            v-model="form.start_date"
-                            class="border border-gray-300 px-3 py-2 rounded-md w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            :disabled="form.processing"
-                            required
-                        />
-                        <div v-if="form.errors.start_date" class="text-red-600 text-sm mt-1">
-                            {{ form.errors.start_date }}
-                        </div>
-                    </div>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Assignment Details</CardTitle>
+                        <CardDescription>Set the timeframe and additional settings for this role</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <!-- Start Date -->
+                            <div class="space-y-2">
+                                <Label for="start-date">Start Date *</Label>
+                                <Input
+                                    id="start-date"
+                                    type="date"
+                                    v-model="form.start_date"
+                                    :disabled="form.processing"
+                                    required
+                                />
+                                <div v-if="form.errors.start_date" class="text-destructive text-sm">{{ form.errors.start_date }}</div>
+                            </div>
 
-                    <!-- End Date (Optional) -->
-                    <div class="col-span-1">
-                        <label class="block font-semibold mb-2">End Date <span class="text-gray-500 font-normal">(Optional)</span></label>
-                        <input
-                            type="date"
-                            v-model="form.end_date"
-                            class="border border-gray-300 px-3 py-2 rounded-md w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            :disabled="form.processing"
-                        />
-                        <p class="text-sm text-gray-500 mt-1">Leave empty for permanent assignment</p>
-                        <div v-if="form.errors.end_date" class="text-red-600 text-sm mt-1">
-                            {{ form.errors.end_date }}
+                            <!-- End Date (Optional) -->
+                            <div class="space-y-2">
+                                <Label for="end-date">End Date <span class="text-muted-foreground font-normal">(Optional)</span></Label>
+                                <Input
+                                    id="end-date"
+                                    type="date"
+                                    v-model="form.end_date"
+                                    :disabled="form.processing"
+                                />
+                                <p class="text-sm text-muted-foreground">Leave empty for permanent assignment</p>
+                                <div v-if="form.errors.end_date" class="text-destructive text-sm">{{ form.errors.end_date }}</div>
+                            </div>
                         </div>
-                    </div>
-                </div>
 
-                <!-- Primary Role and Notes -->
-                <div class="space-y-6 mb-8">
-                    <!-- Primary Role -->
-                    <div>
-                        <div class="flex items-center">
-                            <input
+                        <Separator class="my-6" />
+
+                        <!-- Primary Role -->
+                        <div class="flex items-center space-x-2">
+                            <Checkbox
                                 id="is_primary"
-                                v-model="form.is_primary"
-                                type="checkbox"
-                                class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                :checked="form.is_primary"
+                                @update:checked="handlePrimaryRoleChange"
                                 :disabled="form.processing"
                             />
-                            <label for="is_primary" class="ml-3 block font-semibold text-gray-900">Primary Role</label>
+                            <div class="grid gap-1.5 leading-none">
+                                <Label for="is_primary" class="font-semibold cursor-pointer">
+                                    Primary Role
+                                </Label>
+                                <p class="text-sm text-muted-foreground">
+                                    Primary roles have higher authority and receive priority notifications. Only one primary role is recommended per person per department.
+                                </p>
+                            </div>
                         </div>
-                        <p class="text-sm text-gray-600 mt-2 ml-7">Primary roles have higher authority and receive priority notifications. Only one primary role is recommended per person per department.</p>
-                    </div>
 
-                    <!-- Notes -->
-                    <div>
-                        <label class="block font-semibold mb-2">Notes <span class="text-gray-500 font-normal">(Optional)</span></label>
-                        <textarea
-                            v-model="form.notes"
-                            rows="4"
-                            class="border border-gray-300 px-3 py-2 rounded-md w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            :disabled="form.processing"
-                            placeholder="Additional notes about this role assignment, responsibilities, special conditions, or expectations..."
-                        ></textarea>
-                        <div v-if="form.errors.notes" class="text-red-600 text-sm mt-1">
-                            {{ form.errors.notes }}
+                        <Separator class="my-6" />
+
+                        <!-- Notes -->
+                        <div class="space-y-2">
+                            <Label for="notes">Notes <span class="text-muted-foreground font-normal">(Optional)</span></Label>
+                            <Textarea
+                                id="notes"
+                                v-model="form.notes"
+                                rows="4"
+                                :disabled="form.processing"
+                                placeholder="Additional notes about this role assignment, responsibilities, special conditions, or expectations..."
+                            />
+                            <div v-if="form.errors.notes" class="text-destructive text-sm">{{ form.errors.notes }}</div>
                         </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
                 <!-- Submit Buttons -->
-                <div class="flex flex-col sm:flex-row gap-4 pt-6 border-t border-gray-200">
-                    <button
+                <div class="flex flex-col sm:flex-row gap-4 pt-6 border-t">
+                    <Button
                         type="submit"
-                        class="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition-colors w-full sm:w-auto font-semibold flex items-center justify-center gap-2 shadow-sm"
+                        class="w-full sm:w-auto"
                         :disabled="form.processing"
                     >
-                        <svg v-if="form.processing" class="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
+                        <Loader2 v-if="form.processing" class="mr-2 h-4 w-4 animate-spin" />
+                        <Save v-else class="mr-2 h-4 w-4" />
                         <span v-if="form.processing">Updating Assignment...</span>
                         <span v-else>Update Role Assignment</span>
-                    </button>
+                    </Button>
 
-                    <Link
+                    <Button
+                        :as="Link"
                         :href="route('admin.manager-roles.show', role.id)"
-                        class="bg-gray-100 text-gray-700 px-8 py-3 rounded-lg hover:bg-gray-200 transition-colors w-full sm:w-auto text-center font-semibold border border-gray-300"
-                        :class="{ 'pointer-events-none opacity-50': form.processing }"
+                        variant="secondary"
+                        class="w-full sm:w-auto"
+                        :disabled="form.processing"
                     >
+                        <ArrowLeft class="mr-2 h-4 w-4" />
                         Cancel
-                    </Link>
+                    </Button>
                 </div>
             </form>
         </div>
 
-        <!-- Modal Components -->
-        <NotificationModal
-            :show="showNotification"
-            :type="notification.type"
-            :title="notification.title"
-            :message="notification.message"
-            :auto-close="notification.type === 'success'"
-            :duration="4000"
-            @close="closeNotification"
-        />
+        <!-- Success/Error Notification Dialog -->
+        <Dialog v-model:open="showNotification">
+            <DialogContent class="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle class="flex items-center">
+                        <CheckCircle v-if="notification.type === 'success'" class="h-5 w-5 text-green-500 mr-2" />
+                        <Info v-else class="h-5 w-5 text-red-500 mr-2" />
+                        {{ notification.title }}
+                    </DialogTitle>
+                    <DialogDescription>
+                        {{ notification.message }}
+                    </DialogDescription>
+                </DialogHeader>
+            </DialogContent>
+        </Dialog>
 
-        <ConfirmationModal
-            :show="showConfirmation"
-            :title="confirmation.title"
-            :message="confirmation.message"
-            confirm-text="Yes, Update"
-            cancel-text="Cancel"
-            type="info"
-            @confirm="handleConfirmation"
-            @cancel="closeConfirmation"
-        />
+        <!-- Confirmation Dialog -->
+        <AlertDialog v-model:open="showConfirmation">
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>{{ confirmation.title }}</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        {{ confirmation.message }}
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel @click="closeConfirmation">Cancel</AlertDialogCancel>
+                    <AlertDialogAction @click="handleConfirmation">Yes, Update</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
 
-        <LoadingModal
-            :show="showLoading"
-            :message="loading.message"
-        />
+        <!-- Loading Dialog -->
+        <Dialog v-model:open="showLoading">
+            <DialogContent class="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle class="flex items-center">
+                        <Loader2 class="h-5 w-5 animate-spin mr-2" />
+                        {{ loading.message }}
+                    </DialogTitle>
+                </DialogHeader>
+            </DialogContent>
+        </Dialog>
     </AdminLayout>
 </template>

@@ -1,8 +1,39 @@
+<!--
+  Course Details Page
+  Comprehensive course information with enrollment, rating, and assignment functionality
+-->
 <script setup lang="ts">
 import { Link, useForm, router } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { computed, ref, watch } from 'vue'
 import { type BreadcrumbItemType } from '@/types'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import {
+    Alert,
+    AlertDescription,
+    AlertTitle,
+} from '@/components/ui/alert'
+import {
+    BookOpen,
+    Calendar,
+    Clock,
+    Star,
+    Users,
+    CheckCircle,
+    AlertTriangle,
+    ArrowRight,
+    Check,
+    X,
+    ClipboardList,
+    Trophy,
+    MapPin,
+    Loader2
+} from 'lucide-vue-next'
 
 const props = defineProps({
     course: Object,
@@ -178,6 +209,27 @@ function markCompleted() {
     });
 }
 
+// Get status variant
+const getStatusVariant = (status) => {
+    switch (status) {
+        case 'in_progress': return 'default'
+        case 'pending': return 'secondary'
+        case 'completed': return 'outline'
+        default: return 'outline'
+    }
+}
+
+// Get assignment status variant
+const getAssignmentStatusVariant = (status) => {
+    switch (status) {
+        case 'pending': return 'secondary'
+        case 'accepted': return 'default'
+        case 'declined': return 'destructive'
+        case 'completed': return 'outline'
+        default: return 'outline'
+    }
+}
+
 // ✅ Format capacity (total sessions)
 const formatCapacity = (capacity) => {
     if (!capacity) return 'Capacity not specified';
@@ -198,15 +250,15 @@ const formatSessions = (sessions) => {
 }
 
 // ✅ Availability status methods based on sessions
-const getAvailabilityStatusClass = (availability) => {
+const getAvailabilityStatusVariant = (availability) => {
     const sessions = availability?.sessions || 0;
 
     if (sessions <= 0) {
-        return 'bg-red-100 text-red-800';
+        return 'destructive';
     } else if (sessions <= 2) {
-        return 'bg-yellow-100 text-yellow-800';
+        return 'secondary';
     } else {
-        return 'bg-green-100 text-green-800';
+        return 'default';
     }
 };
 
@@ -259,584 +311,445 @@ const breadcrumbs: BreadcrumbItemType[] = [
 ]
 </script>
 
-<style>
-.course-image-container {
-    position: relative;
-    padding-top: 56.25%; /* 16:9 Aspect Ratio */
-    overflow: hidden;
-    background-color: #f3f4f6;
-}
-
-.course-image-container img {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: fill;
-    transition: transform 0.5s ease;
-}
-
-.course-image-container:hover img {
-    transform: scale(1.05);
-}
-
-.enrollment-card {
-    transition: all 0.3s ease;
-}
-
-.enrollment-card:hover {
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-}
-
-.button-primary {
-    @apply bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition-colors duration-200 disabled:bg-gray-400 disabled:cursor-not-allowed;
-}
-
-.button-success {
-    @apply bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-4 rounded-lg transition-colors duration-200;
-}
-
-.button-warning {
-    @apply bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-3 px-4 rounded-lg transition-colors duration-200;
-}
-
-.session-info-card {
-    @apply bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm;
-}
-
-.session-status {
-    @apply inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full;
-}
-
-.session-details {
-    @apply text-xs text-gray-600 space-y-1;
-}
-
-/* ✅ ERROR ALERT STYLES */
-.error-alert {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 50;
-    max-width: 400px;
-    background: white;
-    border-left: 4px solid #ef4444;
-    border-radius: 8px;
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-    transform: translateX(100%);
-    transition: transform 0.3s ease-in-out;
-}
-
-.error-alert.show {
-    transform: translateX(0);
-}
-
-.alert-content {
-    padding: 16px;
-}
-
-.alert-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    margin-bottom: 8px;
-}
-
-.alert-title {
-    font-weight: 600;
-    color: #dc2626;
-    font-size: 14px;
-    line-height: 20px;
-}
-
-.close-button {
-    background: none;
-    border: none;
-    color: #6b7280;
-    cursor: pointer;
-    font-size: 18px;
-    line-height: 1;
-    padding: 0;
-    margin-left: 12px;
-}
-
-.close-button:hover {
-    color: #374151;
-}
-
-.alert-message {
-    color: #374151;
-    font-size: 13px;
-    line-height: 18px;
-}
-
-.alert-progress {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    height: 3px;
-    background: #ef4444;
-    animation: progress 6s linear forwards;
-}
-
-@keyframes progress {
-    from { width: 100%; }
-    to { width: 0%; }
-}
-
-@media (max-width: 768px) {
-    .course-details-grid {
-        grid-template-columns: 1fr;
-    }
-    .course-image-container {
-        padding-top: 75%; /* 4:3 Aspect Ratio for mobile */
-    }
-
-    .error-alert {
-        top: 10px;
-        right: 10px;
-        left: 10px;
-        max-width: none;
-        transform: translateY(-100%);
-    }
-
-    .error-alert.show {
-        transform: translateY(0);
-    }
-}
-</style>
-
 <template>
     <AppLayout :breadcrumbs="breadcrumbs">
         <!-- ✅ ERROR ALERT POPUP -->
-        <div
-            :class="['error-alert', { 'show': showErrorAlert }]"
-            v-if="showErrorAlert"
-        >
-            <div class="alert-content">
-                <div class="alert-header">
-                    <div class="alert-title">{{ errorTitle }}</div>
-                    <button @click="closeAlert" class="close-button">×</button>
-                </div>
-                <div class="alert-message">{{ errorMessage }}</div>
-            </div>
-            <div class="alert-progress"></div>
-        </div>
+        <Alert v-if="showErrorAlert" class="fixed top-4 right-4 z-50 max-w-md border-destructive">
+            <AlertTriangle class="h-4 w-4" />
+            <AlertTitle>{{ errorTitle }}</AlertTitle>
+            <AlertDescription>{{ errorMessage }}</AlertDescription>
+            <Button @click="closeAlert" variant="ghost" size="sm" class="absolute top-2 right-2">
+                <X class="h-4 w-4" />
+            </Button>
+        </Alert>
 
-        <div class="container px-4 mx-auto py-6 sm:py-8 max-w-7xl">
-            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 sm:mb-8">
-                <h1 class="text-2xl sm:text-3xl font-bold text-gray-800">{{ course.name }}</h1>
-                <span
-                    class="px-3 py-1.5 text-sm rounded-full shadow-sm transition-colors duration-200"
-                    :class="{
-                        'bg-green-100 text-green-800': course.status === 'in_progress',
-                        'bg-yellow-100 text-yellow-800': course.status === 'pending',
-                        'bg-blue-100 text-blue-800': course.status === 'completed'
-                    }"
-                >
+        <div class="container px-4 mx-auto py-6 sm:py-8 max-w-7xl space-y-6">
+            <!-- Course Header -->
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <h1 class="text-2xl sm:text-3xl font-bold text-foreground">{{ course.name }}</h1>
+                <Badge :variant="getStatusVariant(course.status)">
                     {{ formatStatus(course.status) }}
-                </span>
+                </Badge>
             </div>
 
             <!-- Course Assignment Notification -->
-            <div v-if="userAssignment" class="mb-6">
-                <div
-                    class="bg-linear-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 shadow-sm"
-                    :class="{
-                        'from-yellow-50 to-orange-50 border-yellow-200': userAssignment.status === 'pending',
-                        'from-green-50 to-emerald-50 border-green-200': userAssignment.status === 'accepted',
-                        'from-red-50 to-pink-50 border-red-200': userAssignment.status === 'declined',
-                    }"
-                >
+            <Card v-if="userAssignment" class="border-l-4" :class="{
+                'border-l-yellow-500': userAssignment.status === 'pending',
+                'border-l-green-500': userAssignment.status === 'accepted',
+                'border-l-red-500': userAssignment.status === 'declined',
+                'border-l-blue-500': userAssignment.status === 'completed'
+            }">
+                <CardHeader>
                     <div class="flex items-start justify-between">
-                        <div class="flex">
-                            <div class="shrink-0">
-                                <svg
-                                    class="h-5 w-5 mt-0.5"
-                                    :class="{
-                                        'text-yellow-500': userAssignment.status === 'pending',
-                                        'text-green-500': userAssignment.status === 'accepted',
-                                        'text-blue-500': userAssignment.status !== 'pending' && userAssignment.status !== 'accepted',
-                                        'text-red-500': userAssignment.status === 'declined'
-                                    }"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
-                                >
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                            </div>
-                            <div class="ml-3">
-                                <h3 class="text-sm font-medium">
+                        <div class="flex items-start space-x-3">
+                            <ClipboardList class="h-5 w-5 mt-0.5" :class="{
+                                'text-yellow-500': userAssignment.status === 'pending',
+                                'text-green-500': userAssignment.status === 'accepted',
+                                'text-red-500': userAssignment.status === 'declined',
+                                'text-blue-500': userAssignment.status === 'completed'
+                            }" />
+                            <div>
+                                <CardTitle class="text-lg">
                                     <span v-if="userAssignment.status === 'pending'">📋 Course Assignment - Action Required</span>
                                     <span v-else-if="userAssignment.status === 'accepted'">✅ Course Assignment - Accepted</span>
                                     <span v-else-if="userAssignment.status === 'declined'">❌ Course Assignment - Declined</span>
                                     <span v-else-if="userAssignment.status === 'completed'">🎉 Course Assignment - Completed</span>
-                                </h3>
-
-                                <div class="mt-1 text-sm text-gray-600">
-                                    <p v-if="userAssignment.assigned_by">
-                                        <span class="font-medium">Assigned by:</span> {{ userAssignment.assigned_by }}
-                                    </p>
-                                </div>
+                                </CardTitle>
+                                <CardDescription v-if="userAssignment.assigned_by">
+                                    Assigned by: {{ userAssignment.assigned_by }}
+                                </CardDescription>
                             </div>
                         </div>
-
-                        <!-- Assignment Status Badge -->
-                        <span
-                            v-if="userAssignment.status"
-                            class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                            :class="{
-                                'bg-yellow-100 text-yellow-800': userAssignment.status === 'pending',
-                                'bg-green-100 text-green-800': userAssignment.status === 'accepted',
-                                'bg-red-100 text-red-800': userAssignment.status === 'declined',
-                                'bg-blue-100 text-blue-800': userAssignment.status === 'completed'
-                            }"
-                        >
+                        <Badge :variant="getAssignmentStatusVariant(userAssignment.status)">
                             {{ userAssignment.status.charAt(0).toUpperCase() + userAssignment.status.slice(1) }}
-                        </span>
+                        </Badge>
                     </div>
+                </CardHeader>
 
-                    <!-- Assignment Action Buttons -->
-                    <div v-if="userAssignment.status === 'pending'" class="mt-4 flex gap-3">
-                        <Link
+                <!-- Assignment Action Buttons -->
+                <CardContent v-if="userAssignment.status === 'pending'">
+                    <div class="flex gap-3">
+                        <Button
+                            :as="Link"
                             :href="route('assignments.accept', userAssignment.id)"
                             method="post"
-                            class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 transition-colors duration-200"
                         >
+                            <Check class="mr-2 h-4 w-4" />
                             Accept Assignment
-                        </Link>
-                        <Link
+                        </Button>
+                        <Button
+                            :as="Link"
                             :href="route('assignments.decline', userAssignment.id)"
                             method="post"
-                            class="inline-flex items-center px-3 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors duration-200"
+                            variant="outline"
                         >
+                            <X class="mr-2 h-4 w-4" />
                             Decline Assignment
-                        </Link>
+                        </Button>
                     </div>
-                </div>
-            </div>
+                </CardContent>
+            </Card>
 
-            <div class="course-details-grid grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
+            <!-- Course Details Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
                 <!-- Course Details -->
-                <div class="lg:col-span-2 bg-white rounded-xl shadow-sm overflow-hidden transition-shadow duration-200 hover:shadow-md">
+                <Card class="lg:col-span-2 group hover:shadow-lg transition-all duration-200">
                     <!-- Course Image -->
-                    <div class="course-image-container">
+                    <div class="relative bg-muted overflow-hidden aspect-video">
                         <img
                             v-if="course.image_path"
                             :src="`/storage/${course.image_path}`"
                             :alt="course.name"
-                            class="w-full h-full object-cover"
+                            class="absolute inset-0 w-full h-full object-fill transition-transform duration-500 group-hover:scale-105"
                             loading="lazy"
-                        >
+                        />
                         <div
                             v-else
-                            class="absolute inset-0 flex items-center justify-center bg-gray-100"
+                            class="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-muted to-muted/80"
                         >
-                            <svg class="w-12 h-12 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
+                            <BookOpen class="w-12 h-12 text-muted-foreground" />
                         </div>
                     </div>
 
-                    <div class="p-6 sm:p-8">
+                    <CardContent class="p-6 sm:p-8">
                         <!-- Course description with proper HTML rendering -->
-                        <div class="prose max-w-none mb-8" v-html="course.description"></div>
+                        <div class="prose max-w-none mb-8 text-foreground" v-html="course.description"></div>
 
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                            <div class="bg-gray-50 p-4 rounded-lg transition-colors duration-200 hover:bg-gray-100">
-                                <p class="text-gray-500 mb-1.5 font-medium">Start Date</p>
-                                <p class="font-semibold text-gray-900">{{ formatDate(course.start_date) }}</p>
-                            </div>
-                            <div class="bg-gray-50 p-4 rounded-lg transition-colors duration-200 hover:bg-gray-100">
-                                <p class="text-gray-500 mb-1.5 font-medium">End Date</p>
-                                <p class="font-semibold text-gray-900">{{ formatDate(course.end_date) }}</p>
-                            </div>
-                            <div v-if="course.level" class="bg-gray-50 p-4 rounded-lg transition-colors duration-200 hover:bg-gray-100">
-                                <p class="text-gray-500 mb-1.5 font-medium">Level</p>
-                                <p class="font-semibold text-gray-900 capitalize">{{ course.level }}</p>
-                            </div>
-                            <div v-if="course.duration" class="bg-gray-50 p-4 rounded-lg transition-colors duration-200 hover:bg-gray-100">
-                                <p class="text-gray-500 mb-1.5 font-medium">Duration</p>
-                                <p class="font-semibold text-gray-900">{{ course.duration }} hours</p>
-                            </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <Card class="p-4">
+                                <div class="flex items-center space-x-2 text-muted-foreground mb-2">
+                                    <Calendar class="h-4 w-4" />
+                                    <span class="text-sm font-medium">Start Date</span>
+                                </div>
+                                <p class="font-semibold text-foreground">{{ formatDate(course.start_date) }}</p>
+                            </Card>
+                            <Card class="p-4">
+                                <div class="flex items-center space-x-2 text-muted-foreground mb-2">
+                                    <Calendar class="h-4 w-4" />
+                                    <span class="text-sm font-medium">End Date</span>
+                                </div>
+                                <p class="font-semibold text-foreground">{{ formatDate(course.end_date) }}</p>
+                            </Card>
+                            <Card v-if="course.level" class="p-4">
+                                <div class="flex items-center space-x-2 text-muted-foreground mb-2">
+                                    <Badge variant="outline" class="text-xs">Level</Badge>
+                                </div>
+                                <p class="font-semibold text-foreground capitalize">{{ course.level }}</p>
+                            </Card>
+                            <Card v-if="course.duration" class="p-4">
+                                <div class="flex items-center space-x-2 text-muted-foreground mb-2">
+                                    <Clock class="h-4 w-4" />
+                                    <span class="text-sm font-medium">Duration</span>
+                                </div>
+                                <p class="font-semibold text-foreground">{{ course.duration }} hours</p>
+                            </Card>
                         </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
                 <!-- Enrollment Card -->
-                <div class="enrollment-card bg-white rounded-xl shadow-sm overflow-hidden">
-                    <div class="p-6 sm:p-8">
-                        <h2 class="text-xl sm:text-2xl font-semibold mb-6 text-gray-800">Course Enrollment</h2>
-
+                <Card class="h-fit">
+                    <CardHeader>
+                        <CardTitle class="flex items-center">
+                            <BookOpen class="mr-2 h-5 w-5" />
+                            Course Enrollment
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent class="space-y-6">
                         <!-- Not Enrolled State -->
-                        <div v-if="!isEnrolled" class="mb-6">
+                        <div v-if="!isEnrolled">
                             <!-- Assignment-based enrollment message -->
                             <div v-if="userAssignment && userAssignment.status === 'accepted'">
-                                <p class="text-gray-600 mb-6 leading-relaxed">
+                                <p class="text-muted-foreground mb-6 leading-relaxed">
                                     This course has been assigned to you. Select a session schedule to complete your enrollment.
                                 </p>
                             </div>
 
                             <!-- Pending assignment message -->
-                            <div v-else-if="userAssignment && userAssignment.status === 'pending'">
-                                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-                                    <p class="text-yellow-800 font-medium mb-2">Assignment Pending</p>
-                                    <p class="text-yellow-700 text-sm">
-                                        Please accept your course assignment above to proceed with enrollment.
-                                    </p>
-                                </div>
-                            </div>
+                            <Alert v-else-if="userAssignment && userAssignment.status === 'pending'" class="border-yellow-200">
+                                <AlertTriangle class="h-4 w-4" />
+                                <AlertTitle>Assignment Pending</AlertTitle>
+                                <AlertDescription>
+                                    Please accept your course assignment above to proceed with enrollment.
+                                </AlertDescription>
+                            </Alert>
 
                             <!-- Declined assignment message -->
-                            <div v-else-if="userAssignment && userAssignment.status === 'declined'">
-                                <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-                                    <p class="text-red-800 font-medium mb-2">Assignment Declined</p>
-                                    <p class="text-red-700 text-sm">
-                                        You have declined this course assignment. Contact your administrator if you'd like to reconsider.
-                                    </p>
-                                </div>
-                            </div>
+                            <Alert v-else-if="userAssignment && userAssignment.status === 'declined'" class="border-destructive">
+                                <X class="h-4 w-4" />
+                                <AlertTitle>Assignment Declined</AlertTitle>
+                                <AlertDescription>
+                                    You have declined this course assignment. Contact your administrator if you'd like to reconsider.
+                                </AlertDescription>
+                            </Alert>
 
                             <!-- Regular enrollment message -->
                             <div v-else>
-                                <p class="text-gray-600 mb-6 leading-relaxed">
+                                <p class="text-muted-foreground mb-6 leading-relaxed">
                                     Select a session schedule and enroll in this course to track your progress.
                                 </p>
                             </div>
 
-                            <!-- ✅ Available Session Schedules with BOTH Capacity and Sessions -->
-                            <div v-if="availabilities && availabilities.length > 0" class="mb-6" :class="{ 'opacity-50': userAssignment && userAssignment.status === 'pending' }">
-                                <h3 class="font-semibold mb-4 text-gray-800">Available Session Schedules:</h3>
+                            <!-- ✅ Available Session Schedules -->
+                            <div v-if="availabilities && availabilities.length > 0" class="space-y-4" :class="{ 'opacity-50': userAssignment && userAssignment.status === 'pending' }">
+                                <Label class="text-base font-semibold">Available Session Schedules:</Label>
 
-                                <div class="space-y-3" :class="{ 'pointer-events-none': userAssignment && userAssignment.status === 'pending' }">
-                                    <label
+                                <RadioGroup
+                                    v-model="enrollForm.course_availability_id"
+                                    :disabled="userAssignment && userAssignment.status === 'pending'"
+                                    class="space-y-3"
+                                >
+                                    <div
                                         v-for="availability in availabilities"
                                         :key="availability.id"
-                                        class="block cursor-pointer"
+                                        class="flex items-start space-x-3"
                                     >
-                                        <div
-                                            class="border rounded-lg p-4 transition-colors"
-                                            :class="{
-                                                'border-blue-500 bg-blue-50': enrollForm.course_availability_id === availability.id,
-                                                'border-gray-300 hover:border-gray-400': enrollForm.course_availability_id !== availability.id && !isAvailabilityDisabled(availability),
-                                                'border-gray-200 bg-gray-50 cursor-not-allowed': isAvailabilityDisabled(availability)
-                                            }"
-                                        >
-                                            <div class="flex items-start justify-between">
-                                                <div class="flex items-start">
-                                                    <input
-                                                        type="radio"
-                                                        :value="availability.id"
-                                                        v-model="enrollForm.course_availability_id"
-                                                        :disabled="isAvailabilityDisabled(availability)"
-                                                        class="mt-1 mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500"
-                                                    >
-                                                    <div>
-                                                        <p class="font-medium text-gray-900">
-                                                            {{ availability.formatted_date_range }}
-                                                        </p>
-                                                        <p class="text-sm text-gray-600 mt-1">
-                                                            {{ formatDateTime(availability.start_date) }} - {{ formatDateTime(availability.end_date) }}
-                                                        </p>
-                                                        <p v-if="availability.notes" class="text-sm text-gray-500 mt-1">
-                                                            {{ availability.notes }}
-                                                        </p>
+                                        <RadioGroupItem
+                                            :value="availability.id.toString()"
+                                            :disabled="isAvailabilityDisabled(availability)"
+                                            class="mt-1"
+                                        />
+                                        <Card class="flex-1 p-4" :class="{
+                                            'border-primary': enrollForm.course_availability_id === availability.id.toString(),
+                                            'opacity-50': isAvailabilityDisabled(availability)
+                                        }">
+                                            <div class="flex justify-between items-start">
+                                                <div>
+                                                    <p class="font-medium text-foreground">
+                                                        {{ availability.formatted_date_range }}
+                                                    </p>
+                                                    <p class="text-sm text-muted-foreground mt-1">
+                                                        {{ formatDateTime(availability.start_date) }} - {{ formatDateTime(availability.end_date) }}
+                                                    </p>
+                                                    <p v-if="availability.notes" class="text-sm text-muted-foreground mt-1">
+                                                        {{ availability.notes }}
+                                                    </p>
 
-                                                        <!-- ✅ Show BOTH capacity and sessions -->
-                                                        <div class="session-details mt-2 space-y-1">
-                                                            <p class="text-blue-600 font-medium">
-                                                                {{ formatCapacity(availability.capacity) }}
-                                                            </p>
-                                                            <p class="text-green-600 font-medium">
-                                                                {{ formatSessions(availability.sessions) }}
-                                                            </p>
-                                                            <p v-if="(availability.capacity - availability.sessions) > 0" class="text-sm text-gray-600">
-                                                                {{ (availability.capacity - availability.sessions) }} sessions enrolled
-                                                            </p>
-                                                        </div>
+                                                    <!-- ✅ Show BOTH capacity and sessions -->
+                                                    <div class="mt-2 space-y-1">
+                                                        <p class="text-sm text-primary font-medium">
+                                                            {{ formatCapacity(availability.capacity) }}
+                                                        </p>
+                                                        <p class="text-sm text-green-600 font-medium">
+                                                            {{ formatSessions(availability.sessions) }}
+                                                        </p>
+                                                        <p v-if="(availability.capacity - availability.sessions) > 0" class="text-xs text-muted-foreground">
+                                                            {{ (availability.capacity - availability.sessions) }} sessions enrolled
+                                                        </p>
                                                     </div>
                                                 </div>
 
                                                 <!-- ✅ Availability status based on sessions -->
-                                                <div class="text-right ml-4">
-                                                    <span
-                                                        class="session-status"
-                                                        :class="getAvailabilityStatusClass(availability)"
-                                                    >
-                                                        {{ getAvailabilityStatusText(availability) }}
-                                                    </span>
-
-                                                </div>
+                                                <Badge :variant="getAvailabilityStatusVariant(availability)">
+                                                    {{ getAvailabilityStatusText(availability) }}
+                                                </Badge>
                                             </div>
-                                        </div>
-                                    </label>
-                                </div>
+                                        </Card>
+                                    </div>
+                                </RadioGroup>
                             </div>
 
                             <!-- Simple enrollment for courses without availabilities -->
                             <div v-else-if="!availabilities || availabilities.length === 0">
-                                <p class="text-gray-600 mb-6 leading-relaxed">
+                                <p class="text-muted-foreground mb-6 leading-relaxed">
                                     Enroll in this course to track your progress and get access to course materials.
                                 </p>
                             </div>
 
-                            <button
+                            <Button
                                 @click="enroll"
-                                class="button-primary w-full flex items-center justify-center gap-2"
+                                class="w-full"
                                 :disabled="enrollForm.processing || (availabilities && availabilities.length > 0 && !enrollForm.course_availability_id) || (userAssignment && userAssignment.status === 'pending')"
                             >
+                                <Loader2 v-if="enrollForm.processing" class="mr-2 h-4 w-4 animate-spin" />
                                 <span v-if="enrollForm.processing">Enrolling...</span>
                                 <span v-else-if="userAssignment && userAssignment.status === 'pending'">Accept Assignment First</span>
                                 <span v-else-if="userAssignment && userAssignment.status === 'declined'">Assignment Declined</span>
                                 <span v-else>Enroll Now</span>
-                                <svg v-if="!enrollForm.processing && (!userAssignment || userAssignment.status === 'accepted')" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                                </svg>
-                            </button>
+                                <ArrowRight v-if="!enrollForm.processing && (!userAssignment || userAssignment.status === 'accepted')" class="ml-2 h-4 w-4" />
+                            </Button>
                         </div>
 
                         <!-- Enrolled State -->
                         <div v-else class="space-y-6" :key="componentKey">
                             <div class="space-y-4">
-                                <div class="flex items-center p-4 bg-gray-50 rounded-lg transition-colors duration-200">
+                                <div class="flex items-center p-4 bg-muted rounded-lg">
                                     <div class="w-3 h-3 rounded-full mr-3" :class="{
                                         'bg-green-500': userStatus === 'completed',
-                                        'bg-blue-500': userStatus === 'pending' || userStatus === 'in_progress'
+                                        'bg-primary': userStatus === 'pending' || userStatus === 'in_progress'
                                     }"></div>
-                                    <span class="font-medium text-gray-800">
+                                    <span class="font-medium text-foreground">
                                         Status: {{ userStatus === 'completed' ? 'Completed' : 'Enrolled' }}
                                     </span>
                                 </div>
 
                                 <!-- Step 1: Rating Section (Show if enrolled but not rated) -->
-                                <div v-if="(userStatus === 'pending' || userStatus === 'in_progress') && !hasRated" class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                                    <h3 class="font-semibold text-yellow-800 mb-3">📋 Rate This Course First</h3>
-                                    <p class="text-yellow-700 text-sm mb-4">Please rate this course before marking it as complete.</p>
+                                <Alert v-if="(userStatus === 'pending' || userStatus === 'in_progress') && !hasRated" class="border-yellow-200">
+                                    <Star class="h-4 w-4" />
+                                    <AlertTitle>📋 Rate This Course First</AlertTitle>
+                                    <AlertDescription class="mb-4">
+                                        Please rate this course before marking it as complete.
+                                    </AlertDescription>
 
                                     <!-- Star Rating -->
-                                    <div class="mb-4">
-                                        <label class="block text-sm font-medium text-gray-700 mb-2">Your Rating</label>
-                                        <div class="flex space-x-1">
-                                            <button
-                                                v-for="star in 5"
-                                                :key="star"
-                                                type="button"
-                                                @click="ratingForm.rating = star"
-                                                class="text-2xl transition-colors duration-200"
-                                                :class="{
-                                                    'text-yellow-400': star <= ratingForm.rating,
-                                                    'text-gray-300 hover:text-yellow-400': star > ratingForm.rating
-                                                }"
-                                            >
-                                                ★
-                                            </button>
+                                    <div class="space-y-4">
+                                        <div>
+                                            <Label class="text-sm font-medium">Your Rating</Label>
+                                            <div class="flex space-x-1 mt-2">
+                                                <Button
+                                                    v-for="star in 5"
+                                                    :key="star"
+                                                    type="button"
+                                                    @click="ratingForm.rating = star"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    class="p-1"
+                                                >
+                                                    <Star
+                                                        class="h-6 w-6"
+                                                        :class="{
+                                                            'text-yellow-400 fill-current': star <= ratingForm.rating,
+                                                            'text-muted-foreground': star > ratingForm.rating
+                                                        }"
+                                                    />
+                                                </Button>
+                                            </div>
                                         </div>
-                                    </div>
 
-                                    <!-- Feedback (Required) -->
-                                    <div class="mb-4">
-                                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                                            Feedback <span class="text-red-500">*</span>
-                                        </label>
-                                        <textarea
-                                            v-model="ratingForm.feedback"
-                                            rows="3"
-                                            class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-                                            :class="{ 'border-red-500': ratingForm.errors.feedback }"
-                                            placeholder="Please share your thoughts about this course... (required)"
-                                            required
-                                        ></textarea>
-                                        <div v-if="ratingForm.errors.feedback" class="text-red-500 text-sm mt-1">
-                                            {{ ratingForm.errors.feedback }}
+                                        <!-- Feedback (Required) -->
+                                        <div>
+                                            <Label class="text-sm font-medium">
+                                                Feedback <span class="text-destructive">*</span>
+                                            </Label>
+                                            <Textarea
+                                                v-model="ratingForm.feedback"
+                                                placeholder="Please share your thoughts about this course... (required)"
+                                                class="mt-2"
+                                                :class="{ 'border-destructive': ratingForm.errors.feedback }"
+                                                required
+                                            />
+                                            <div v-if="ratingForm.errors.feedback" class="text-destructive text-sm mt-1">
+                                                {{ ratingForm.errors.feedback }}
+                                            </div>
+                                            <p class="text-xs text-muted-foreground mt-1">Minimum 10 characters required</p>
                                         </div>
-                                        <p class="text-xs text-gray-500 mt-1">Minimum 10 characters required</p>
-                                    </div>
 
-                                    <!-- Submit Rating Button -->
-                                    <button
-                                        @click="submitRating"
-                                        :disabled="ratingForm.processing || ratingForm.rating === 0 || !ratingForm.feedback?.trim() || ratingForm.feedback.trim().length < 10"
-                                        class="bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg transition-colors duration-200 w-full"
-                                    >
-                                        <span v-if="ratingForm.processing">Submitting Rating...</span>
-                                        <span v-else>Submit Rating</span>
-                                    </button>
-                                </div>
+                                        <!-- Submit Rating Button -->
+                                        <Button
+                                            @click="submitRating"
+                                            :disabled="ratingForm.processing || ratingForm.rating === 0 || !ratingForm.feedback?.trim() || ratingForm.feedback.trim().length < 10"
+                                            class="w-full"
+                                        >
+                                            <Loader2 v-if="ratingForm.processing" class="mr-2 h-4 w-4 animate-spin" />
+                                            <span v-if="ratingForm.processing">Submitting Rating...</span>
+                                            <span v-else>Submit Rating</span>
+                                        </Button>
+                                    </div>
+                                </Alert>
 
                                 <!-- Step 2: Mark Complete Section (Show if rated but not completed) -->
-                                <div v-else-if="(userStatus === 'pending' || userStatus === 'in_progress') && hasRated" class="bg-green-50 border border-green-200 rounded-lg p-4">
-                                    <h3 class="font-semibold text-green-800 mb-3">✅ Ready to Complete</h3>
-                                    <p class="text-green-700 text-sm mb-4">
+                                <Alert v-else-if="(userStatus === 'pending' || userStatus === 'in_progress') && hasRated" class="border-green-200">
+                                    <CheckCircle class="h-4 w-4" />
+                                    <AlertTitle>✅ Ready to Complete</AlertTitle>
+                                    <AlertDescription class="mb-4">
                                         Thank you for rating! You can now mark this course as completed.
-                                    </p>
-                                    <p v-if="completion && completion.rating" class="text-xs text-green-600 mb-4">
-                                        Your rating:
-                                        <span class="text-yellow-500">
-                                            {{ '★'.repeat(completion.rating) }}{{ '☆'.repeat(5 - completion.rating) }}
-                                        </span>
-                                    </p>
+                                    </AlertDescription>
 
-                                    <button
+                                    <div v-if="completion && completion.rating" class="mb-4">
+                                        <div class="flex items-center space-x-2">
+                                            <span class="text-sm">Your rating:</span>
+                                            <div class="flex">
+                                                <Star
+                                                    v-for="i in 5"
+                                                    :key="i"
+                                                    class="h-4 w-4"
+                                                    :class="i <= completion.rating ? 'text-yellow-400 fill-current' : 'text-muted-foreground'"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <Button
                                         @click="markCompleted"
                                         :disabled="completeForm.processing"
-                                        class="button-success w-full flex items-center justify-center gap-2"
+                                        class="w-full"
                                     >
+                                        <Loader2 v-if="completeForm.processing" class="mr-2 h-4 w-4 animate-spin" />
+                                        <Check v-else class="mr-2 h-4 w-4" />
                                         <span v-if="completeForm.processing">Processing...</span>
                                         <span v-else>Mark as Completed</span>
-                                        <svg v-if="!completeForm.processing" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                                        </svg>
-                                    </button>
-                                </div>
+                                    </Button>
+                                </Alert>
 
                                 <!-- Step 3: Completed Section -->
-                                <div v-else-if="userStatus === 'completed'" class="bg-green-50 border border-green-200 rounded-lg p-4">
-                                    <h3 class="font-semibold text-green-800 mb-3">🎉 Course Completed!</h3>
-                                    <p class="text-green-700 font-medium">
+                                <Alert v-else-if="userStatus === 'completed'" class="border-green-200">
+                                    <Trophy class="h-4 w-4" />
+                                    <AlertTitle>🎉 Course Completed!</AlertTitle>
+                                    <AlertDescription class="mb-4">
                                         Congratulations! You've successfully completed all sessions in this course.
-                                    </p>
+                                    </AlertDescription>
 
-                                    <div class="mt-4 space-y-4">
-                                        <Link
-                                            href="/courses"
-                                            class="button-primary w-full flex items-center justify-center gap-2"
-                                        >
-                                            Browse More Courses
-                                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                            </svg>
-                                        </Link>
-                                    </div>
-                                </div>
+                                    <Button :as="Link" href="/courses" class="w-full">
+                                        <BookOpen class="mr-2 h-4 w-4" />
+                                        Browse More Courses
+                                    </Button>
+                                </Alert>
 
-                                <!-- ✅ Show selected session schedule with BOTH capacity and sessions -->
-                                <div v-if="selectedAvailability" class="session-info-card">
-                                    <p class="text-sm text-blue-600 font-medium mb-1">Your Selected Session Schedule:</p>
-                                    <p class="font-semibold text-blue-900">{{ selectedAvailability.formatted_date_range }}</p>
-                                    <p class="text-sm text-blue-700 mt-1">
-                                        {{ formatDateTime(selectedAvailability.start_date) }} - {{ formatDateTime(selectedAvailability.end_date) }}
-                                    </p>
+                                <!-- ✅ Show selected session schedule -->
+                                <Card v-if="selectedAvailability" class="bg-primary/5 border-primary/20">
+                                    <CardContent class="p-4">
+                                        <div class="flex items-center space-x-2 mb-2">
+                                            <MapPin class="h-4 w-4 text-primary" />
+                                            <span class="text-sm font-medium text-primary">Your Selected Session Schedule:</span>
+                                        </div>
+                                        <p class="font-semibold text-foreground">{{ selectedAvailability.formatted_date_range }}</p>
+                                        <p class="text-sm text-muted-foreground mt-1">
+                                            {{ formatDateTime(selectedAvailability.start_date) }} - {{ formatDateTime(selectedAvailability.end_date) }}
+                                        </p>
 
-                                    <!-- ✅ Display BOTH capacity and sessions -->
-                                    <div class="mt-2 space-y-1">
-                                        <p class="text-xs text-blue-600">
-                                            Total Capacity: {{ selectedAvailability.capacity }} sessions
-                                        </p>
-                                        <p class="text-xs text-blue-500">
-                                            Available: {{ selectedAvailability.sessions }} sessions
-                                        </p>
-                                        <p class="text-xs text-gray-600">
-                                            Enrolled: {{ (selectedAvailability.capacity - selectedAvailability.sessions) }} sessions
-                                        </p>
-                                    </div>
-                                </div>
+                                        <!-- ✅ Display BOTH capacity and sessions -->
+                                        <div class="mt-2 space-y-1 text-xs">
+                                            <p class="text-primary font-medium">
+                                                Total Capacity: {{ selectedAvailability.capacity }} sessions
+                                            </p>
+                                            <p class="text-green-600 font-medium">
+                                                Available: {{ selectedAvailability.sessions }} sessions
+                                            </p>
+                                            <p class="text-muted-foreground">
+                                                Enrolled: {{ (selectedAvailability.capacity - selectedAvailability.sessions) }} sessions
+                                            </p>
+                                        </div>
+                                    </CardContent>
+                                </Card>
                             </div>
                         </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
             </div>
         </div>
     </AppLayout>
 </template>
+
+<style scoped>
+.aspect-video {
+    aspect-ratio: 16 / 9;
+}
+
+.prose {
+    max-width: none;
+}
+
+.prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
+    color: hsl(var(--foreground));
+}
+
+.prose p, .prose li {
+    color: hsl(var(--foreground));
+}
+
+@media (max-width: 768px) {
+    .aspect-video {
+        aspect-ratio: 4 / 3;
+    }
+}
+</style>

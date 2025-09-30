@@ -1,387 +1,391 @@
 <template>
-    <div class="monthly-kpi-dashboard">
-        <!-- 🎯 ORIGINAL DASHBOARD HEADER -->
-        <div class="dashboard-header">
-            <div class="header-content">
-                <div class="title-section">
-                    <h1 class="dashboard-title">📊 Monthly Training KPI Report</h1>
-                    <p class="period-display">{{ kpiData.period?.period_name || 'Loading...' }}</p>
-                </div>
+    <AdminLayout :breadcrumbs="breadcrumbs">
+        <div class="monthly-kpi-dashboard bg-black text-white min-h-screen dark">
+            <!-- 🎯 DASHBOARD HEADER -->
+            <div class="dashboard-header bg-gray-800 border-b border-gray-600 p-4 sm:p-6">
+                <div class="header-content">
+                    <div class="title-section">
+                        <h1 class="dashboard-title text-2xl sm:text-3xl font-bold text-white">📊 Monthly Training KPI Report</h1>
+                        <p class="period-display text-gray-300 mt-2">{{ kpiData.period?.period_name || 'Loading...' }}</p>
+                    </div>
 
-                <div class="header-actions">
-                    <button @click="showFilters = !showFilters" class="filter-btn" :class="{ 'active': showFilters }">
-                        🔍 Filters
-                    </button>
-
-                    <!-- 🎯 Export Buttons -->
-                    <div class="export-buttons">
-                        <button @click="generateDirectScreenshot" class="export-btn screenshot-btn" :disabled="loading || screenshotLoading">
-                            {{ screenshotLoading ? '⏳ Capturing...' : '📸 Screenshot' }}
+                    <div class="header-actions flex flex-wrap gap-3 mt-4">
+                        <button @click="showFilters = !showFilters" class="filter-btn bg-gray-700 text-gray-200 px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors" :class="{ 'bg-blue-800 text-blue-200': showFilters }">
+                            🔍 Filters
                         </button>
-                        <button @click="exportCsv" class="export-btn csv-btn" :disabled="loading">
-                            📋 Export CSV
+
+                        <!-- 🎯 Export Buttons -->
+                        <div class="export-buttons flex gap-2">
+                            <button @click="generateDirectScreenshot" class="export-btn screenshot-btn bg-purple-800 text-purple-200 px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50" :disabled="loading || screenshotLoading">
+                                {{ screenshotLoading ? '⏳ Capturing...' : '📸 Screenshot' }}
+                            </button>
+                            <button @click="exportCsv" class="export-btn csv-btn bg-green-800 text-green-200 px-4 py-2 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50" :disabled="loading">
+                                📋 Export CSV
+                            </button>
+                        </div>
+
+                        <button @click="refreshData" class="refresh-btn bg-indigo-800 text-indigo-200 px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50" :disabled="loading">
+                            {{ loading ? '⏳' : '🔄' }} Refresh
                         </button>
                     </div>
+                </div>
 
-                    <button @click="refreshData" class="refresh-btn" :disabled="loading">
-                        {{ loading ? '⏳' : '🔄' }} Refresh
-                    </button>
+                <!-- Filter Panel -->
+                <div v-show="showFilters" class="filter-panel bg-gray-700 border border-gray-600 rounded-lg p-4 mt-4">
+                    <div class="filter-grid grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="filter-group">
+                            <label class="block text-sm font-medium text-gray-200 mb-2">Month</label>
+                            <select v-model="filters.month" @change="applyFilters" class="w-full bg-gray-600 border border-gray-500 text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400">
+                                <option v-for="month in filterData.months" :key="month.value" :value="month.value">
+                                    {{ month.label }}
+                                </option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label class="block text-sm font-medium text-gray-200 mb-2">Year</label>
+                            <select v-model="filters.year" @change="applyFilters" class="w-full bg-gray-600 border border-gray-500 text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400">
+                                <option v-for="year in filterData.years" :key="year.value" :value="year.value">
+                                    {{ year.label }}
+                                </option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label class="block text-sm font-medium text-gray-200 mb-2">Department</label>
+                            <select v-model="filters.department_id" @change="applyFilters" class="w-full bg-gray-600 border border-gray-500 text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400">
+                                <option value="">All Departments</option>
+                                <option v-for="dept in filterData.departments" :key="dept.id" :value="dept.id">
+                                    {{ dept.name }}
+                                </option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Last Updated -->
+                <div class="update-info mt-4 pt-4 border-t border-gray-600">
+                    <span class="last-updated text-sm text-gray-300">Last updated: {{ formatDateTime(lastUpdated) }}</span>
                 </div>
             </div>
 
-            <!-- Filter Panel -->
-            <div v-show="showFilters" class="filter-panel">
-                <div class="filter-grid">
-                    <div class="filter-group">
-                        <label>Month</label>
-                        <select v-model="filters.month" @change="applyFilters">
-                            <option v-for="month in filterData.months" :key="month.value" :value="month.value">
-                                {{ month.label }}
-                            </option>
-                        </select>
-                    </div>
-                    <div class="filter-group">
-                        <label>Year</label>
-                        <select v-model="filters.year" @change="applyFilters">
-                            <option v-for="year in filterData.years" :key="year.value" :value="year.value">
-                                {{ year.label }}
-                            </option>
-                        </select>
-                    </div>
-                    <div class="filter-group">
-                        <label>Department</label>
-                        <select v-model="filters.department_id" @change="applyFilters">
-                            <option value="">All Departments</option>
-                            <option v-for="dept in filterData.departments" :key="dept.id" :value="dept.id">
-                                {{ dept.name }}
-                            </option>
-                        </select>
-                    </div>
+            <!-- Loading Overlay -->
+            <div v-if="loading" class="loading-overlay fixed inset-0 bg-gray-900 bg-opacity-90 flex items-center justify-center z-50">
+                <div class="loading-spinner bg-gray-800 rounded-lg p-8 text-center shadow-2xl border border-gray-600">
+                    <div class="spinner inline-block w-8 h-8 border-4 border-gray-600 border-t-blue-400 rounded-full animate-spin mb-4"></div>
+                    <p class="text-white">Loading KPI Data...</p>
                 </div>
             </div>
 
-            <!-- Last Updated -->
-            <div class="update-info">
-                <span class="last-updated">Last updated: {{ formatDateTime(lastUpdated) }}</span>
+            <!-- 🎯 DASHBOARD CONTENT -->
+            <div v-else class="dashboard-content p-4 sm:p-6 space-y-8">
+                <!-- 📊 SECTION 1: Training Delivery Overview -->
+                <section class="kpi-section delivery-overview">
+                    <h2 class="section-title text-xl font-semibold text-white mb-6">📊 Training Delivery Overview</h2>
+                    <div class="kpi-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div class="kpi-card bg-gray-800 border border-gray-600 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow hover:bg-gray-750">
+                            <div class="kpi-header flex items-center mb-4">
+                                <span class="kpi-icon text-2xl mr-3">📚</span>
+                                <span class="kpi-title text-sm font-medium text-gray-300">Courses Delivered</span>
+                            </div>
+                            <div class="kpi-value text-3xl font-bold text-white">{{ kpiData.delivery_overview?.courses_delivered || 0 }}</div>
+                        </div>
+                        <div class="kpi-card bg-gray-800 border border-gray-600 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow hover:bg-gray-750">
+                            <div class="kpi-header flex items-center mb-4">
+                                <span class="kpi-icon text-2xl mr-3">👥</span>
+                                <span class="kpi-title text-sm font-medium text-gray-300">Total Enrolled</span>
+                            </div>
+                            <div class="kpi-value text-3xl font-bold text-white">{{ kpiData.delivery_overview?.total_enrolled || 0 }}</div>
+                        </div>
+                        <div class="kpi-card bg-gray-800 border border-gray-600 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow hover:bg-gray-750">
+                            <div class="kpi-header flex items-center mb-4">
+                                <span class="kpi-icon text-2xl mr-3">🎯</span>
+                                <span class="kpi-title text-sm font-medium text-gray-300">Active Participants</span>
+                            </div>
+                            <div class="kpi-value text-3xl font-bold text-white">{{ kpiData.delivery_overview?.active_participants || 0 }}</div>
+                        </div>
+                        <div class="kpi-card bg-gray-800 border border-gray-600 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow hover:bg-gray-750">
+                            <div class="kpi-header flex items-center mb-4">
+                                <span class="kpi-icon text-2xl mr-3">✅</span>
+                                <span class="kpi-title text-sm font-medium text-gray-300">Completion Rate</span>
+                            </div>
+                            <div class="kpi-value text-3xl font-bold text-white">{{ kpiData.delivery_overview?.completion_rate || 0 }}%</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 🎯 SECTION 2: Attendance & Engagement -->
+                <section class="kpi-section attendance-engagement">
+                    <h2 class="section-title text-xl font-semibold text-white mb-6">🎯 Attendance & Engagement</h2>
+                    <div class="kpi-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div class="kpi-card bg-gray-800 border border-gray-600 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow hover:bg-gray-750">
+                            <div class="kpi-header flex items-center mb-4">
+                                <span class="kpi-icon text-2xl mr-3">📋</span>
+                                <span class="kpi-title text-sm font-medium text-gray-300">Attendance Rate</span>
+                            </div>
+                            <div class="kpi-value text-3xl font-bold text-white">{{ kpiData.attendance_engagement?.average_attendance_rate || 0 }}%</div>
+                        </div>
+                        <div class="kpi-card bg-gray-800 border border-gray-600 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow hover:bg-gray-750">
+                            <div class="kpi-header flex items-center mb-4">
+                                <span class="kpi-icon text-2xl mr-3">⏱️</span>
+                                <span class="kpi-title text-sm font-medium text-gray-300">Avg Time Spent</span>
+                            </div>
+                            <div class="kpi-value text-3xl font-bold text-white">{{ kpiData.attendance_engagement?.average_time_spent || 0 }}h</div>
+                        </div>
+                        <div class="kpi-card bg-gray-800 border border-gray-600 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow hover:bg-gray-750">
+                            <div class="kpi-header flex items-center mb-4">
+                                <span class="kpi-icon text-2xl mr-3">🕐</span>
+                                <span class="kpi-title text-sm font-medium text-gray-300">Clock Consistency</span>
+                            </div>
+                            <div class="kpi-value text-3xl font-bold text-white">{{ kpiData.attendance_engagement?.clocking_consistency || 0 }}%</div>
+                        </div>
+                        <div class="kpi-card bg-gray-800 border border-gray-600 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow hover:bg-gray-750">
+                            <div class="kpi-header flex items-center mb-4">
+                                <span class="kpi-icon text-2xl mr-3">💯</span>
+                                <span class="kpi-title text-sm font-medium text-gray-300">Engagement Score</span>
+                            </div>
+                            <div class="kpi-value text-3xl font-bold text-white">{{ kpiData.attendance_engagement?.engagement_score || 0 }}%</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 📈 SECTION 3: Learning Outcomes -->
+                <section class="kpi-section learning-outcomes">
+                    <h2 class="section-title text-xl font-semibold text-white mb-6">📈 Learning Outcomes</h2>
+                    <div class="kpi-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div class="kpi-card success bg-gray-800 border border-green-700 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow hover:bg-green-900/20">
+                            <div class="kpi-header flex items-center mb-4">
+                                <span class="kpi-icon text-2xl mr-3">✅</span>
+                                <span class="kpi-title text-sm font-medium text-green-400">Quiz Pass Rate</span>
+                            </div>
+                            <div class="kpi-value text-3xl font-bold text-green-300">{{ kpiData.learning_outcomes?.quiz_pass_rate || 0 }}%</div>
+                        </div>
+                        <div class="kpi-card danger bg-gray-800 border border-red-700 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow hover:bg-red-900/20">
+                            <div class="kpi-header flex items-center mb-4">
+                                <span class="kpi-icon text-2xl mr-3">❌</span>
+                                <span class="kpi-title text-sm font-medium text-red-400">Quiz Fail Rate</span>
+                            </div>
+                            <div class="kpi-value text-3xl font-bold text-red-300">{{ kpiData.learning_outcomes?.quiz_fail_rate || 0 }}%</div>
+                        </div>
+                        <div class="kpi-card bg-gray-800 border border-gray-600 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow hover:bg-gray-750">
+                            <div class="kpi-header flex items-center mb-4">
+                                <span class="kpi-icon text-2xl mr-3">📊</span>
+                                <span class="kpi-title text-sm font-medium text-gray-300">Average Score</span>
+                            </div>
+                            <div class="kpi-value text-3xl font-bold text-white">{{ kpiData.learning_outcomes?.average_quiz_score || 0 }}%</div>
+                        </div>
+                        <div class="kpi-card bg-gray-800 border border-gray-600 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow hover:bg-gray-750">
+                            <div class="kpi-header flex items-center mb-4">
+                                <span class="kpi-icon text-2xl mr-3">📈</span>
+                                <span class="kpi-title text-sm font-medium text-gray-300">Improvement Rate</span>
+                            </div>
+                            <div class="kpi-value text-3xl font-bold text-white">{{ kpiData.learning_outcomes?.improvement_rate || 0 }}%</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ⭐ SECTION 4: Course Quality & Feedback -->
+                <section class="kpi-section feedback-analysis">
+                    <h2 class="section-title text-xl font-semibold text-white mb-6">⭐ Course Quality & Feedback</h2>
+                    <div class="feedback-grid grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div class="feedback-cards grid grid-cols-1 sm:grid-cols-2 gap-6">
+                            <div class="kpi-card bg-gray-800 border border-gray-600 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow hover:bg-gray-750">
+                                <div class="kpi-header flex items-center mb-4">
+                                    <span class="kpi-icon text-2xl mr-3">⭐</span>
+                                    <span class="kpi-title text-sm font-medium text-gray-300">Average Rating</span>
+                                </div>
+                                <div class="kpi-value text-3xl font-bold text-white">{{ kpiData.feedback_analysis?.average_rating || 0 }}/5</div>
+                            </div>
+                            <div class="kpi-card bg-gray-800 border border-gray-600 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow hover:bg-gray-750">
+                                <div class="kpi-header flex items-center mb-4">
+                                    <span class="kpi-icon text-2xl mr-3">💬</span>
+                                    <span class="kpi-title text-sm font-medium text-gray-300">Total Feedback</span>
+                                </div>
+                                <div class="kpi-value text-3xl font-bold text-white">{{ kpiData.feedback_analysis?.total_feedback_count || 0 }}</div>
+                            </div>
+                        </div>
+                        <div class="feedback-sentiment bg-gray-800 border border-gray-600 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow">
+                            <h3 class="text-lg font-semibold text-white mb-4">Feedback Sentiment</h3>
+                            <div class="sentiment-display space-y-3">
+                                <div class="sentiment-item flex justify-between items-center">
+                                    <span class="sentiment-label text-gray-300">😊 Positive:</span>
+                                    <span class="sentiment-value font-bold text-green-400">{{ kpiData.feedback_analysis?.feedback_sentiment?.positive || 0 }}%</span>
+                                </div>
+                                <div class="sentiment-item flex justify-between items-center">
+                                    <span class="sentiment-label text-gray-300">😐 Neutral:</span>
+                                    <span class="sentiment-value font-bold text-yellow-400">{{ kpiData.feedback_analysis?.feedback_sentiment?.neutral || 0 }}%</span>
+                                </div>
+                                <div class="sentiment-item flex justify-between items-center">
+                                    <span class="sentiment-label text-gray-300">😞 Negative:</span>
+                                    <span class="sentiment-value font-bold text-red-400">{{ kpiData.feedback_analysis?.feedback_sentiment?.negative || 0 }}%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 🏆 SECTION 5: Course Performance Analysis -->
+                <section class="kpi-section performance-analysis">
+                    <h2 class="section-title text-xl font-semibold text-white mb-6">🏆 Course Performance Analysis</h2>
+                    <div class="performance-grid grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div class="performance-table bg-gray-800 border border-gray-600 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow">
+                            <h3 class="text-lg font-semibold text-white mb-2">🥇 Top-Performing Courses</h3>
+                            <p class="subtitle text-sm text-gray-300 mb-4">Based on rating & completion</p>
+                            <div class="table-container overflow-x-auto">
+                                <table class="performance-table-content w-full">
+                                    <thead>
+                                    <tr class="bg-gray-700 border-b border-gray-600">
+                                        <th class="px-4 py-3 text-left text-sm font-medium text-white">Course Name</th>
+                                        <th class="px-4 py-3 text-left text-sm font-medium text-white">Rating</th>
+                                        <th class="px-4 py-3 text-left text-sm font-medium text-white">Completion %</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-600">
+                                    <tr v-for="course in kpiData.performance_analysis?.top_performing_courses || []" :key="course.id" class="table-row hover:bg-gray-700 transition-colors">
+                                        <td class="course-name px-4 py-3 text-sm text-white">{{ course.name }}</td>
+                                        <td class="rating px-4 py-3 text-sm text-white">{{ course.rating }}/5</td>
+                                        <td class="completion px-4 py-3 text-sm text-white">{{ course.completion_rate }}%</td>
+                                    </tr>
+                                    <tr v-if="!kpiData.performance_analysis?.top_performing_courses?.length">
+                                        <td colspan="3" class="no-data px-4 py-8 text-center text-gray-400">No data available</td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="performance-table bg-gray-800 border border-gray-600 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow">
+                            <h3 class="text-lg font-semibold text-white mb-2">⚠️ Courses Needing Improvement</h3>
+                            <p class="subtitle text-sm text-gray-300 mb-4">Based on dropout or low ratings</p>
+                            <div class="table-container overflow-x-auto">
+                                <table class="performance-table-content w-full">
+                                    <thead>
+                                    <tr class="bg-gray-700 border-b border-gray-600">
+                                        <th class="px-4 py-3 text-left text-sm font-medium text-white">Course Name</th>
+                                        <th class="px-4 py-3 text-left text-sm font-medium text-white">Rating</th>
+                                        <th class="px-4 py-3 text-left text-sm font-medium text-white">Issues</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-600">
+                                    <tr v-for="course in kpiData.performance_analysis?.courses_needing_improvement || []" :key="course.name" class="table-row improvement-needed hover:bg-red-900/30 transition-colors">
+                                        <td class="course-name px-4 py-3 text-sm text-white">{{ course.name }}</td>
+                                        <td class="rating low px-4 py-3 text-sm text-red-400">{{ course.rating || 'N/A' }}</td>
+                                        <td class="issues px-4 py-3">
+                                            <span v-for="issue in course.issues" :key="issue" class="issue-tag inline-block bg-red-800 text-red-200 text-xs px-2 py-1 rounded mr-1 mb-1">{{ issue }}</span>
+                                        </td>
+                                    </tr>
+                                    <tr v-if="!kpiData.performance_analysis?.courses_needing_improvement?.length">
+                                        <td colspan="3" class="no-data px-4 py-8 text-center text-gray-400">No courses needing improvement</td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 👤 SECTION 6: User Performance Analysis -->
+                <section class="kpi-section user-performance">
+                    <h2 class="section-title text-xl font-semibold text-white mb-6">👤 User Performance Analysis</h2>
+                    <div class="performance-grid grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div class="performance-table bg-gray-800 border border-gray-600 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow">
+                            <h3 class="text-lg font-semibold text-white mb-2">🌟 Top-Performing Users</h3>
+                            <p class="subtitle text-sm text-gray-300 mb-4">Based on evaluation system scores</p>
+                            <div class="table-container overflow-x-auto">
+                                <table class="performance-table-content w-full">
+                                    <thead>
+                                    <tr class="bg-gray-700 border-b border-gray-600">
+                                        <th class="px-4 py-3 text-left text-sm font-medium text-white">User Name</th>
+                                        <th class="px-4 py-3 text-left text-sm font-medium text-white">Score %</th>
+                                        <th class="px-4 py-3 text-left text-sm font-medium text-white">Courses Completed</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-600">
+                                    <tr v-for="user in kpiData.performance_analysis?.top_performing_users || []" :key="user.name" class="table-row top-performer hover:bg-green-900/30 transition-colors">
+                                        <td class="user-name px-4 py-3 text-sm text-white">{{ user.name }}</td>
+                                        <td class="score high px-4 py-3 text-sm text-green-400 font-semibold">{{ user.score }}%</td>
+                                        <td class="courses px-4 py-3 text-sm text-white">{{ user.courses_completed || 0 }}</td>
+                                    </tr>
+                                    <tr v-if="!kpiData.performance_analysis?.top_performing_users?.length">
+                                        <td colspan="3" class="no-data px-4 py-8 text-center text-gray-400">No data available</td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="performance-table bg-gray-800 border border-gray-600 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow">
+                            <h3 class="text-lg font-semibold text-white mb-2">📈 Users Needing Support</h3>
+                            <p class="subtitle text-sm text-gray-300 mb-4">Based on evaluation system scores</p>
+                            <div class="table-container overflow-x-auto">
+                                <table class="performance-table-content w-full">
+                                    <thead>
+                                    <tr class="bg-gray-700 border-b border-gray-600">
+                                        <th class="px-4 py-3 text-left text-sm font-medium text-white">User Name</th>
+                                        <th class="px-4 py-3 text-left text-sm font-medium text-white">Score %</th>
+                                        <th class="px-4 py-3 text-left text-sm font-medium text-white">Incomplete Courses</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-600">
+                                    <tr v-for="user in kpiData.performance_analysis?.low_performing_users || []" :key="user.name" class="table-row needs-support hover:bg-yellow-900/30 transition-colors">
+                                        <td class="user-name px-4 py-3 text-sm text-white">{{ user.name }}</td>
+                                        <td class="score low px-4 py-3 text-sm text-yellow-400 font-semibold">{{ user.score }}%</td>
+                                        <td class="courses px-4 py-3 text-sm text-white">{{ user.courses_incomplete || 0 }}</td>
+                                    </tr>
+                                    <tr v-if="!kpiData.performance_analysis?.low_performing_users?.length">
+                                        <td colspan="3" class="no-data px-4 py-8 text-center text-gray-400">No users needing support</td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 📈 SECTION 7: Monthly Engagement Trend -->
+                <section class="kpi-section engagement-trends">
+                    <h2 class="section-title text-xl font-semibold text-white mb-6">📈 Monthly Engagement Trend</h2>
+                    <div class="trends-display">
+                        <div class="trend-cards grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div class="trend-card current bg-gray-800 border border-blue-700 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow hover:bg-blue-900/20">
+                                <div class="trend-header flex items-center mb-4">
+                                    <span class="trend-icon text-2xl mr-3">📊</span>
+                                    <span class="trend-title text-sm font-medium text-blue-400">Current Month Engagement</span>
+                                </div>
+                                <div class="trend-value text-3xl font-bold text-blue-300">{{ kpiData.engagement_trends?.current_month_engagement || 0 }}%</div>
+                                <div class="trend-label text-sm text-gray-300 mt-2">{{ kpiData.period?.period_name || 'Current Period' }}</div>
+                            </div>
+                            <div class="trend-card previous bg-gray-800 border border-gray-600 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow hover:bg-gray-750">
+                                <div class="trend-header flex items-center mb-4">
+                                    <span class="trend-icon text-2xl mr-3">📉</span>
+                                    <span class="trend-title text-sm font-medium text-gray-300">Previous Month Engagement</span>
+                                </div>
+                                <div class="trend-value text-3xl font-bold text-gray-200">{{ kpiData.engagement_trends?.previous_month_engagement || 0 }}%</div>
+                                <div class="trend-label text-sm text-gray-300 mt-2">Previous Period</div>
+                            </div>
+                            <div class="trend-card comparison bg-gray-800 border border-gray-600 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow hover:bg-gray-750">
+                                <div class="trend-header flex items-center mb-4">
+                                    <span class="trend-icon text-2xl mr-3">🔄</span>
+                                    <span class="trend-title text-sm font-medium text-gray-300">Trend Direction</span>
+                                </div>
+                                <div class="trend-value text-2xl font-bold flex items-center" :class="getTrendClass(kpiData.engagement_trends?.trend_direction)">
+                                    <span class="trend-arrow mr-2">{{ getTrendArrow(kpiData.engagement_trends?.trend_direction) }}</span>
+                                    {{ kpiData.engagement_trends?.trend_direction || 'stable' }}
+                                </div>
+                                <div class="trend-percentage text-sm text-gray-300 mt-2">{{ kpiData.engagement_trends?.trend_percentage || 0 }}% change</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
             </div>
         </div>
-
-        <!-- Loading Overlay -->
-        <div v-if="loading" class="loading-overlay">
-            <div class="loading-spinner">
-                <div class="spinner"></div>
-                <p>Loading KPI Data...</p>
-            </div>
-        </div>
-
-        <!-- 🎯 ORIGINAL DASHBOARD CONTENT -->
-        <div v-else class="dashboard-content">
-            <!-- 📊 SECTION 1: Training Delivery Overview -->
-            <section class="kpi-section delivery-overview">
-                <h2 class="section-title">📊 Training Delivery Overview</h2>
-                <div class="kpi-grid">
-                    <div class="kpi-card">
-                        <div class="kpi-header">
-                            <span class="kpi-icon">📚</span>
-                            <span class="kpi-title">Courses Delivered</span>
-                        </div>
-                        <div class="kpi-value">{{ kpiData.delivery_overview?.courses_delivered || 0 }}</div>
-                    </div>
-                    <div class="kpi-card">
-                        <div class="kpi-header">
-                            <span class="kpi-icon">👥</span>
-                            <span class="kpi-title">Total Enrolled</span>
-                        </div>
-                        <div class="kpi-value">{{ kpiData.delivery_overview?.total_enrolled || 0 }}</div>
-                    </div>
-                    <div class="kpi-card">
-                        <div class="kpi-header">
-                            <span class="kpi-icon">🎯</span>
-                            <span class="kpi-title">Active Participants</span>
-                        </div>
-                        <div class="kpi-value">{{ kpiData.delivery_overview?.active_participants || 0 }}</div>
-                    </div>
-                    <div class="kpi-card">
-                        <div class="kpi-header">
-                            <span class="kpi-icon">✅</span>
-                            <span class="kpi-title">Completion Rate</span>
-                        </div>
-                        <div class="kpi-value">{{ kpiData.delivery_overview?.completion_rate || 0 }}%</div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- 🎯 SECTION 2: Attendance & Engagement -->
-            <section class="kpi-section attendance-engagement">
-                <h2 class="section-title">🎯 Attendance & Engagement</h2>
-                <div class="kpi-grid">
-                    <div class="kpi-card">
-                        <div class="kpi-header">
-                            <span class="kpi-icon">📋</span>
-                            <span class="kpi-title">Attendance Rate</span>
-                        </div>
-                        <div class="kpi-value">{{ kpiData.attendance_engagement?.average_attendance_rate || 0 }}%</div>
-                    </div>
-                    <div class="kpi-card">
-                        <div class="kpi-header">
-                            <span class="kpi-icon">⏱️</span>
-                            <span class="kpi-title">Avg Time Spent</span>
-                        </div>
-                        <div class="kpi-value">{{ kpiData.attendance_engagement?.average_time_spent || 0 }}h</div>
-                    </div>
-                    <div class="kpi-card">
-                        <div class="kpi-header">
-                            <span class="kpi-icon">🕐</span>
-                            <span class="kpi-title">Clock Consistency</span>
-                        </div>
-                        <div class="kpi-value">{{ kpiData.attendance_engagement?.clocking_consistency || 0 }}%</div>
-                    </div>
-                    <div class="kpi-card">
-                        <div class="kpi-header">
-                            <span class="kpi-icon">💯</span>
-                            <span class="kpi-title">Engagement Score</span>
-                        </div>
-                        <div class="kpi-value">{{ kpiData.attendance_engagement?.engagement_score || 0 }}%</div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- 📈 SECTION 3: Learning Outcomes -->
-            <section class="kpi-section learning-outcomes">
-                <h2 class="section-title">📈 Learning Outcomes</h2>
-                <div class="kpi-grid">
-                    <div class="kpi-card success">
-                        <div class="kpi-header">
-                            <span class="kpi-icon">✅</span>
-                            <span class="kpi-title">Quiz Pass Rate</span>
-                        </div>
-                        <div class="kpi-value">{{ kpiData.learning_outcomes?.quiz_pass_rate || 0 }}%</div>
-                    </div>
-                    <div class="kpi-card danger">
-                        <div class="kpi-header">
-                            <span class="kpi-icon">❌</span>
-                            <span class="kpi-title">Quiz Fail Rate</span>
-                        </div>
-                        <div class="kpi-value">{{ kpiData.learning_outcomes?.quiz_fail_rate || 0 }}%</div>
-                    </div>
-                    <div class="kpi-card">
-                        <div class="kpi-header">
-                            <span class="kpi-icon">📊</span>
-                            <span class="kpi-title">Average Score</span>
-                        </div>
-                        <div class="kpi-value">{{ kpiData.learning_outcomes?.average_quiz_score || 0 }}%</div>
-                    </div>
-                    <div class="kpi-card">
-                        <div class="kpi-header">
-                            <span class="kpi-icon">📈</span>
-                            <span class="kpi-title">Improvement Rate</span>
-                        </div>
-                        <div class="kpi-value">{{ kpiData.learning_outcomes?.improvement_rate || 0 }}%</div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- ⭐ SECTION 4: Course Quality & Feedback -->
-            <section class="kpi-section feedback-analysis">
-                <h2 class="section-title">⭐ Course Quality & Feedback</h2>
-                <div class="feedback-grid">
-                    <div class="feedback-cards">
-                        <div class="kpi-card">
-                            <div class="kpi-header">
-                                <span class="kpi-icon">⭐</span>
-                                <span class="kpi-title">Average Rating</span>
-                            </div>
-                            <div class="kpi-value">{{ kpiData.feedback_analysis?.average_rating || 0 }}/5</div>
-                        </div>
-                        <div class="kpi-card">
-                            <div class="kpi-header">
-                                <span class="kpi-icon">💬</span>
-                                <span class="kpi-title">Total Feedback</span>
-                            </div>
-                            <div class="kpi-value">{{ kpiData.feedback_analysis?.total_feedback_count || 0 }}</div>
-                        </div>
-                    </div>
-                    <div class="feedback-sentiment">
-                        <h3>Feedback Sentiment</h3>
-                        <div class="sentiment-display">
-                            <div class="sentiment-item">
-                                <span class="sentiment-label">😊 Positive:</span>
-                                <span class="sentiment-value">{{ kpiData.feedback_analysis?.feedback_sentiment?.positive || 0 }}%</span>
-                            </div>
-                            <div class="sentiment-item">
-                                <span class="sentiment-label">😐 Neutral:</span>
-                                <span class="sentiment-value">{{ kpiData.feedback_analysis?.feedback_sentiment?.neutral || 0 }}%</span>
-                            </div>
-                            <div class="sentiment-item">
-                                <span class="sentiment-label">😞 Negative:</span>
-                                <span class="sentiment-value">{{ kpiData.feedback_analysis?.feedback_sentiment?.negative || 0 }}%</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- 🏆 SECTION 5: Course Performance Analysis -->
-            <section class="kpi-section performance-analysis">
-                <h2 class="section-title">🏆 Course Performance Analysis</h2>
-                <div class="performance-grid">
-                    <div class="performance-table">
-                        <h3>🥇 Top-Performing Courses</h3>
-                        <p class="subtitle">Based on rating & completion</p>
-                        <div class="table-container">
-                            <table class="performance-table-content">
-                                <thead>
-                                <tr>
-                                    <th>Course Name</th>
-                                    <th>Rating</th>
-                                    <th>Completion %</th>
-                                </tr>
-                                </thead>
-                                <tbody>
-                                <tr v-for="course in kpiData.performance_analysis?.top_performing_courses || []" :key="course.id" class="table-row">
-                                    <td class="course-name">{{ course.name }}</td>
-                                    <td class="rating">{{ course.rating }}/5</td>
-                                    <td class="completion">{{ course.completion_rate }}%</td>
-                                </tr>
-                                <tr v-if="!kpiData.performance_analysis?.top_performing_courses?.length">
-                                    <td colspan="3" class="no-data">No data available</td>
-                                </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    <div class="performance-table">
-                        <h3>⚠️ Courses Needing Improvement</h3>
-                        <p class="subtitle">Based on dropout or low ratings</p>
-                        <div class="table-container">
-                            <table class="performance-table-content">
-                                <thead>
-                                <tr>
-                                    <th>Course Name</th>
-                                    <th>Rating</th>
-                                    <th>Issues</th>
-                                </tr>
-                                </thead>
-                                <tbody>
-                                <tr v-for="course in kpiData.performance_analysis?.courses_needing_improvement || []" :key="course.name" class="table-row improvement-needed">
-                                    <td class="course-name">{{ course.name }}</td>
-                                    <td class="rating low">{{ course.rating || 'N/A' }}</td>
-                                    <td class="issues">
-                                        <span v-for="issue in course.issues" :key="issue" class="issue-tag">{{ issue }}</span>
-                                    </td>
-                                </tr>
-                                <tr v-if="!kpiData.performance_analysis?.courses_needing_improvement?.length">
-                                    <td colspan="3" class="no-data">No courses needing improvement</td>
-                                </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- 👤 SECTION 6: User Performance Analysis -->
-            <section class="kpi-section user-performance">
-                <h2 class="section-title">👤 User Performance Analysis</h2>
-                <div class="performance-grid">
-                    <div class="performance-table">
-                        <h3>🌟 Top-Performing Users</h3>
-                        <p class="subtitle">Based on evaluation system scores</p>
-                        <div class="table-container">
-                            <table class="performance-table-content">
-                                <thead>
-                                <tr>
-                                    <th>User Name</th>
-                                    <th>Score %</th>
-                                    <th>Courses Completed</th>
-                                </tr>
-                                </thead>
-                                <tbody>
-                                <tr v-for="user in kpiData.performance_analysis?.top_performing_users || []" :key="user.name" class="table-row top-performer">
-                                    <td class="user-name">{{ user.name }}</td>
-                                    <td class="score high">{{ user.score }}%</td>
-                                    <td class="courses">{{ user.courses_completed || 0 }}</td>
-                                </tr>
-                                <tr v-if="!kpiData.performance_analysis?.top_performing_users?.length">
-                                    <td colspan="3" class="no-data">No data available</td>
-                                </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    <div class="performance-table">
-                        <h3>📈 Users Needing Support</h3>
-                        <p class="subtitle">Based on evaluation system scores</p>
-                        <div class="table-container">
-                            <table class="performance-table-content">
-                                <thead>
-                                <tr>
-                                    <th>User Name</th>
-                                    <th>Score %</th>
-                                    <th>Incomplete Courses</th>
-                                </tr>
-                                </thead>
-                                <tbody>
-                                <tr v-for="user in kpiData.performance_analysis?.low_performing_users || []" :key="user.name" class="table-row needs-support">
-                                    <td class="user-name">{{ user.name }}</td>
-                                    <td class="score low">{{ user.score }}%</td>
-                                    <td class="courses">{{ user.courses_incomplete || 0 }}</td>
-                                </tr>
-                                <tr v-if="!kpiData.performance_analysis?.low_performing_users?.length">
-                                    <td colspan="3" class="no-data">No users needing support</td>
-                                </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- 📈 SECTION 7: Monthly Engagement Trend -->
-            <section class="kpi-section engagement-trends">
-                <h2 class="section-title">📈 Monthly Engagement Trend</h2>
-                <div class="trends-display">
-                    <div class="trend-cards">
-                        <div class="trend-card current">
-                            <div class="trend-header">
-                                <span class="trend-icon">📊</span>
-                                <span class="trend-title">Current Month Engagement</span>
-                            </div>
-                            <div class="trend-value">{{ kpiData.engagement_trends?.current_month_engagement || 0 }}%</div>
-                            <div class="trend-label">{{ kpiData.period?.period_name || 'Current Period' }}</div>
-                        </div>
-                        <div class="trend-card previous">
-                            <div class="trend-header">
-                                <span class="trend-icon">📉</span>
-                                <span class="trend-title">Previous Month Engagement</span>
-                            </div>
-                            <div class="trend-value">{{ kpiData.engagement_trends?.previous_month_engagement || 0 }}%</div>
-                            <div class="trend-label">Previous Period</div>
-                        </div>
-                        <div class="trend-card comparison">
-                            <div class="trend-header">
-                                <span class="trend-icon">🔄</span>
-                                <span class="trend-title">Trend Direction</span>
-                            </div>
-                            <div class="trend-value" :class="getTrendClass(kpiData.engagement_trends?.trend_direction)">
-                                <span class="trend-arrow">{{ getTrendArrow(kpiData.engagement_trends?.trend_direction) }}</span>
-                                {{ kpiData.engagement_trends?.trend_direction || 'stable' }}
-                            </div>
-                            <div class="trend-percentage">{{ kpiData.engagement_trends?.trend_percentage || 0 }}% change</div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-        </div>
-    </div>
+    </AdminLayout>
 </template>
 
 <script>
 import { ref, reactive, onMounted, computed } from 'vue'
 import { router } from '@inertiajs/vue3'
+import AdminLayout from '@/layouts/AdminLayout.vue';
 
 export default {
     name: 'MonthlyKpiDashboard',
+    components: { AdminLayout },
 
     props: {
         kpiData: { type: Object, required: true },
@@ -1150,19 +1154,20 @@ export default {
 
 <style scoped>
 /* =============================================== */
-/* 🎨 DASHBOARD STYLES (Keep all your existing styles) */
+/* 🎨 DASHBOARD STYLES - Updated with CSS Variables */
 /* =============================================== */
 
 .monthly-kpi-dashboard {
     min-height: 100vh;
-    background-color: #f9fafb;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
 }
 
 /* Header Styles */
 .dashboard-header {
-    background: white;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    border-bottom: 1px solid #e5e7eb;
+    background: hsl(var(--card));
+    box-shadow: 0 1px 3px hsl(var(--border) / 0.1);
+    border-bottom: 1px solid hsl(var(--border));
     position: sticky;
     top: 0;
     z-index: 40;
@@ -1180,13 +1185,13 @@ export default {
 .dashboard-title {
     font-size: 1.5rem;
     font-weight: 700;
-    color: #111827;
+    color: hsl(var(--card-foreground));
     margin: 0 0 0.25rem 0;
 }
 
 .period-display {
     font-size: 0.875rem;
-    color: #6b7280;
+    color: hsl(var(--muted-foreground));
 }
 
 .header-actions {
@@ -1197,21 +1202,21 @@ export default {
 
 .filter-btn {
     padding: 0.5rem 1rem;
-    background-color: #dbeafe;
-    color: #1d4ed8;
+    background-color: hsl(var(--secondary) / 0.1);
+    color: hsl(var(--secondary-foreground));
     border-radius: 0.5rem;
-    border: 1px solid #93c5fd;
+    border: 1px solid hsl(var(--border));
     cursor: pointer;
     transition: all 0.2s;
 }
 
 .filter-btn:hover {
-    background-color: #bfdbfe;
+    background-color: hsl(var(--secondary) / 0.2);
 }
 
 .filter-btn.active {
-    background-color: #1d4ed8;
-    color: white;
+    background-color: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
 }
 
 /* Export Buttons */
@@ -1223,7 +1228,7 @@ export default {
 .export-btn {
     padding: 0.5rem 1rem;
     border-radius: 0.5rem;
-    border: 1px solid;
+    border: 1px solid hsl(var(--border));
     cursor: pointer;
     transition: all 0.2s;
     font-size: 0.875rem;
@@ -1231,6 +1236,8 @@ export default {
     display: flex;
     align-items: center;
     gap: 0.25rem;
+    background-color: hsl(var(--card));
+    color: hsl(var(--card-foreground));
 }
 
 .export-btn:disabled {
@@ -1239,37 +1246,37 @@ export default {
 }
 
 .screenshot-btn {
-    background-color: #f3e8ff;
-    color: #7c3aed;
-    border-color: #c4b5fd;
+    background-color: hsl(var(--chart-1) / 0.1);
+    color: hsl(var(--chart-1));
+    border-color: hsl(var(--chart-1) / 0.3);
 }
 
 .screenshot-btn:hover:not(:disabled) {
-    background-color: #e9d5ff;
+    background-color: hsl(var(--chart-1) / 0.2);
 }
 
 .csv-btn {
-    background-color: #f0f9ff;
-    color: #0369a1;
-    border-color: #bae6fd;
+    background-color: hsl(var(--chart-2) / 0.1);
+    color: hsl(var(--chart-2));
+    border-color: hsl(var(--chart-2) / 0.3);
 }
 
 .csv-btn:hover:not(:disabled) {
-    background-color: #e0f2fe;
+    background-color: hsl(var(--chart-2) / 0.2);
 }
 
 .refresh-btn {
     padding: 0.5rem 1rem;
-    background-color: #f3f4f6;
-    color: #374151;
+    background-color: hsl(var(--secondary));
+    color: hsl(var(--secondary-foreground));
     border-radius: 0.5rem;
-    border: 1px solid #d1d5db;
+    border: 1px solid hsl(var(--border));
     cursor: pointer;
     transition: all 0.2s;
 }
 
 .refresh-btn:hover:not(:disabled) {
-    background-color: #e5e7eb;
+    background-color: hsl(var(--secondary) / 0.8);
 }
 
 .refresh-btn:disabled {
@@ -1279,8 +1286,8 @@ export default {
 
 /* Filter Panel */
 .filter-panel {
-    border-top: 1px solid #e5e7eb;
-    background-color: #f9fafb;
+    border-top: 1px solid hsl(var(--border));
+    background-color: hsl(var(--muted));
     padding: 1rem;
 }
 
@@ -1302,31 +1309,32 @@ export default {
     display: block;
     font-size: 0.875rem;
     font-weight: 500;
-    color: #374151;
+    color: hsl(var(--foreground));
 }
 
 .filter-group select {
     width: 100%;
     padding: 0.5rem 0.75rem;
-    border: 1px solid #d1d5db;
+    border: 1px solid hsl(var(--border));
     border-radius: 0.375rem;
-    background-color: white;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
     font-size: 0.875rem;
 }
 
 .filter-group select:focus {
     outline: none;
-    box-shadow: 0 0 0 2px #3b82f6;
-    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px hsl(var(--ring));
+    border-color: hsl(var(--ring));
 }
 
 /* Update Info */
 .update-info {
-    border-top: 1px solid #e5e7eb;
+    border-top: 1px solid hsl(var(--border));
     padding: 0.5rem 1rem;
-    background-color: #f9fafb;
+    background-color: hsl(var(--muted));
     font-size: 0.75rem;
-    color: #6b7280;
+    color: hsl(var(--muted-foreground));
     text-align: center;
     max-width: 1280px;
     margin: 0 auto;
@@ -1339,7 +1347,7 @@ export default {
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5);
+    background-color: hsl(var(--background) / 0.8);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1347,17 +1355,19 @@ export default {
 }
 
 .loading-spinner {
-    background-color: white;
+    background-color: hsl(var(--card));
     border-radius: 0.5rem;
     padding: 2rem;
     text-align: center;
+    border: 1px solid hsl(var(--border));
+    color: hsl(var(--card-foreground));
 }
 
 .spinner {
     width: 3rem;
     height: 3rem;
-    border: 2px solid #e5e7eb;
-    border-top: 2px solid #3b82f6;
+    border: 2px solid hsl(var(--muted));
+    border-top: 2px solid hsl(var(--primary));
     border-radius: 50%;
     animation: spin 1s linear infinite;
     margin: 0 auto 1rem auto;
@@ -1380,17 +1390,17 @@ export default {
 
 /* KPI Sections */
 .kpi-section {
-    background-color: white;
+    background-color: hsl(var(--card));
     border-radius: 0.75rem;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    border: 1px solid #e5e7eb;
+    box-shadow: 0 1px 3px hsl(var(--border) / 0.1);
+    border: 1px solid hsl(var(--border));
     padding: 1.5rem;
 }
 
 .section-title {
     font-size: 1.25rem;
     font-weight: 600;
-    color: #111827;
+    color: hsl(var(--card-foreground));
     margin-bottom: 1.5rem;
     display: flex;
     align-items: center;
@@ -1404,24 +1414,24 @@ export default {
 }
 
 .kpi-card {
-    background-color: white;
+    background-color: hsl(var(--card));
     border-radius: 0.5rem;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 1px 3px hsl(var(--border) / 0.1);
     padding: 1.5rem;
-    border: 1px solid #e5e7eb;
+    border: 1px solid hsl(var(--border));
     transition: all 0.2s;
 }
 
 .kpi-card:hover {
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 6px hsl(var(--border) / 0.2);
 }
 
 .kpi-card.success {
-    border-left: 4px solid #10b981;
+    border-left: 4px solid hsl(var(--chart-3));
 }
 
 .kpi-card.danger {
-    border-left: 4px solid #ef4444;
+    border-left: 4px solid hsl(var(--destructive));
 }
 
 .kpi-header {
@@ -1438,13 +1448,13 @@ export default {
 .kpi-title {
     font-size: 0.875rem;
     font-weight: 500;
-    color: #6b7280;
+    color: hsl(var(--muted-foreground));
 }
 
 .kpi-value {
     font-size: 2rem;
     font-weight: 700;
-    color: #111827;
+    color: hsl(var(--card-foreground));
     margin-bottom: 0.5rem;
 }
 
@@ -1464,7 +1474,7 @@ export default {
 .feedback-sentiment h3 {
     font-size: 1.125rem;
     font-weight: 500;
-    color: #111827;
+    color: hsl(var(--card-foreground));
     margin-bottom: 1rem;
 }
 
@@ -1479,17 +1489,19 @@ export default {
     justify-content: space-between;
     align-items: center;
     padding: 0.75rem;
-    background-color: #f9fafb;
+    background-color: hsl(var(--muted));
     border-radius: 0.375rem;
+    border: 1px solid hsl(var(--border));
 }
 
 .sentiment-label {
     font-weight: 500;
+    color: hsl(var(--foreground));
 }
 
 .sentiment-value {
     font-weight: 600;
-    color: #3b82f6;
+    color: hsl(var(--primary));
 }
 
 /* Performance Analysis */
@@ -1500,29 +1512,31 @@ export default {
 }
 
 .performance-table {
-    background-color: #f9fafb;
+    background-color: hsl(var(--muted));
     border-radius: 0.5rem;
     padding: 1rem;
+    border: 1px solid hsl(var(--border));
 }
 
 .performance-table h3 {
     font-size: 1.125rem;
     font-weight: 600;
-    color: #111827;
+    color: hsl(var(--foreground));
     margin: 0 0 0.25rem 0;
 }
 
 .subtitle {
     font-size: 0.875rem;
-    color: #6b7280;
+    color: hsl(var(--muted-foreground));
     margin: 0 0 1rem 0;
 }
 
 .table-container {
-    background-color: white;
+    background-color: hsl(var(--card));
     border-radius: 0.375rem;
     overflow: hidden;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 1px 3px hsl(var(--border) / 0.1);
+    border: 1px solid hsl(var(--border));
 }
 
 .performance-table-content {
@@ -1531,19 +1545,20 @@ export default {
 }
 
 .performance-table-content th {
-    background-color: #f3f4f6;
+    background-color: hsl(var(--muted));
     padding: 0.75rem;
     font-size: 0.875rem;
     font-weight: 600;
-    color: #374151;
+    color: hsl(var(--muted-foreground));
     text-align: left;
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: 1px solid hsl(var(--border));
 }
 
 .performance-table-content td {
     padding: 0.75rem;
     font-size: 0.875rem;
-    border-bottom: 1px solid #f3f4f6;
+    border-bottom: 1px solid hsl(var(--border));
+    color: hsl(var(--card-foreground));
 }
 
 .table-row:last-child td {
@@ -1551,53 +1566,54 @@ export default {
 }
 
 .table-row:hover {
-    background-color: #f9fafb;
+    background-color: hsl(var(--accent));
 }
 
 .course-name,
 .user-name {
     font-weight: 500;
-    color: #111827;
+    color: hsl(var(--card-foreground));
 }
 
 .rating.high,
 .score.high {
-    color: #059669;
+    color: hsl(var(--chart-3));
     font-weight: 600;
 }
 
 .rating.low,
 .score.low {
-    color: #dc2626;
+    color: hsl(var(--destructive));
     font-weight: 600;
 }
 
 .issue-tag {
     display: inline-block;
-    background-color: #fef3c7;
-    color: #92400e;
+    background-color: hsl(var(--chart-4) / 0.2);
+    color: hsl(var(--chart-4));
     padding: 0.125rem 0.5rem;
     border-radius: 0.25rem;
     font-size: 0.75rem;
     margin-right: 0.25rem;
+    border: 1px solid hsl(var(--chart-4) / 0.3);
 }
 
 .no-data {
     text-align: center;
-    color: #6b7280;
+    color: hsl(var(--muted-foreground));
     font-style: italic;
 }
 
 .top-performer {
-    background-color: #f0fdf4;
+    background-color: hsl(var(--chart-3) / 0.1);
 }
 
 .improvement-needed {
-    background-color: #fef3c7;
+    background-color: hsl(var(--chart-4) / 0.1);
 }
 
 .needs-support {
-    background-color: #fef2f2;
+    background-color: hsl(var(--destructive) / 0.1);
 }
 
 /* Engagement Trends */
@@ -1612,23 +1628,23 @@ export default {
 }
 
 .trend-card {
-    background-color: white;
+    background-color: hsl(var(--card));
     border-radius: 0.5rem;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 1px 3px hsl(var(--border) / 0.1);
     padding: 1.5rem;
-    border: 1px solid #e5e7eb;
+    border: 1px solid hsl(var(--border));
 }
 
 .trend-card.current {
-    border-left: 4px solid #3b82f6;
+    border-left: 4px solid hsl(var(--primary));
 }
 
 .trend-card.previous {
-    border-left: 4px solid #6b7280;
+    border-left: 4px solid hsl(var(--muted-foreground));
 }
 
 .trend-card.comparison {
-    border-left: 4px solid #8b5cf6;
+    border-left: 4px solid hsl(var(--chart-1));
 }
 
 .trend-header {
@@ -1645,36 +1661,36 @@ export default {
 .trend-title {
     font-size: 0.875rem;
     font-weight: 500;
-    color: #6b7280;
+    color: hsl(var(--muted-foreground));
 }
 
 .trend-value {
     font-size: 2rem;
     font-weight: 700;
-    color: #111827;
+    color: hsl(var(--card-foreground));
     margin-bottom: 0.25rem;
 }
 
 .trend-value.trend-up {
-    color: #059669;
+    color: hsl(var(--chart-3));
 }
 
 .trend-value.trend-down {
-    color: #dc2626;
+    color: hsl(var(--destructive));
 }
 
 .trend-value.trend-stable {
-    color: #6b7280;
+    color: hsl(var(--muted-foreground));
 }
 
 .trend-label {
     font-size: 0.875rem;
-    color: #6b7280;
+    color: hsl(var(--muted-foreground));
 }
 
 .trend-percentage {
     font-size: 0.875rem;
-    color: #6b7280;
+    color: hsl(var(--muted-foreground));
     margin-top: 0.25rem;
 }
 

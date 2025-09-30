@@ -1,8 +1,35 @@
+<!--
+  Create User Level Page
+  Interface for creating new organizational hierarchy levels with management permissions
+-->
 <script setup lang="ts">
 import { useForm, Link } from '@inertiajs/vue3'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import { ref } from 'vue'
 import { type BreadcrumbItemType } from '@/types/index'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Badge } from '@/components/ui/badge'
+import {
+    Save,
+    X,
+    Loader2,
+    Users,
+    Shield,
+    Eye,
+    Lightbulb
+} from 'lucide-vue-next'
 
 const props = defineProps({
     existingLevels: Array,
@@ -56,6 +83,12 @@ const generateSuggestions = () => {
     }
 }
 
+// Handle select changes
+const handleHierarchyChange = (value: string) => {
+    form.hierarchy_level = value
+    generateSuggestions()
+}
+
 // Toggle manageable level
 const toggleManageableLevel = (levelCode: string) => {
     const index = form.can_manage_levels.indexOf(levelCode)
@@ -65,6 +98,26 @@ const toggleManageableLevel = (levelCode: string) => {
         form.can_manage_levels.push(levelCode)
     }
 }
+
+// Get level color scheme
+const getLevelColorScheme = (level: number | string) => {
+    const lvl = parseInt(level.toString())
+    switch (lvl) {
+        case 1: return { bg: 'bg-blue-100', text: 'text-blue-600', border: 'border-blue-200' }
+        case 2: return { bg: 'bg-green-100', text: 'text-green-600', border: 'border-green-200' }
+        case 3: return { bg: 'bg-orange-100', text: 'text-orange-600', border: 'border-orange-200' }
+        case 4: return { bg: 'bg-red-100', text: 'text-red-600', border: 'border-red-200' }
+        default: return { bg: 'bg-purple-100', text: 'text-purple-600', border: 'border-purple-200' }
+    }
+}
+
+// Quick setup template data
+const quickSetupTemplates = [
+    { level: '1', code: 'L1', name: 'Employee Level', description: 'Front-line employees' },
+    { level: '2', code: 'L2', name: 'Manager Level', description: 'Team managers' },
+    { level: '3', code: 'L3', name: 'Senior Manager', description: 'Department heads' },
+    { level: '4', code: 'L4', name: 'Director Level', description: 'Executive level' }
+]
 
 // Breadcrumbs
 const breadcrumbs: BreadcrumbItemType[] = [
@@ -76,205 +129,210 @@ const breadcrumbs: BreadcrumbItemType[] = [
 
 <template>
     <AdminLayout :breadcrumbs="breadcrumbs">
-        <div class="px-4 sm:px-0">
-            <h1 class="text-xl sm:text-2xl font-bold mb-4">Create New User Level</h1>
+        <div class="px-4 sm:px-0 space-y-6">
+            <!-- Header -->
+            <div>
+                <h1 class="text-xl sm:text-2xl font-bold text-foreground">Create New User Level</h1>
+                <p class="text-sm text-muted-foreground mt-1">Define a new organizational hierarchy level with management permissions and responsibilities</p>
+            </div>
 
-            <form @submit.prevent="submit" class="max-w-2xl">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-6">
-                    <!-- Hierarchy Level -->
-                    <div class="col-span-1">
-                        <label class="block font-semibold mb-1">Hierarchy Level</label>
-                        <select
-                            v-model="form.hierarchy_level"
-                            @change="generateSuggestions"
-                            class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-                            :disabled="form.processing"
-                            required
-                        >
-                            <option value="">Select Level</option>
-                            <option value="1">Level 1 (Employees)</option>
-                            <option value="2">Level 2 (Managers)</option>
-                            <option value="3">Level 3 (Senior Managers)</option>
-                            <option value="4">Level 4 (Directors)</option>
-                            <option value="5">Level 5 (Executive)</option>
-                        </select>
-                        <p class="text-xs text-gray-500 mt-1">Higher numbers indicate higher authority levels</p>
-                        <div v-if="form.errors.hierarchy_level" class="text-red-600 text-sm mt-1">{{ form.errors.hierarchy_level }}</div>
-                    </div>
+            <form @submit.prevent="submit" class="max-w-4xl space-y-6">
+                <!-- Main Form Fields -->
+                <Card>
+                    <CardHeader>
+                        <CardTitle class="flex items-center">
+                            <Shield class="mr-2 h-5 w-5" />
+                            Level Configuration
+                        </CardTitle>
+                        <CardDescription>Define the basic properties and hierarchy position of this user level</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <!-- Hierarchy Level -->
+                            <div class="space-y-2">
+                                <Label for="hierarchy_level">Hierarchy Level</Label>
+                                <Select :model-value="form.hierarchy_level" @update:model-value="handleHierarchyChange">
+                                    <SelectTrigger id="hierarchy_level" :disabled="form.processing">
+                                        <SelectValue placeholder="Select Level" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="1">Level 1 (Employees)</SelectItem>
+                                        <SelectItem value="2">Level 2 (Managers)</SelectItem>
+                                        <SelectItem value="3">Level 3 (Senior Managers)</SelectItem>
+                                        <SelectItem value="4">Level 4 (Directors)</SelectItem>
+                                        <SelectItem value="5">Level 5 (Executive)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <p class="text-xs text-muted-foreground">Higher numbers indicate higher authority levels</p>
+                                <div v-if="form.errors.hierarchy_level" class="text-sm text-destructive">{{ form.errors.hierarchy_level }}</div>
+                            </div>
 
-                    <!-- Level Code -->
-                    <div class="col-span-1">
-                        <label class="block font-semibold mb-1">Level Code</label>
-                        <input
-                            type="text"
-                            v-model="form.code"
-                            class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-                            :disabled="form.processing"
-                            maxlength="10"
-                            placeholder="e.g., L1, L2, MGR"
-                            required
-                        />
-                        <p class="text-xs text-gray-500 mt-1">Short identifier (e.g., L1, L2, L3, L4)</p>
-                        <div v-if="form.errors.code" class="text-red-600 text-sm mt-1">{{ form.errors.code }}</div>
-                    </div>
-
-                    <!-- Level Name -->
-                    <div class="col-span-full">
-                        <label class="block font-semibold mb-1">Level Name</label>
-                        <input
-                            type="text"
-                            v-model="form.name"
-                            class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-                            :disabled="form.processing"
-                            placeholder="e.g., Employee, Direct Manager, Senior Manager"
-                            required
-                        />
-                        <div v-if="form.errors.name" class="text-red-600 text-sm mt-1">{{ form.errors.name }}</div>
-                    </div>
-
-                    <!-- Description -->
-                    <div class="col-span-full">
-                        <label class="block font-semibold mb-1">Description</label>
-                        <textarea
-                            v-model="form.description"
-                            rows="3"
-                            class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-                            :disabled="form.processing"
-                            placeholder="Describe the responsibilities and scope of this level"
-                        ></textarea>
-                        <div v-if="form.errors.description" class="text-red-600 text-sm mt-1">{{ form.errors.description }}</div>
-                    </div>
-
-                    <!-- Can Manage Levels -->
-                    <div class="col-span-full" v-if="availableLevels.length > 0">
-                        <label class="block font-semibold mb-2">Can Manage Levels</label>
-                        <p class="text-sm text-gray-600 mb-3">Select which levels this level can manage:</p>
-
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            <div v-for="level in availableLevels" :key="level.code" class="flex items-center">
-                                <input
-                                    :id="`manage_${level.code}`"
-                                    type="checkbox"
-                                    :value="level.code"
-                                    @change="toggleManageableLevel(level.code)"
-                                    :checked="form.can_manage_levels.includes(level.code)"
-                                    class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            <!-- Level Code -->
+                            <div class="space-y-2">
+                                <Label for="code">Level Code</Label>
+                                <Input
+                                    id="code"
+                                    v-model="form.code"
                                     :disabled="form.processing"
+                                    maxlength="10"
+                                    placeholder="e.g., L1, L2, MGR"
+                                    required
                                 />
-                                <label :for="`manage_${level.code}`" class="ml-2 block text-sm text-gray-900">
-                                    {{ level.code }} - {{ level.name }}
-                                </label>
+                                <p class="text-xs text-muted-foreground">Short identifier (e.g., L1, L2, L3, L4)</p>
+                                <div v-if="form.errors.code" class="text-sm text-destructive">{{ form.errors.code }}</div>
+                            </div>
+
+                            <!-- Level Name -->
+                            <div class="space-y-2 md:col-span-2">
+                                <Label for="name">Level Name</Label>
+                                <Input
+                                    id="name"
+                                    v-model="form.name"
+                                    :disabled="form.processing"
+                                    placeholder="e.g., Employee, Direct Manager, Senior Manager"
+                                    required
+                                />
+                                <div v-if="form.errors.name" class="text-sm text-destructive">{{ form.errors.name }}</div>
+                            </div>
+
+                            <!-- Description -->
+                            <div class="space-y-2 md:col-span-2">
+                                <Label for="description">Description</Label>
+                                <Textarea
+                                    id="description"
+                                    v-model="form.description"
+                                    :disabled="form.processing"
+                                    placeholder="Describe the responsibilities and scope of this level"
+                                    rows="3"
+                                />
+                                <div v-if="form.errors.description" class="text-sm text-destructive">{{ form.errors.description }}</div>
                             </div>
                         </div>
+                    </CardContent>
+                </Card>
 
-                        <p class="text-xs text-gray-500 mt-2">Leave empty if this level cannot manage other users</p>
-                        <div v-if="form.errors.can_manage_levels" class="text-red-600 text-sm mt-1">{{ form.errors.can_manage_levels }}</div>
-                    </div>
-                </div>
+                <!-- Management Permissions -->
+                <Card v-if="availableLevels.length > 0">
+                    <CardHeader>
+                        <CardTitle class="flex items-center">
+                            <Users class="mr-2 h-5 w-5" />
+                            Management Permissions
+                        </CardTitle>
+                        <CardDescription>Select which levels this level can manage and oversee</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div class="space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                <div v-for="level in availableLevels" :key="level.code" class="flex items-center space-x-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                                    <Checkbox
+                                        :id="`manage_${level.code}`"
+                                        :checked="form.can_manage_levels.includes(level.code)"
+                                        @update:checked="(checked) => checked ? form.can_manage_levels.push(level.code) : toggleManageableLevel(level.code)"
+                                        :disabled="form.processing"
+                                    />
+                                    <Label :for="`manage_${level.code}`" class="flex-1 cursor-pointer">
+                                        <div class="font-medium">{{ level.code }} - {{ level.name }}</div>
+                                        <div class="text-xs text-muted-foreground">Level {{ level.hierarchy_level }}</div>
+                                    </Label>
+                                </div>
+                            </div>
+
+                            <p class="text-xs text-muted-foreground">Leave empty if this level cannot manage other users</p>
+                            <div v-if="form.errors.can_manage_levels" class="text-sm text-destructive">{{ form.errors.can_manage_levels }}</div>
+                        </div>
+                    </CardContent>
+                </Card>
 
                 <!-- Preview Card -->
-                <div v-if="form.code" class="bg-gray-50 border rounded-lg p-4 mb-6">
-                    <h3 class="text-sm font-medium text-gray-900 mb-2">Preview</h3>
-                    <div class="flex items-center space-x-4">
-                        <div class="shrink-0 h-12 w-12 rounded-full flex items-center justify-center"
-                             :class="{
-                                 'bg-blue-100 text-blue-600': form.hierarchy_level == 1,
-                                 'bg-green-100 text-green-600': form.hierarchy_level == 2,
-                                 'bg-orange-100 text-orange-600': form.hierarchy_level == 3,
-                                 'bg-red-100 text-red-600': form.hierarchy_level == 4,
-                                 'bg-purple-100 text-purple-600': form.hierarchy_level >= 5,
-                             }">
-                            <span class="text-sm font-bold">{{ form.code }}</span>
-                        </div>
-                        <div class="flex-1">
-                            <div class="text-sm font-medium text-gray-900">{{ form.name || 'Level Name' }}</div>
-                            <div class="text-sm text-gray-500">Hierarchy Level {{ form.hierarchy_level || '?' }}</div>
-                            <div v-if="form.can_manage_levels.length > 0" class="text-xs text-gray-400 mt-1">
-                                Can manage: {{ form.can_manage_levels.join(', ') }}
+                <Card v-if="form.code" class="border-primary/20 bg-primary/5">
+                    <CardHeader>
+                        <CardTitle class="flex items-center">
+                            <Eye class="mr-2 h-5 w-5" />
+                            Preview
+                        </CardTitle>
+                        <CardDescription>How this level will appear in the system</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div class="flex items-center space-x-4">
+                            <div
+                                class="shrink-0 h-16 w-16 rounded-full flex items-center justify-center border-2"
+                                :class="[getLevelColorScheme(form.hierarchy_level).bg, getLevelColorScheme(form.hierarchy_level).text, getLevelColorScheme(form.hierarchy_level).border]"
+                            >
+                                <span class="text-lg font-bold">{{ form.code }}</span>
+                            </div>
+                            <div class="flex-1">
+                                <div class="text-lg font-semibold text-foreground">{{ form.name || 'Level Name' }}</div>
+                                <div class="text-sm text-muted-foreground">Hierarchy Level {{ form.hierarchy_level || '?' }}</div>
+                                <div v-if="form.description" class="text-sm text-muted-foreground mt-1">{{ form.description }}</div>
+                                <div v-if="form.can_manage_levels.length > 0" class="flex flex-wrap gap-1 mt-2">
+                                    <Badge v-for="level in form.can_manage_levels" :key="level" variant="secondary" class="text-xs">
+                                        Can manage: {{ level }}
+                                    </Badge>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
-                <div class="flex flex-col sm:flex-row gap-2 mb-4">
-                    <button
+                <!-- Action Buttons -->
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <Button
                         type="submit"
-                        class="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition w-full sm:w-auto font-medium flex items-center justify-center gap-2"
                         :disabled="form.processing"
+                        class="w-full sm:w-auto"
                     >
-                        <svg v-if="form.processing" class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
+                        <Loader2 v-if="form.processing" class="mr-2 h-4 w-4 animate-spin" />
+                        <Save v-else class="mr-2 h-4 w-4" />
                         <span v-if="form.processing">Creating Level...</span>
                         <span v-else>Create User Level</span>
-                    </button>
-                    <Link
+                    </Button>
+                    <Button
+                        :as="Link"
                         :href="route('admin.user-levels.index')"
-                        class="bg-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-400 transition w-full sm:w-auto text-center font-medium"
-                        :class="{ 'pointer-events-none opacity-50': form.processing }"
+                        variant="outline"
+                        :disabled="form.processing"
+                        class="w-full sm:w-auto"
                     >
+                        <X class="mr-2 h-4 w-4" />
                         Cancel
-                    </Link>
+                    </Button>
                 </div>
 
                 <!-- Quick Setup Templates -->
-                <div class="border-t pt-6">
-                    <h3 class="text-lg font-medium text-gray-900 mb-4">Quick Setup Templates</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="border rounded-lg p-4 hover:border-blue-300 transition-colors cursor-pointer"
-                             @click="form.hierarchy_level = '1'; generateSuggestions()">
-                            <div class="flex items-center space-x-3">
-                                <div class="h-8 w-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center">
-                                    <span class="text-xs font-bold">L1</span>
-                                </div>
-                                <div>
-                                    <div class="text-sm font-medium">Employee Level</div>
-                                    <div class="text-xs text-gray-500">Front-line employees</div>
-                                </div>
-                            </div>
+                <Card>
+                    <CardHeader>
+                        <CardTitle class="flex items-center">
+                            <Lightbulb class="mr-2 h-5 w-5" />
+                            Quick Setup Templates
+                        </CardTitle>
+                        <CardDescription>Click on a template to quickly configure common organizational levels</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <Card
+                                v-for="template in quickSetupTemplates"
+                                :key="template.level"
+                                class="cursor-pointer transition-all duration-200 hover:shadow-md hover:scale-105 border-2 hover:border-primary/50"
+                                @click="handleHierarchyChange(template.level)"
+                            >
+                                <CardContent class="p-4">
+                                    <div class="flex items-center space-x-3">
+                                        <div
+                                            class="h-10 w-10 rounded-full flex items-center justify-center text-xs font-bold"
+                                            :class="[getLevelColorScheme(template.level).bg, getLevelColorScheme(template.level).text]"
+                                        >
+                                            {{ template.code }}
+                                        </div>
+                                        <div class="flex-1">
+                                            <div class="font-medium text-sm">{{ template.name }}</div>
+                                            <div class="text-xs text-muted-foreground">{{ template.description }}</div>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
                         </div>
-
-                        <div class="border rounded-lg p-4 hover:border-blue-300 transition-colors cursor-pointer"
-                             @click="form.hierarchy_level = '2'; generateSuggestions()">
-                            <div class="flex items-center space-x-3">
-                                <div class="h-8 w-8 bg-green-100 text-green-600 rounded-full flex items-center justify-center">
-                                    <span class="text-xs font-bold">L2</span>
-                                </div>
-                                <div>
-                                    <div class="text-sm font-medium">Manager Level</div>
-                                    <div class="text-xs text-gray-500">Team managers</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="border rounded-lg p-4 hover:border-blue-300 transition-colors cursor-pointer"
-                             @click="form.hierarchy_level = '3'; generateSuggestions()">
-                            <div class="flex items-center space-x-3">
-                                <div class="h-8 w-8 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center">
-                                    <span class="text-xs font-bold">L3</span>
-                                </div>
-                                <div>
-                                    <div class="text-sm font-medium">Senior Manager</div>
-                                    <div class="text-xs text-gray-500">Department heads</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="border rounded-lg p-4 hover:border-blue-300 transition-colors cursor-pointer"
-                             @click="form.hierarchy_level = '4'; generateSuggestions()">
-                            <div class="flex items-center space-x-3">
-                                <div class="h-8 w-8 bg-red-100 text-red-600 rounded-full flex items-center justify-center">
-                                    <span class="text-xs font-bold">L4</span>
-                                </div>
-                                <div>
-                                    <div class="text-sm font-medium">Director Level</div>
-                                    <div class="text-xs text-gray-500">Executive level</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
             </form>
         </div>
     </AdminLayout>

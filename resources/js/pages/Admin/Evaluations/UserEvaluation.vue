@@ -1,10 +1,39 @@
+<!--
+  User Performance Evaluation Page
+  Assess employee performance for completed courses using predefined evaluation criteria
+-->
 <script setup lang="ts">
 import { useForm, Link, router } from '@inertiajs/vue3'
 import AdminLayout from '@/layouts/AdminLayout.vue'
-import Modal from '@/Components/Modal.vue'
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import axios from 'axios'
 import type { BreadcrumbItemType } from '@/types'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Badge } from '@/components/ui/badge'
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Progress } from '@/components/ui/progress'
+import { Separator } from '@/components/ui/separator'
+import { User, BookOpen, Calendar, TrendingUp, Award, DollarSign, CheckCircle, RotateCcw, Send, Loader2 } from 'lucide-vue-next'
 
 const props = defineProps<{
     users?: Array<{
@@ -63,6 +92,7 @@ const availableUsers = ref(safeUsers.value)
 const availableCourses = ref(safeCourses.value)
 const isLoadingUsers = ref(false)
 const isLoadingCourses = ref(false)
+const isMounted = ref(true)
 
 // Form for user evaluation
 const form = useForm({
@@ -92,24 +122,39 @@ watch(() => props.categories, () => {
     initializeFormCategories()
 }, { immediate: true })
 
+// Handle department change
+const handleDepartmentChange = (value: string) => {
+    if (!isMounted.value) return
+    form.department_id = value === 'none' ? null : parseInt(value)
+}
+
+// Handle user change
+const handleUserChange = (value: string) => {
+    if (!isMounted.value) return
+    form.user_id = value === 'none' ? null : parseInt(value)
+}
+
+// Handle course change
+const handleCourseChange = (value: string) => {
+    if (!isMounted.value) return
+    form.course_id = value === 'none' ? null : parseInt(value)
+}
+
 // FIXED: Watch department selection to filter users
 watch(() => form.department_id, async (newDepartmentId) => {
+    if (!isMounted.value) return
+
     if (newDepartmentId) {
         isLoadingUsers.value = true
         try {
-            // FIXED: Convert route to string and create clean params object
             const routeUrl = route('admin.evaluations.users-by-department')
             const params = {
                 department_id: newDepartmentId
             }
 
             console.log('Fetching users for department:', newDepartmentId)
-            console.log('Route URL:', routeUrl)
-
             const response = await axios.get(routeUrl, { params })
             availableUsers.value = response.data.users || []
-
-            console.log('Users loaded:', availableUsers.value.length)
         } catch (error) {
             console.error('Error fetching users by department:', error)
             availableUsers.value = []
@@ -128,25 +173,20 @@ watch(() => form.department_id, async (newDepartmentId) => {
 
 // FIXED: Watch user selection to filter courses
 watch(() => form.user_id, async (newUserId) => {
+    if (!isMounted.value) return
+
     if (newUserId) {
         isLoadingCourses.value = true
         try {
-            // FIXED: Convert route to string and create clean params object
             const routeUrl = route('admin.evaluations.user-courses')
             const params = {
                 user_id: newUserId
             }
 
-            console.log('Fetching courses for user:', newUserId)
-            console.log('Route URL:', routeUrl)
-
             const response = await axios.get(routeUrl, { params })
             availableCourses.value = response.data.courses || []
-
-            console.log('Courses loaded:', availableCourses.value.length)
         } catch (error) {
             console.error('Error fetching user courses:', error)
-            // Fallback to user's completed courses from props
             const selectedUser = availableUsers.value.find(u => u.id === newUserId)
             availableCourses.value = selectedUser?.completed_courses || []
         } finally {
@@ -248,23 +288,33 @@ const getTierName = (minScore: number, maxScore: number) => {
 
 // Get performance level based on score
 const getPerformanceLevel = (score: number) => {
-    if (score >= 13) return { label: 'Excellent', class: 'text-emerald-700 bg-emerald-100 border-emerald-200' }
-    if (score >= 10) return { label: 'Good', class: 'text-green-700 bg-green-100 border-green-200' }
-    if (score >= 7) return { label: 'Average', class: 'text-blue-700 bg-blue-100 border-blue-200' }
-    if (score >= 4) return { label: 'Below Average', class: 'text-yellow-700 bg-yellow-100 border-yellow-200' }
-    if (score >= 1) return { label: 'Poor', class: 'text-red-700 bg-red-100 border-red-200' }
-    return { label: 'No Score', class: 'text-gray-700 bg-gray-100 border-gray-200' }
+    if (score >= 13) return { label: 'Excellent', variant: 'default' }
+    if (score >= 10) return { label: 'Good', variant: 'secondary' }
+    if (score >= 7) return { label: 'Average', variant: 'outline' }
+    if (score >= 4) return { label: 'Below Average', variant: 'secondary' }
+    if (score >= 1) return { label: 'Poor', variant: 'destructive' }
+    return { label: 'No Score', variant: 'secondary' }
 }
 
 // Get type color based on score value
-const getTypeColor = (scoreValue: number, maxScore: number) => {
+const getTypeVariant = (scoreValue: number, maxScore: number) => {
     const percentage = (scoreValue / maxScore) * 100
-    if (percentage >= 90) return 'bg-emerald-100 text-emerald-800 border-emerald-200'
-    if (percentage >= 80) return 'bg-green-100 text-green-800 border-green-200'
-    if (percentage >= 70) return 'bg-blue-100 text-blue-800 border-blue-200'
-    if (percentage >= 60) return 'bg-yellow-100 text-yellow-800 border-yellow-200'
-    if (percentage >= 40) return 'bg-orange-100 text-orange-800 border-orange-200'
-    return 'bg-red-100 text-red-800 border-red-200'
+    if (percentage >= 90) return 'default'
+    if (percentage >= 80) return 'secondary'
+    if (percentage >= 70) return 'outline'
+    if (percentage >= 60) return 'secondary'
+    return 'destructive'
+}
+
+// Handle evaluation type change
+const handleEvaluationTypeChange = (categoryId: number, typeId: string) => {
+    if (!isMounted.value) return
+
+    const categoryIndex = form.categories.findIndex(cat => cat.category_id === categoryId)
+    if (categoryIndex !== -1) {
+        form.categories[categoryIndex].evaluation_type_id = parseInt(typeId)
+        validateForm()
+    }
 }
 
 // Validate form
@@ -287,6 +337,8 @@ function submit() {
 }
 
 function confirmSubmit() {
+    if (!isMounted.value) return
+
     form.post(route('admin.evaluations.user-evaluation.store'), {
         onSuccess: () => {
             showSubmitModal.value = false
@@ -304,6 +356,8 @@ function confirmSubmit() {
 
 // Reset form
 function resetForm() {
+    if (!isMounted.value) return
+
     form.reset()
     availableUsers.value = safeUsers.value
     availableCourses.value = safeCourses.value
@@ -316,588 +370,483 @@ const breadcrumbs: BreadcrumbItemType[] = [
     { name: 'Evaluations', href: route('admin.evaluations.index') },
     { name: 'User Evaluation', href: null }
 ]
+
+// Cleanup on unmount
+onUnmounted(() => {
+    isMounted.value = false
+})
 </script>
 
 <template>
     <AdminLayout :breadcrumbs="breadcrumbs">
-        <div class="mx-auto max-w-7xl py-8 px-4 sm:px-6 lg:px-8">
+        <div class="mx-auto max-w-7xl py-8 px-4 sm:px-6 lg:px-8 space-y-8">
             <!-- Header -->
-            <div class="mb-8">
+            <div>
                 <div class="flex items-center justify-between">
                     <div>
-                        <h1 class="text-3xl font-bold text-gray-900">User Performance Evaluation</h1>
-                        <p class="mt-2 text-sm text-gray-600">Assess employee performance for completed courses using predefined evaluation criteria.</p>
+                        <h1 class="text-3xl font-bold text-foreground">User Performance Evaluation</h1>
+                        <p class="mt-2 text-sm text-muted-foreground">Assess employee performance for completed courses using predefined evaluation criteria.</p>
                     </div>
-                    <Link
-                        :href="route('admin.evaluations.index')"
-                        class="inline-flex items-center rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors duration-200 hover:bg-gray-200"
-                    >
-                        <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                        </svg>
+                    <Button :as="Link" :href="route('admin.evaluations.index')" variant="outline">
+                        <RotateCcw class="mr-2 h-4 w-4" />
                         Back to Evaluations
-                    </Link>
+                    </Button>
                 </div>
             </div>
 
             <form @submit.prevent="submit" class="space-y-8">
                 <!-- User Selection Section -->
-                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                    <div class="flex items-center mb-6">
-                        <div class="shrink-0">
-                            <div class="flex items-center justify-center h-10 w-10 rounded-lg bg-blue-100">
-                                <svg class="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                </svg>
-                            </div>
-                        </div>
-                        <div class="ml-4">
-                            <h2 class="text-xl font-semibold text-gray-900">Select Department, Employee & Course</h2>
-                            <p class="text-sm text-gray-600">Choose department first, then employee, and finally their completed course</p>
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-                        <!-- Department Selection -->
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">
-                                Select Department
-                            </label>
-                            <select
-                                v-model="form.department_id"
-                                class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm transition-colors duration-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500"
-                                :disabled="form.processing"
-                            >
-                                <option :value="null">All Departments</option>
-                                <option v-for="dept in safeDepartments" :key="dept.id" :value="dept.id">
-                                    {{ dept.name }}
-                                </option>
-                            </select>
-                            <p class="mt-1 text-xs text-gray-500">
-                                Filter employees by department
-                            </p>
-                        </div>
-
-                        <!-- User Selection -->
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">
-                                Select Employee <span class="text-red-500">*</span>
-                            </label>
-                            <div class="relative">
-                                <select
-                                    v-model="form.user_id"
-                                    class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm transition-colors duration-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500"
-                                    :disabled="form.processing || isLoadingUsers"
-                                    required
-                                    @change="validateForm"
-                                >
-                                    <option :value="null">
-                                        {{ isLoadingUsers ? 'Loading users...' : 'Choose an employee...' }}
-                                    </option>
-                                    <option v-for="user in availableUsers" :key="user.id" :value="user.id">
-                                        {{ user.name }}
-                                        {{ user.department ? `(${user.department.name})` : '' }}
-                                    </option>
-                                </select>
-                                <div v-if="isLoadingUsers" class="absolute right-3 top-2.5">
-                                    <svg class="animate-spin h-4 w-4 text-indigo-600" fill="none" viewBox="0 0 24 24">
-                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                                    </svg>
+                <Card>
+                    <CardHeader>
+                        <div class="flex items-center">
+                            <div class="shrink-0 mr-4">
+                                <div class="flex items-center justify-center h-10 w-10 rounded-lg bg-primary/10">
+                                    <User class="h-6 w-6 text-primary" />
                                 </div>
                             </div>
-                            <p v-if="!form.department_id" class="mt-1 text-xs text-gray-500">
-                                Showing all employees
-                            </p>
-                            <p v-else-if="availableUsers.length === 0 && !isLoadingUsers" class="mt-1 text-xs text-yellow-600">
-                                No employees found in this department
-                            </p>
-                            <span v-if="form.errors.user_id" class="mt-1 flex items-center text-sm text-red-600">
-                                {{ form.errors.user_id }}
-                            </span>
+                            <div>
+                                <CardTitle>Select Department, Employee & Course</CardTitle>
+                                <CardDescription>Choose department first, then employee, and finally their completed course</CardDescription>
+                            </div>
                         </div>
-
-                        <!-- Course Selection -->
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">
-                                Select Completed Course <span class="text-red-500">*</span>
-                            </label>
-                            <div class="relative">
-                                <select
-                                    v-model="form.course_id"
-                                    class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm transition-colors duration-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500"
-                                    :disabled="form.processing || !form.user_id || isLoadingCourses"
-                                    required
-                                    @change="validateForm"
+                    </CardHeader>
+                    <CardContent>
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                            <!-- Department Selection -->
+                            <div class="space-y-2">
+                                <Label for="department">Select Department</Label>
+                                <Select
+                                    :model-value="form.department_id?.toString() || 'none'"
+                                    @update:model-value="handleDepartmentChange"
+                                    :disabled="form.processing"
                                 >
-                                    <option :value="null">
-                                        {{
-                                            !form.user_id ? 'Select employee first...' :
-                                                isLoadingCourses ? 'Loading courses...' :
-                                                    'Choose a completed course...'
-                                        }}
-                                    </option>
-                                    <option v-for="course in availableCourses" :key="course.id" :value="course.id">
-                                        {{ course.title }}
-                                    </option>
-                                </select>
-                                <div v-if="isLoadingCourses" class="absolute right-3 top-2.5">
-                                    <svg class="animate-spin h-4 w-4 text-indigo-600" fill="none" viewBox="0 0 24 24">
-                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 818-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                                    </svg>
+                                    <SelectTrigger id="department">
+                                        <SelectValue placeholder="All Departments" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">All Departments</SelectItem>
+                                        <SelectItem v-for="dept in safeDepartments" :key="dept.id" :value="dept.id.toString()">
+                                            {{ dept.name }}
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <p class="text-xs text-muted-foreground">Filter employees by department</p>
+                            </div>
+
+                            <!-- User Selection -->
+                            <div class="space-y-2">
+                                <Label for="user">Select Employee *</Label>
+                                <div class="relative">
+                                    <Select
+                                        :model-value="form.user_id?.toString() || 'none'"
+                                        @update:model-value="handleUserChange"
+                                        :disabled="form.processing || isLoadingUsers"
+                                    >
+                                        <SelectTrigger id="user">
+                                            <SelectValue :placeholder="isLoadingUsers ? 'Loading users...' : 'Choose an employee...'" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="none">
+                                                {{ isLoadingUsers ? 'Loading users...' : 'Choose an employee...' }}
+                                            </SelectItem>
+                                            <SelectItem v-for="user in availableUsers" :key="user.id" :value="user.id.toString()">
+                                                {{ user.name }}
+                                                {{ user.department ? `(${user.department.name})` : '' }}
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <div v-if="isLoadingUsers" class="absolute right-8 top-2.5">
+                                        <Loader2 class="h-4 w-4 animate-spin text-primary" />
+                                    </div>
                                 </div>
+                                <p v-if="!form.department_id" class="text-xs text-muted-foreground">Showing all employees</p>
+                                <p v-else-if="availableUsers.length === 0 && !isLoadingUsers" class="text-xs text-destructive">No employees found in this department</p>
+                                <span v-if="form.errors.user_id" class="text-sm text-destructive">{{ form.errors.user_id }}</span>
                             </div>
-                            <p v-if="!form.user_id" class="mt-1 text-xs text-gray-500">
-                                Select an employee to see their completed courses
-                            </p>
-                            <p v-else-if="availableCourses.length === 0 && !isLoadingCourses" class="mt-1 text-xs text-yellow-600">
-                                This employee hasn't completed any courses yet
-                            </p>
-                            <span v-if="form.errors.course_id" class="mt-1 flex items-center text-sm text-red-600">
-                                {{ form.errors.course_id }}
-                            </span>
+
+                            <!-- Course Selection -->
+                            <div class="space-y-2">
+                                <Label for="course">Select Completed Course *</Label>
+                                <div class="relative">
+                                    <Select
+                                        :model-value="form.course_id?.toString() || 'none'"
+                                        @update:model-value="handleCourseChange"
+                                        :disabled="form.processing || !form.user_id || isLoadingCourses"
+                                    >
+                                        <SelectTrigger id="course">
+                                            <SelectValue :placeholder="!form.user_id ? 'Select employee first...' : isLoadingCourses ? 'Loading courses...' : 'Choose a completed course...'" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="none">
+                                                {{
+                                                    !form.user_id ? 'Select employee first...' :
+                                                        isLoadingCourses ? 'Loading courses...' :
+                                                            'Choose a completed course...'
+                                                }}
+                                            </SelectItem>
+                                            <SelectItem v-for="course in availableCourses" :key="course.id" :value="course.id.toString()">
+                                                {{ course.title }}
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <div v-if="isLoadingCourses" class="absolute right-8 top-2.5">
+                                        <Loader2 class="h-4 w-4 animate-spin text-primary" />
+                                    </div>
+                                </div>
+                                <p v-if="!form.user_id" class="text-xs text-muted-foreground">Select an employee to see their completed courses</p>
+                                <p v-else-if="availableCourses.length === 0 && !isLoadingCourses" class="text-xs text-destructive">This employee hasn't completed any courses yet</p>
+                                <span v-if="form.errors.course_id" class="text-sm text-destructive">{{ form.errors.course_id }}</span>
+                            </div>
+
+                            <!-- Evaluation Date -->
+                            <div class="space-y-2">
+                                <Label for="date">Evaluation Date *</Label>
+                                <Input
+                                    id="date"
+                                    type="date"
+                                    v-model="form.evaluation_date"
+                                    :disabled="form.processing"
+                                    required
+                                />
+                                <span v-if="form.errors.evaluation_date" class="text-sm text-destructive">{{ form.errors.evaluation_date }}</span>
+                            </div>
                         </div>
 
-                        <!-- Evaluation Date -->
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">
-                                Evaluation Date <span class="text-red-500">*</span>
-                            </label>
-                            <input
-                                type="date"
-                                v-model="form.evaluation_date"
-                                class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm transition-colors duration-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500"
-                                :disabled="form.processing"
-                                required
-                            />
-                            <span v-if="form.errors.evaluation_date" class="mt-1 flex items-center text-sm text-red-600">
-                                {{ form.errors.evaluation_date }}
-                            </span>
-                        </div>
-                    </div>
-
-                    <!-- Selected User and Course Info -->
-                    <div v-if="selectedUser && selectedCourse" class="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                        <h3 class="font-medium text-blue-900 mb-3 flex items-center">
-                            <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            Evaluation Details
-                        </h3>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 text-sm">
-                            <div>
-                                <span class="font-medium text-blue-900">Employee:</span>
-                                <p class="text-blue-800">{{ selectedUser.name }}</p>
-                            </div>
-                            <div>
-                                <span class="font-medium text-blue-900">Course:</span>
-                                <p class="text-blue-800">{{ selectedCourse.title }}</p>
-                            </div>
-                            <div v-if="selectedCourse.completed_at">
-                                <span class="font-medium text-blue-900">Completed:</span>
-                                <p class="text-blue-800">{{ new Date(selectedCourse.completed_at).toLocaleDateString() }}</p>
-                            </div>
-                            <div v-if="selectedUser.department">
-                                <span class="font-medium text-blue-900">Department:</span>
-                                <p class="text-blue-800">{{ selectedUser.department.name }}</p>
-                            </div>
-                            <div>
-                                <span class="font-medium text-blue-900">Email:</span>
-                                <p class="text-blue-800">{{ selectedUser.email }}</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                        <!-- Selected User and Course Info -->
+                        <Alert v-if="selectedUser && selectedCourse" class="mt-6">
+                            <CheckCircle class="h-4 w-4" />
+                            <AlertDescription>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 text-sm">
+                                    <div>
+                                        <span class="font-medium">Employee:</span>
+                                        <p>{{ selectedUser.name }}</p>
+                                    </div>
+                                    <div>
+                                        <span class="font-medium">Course:</span>
+                                        <p>{{ selectedCourse.title }}</p>
+                                    </div>
+                                    <div v-if="selectedCourse.completed_at">
+                                        <span class="font-medium">Completed:</span>
+                                        <p>{{ new Date(selectedCourse.completed_at).toLocaleDateString() }}</p>
+                                    </div>
+                                    <div v-if="selectedUser.department">
+                                        <span class="font-medium">Department:</span>
+                                        <p>{{ selectedUser.department.name }}</p>
+                                    </div>
+                                    <div>
+                                        <span class="font-medium">Email:</span>
+                                        <p>{{ selectedUser.email }}</p>
+                                    </div>
+                                </div>
+                            </AlertDescription>
+                        </Alert>
+                    </CardContent>
+                </Card>
 
                 <!-- Evaluation Categories -->
                 <div v-if="form.user_id && form.course_id && safeCategories.length > 0" class="space-y-6">
                     <div class="flex items-center justify-between">
-                        <h2 class="text-xl font-semibold text-gray-900">Evaluation Categories</h2>
-                        <span class="text-sm text-gray-500">{{ safeCategories.length }} categories</span>
+                        <h2 class="text-xl font-semibold text-foreground">Evaluation Categories</h2>
+                        <Badge variant="secondary">{{ safeCategories.length }} categories</Badge>
                     </div>
 
                     <div class="grid gap-6">
-                        <div
+                        <Card
                             v-for="(evalCategory, index) in form.categories"
                             :key="evalCategory.category_id"
-                            class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200"
+                            class="hover:shadow-md transition-shadow duration-200"
                         >
-                            <div class="flex items-start justify-between mb-6">
-                                <div class="flex-1">
-                                    <div class="flex items-center space-x-3 mb-2">
-                                        <h3 class="text-lg font-semibold text-gray-900">
-                                            {{ safeCategories.find(cat => cat.id === evalCategory.category_id)?.name || 'Category' }}
-                                        </h3>
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
-                                            {{ safeCategories.find(cat => cat.id === evalCategory.category_id)?.weight || 0 }}% weight
-                                        </span>
+                            <CardHeader>
+                                <div class="flex items-start justify-between">
+                                    <div class="flex-1">
+                                        <div class="flex items-center space-x-3 mb-2">
+                                            <CardTitle class="text-lg">
+                                                {{ safeCategories.find(cat => cat.id === evalCategory.category_id)?.name || 'Category' }}
+                                            </CardTitle>
+                                            <Badge variant="outline">
+                                                {{ safeCategories.find(cat => cat.id === evalCategory.category_id)?.weight || 0 }}% weight
+                                            </Badge>
+                                        </div>
+                                        <CardDescription>
+                                            {{ safeCategories.find(cat => cat.id === evalCategory.category_id)?.description || 'No description available' }}
+                                        </CardDescription>
                                     </div>
-                                    <p class="text-sm text-gray-600">
-                                        {{ safeCategories.find(cat => cat.id === evalCategory.category_id)?.description || 'No description available' }}
-                                    </p>
-                                </div>
 
-                                <!-- Score Display -->
-                                <div v-if="getSelectedEvaluationType(evalCategory.category_id, evalCategory.evaluation_type_id)" class="text-right">
-                                    <div class="text-2xl font-bold text-gray-900">
-                                        {{ getSelectedEvaluationType(evalCategory.category_id, evalCategory.evaluation_type_id)?.score_value }}
-                                    </div>
-                                    <div class="text-xs text-gray-500">
-                                        out of {{ safeCategories.find(cat => cat.id === evalCategory.category_id)?.max_score }}
+                                    <!-- Score Display -->
+                                    <div v-if="getSelectedEvaluationType(evalCategory.category_id, evalCategory.evaluation_type_id)" class="text-right">
+                                        <div class="text-2xl font-bold text-foreground">
+                                            {{ getSelectedEvaluationType(evalCategory.category_id, evalCategory.evaluation_type_id)?.score_value }}
+                                        </div>
+                                        <div class="text-xs text-muted-foreground">
+                                            out of {{ safeCategories.find(cat => cat.id === evalCategory.category_id)?.max_score }}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-
-                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                <!-- Evaluation Type Selection -->
-                                <div class="space-y-4">
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-700 mb-3">
-                                            Select Performance Level
-                                        </label>
-                                        <div class="space-y-2">
+                            </CardHeader>
+                            <CardContent>
+                                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    <!-- Evaluation Type Selection -->
+                                    <div class="space-y-4">
+                                        <Label class="text-sm font-medium">Select Performance Level</Label>
+                                        <RadioGroup
+                                            :model-value="evalCategory.evaluation_type_id?.toString() || ''"
+                                            @update:model-value="(value) => handleEvaluationTypeChange(evalCategory.category_id, value)"
+                                            class="space-y-2"
+                                        >
                                             <div
                                                 v-for="type in safeCategories.find(cat => cat.id === evalCategory.category_id)?.types || []"
                                                 :key="type.id"
-                                                class="relative"
+                                                class="flex items-center space-x-3 p-4 border rounded-lg hover:bg-accent/50 transition-colors"
+                                                :class="{ 'border-primary bg-primary/5': evalCategory.evaluation_type_id === type.id }"
                                             >
-                                                <input
-                                                    :id="`type_${evalCategory.category_id}_${type.id}`"
-                                                    v-model="evalCategory.evaluation_type_id"
-                                                    :value="type.id"
-                                                    type="radio"
-                                                    :name="`category_${evalCategory.category_id}`"
-                                                    class="sr-only"
-                                                    @change="validateForm"
-                                                />
-                                                <label
-                                                    :for="`type_${evalCategory.category_id}_${type.id}`"
-                                                    class="flex items-center justify-between p-4 border rounded-lg cursor-pointer transition-all duration-200 hover:bg-gray-50"
-                                                    :class="{
-                                                        'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200': evalCategory.evaluation_type_id === type.id,
-                                                        'border-gray-200': evalCategory.evaluation_type_id !== type.id
-                                                    }"
-                                                >
-                                                    <div class="flex items-center space-x-3">
-                                                        <div class="shrink-0">
-                                                            <div
-                                                                class="w-4 h-4 rounded-full border-2 flex items-center justify-center"
-                                                                :class="{
-                                                                    'border-indigo-500 bg-indigo-500': evalCategory.evaluation_type_id === type.id,
-                                                                    'border-gray-300': evalCategory.evaluation_type_id !== type.id
-                                                                }"
-                                                            >
-                                                                <div v-if="evalCategory.evaluation_type_id === type.id" class="w-2 h-2 bg-white rounded-full"></div>
-                                                            </div>
-                                                        </div>
-                                                        <div>
-                                                            <p class="font-medium text-gray-900">{{ type.type_name }}</p>
-                                                            <p class="text-sm text-gray-600">{{ type.description }}</p>
-                                                        </div>
+                                                <RadioGroupItem :value="type.id.toString()" :id="`type_${evalCategory.category_id}_${type.id}`" />
+                                                <div class="flex-1 flex items-center justify-between">
+                                                    <div>
+                                                        <Label :for="`type_${evalCategory.category_id}_${type.id}`" class="font-medium cursor-pointer">
+                                                            {{ type.type_name }}
+                                                        </Label>
+                                                        <p class="text-sm text-muted-foreground">{{ type.description }}</p>
                                                     </div>
-                                                    <div class="flex items-center space-x-2">
-                                                        <span
-                                                            class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border"
-                                                            :class="getTypeColor(type.score_value, safeCategories.find(cat => cat.id === evalCategory.category_id)?.max_score || 100)"
-                                                        >
-                                                            {{ type.score_value }} pts
-                                                        </span>
-                                                    </div>
-                                                </label>
+                                                    <Badge :variant="getTypeVariant(type.score_value, safeCategories.find(cat => cat.id === evalCategory.category_id)?.max_score || 100)">
+                                                        {{ type.score_value }} pts
+                                                    </Badge>
+                                                </div>
                                             </div>
-                                        </div>
-                                        <span v-if="form.errors[`categories.${index}.evaluation_type_id`]" class="mt-2 flex items-center text-sm text-red-600">
-                                            <svg class="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                            </svg>
+                                        </RadioGroup>
+                                        <span v-if="form.errors[`categories.${index}.evaluation_type_id`]" class="text-sm text-destructive">
                                             {{ form.errors[`categories.${index}.evaluation_type_id`] }}
                                         </span>
                                     </div>
-                                </div>
 
-                                <!-- Selected Performance Info -->
-                                <div v-if="getSelectedEvaluationType(evalCategory.category_id, evalCategory.evaluation_type_id)" class="space-y-4">
-                                    <div class="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                                        <h4 class="font-medium text-gray-900 mb-3 flex items-center">
-                                            <svg class="mr-2 h-4 w-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                            </svg>
-                                            Selected Performance Level
-                                        </h4>
-                                        <div class="space-y-3">
-                                            <div class="flex items-center justify-between">
-                                                <span class="text-sm font-medium text-gray-700">Performance:</span>
-                                                <span
-                                                    class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                                                    :class="getPerformanceLevel(getSelectedEvaluationType(evalCategory.category_id, evalCategory.evaluation_type_id)?.score_value || 0).class"
-                                                >
-                                                    {{ getSelectedEvaluationType(evalCategory.category_id, evalCategory.evaluation_type_id)?.type_name }}
-                                                </span>
-                                            </div>
-                                            <div class="flex items-center justify-between">
-                                                <span class="text-sm font-medium text-gray-700">Score:</span>
-                                                <span class="text-sm font-bold text-gray-900">
-                                                    {{ getSelectedEvaluationType(evalCategory.category_id, evalCategory.evaluation_type_id)?.score_value }} /
-                                                    {{ safeCategories.find(cat => cat.id === evalCategory.category_id)?.max_score }}
-                                                </span>
-                                            </div>
-
-                                            <!-- Score Bar -->
-                                            <div class="w-full bg-gray-200 rounded-full h-2">
-                                                <div
-                                                    class="h-2 rounded-full transition-all duration-300"
-                                                    :class="{
-                                                        'bg-emerald-500': (getSelectedEvaluationType(evalCategory.category_id, evalCategory.evaluation_type_id)?.score_value || 0) >= 90,
-                                                        'bg-green-500': (getSelectedEvaluationType(evalCategory.category_id, evalCategory.evaluation_type_id)?.score_value || 0) >= 80 && (getSelectedEvaluationType(evalCategory.category_id, evalCategory.evaluation_type_id)?.score_value || 0) < 90,
-                                                        'bg-blue-500': (getSelectedEvaluationType(evalCategory.category_id, evalCategory.evaluation_type_id)?.score_value || 0) >= 70 && (getSelectedEvaluationType(evalCategory.category_id, evalCategory.evaluation_type_id)?.score_value || 0) < 80,
-                                                        'bg-yellow-500': (getSelectedEvaluationType(evalCategory.category_id, evalCategory.evaluation_type_id)?.score_value || 0) >= 60 && (getSelectedEvaluationType(evalCategory.category_id, evalCategory.evaluation_type_id)?.score_value || 0) < 70,
-                                                        'bg-orange-500': (getSelectedEvaluationType(evalCategory.category_id, evalCategory.evaluation_type_id)?.score_value || 0) >= 40 && (getSelectedEvaluationType(evalCategory.category_id, evalCategory.evaluation_type_id)?.score_value || 0) < 60,
-                                                        'bg-red-500': (getSelectedEvaluationType(evalCategory.category_id, evalCategory.evaluation_type_id)?.score_value || 0) < 40
-                                                    }"
-                                                    :style="`width: ${Math.round(((getSelectedEvaluationType(evalCategory.category_id, evalCategory.evaluation_type_id)?.score_value || 0) / (safeCategories.find(cat => cat.id === evalCategory.category_id)?.max_score || 100)) * 100)}%`"
-                                                ></div>
-                                            </div>
-                                        </div>
+                                    <!-- Selected Performance Info -->
+                                    <div v-if="getSelectedEvaluationType(evalCategory.category_id, evalCategory.evaluation_type_id)" class="space-y-4">
+                                        <Alert>
+                                            <TrendingUp class="h-4 w-4" />
+                                            <AlertDescription>
+                                                <h4 class="font-medium mb-3">Selected Performance Level</h4>
+                                                <div class="space-y-3">
+                                                    <div class="flex items-center justify-between">
+                                                        <span class="text-sm font-medium">Performance:</span>
+                                                        <Badge :variant="getPerformanceLevel(getSelectedEvaluationType(evalCategory.category_id, evalCategory.evaluation_type_id)?.score_value || 0).variant">
+                                                            {{ getSelectedEvaluationType(evalCategory.category_id, evalCategory.evaluation_type_id)?.type_name }}
+                                                        </Badge>
+                                                    </div>
+                                                    <div class="flex items-center justify-between">
+                                                        <span class="text-sm font-medium">Score:</span>
+                                                        <span class="text-sm font-bold">
+                                                            {{ getSelectedEvaluationType(evalCategory.category_id, evalCategory.evaluation_type_id)?.score_value }} /
+                                                            {{ safeCategories.find(cat => cat.id === evalCategory.category_id)?.max_score }}
+                                                        </span>
+                                                    </div>
+                                                    <!-- Score Progress Bar -->
+                                                    <Progress
+                                                        :value="Math.round(((getSelectedEvaluationType(evalCategory.category_id, evalCategory.evaluation_type_id)?.score_value || 0) / (safeCategories.find(cat => cat.id === evalCategory.category_id)?.max_score || 100)) * 100)"
+                                                        class="h-2"
+                                                    />
+                                                </div>
+                                            </AlertDescription>
+                                        </Alert>
                                     </div>
                                 </div>
-                            </div>
 
-                            <!-- Comments Section -->
-                            <div class="mt-6">
-                                <label class="block text-sm font-medium text-gray-700 mb-2">
-                                    Detailed Comments & Feedback
-                                </label>
-                                <textarea
-                                    v-model="evalCategory.comments"
-                                    rows="3"
-                                    class="block w-full rounded-lg border border-gray-300 px-4 py-3 text-sm shadow-sm transition-colors duration-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 resize-none"
-                                    :disabled="form.processing"
-                                    placeholder="Provide specific feedback, strengths, areas for improvement, and recommendations..."
-                                />
-                                <span v-if="form.errors[`categories.${index}.comments`]" class="mt-1 flex items-center text-sm text-red-600">
-                                    <svg class="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    {{ form.errors[`categories.${index}.comments`] }}
-                                </span>
-                            </div>
-                        </div>
+                                <!-- Comments Section - FIXED: Use proper Vue syntax for :for -->
+                                <div class="mt-6 space-y-2">
+                                    <Label :for="`comments_${evalCategory.category_id}`">Detailed Comments & Feedback</Label>
+                                    <Textarea
+                                        :id="`comments_${evalCategory.category_id}`"
+                                        v-model="evalCategory.comments"
+                                        rows="3"
+                                        :disabled="form.processing"
+                                        placeholder="Provide specific feedback, strengths, areas for improvement, and recommendations..."
+                                    />
+                                    <span v-if="form.errors[`categories.${index}.comments`]" class="text-sm text-destructive">
+                                        {{ form.errors[`categories.${index}.comments`] }}
+                                    </span>
+                                </div>
+                            </CardContent>
+                        </Card>
                     </div>
                 </div>
 
                 <!-- Overall Assessment Summary -->
-                <div v-if="form.user_id && form.course_id && form.categories.some(cat => cat.evaluation_type_id !== null)" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                    <div class="flex items-center mb-6">
-                        <div class="shrink-0">
-                            <div class="flex items-center justify-center h-10 w-10 rounded-lg bg-green-100">
-                                <svg class="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                            </div>
-                        </div>
-                        <div class="ml-4">
-                            <h3 class="text-xl font-semibold text-gray-900">Overall Assessment</h3>
-                            <p class="text-sm text-gray-600">Summary of evaluation results and incentive information</p>
-                        </div>
-                    </div>
-
-                    <!-- Score Summary Cards -->
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                        <div class="bg-linear-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
-                            <div class="flex items-center">
-                                <div class="shrink-0">
-                                    <svg class="h-8 w-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                                    </svg>
-                                </div>
-                                <div class="ml-4">
-                                    <p class="text-sm font-medium text-blue-900">Total Score</p>
-                                    <p class="text-2xl font-bold"
-                                       :class="{
-                                        'text-emerald-600': totalScore >= 13,
-                                        'text-green-600': totalScore >= 10 && totalScore < 13,
-                                        'text-blue-600': totalScore >= 7 && totalScore < 10,
-                                        'text-yellow-600': totalScore >= 4 && totalScore < 7,
-                                        'text-red-600': totalScore < 4
-                                       }">
-                                        {{ totalScore }}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="bg-linear-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
-                            <div class="flex items-center">
-                                <div class="shrink-0">
-                                    <svg class="h-8 w-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                                    </svg>
-                                </div>
-                                <div class="ml-4">
-                                    <p class="text-sm font-medium text-green-900">Incentive Amount</p>
-                                    <p class="text-2xl font-bold text-green-600">
-                                        ${{ totalIncentiveAmount.toFixed(2) }}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="bg-linear-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg p-4">
-                            <div class="flex items-center">
-                                <div class="shrink-0">
-                                    <svg class="h-8 w-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                                    </svg>
-                                </div>
-                                <div class="ml-4">
-                                    <p class="text-sm font-medium text-purple-900">Performance Rating</p>
-                                    <p class="text-lg font-bold text-purple-600">
-                                        {{ getPerformanceLevel(totalScore).label }}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Incentive Tier Info -->
-                    <div v-if="getIncentiveTierInfo" class="mb-6 p-4 bg-linear-to-r from-yellow-50 to-amber-50 border border-yellow-200 rounded-lg">
+                <Card v-if="form.user_id && form.course_id && form.categories.some(cat => cat.evaluation_type_id !== null)">
+                    <CardHeader>
                         <div class="flex items-center">
-                            <svg class="h-6 w-6 text-yellow-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                            </svg>
+                            <div class="shrink-0 mr-4">
+                                <div class="flex items-center justify-center h-10 w-10 rounded-lg bg-green-100">
+                                    <CheckCircle class="h-6 w-6 text-green-600" />
+                                </div>
+                            </div>
                             <div>
+                                <CardTitle>Overall Assessment</CardTitle>
+                                <CardDescription>Summary of evaluation results and incentive information</CardDescription>
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <!-- Score Summary Cards -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                            <Card class="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+                                <CardContent class="p-4">
+                                    <div class="flex items-center">
+                                        <TrendingUp class="h-8 w-8 text-blue-600 mr-4" />
+                                        <div>
+                                            <p class="text-sm font-medium text-blue-900">Total Score</p>
+                                            <p class="text-2xl font-bold"
+                                               :class="{
+                                                'text-emerald-600': totalScore >= 13,
+                                                'text-green-600': totalScore >= 10 && totalScore < 13,
+                                                'text-blue-600': totalScore >= 7 && totalScore < 10,
+                                                'text-yellow-600': totalScore >= 4 && totalScore < 7,
+                                                'text-red-600': totalScore < 4
+                                               }">
+                                                {{ totalScore }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            <Card class="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
+                                <CardContent class="p-4">
+                                    <div class="flex items-center">
+                                        <DollarSign class="h-8 w-8 text-green-600 mr-4" />
+                                        <div>
+                                            <p class="text-sm font-medium text-green-900">Incentive Amount</p>
+                                            <p class="text-2xl font-bold text-green-600">
+                                                ${{ totalIncentiveAmount.toFixed(2) }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            <Card class="bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200">
+                                <CardContent class="p-4">
+                                    <div class="flex items-center">
+                                        <Award class="h-8 w-8 text-purple-600 mr-4" />
+                                        <div>
+                                            <p class="text-sm font-medium text-purple-900">Performance Rating</p>
+                                            <p class="text-lg font-bold text-purple-600">
+                                                {{ getPerformanceLevel(totalScore).label }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+
+                        <!-- Incentive Tier Info -->
+                        <Alert v-if="getIncentiveTierInfo" class="mb-6 bg-gradient-to-r from-yellow-50 to-amber-50 border-yellow-200">
+                            <Award class="h-4 w-4" />
+                            <AlertDescription>
                                 <h4 class="font-semibold text-yellow-900">{{ getIncentiveTierInfo.tier }}</h4>
                                 <p class="text-sm text-yellow-700">
                                     Score Range: {{ getIncentiveTierInfo.range }} |
                                     Incentive: ${{ getIncentiveTierInfo.amount.toFixed(2) }}
                                 </p>
-                            </div>
-                        </div>
-                    </div>
+                            </AlertDescription>
+                        </Alert>
 
-                    <!-- Overall Notes -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                            Overall Notes & Recommendations
-                        </label>
-                        <textarea
-                            v-model="form.notes"
-                            rows="4"
-                            class="block w-full rounded-lg border border-gray-300 px-4 py-3 text-sm shadow-sm transition-colors duration-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 resize-none"
-                            :disabled="form.processing"
-                            placeholder="Provide overall assessment, key achievements, development areas, goals for improvement, and recommendations for career development..."
-                        />
-                        <span v-if="form.errors.notes" class="mt-1 flex items-center text-sm text-red-600">
-                            <svg class="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            {{ form.errors.notes }}
-                        </span>
-                    </div>
-                </div>
+                        <!-- Overall Notes -->
+                        <div class="space-y-2">
+                            <Label for="notes">Overall Notes & Recommendations</Label>
+                            <Textarea
+                                id="notes"
+                                v-model="form.notes"
+                                rows="4"
+                                :disabled="form.processing"
+                                placeholder="Provide overall assessment, key achievements, development areas, goals for improvement, and recommendations for career development..."
+                            />
+                            <span v-if="form.errors.notes" class="text-sm text-destructive">{{ form.errors.notes }}</span>
+                        </div>
+                    </CardContent>
+                </Card>
 
                 <!-- Action Buttons -->
                 <div v-if="form.user_id && form.course_id" class="flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-4">
-                    <button
+                    <Button
                         type="button"
                         @click="resetForm"
-                        class="inline-flex items-center justify-center rounded-lg bg-gray-100 px-6 py-3 text-sm font-medium text-gray-700 transition-colors duration-200 hover:bg-gray-200 focus:outline-hidden focus:ring-2 focus:ring-gray-500"
+                        variant="outline"
                         :disabled="form.processing"
                     >
-                        <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
+                        <RotateCcw class="mr-2 h-4 w-4" />
                         Reset Form
-                    </button>
+                    </Button>
 
-                    <button
+                    <Button
                         type="submit"
-                        class="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-8 py-3 text-sm font-medium text-white transition-colors duration-200 hover:bg-indigo-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 shadow-sm"
                         :disabled="form.processing || !isFormValid || totalScore === 0"
-                        :class="{ 'opacity-50 cursor-not-allowed': form.processing || !isFormValid || totalScore === 0 }"
                     >
-                        <svg v-if="form.processing" class="mr-2 h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                        </svg>
-                        <svg v-else class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
+                        <Loader2 v-if="form.processing" class="mr-2 h-4 w-4 animate-spin" />
+                        <Send v-else class="mr-2 h-4 w-4" />
                         <span v-if="form.processing">Submitting Evaluation...</span>
                         <span v-else>Submit Evaluation</span>
-                    </button>
+                    </Button>
                 </div>
             </form>
         </div>
 
         <!-- Confirmation Modal -->
-        <Modal :show="showSubmitModal" @close="showSubmitModal = false" max-width="lg">
-            <div class="p-6 sm:p-8">
-                <div class="flex items-start">
-                    <div class="shrink-0">
-                        <div class="flex items-center justify-center h-12 w-12 rounded-full bg-green-100">
-                            <svg class="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                        </div>
-                    </div>
-                    <div class="ml-4 flex-1">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-2">Confirm Evaluation Submission</h3>
-                        <p class="text-sm text-gray-600 mb-4">
-                            Please review the evaluation details before submitting. This action will record the performance evaluation for
-                            <span class="font-semibold">{{ selectedUser?.name }}</span>.
-                        </p>
-
-                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
-                            <h4 class="font-medium text-gray-900 mb-2">Evaluation Summary</h4>
-                            <div class="grid grid-cols-2 gap-4 text-sm">
-                                <div>
-                                    <span class="text-gray-600">Employee:</span>
-                                    <p class="font-medium">{{ selectedUser?.name }}</p>
-                                </div>
-                                <div>
-                                    <span class="text-gray-600">Course:</span>
-                                    <p class="font-medium">{{ selectedCourse?.title }}</p>
-                                </div>
-                                <div>
-                                    <span class="text-gray-600">Date:</span>
-                                    <p class="font-medium">{{ form.evaluation_date }}</p>
-                                </div>
-                                <div>
-                                    <span class="text-gray-600">Total Score:</span>
-                                    <p class="font-medium">{{ totalScore }}</p>
-                                </div>
-                                <div>
-                                    <span class="text-gray-600">Incentive Amount:</span>
-                                    <p class="font-medium">${{ totalIncentiveAmount.toFixed(2) }}</p>
-                                </div>
+        <Dialog v-model:open="showSubmitModal">
+            <DialogContent class="sm:max-w-lg">
+                <DialogHeader>
+                    <div class="flex items-start">
+                        <div class="shrink-0 mr-4">
+                            <div class="flex items-center justify-center h-12 w-12 rounded-full bg-green-100">
+                                <CheckCircle class="h-6 w-6 text-green-600" />
                             </div>
                         </div>
-
-                        <div class="flex justify-end space-x-3">
-                            <button
-                                @click="showSubmitModal = false"
-                                class="inline-flex items-center rounded-lg bg-white px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 transition-colors duration-200 hover:bg-gray-50 focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                @click="confirmSubmit"
-                                class="inline-flex items-center rounded-lg bg-green-600 px-6 py-2 text-sm font-medium text-white transition-colors duration-200 hover:bg-green-700 focus:outline-hidden focus:ring-2 focus:ring-green-500"
-                                :disabled="form.processing"
-                            >
-                                <svg v-if="form.processing" class="mr-2 h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 818-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                                </svg>
-                                <span v-if="form.processing">Submitting...</span>
-                                <span v-else>Confirm & Submit</span>
-                            </button>
+                        <div class="flex-1">
+                            <DialogTitle>Confirm Evaluation Submission</DialogTitle>
+                            <DialogDescription>
+                                Please review the evaluation details before submitting. This action will record the performance evaluation for
+                                <span class="font-semibold">{{ selectedUser?.name }}</span>.
+                            </DialogDescription>
                         </div>
                     </div>
-                </div>
-            </div>
-        </Modal>
+                </DialogHeader>
+
+                <Alert class="my-4">
+                    <AlertDescription>
+                        <h4 class="font-medium mb-2">Evaluation Summary</h4>
+                        <div class="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <span class="text-muted-foreground">Employee:</span>
+                                <p class="font-medium">{{ selectedUser?.name }}</p>
+                            </div>
+                            <div>
+                                <span class="text-muted-foreground">Course:</span>
+                                <p class="font-medium">{{ selectedCourse?.title }}</p>
+                            </div>
+                            <div>
+                                <span class="text-muted-foreground">Date:</span>
+                                <p class="font-medium">{{ form.evaluation_date }}</p>
+                            </div>
+                            <div>
+                                <span class="text-muted-foreground">Total Score:</span>
+                                <p class="font-medium">{{ totalScore }}</p>
+                            </div>
+                            <div>
+                                <span class="text-muted-foreground">Incentive Amount:</span>
+                                <p class="font-medium">${{ totalIncentiveAmount.toFixed(2) }}</p>
+                            </div>
+                        </div>
+                    </AlertDescription>
+                </Alert>
+
+                <DialogFooter>
+                    <Button @click="showSubmitModal = false" variant="outline">
+                        Cancel
+                    </Button>
+                    <Button @click="confirmSubmit" :disabled="form.processing">
+                        <Loader2 v-if="form.processing" class="mr-2 h-4 w-4 animate-spin" />
+                        <span v-if="form.processing">Submitting...</span>
+                        <span v-else>Confirm & Submit</span>
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     </AdminLayout>
 </template>

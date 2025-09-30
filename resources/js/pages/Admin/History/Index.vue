@@ -4,6 +4,44 @@ import { useForm, router, Link } from '@inertiajs/vue3'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import type { BreadcrumbItemType } from '@/types'
 
+// shadcn-vue components
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue
+} from '@/components/ui/select'
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from '@/components/ui/collapsible'
+import { Separator } from '@/components/ui/separator'
+
+// Icons
+import {
+    Filter,
+    Download,
+    BarChart3,
+    DollarSign,
+    FileText,
+    Star,
+    TrendingUp,
+    Calendar,
+    User,
+    Eye,
+    ChevronDown,
+    Settings,
+    Loader2,
+    X
+} from 'lucide-vue-next'
+
 const props = defineProps<{
     history?: {
         data: Array<{
@@ -88,9 +126,9 @@ const showFilters = ref(false)
 
 // Form for filters
 const filterForm = useForm({
-    department_id: props.filters?.department_id || null,
-    user_id: props.filters?.user_id || null,
-    course_id: props.filters?.course_id || null,
+    department_id: props.filters?.department_id?.toString() || '',
+    user_id: props.filters?.user_id?.toString() || '',
+    course_id: props.filters?.course_id?.toString() || '',
     start_date: props.filters?.start_date || '',
     end_date: props.filters?.end_date || '',
 })
@@ -150,9 +188,9 @@ function clearFilters() {
 function exportHistory() {
     const params = new URLSearchParams()
 
-    if (filterForm.department_id) params.append('department_id', filterForm.department_id.toString())
-    if (filterForm.user_id) params.append('user_id', filterForm.user_id.toString())
-    if (filterForm.course_id) params.append('course_id', filterForm.course_id.toString())
+    if (filterForm.department_id) params.append('department_id', filterForm.department_id)
+    if (filterForm.user_id) params.append('user_id', filterForm.user_id)
+    if (filterForm.course_id) params.append('course_id', filterForm.course_id)
     if (filterForm.start_date) params.append('start_date', filterForm.start_date)
     if (filterForm.end_date) params.append('end_date', filterForm.end_date)
 
@@ -162,9 +200,9 @@ function exportHistory() {
 function exportSummary() {
     const params = new URLSearchParams()
 
-    if (filterForm.department_id) params.append('department_id', filterForm.department_id.toString())
-    if (filterForm.user_id) params.append('user_id', filterForm.user_id.toString())
-    if (filterForm.course_id) params.append('course_id', filterForm.course_id.toString())
+    if (filterForm.department_id) params.append('department_id', filterForm.department_id)
+    if (filterForm.user_id) params.append('user_id', filterForm.user_id)
+    if (filterForm.course_id) params.append('course_id', filterForm.course_id)
     if (filterForm.start_date) params.append('start_date', filterForm.start_date)
     if (filterForm.end_date) params.append('end_date', filterForm.end_date)
 
@@ -179,76 +217,50 @@ function viewDetails(evaluationId: number) {
 // Enhanced performance level function that uses dynamic ranges
 function getPerformanceLevel(score: number) {
     if (!safeAnalytics.value.performance_distribution.length) {
-        // Fallback if no incentives configured
-        return { label: 'No Tiers Configured', class: 'bg-gray-100 text-gray-800 border-gray-200' }
+        return { label: 'No Tiers Configured', variant: 'outline' as const }
     }
 
-    // Find the matching tier for this score
     const tier = safeAnalytics.value.performance_distribution.find(tier =>
         score >= tier.min_score && score <= tier.max_score
     )
 
     if (!tier) {
-        return { label: 'Unranked', class: 'bg-gray-100 text-gray-800 border-gray-200' }
+        return { label: 'Unranked', variant: 'outline' as const }
     }
 
-    const colorClasses = {
-        'emerald': 'bg-emerald-100 text-emerald-800 border-emerald-200',
-        'green': 'bg-green-100 text-green-800 border-green-200',
-        'blue': 'bg-blue-100 text-blue-800 border-blue-200',
-        'yellow': 'bg-yellow-100 text-yellow-800 border-yellow-200',
-        'red': 'bg-red-100 text-red-800 border-red-200'
+    const variants = {
+        'emerald': 'default',
+        'green': 'default',
+        'blue': 'secondary',
+        'yellow': 'secondary',
+        'red': 'destructive'
     }
 
     return {
         label: tier.name,
-        class: colorClasses[tier.color_class] || 'bg-gray-100 text-gray-800 border-gray-200'
+        variant: variants[tier.color_class] || 'outline'
     }
 }
 
-// Get category score color
-function getCategoryColor(score: number) {
-    if (score >= 5) return 'bg-emerald-100 text-emerald-800 border-emerald-200'
-    if (score >= 4) return 'bg-green-100 text-green-800 border-green-200'
-    if (score >= 3) return 'bg-blue-100 text-blue-800 border-blue-200'
-    if (score >= 2) return 'bg-yellow-100 text-yellow-800 border-yellow-200'
-    return 'bg-red-100 text-red-800 border-red-200'
+// Get category score badge variant
+function getCategoryVariant(score: number) {
+    if (score >= 5) return 'default'
+    if (score >= 4) return 'default'
+    if (score >= 3) return 'secondary'
+    if (score >= 2) return 'secondary'
+    return 'destructive'
 }
 
-// Get tier background color for performance distribution
-function getTierBackgroundColor(colorClass: string) {
-    const backgrounds = {
-        'emerald': 'bg-emerald-50 border-emerald-200',
-        'green': 'bg-green-50 border-green-200',
-        'blue': 'bg-blue-50 border-blue-200',
-        'yellow': 'bg-yellow-50 border-yellow-200',
-        'red': 'bg-red-50 border-red-200'
+// Get tier variant for performance distribution
+function getTierVariant(colorClass: string) {
+    const variants = {
+        'emerald': 'default',
+        'green': 'default',
+        'blue': 'secondary',
+        'yellow': 'secondary',
+        'red': 'destructive'
     }
-    return backgrounds[colorClass] || 'bg-gray-50 border-gray-200'
-}
-
-// Get tier text color for performance distribution
-function getTierTextColor(colorClass: string) {
-    const textColors = {
-        'emerald': 'text-emerald-600',
-        'green': 'text-green-600',
-        'blue': 'text-blue-600',
-        'yellow': 'text-yellow-600',
-        'red': 'text-red-600'
-    }
-    return textColors[colorClass] || 'text-gray-600'
-}
-
-// Get tier label color for performance distribution
-function getTierLabelColor(colorClass: string) {
-    const labelColors = {
-        'emerald': 'text-emerald-700',
-        'green': 'text-green-700',
-        'blue': 'text-blue-700',
-        'yellow': 'text-yellow-700',
-        'red': 'text-red-700'
-    }
-    return labelColors[colorClass] || 'text-gray-700'
+    return variants[colorClass] || 'outline'
 }
 
 // Calculate grid columns based on number of tiers
@@ -263,475 +275,452 @@ const performanceGridCols = computed(() => {
     return 'grid-cols-1 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8'
 })
 
-// Format monthly trends for display
-const monthlyTrendsData = computed(() => {
-    const trends = safeAnalytics.value.monthly_trends
-    return Object.entries(trends).map(([month, count]) => ({
-        month: new Date(month + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
-        count
-    }))
-})
-
 // Breadcrumbs
 const breadcrumbs: BreadcrumbItemType[] = [
     { name: 'Dashboard', href: route('dashboard') },
     { name: 'Evaluations', href: route('admin.evaluations.index') },
     { name: 'History', href: null }
 ]
+
+// Active filter count
+const activeFilterCount = computed(() => {
+    return [filterForm.department_id, filterForm.user_id, filterForm.course_id, filterForm.start_date, filterForm.end_date].filter(Boolean).length
+})
 </script>
 
 <template>
     <AdminLayout :breadcrumbs="breadcrumbs">
-        <div class="mx-auto max-w-7xl py-8 px-4 sm:px-6 lg:px-8">
+        <div class="mx-auto max-w-7xl py-8 px-4 sm:px-6 lg:px-8 space-y-8">
             <!-- Header -->
-            <div class="mb-8">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <h1 class="text-3xl font-bold text-gray-900">Evaluation History</h1>
-                        <p class="mt-2 text-sm text-gray-600">
-                            View and manage all evaluation records and history
-                            <span v-if="safeHistory.total > 0" class="font-medium">
-                                ({{ safeHistory.total }} total records)
-                            </span>
-                        </p>
-                    </div>
-                    <div class="flex space-x-3">
-                        <button
-                            @click="showFilters = !showFilters"
-                            class="inline-flex items-center rounded-lg px-4 py-2 text-sm font-semibold transition-colors duration-200 focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
-                            :class="hasActiveFilters
-                                ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
-                        >
-                            <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.414A1 1 0 013 6.707V4z" />
-                            </svg>
-                            Filters
-                            <span v-if="hasActiveFilters" class="ml-2 inline-flex items-center justify-center w-5 h-5 text-xs bg-indigo-500 text-white rounded-full">
-                                {{ [filterForm.department_id, filterForm.user_id, filterForm.course_id, filterForm.start_date, filterForm.end_date].filter(Boolean).length }}
-                            </span>
-                        </button>
-                        <button
-                            @click="exportSummary"
-                            class="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-200 hover:bg-blue-700 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-                        >
-                            <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                            </svg>
-                            Export Summary
-                        </button>
-                        <button
-                            @click="exportHistory"
-                            class="inline-flex items-center rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-200 hover:bg-green-700 focus:outline-hidden focus:ring-2 focus:ring-green-500"
-                        >
-                            <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-                            </svg>
-                            Export Details
-                        </button>
-                    </div>
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold">Evaluation History</h1>
+                    <p class="mt-2 text-sm text-muted-foreground">
+                        View and manage all evaluation records and history
+                        <span v-if="safeHistory.total > 0" class="font-medium">
+                            ({{ safeHistory.total }} total records)
+                        </span>
+                    </p>
+                </div>
+                <div class="flex space-x-3">
+                    <Button
+                        @click="showFilters = !showFilters"
+                        variant="outline"
+                        :class="hasActiveFilters ? 'border-primary' : ''"
+                    >
+                        <Filter class="mr-2 h-4 w-4" />
+                        Filters
+                        <Badge v-if="hasActiveFilters" variant="secondary" class="ml-2">
+                            {{ activeFilterCount }}
+                        </Badge>
+                    </Button>
+                    <Button @click="exportSummary" variant="outline">
+                        <BarChart3 class="mr-2 h-4 w-4" />
+                        Export Summary
+                    </Button>
+                    <Button @click="exportHistory">
+                        <Download class="mr-2 h-4 w-4" />
+                        Export Details
+                    </Button>
                 </div>
             </div>
 
             <!-- Analytics Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <!-- Total Evaluations -->
-                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                    <div class="flex items-center">
-                        <div class="shrink-0">
-                            <svg class="h-8 w-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
+                <Card>
+                    <CardContent class="p-6">
+                        <div class="flex items-center">
+                            <div class="shrink-0">
+                                <FileText class="h-8 w-8 text-primary" />
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-muted-foreground">Total Evaluations</p>
+                                <p class="text-2xl font-bold text-primary">{{ safeAnalytics.total_evaluations.toLocaleString() }}</p>
+                            </div>
                         </div>
-                        <div class="ml-4">
-                            <p class="text-sm font-medium text-gray-900">Total Evaluations</p>
-                            <p class="text-2xl font-bold text-blue-600">{{ safeAnalytics.total_evaluations.toLocaleString() }}</p>
-                        </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
                 <!-- Total Incentives -->
-                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                    <div class="flex items-center">
-                        <div class="shrink-0">
-                            <svg class="h-8 w-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                            </svg>
+                <Card>
+                    <CardContent class="p-6">
+                        <div class="flex items-center">
+                            <div class="shrink-0">
+                                <DollarSign class="h-8 w-8 text-green-600" />
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-muted-foreground">Total Incentives</p>
+                                <p class="text-2xl font-bold text-green-600">${{ safeAnalytics.total_incentives.toLocaleString('en-US', { minimumFractionDigits: 2 }) }}</p>
+                            </div>
                         </div>
-                        <div class="ml-4">
-                            <p class="text-sm font-medium text-gray-900">Total Incentives</p>
-                            <p class="text-2xl font-bold text-green-600">${{ safeAnalytics.total_incentives.toLocaleString('en-US', { minimumFractionDigits: 2 }) }}</p>
-                        </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
                 <!-- Average Score -->
-                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                    <div class="flex items-center">
-                        <div class="shrink-0">
-                            <svg class="h-8 w-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                            </svg>
+                <Card>
+                    <CardContent class="p-6">
+                        <div class="flex items-center">
+                            <div class="shrink-0">
+                                <TrendingUp class="h-8 w-8 text-purple-600" />
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-muted-foreground">Average Score</p>
+                                <p class="text-2xl font-bold text-purple-600">{{ safeAnalytics.average_score }}</p>
+                            </div>
                         </div>
-                        <div class="ml-4">
-                            <p class="text-sm font-medium text-gray-900">Average Score</p>
-                            <p class="text-2xl font-bold text-purple-600">{{ safeAnalytics.average_score }}</p>
-                        </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
                 <!-- Performance Summary -->
-                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                    <div class="flex items-center mb-3">
-                        <div class="shrink-0">
-                            <svg class="h-8 w-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                            </svg>
+                <Card>
+                    <CardContent class="p-6">
+                        <div class="flex items-center">
+                            <div class="shrink-0">
+                                <Star class="h-8 w-8 text-yellow-600" />
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-muted-foreground">Performance</p>
+                                <p class="text-lg font-bold text-yellow-600">
+                                    {{ getPerformanceLevel(safeAnalytics.average_score).label }}
+                                </p>
+                            </div>
                         </div>
-                        <div class="ml-4">
-                            <p class="text-sm font-medium text-gray-900">Performance</p>
-                            <p class="text-lg font-bold text-indigo-600">
-                                {{ getPerformanceLevel(safeAnalytics.average_score).label }}
-                            </p>
-                        </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
             </div>
 
             <!-- Filters Panel -->
-            <div v-if="showFilters" class="mb-6 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-lg font-semibold text-gray-900">Filter Evaluations</h3>
-                    <div class="flex space-x-2">
-                        <button
-                            v-if="hasActiveFilters"
-                            @click="clearFilters"
-                            type="button"
-                            class="inline-flex items-center rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors duration-200 hover:bg-gray-200"
+            <Collapsible v-model:open="showFilters">
+                <CollapsibleContent>
+                    <Card>
+                        <CardHeader>
+                            <div class="flex items-center justify-between">
+                                <CardTitle>Filter Evaluations</CardTitle>
+                                <Button
+                                    v-if="hasActiveFilters"
+                                    @click="clearFilters"
+                                    variant="outline"
+                                    size="sm"
+                                >
+                                    <X class="mr-2 h-4 w-4" />
+                                    Clear All
+                                </Button>
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                                <!-- Department Filter -->
+                                <div class="space-y-2">
+                                    <Label>Department</Label>
+                                    <Select v-model="filterForm.department_id">
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="All Departments" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="">All Departments</SelectItem>
+                                            <SelectItem v-for="dept in safeDepartments" :key="dept.id" :value="dept.id.toString()">
+                                                {{ dept.name }}
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                <!-- User Filter -->
+                                <div class="space-y-2">
+                                    <Label>Employee</Label>
+                                    <Select v-model="filterForm.user_id">
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="All Employees" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="">All Employees</SelectItem>
+                                            <SelectItem v-for="user in safeUsers" :key="user.id" :value="user.id.toString()">
+                                                {{ user.name }}
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                <!-- Course Filter -->
+                                <div class="space-y-2">
+                                    <Label>Course</Label>
+                                    <Select v-model="filterForm.course_id">
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="All Courses" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="">All Courses</SelectItem>
+                                            <SelectItem v-for="course in safeCourses" :key="course.id" :value="course.id.toString()">
+                                                {{ course.name }}
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                <!-- Start Date Filter -->
+                                <div class="space-y-2">
+                                    <Label>Start Date</Label>
+                                    <Input
+                                        type="date"
+                                        v-model="filterForm.start_date"
+                                    />
+                                </div>
+
+                                <!-- End Date Filter -->
+                                <div class="space-y-2">
+                                    <Label>End Date</Label>
+                                    <Input
+                                        type="date"
+                                        v-model="filterForm.end_date"
+                                    />
+                                </div>
+                            </div>
+
+                            <div class="mt-4 flex justify-end">
+                                <Button
+                                    @click="applyFilters"
+                                    :disabled="filterForm.processing"
+                                >
+                                    <Loader2 v-if="filterForm.processing" class="mr-2 h-4 w-4 animate-spin" />
+                                    <span v-if="filterForm.processing">Applying...</span>
+                                    <span v-else>Apply Filters</span>
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </CollapsibleContent>
+            </Collapsible>
+
+            <!-- Performance Distribution Chart -->
+            <Card>
+                <CardHeader>
+                    <div class="flex items-center justify-between">
+                        <CardTitle>Performance Distribution</CardTitle>
+                        <CardDescription>
+                            {{ safeAnalytics.performance_distribution.length > 0
+                            ? `Based on ${safeAnalytics.performance_distribution.length} configured tiers`
+                            : 'No performance tiers configured' }}
+                        </CardDescription>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <!-- Performance Tiers -->
+                    <div v-if="safeAnalytics.performance_distribution.length > 0" class="grid gap-4" :class="performanceGridCols">
+                        <Card
+                            v-for="tier in safeAnalytics.performance_distribution"
+                            :key="tier.id"
+                            class="text-center hover:shadow-md transition-shadow duration-200"
                         >
-                            Clear All
-                        </button>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
-                    <!-- Department Filter -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Department</label>
-                        <select
-                            v-model="filterForm.department_id"
-                            class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm transition-colors duration-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500"
-                        >
-                            <option :value="null">All Departments</option>
-                            <option v-for="dept in safeDepartments" :key="dept.id" :value="dept.id">
-                                {{ dept.name }}
-                            </option>
-                        </select>
+                            <CardContent class="p-4">
+                                <div class="text-2xl font-bold mb-1">
+                                    {{ tier.count }}
+                                </div>
+                                <Badge :variant="getTierVariant(tier.color_class)" class="mb-2">
+                                    {{ tier.name }}
+                                </Badge>
+                                <div class="text-xs text-muted-foreground mb-1">
+                                    {{ tier.range }} points
+                                </div>
+                                <div class="text-xs text-muted-foreground">
+                                    ${{ parseFloat(tier.incentive_amount).toFixed(2) }}
+                                </div>
+                            </CardContent>
+                        </Card>
                     </div>
 
-                    <!-- User Filter -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Employee</label>
-                        <select
-                            v-model="filterForm.user_id"
-                            class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm transition-colors duration-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500"
-                        >
-                            <option :value="null">All Employees</option>
-                            <option v-for="user in safeUsers" :key="user.id" :value="user.id">
-                                {{ user.name }}
-                            </option>
-                        </select>
+                    <!-- No Incentives Configured Message -->
+                    <div v-else class="text-center py-8">
+                        <BarChart3 class="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                        <CardTitle class="mb-2">No Performance Tiers Configured</CardTitle>
+                        <CardDescription class="mb-4">Configure incentive ranges to see performance distribution.</CardDescription>
+                        <Button asChild>
+                            <Link :href="route('admin.evaluations.index')">
+                                <Settings class="mr-2 h-4 w-4" />
+                                Configure Incentives
+                            </Link>
+                        </Button>
                     </div>
-
-                    <!-- Course Filter -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Course</label>
-                        <select
-                            v-model="filterForm.course_id"
-                            class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm transition-colors duration-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500"
-                        >
-                            <option :value="null">All Courses</option>
-                            <option v-for="course in safeCourses" :key="course.id" :value="course.id">
-                                {{ course.name }}
-                            </option>
-                        </select>
-                    </div>
-
-                    <!-- Start Date Filter -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
-                        <input
-                            type="date"
-                            v-model="filterForm.start_date"
-                            class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm transition-colors duration-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500"
-                        />
-                    </div>
-
-                    <!-- End Date Filter -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">End Date</label>
-                        <input
-                            type="date"
-                            v-model="filterForm.end_date"
-                            class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm transition-colors duration-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500"
-                        />
-                    </div>
-                </div>
-
-                <div class="mt-4 flex justify-end">
-                    <button
-                        @click="applyFilters"
-                        type="button"
-                        class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors duration-200 hover:bg-indigo-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
-                        :disabled="filterForm.processing"
-                    >
-                        <svg v-if="filterForm.processing" class="mr-2 h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                        </svg>
-                        <span v-if="filterForm.processing">Applying...</span>
-                        <span v-else">Apply Filters</span>
-                    </button>
-                </div>
-            </div>
-
-            <!-- DYNAMIC Performance Distribution Chart -->
-            <div class="mb-8 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <div class="flex items-center justify-between mb-6">
-                    <h3 class="text-lg font-semibold text-gray-900">Performance Distribution</h3>
-                    <div class="text-sm text-gray-500">
-                        {{ safeAnalytics.performance_distribution.length > 0
-                        ? `Based on ${safeAnalytics.performance_distribution.length} configured tiers`
-                        : 'No performance tiers configured' }}
-                    </div>
-                </div>
-
-                <!-- Performance Tiers -->
-                <div v-if="safeAnalytics.performance_distribution.length > 0" class="grid gap-4" :class="performanceGridCols">
-                    <div
-                        v-for="tier in safeAnalytics.performance_distribution"
-                        :key="tier.id"
-                        class="text-center p-4 rounded-lg border transition-all duration-200 hover:shadow-md"
-                        :class="getTierBackgroundColor(tier.color_class)"
-                    >
-                        <div
-                            class="text-2xl font-bold mb-1"
-                            :class="getTierTextColor(tier.color_class)"
-                        >
-                            {{ tier.count }}
-                        </div>
-                        <div
-                            class="text-sm font-medium mb-1"
-                            :class="getTierLabelColor(tier.color_class)"
-                        >
-                            {{ tier.name }}
-                        </div>
-                        <div class="text-xs text-gray-600 mb-1">
-                            {{ tier.range }} points
-                        </div>
-                        <div class="text-xs text-gray-500">
-                            ${{ parseFloat(tier.incentive_amount).toFixed(2) }}
-                        </div>
-                    </div>
-                </div>
-
-                <!-- No Incentives Configured Message -->
-                <div v-else class="text-center py-8">
-                    <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                    <h3 class="text-lg font-medium text-gray-900 mb-2">No Performance Tiers Configured</h3>
-                    <p class="text-sm text-gray-500 mb-4">Configure incentive ranges to see performance distribution.</p>
-                    <Link
-                        :href="route('admin.evaluations.index')"
-                        class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 transition-colors duration-200"
-                    >
-                        <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                        </svg>
-                        Configure Incentives
-                    </Link>
-                </div>
-            </div>
+                </CardContent>
+            </Card>
 
             <!-- Top Categories -->
-            <div v-if="safeAnalytics.top_categories.length > 0" class="mb-8 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <h3 class="text-lg font-semibold text-gray-900 mb-4">Top Performing Categories</h3>
-                <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                    <div
-                        v-for="category in safeAnalytics.top_categories"
-                        :key="category.category_name"
-                        class="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:shadow-sm transition-shadow duration-200"
-                    >
-                        <h4 class="font-medium text-gray-900 text-sm mb-2">{{ category.category_name }}</h4>
-                        <div class="flex items-center justify-between">
-                            <span class="text-lg font-bold text-indigo-600">{{ category.avg_score }}</span>
-                            <span class="text-xs text-gray-500">{{ category.count }} evals</span>
-                        </div>
+            <Card v-if="safeAnalytics.top_categories.length > 0">
+                <CardHeader>
+                    <CardTitle>Top Performing Categories</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                        <Card
+                            v-for="category in safeAnalytics.top_categories"
+                            :key="category.category_name"
+                            class="hover:shadow-sm transition-shadow duration-200"
+                        >
+                            <CardContent class="p-4">
+                                <CardTitle class="text-sm mb-2">{{ category.category_name }}</CardTitle>
+                                <div class="flex items-center justify-between">
+                                    <span class="text-lg font-bold text-primary">{{ category.avg_score }}</span>
+                                    <Badge variant="outline" class="text-xs">{{ category.count }} evals</Badge>
+                                </div>
+                            </CardContent>
+                        </Card>
                     </div>
-                </div>
-            </div>
+                </CardContent>
+            </Card>
 
             <!-- History List -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+            <Card>
                 <!-- List Header -->
-                <div class="px-6 py-4 border-b border-gray-200">
+                <CardHeader>
                     <div class="flex items-center justify-between">
-                        <h3 class="text-lg font-semibold text-gray-900">Evaluation Records</h3>
-                        <div class="text-sm text-gray-500">
+                        <CardTitle>Evaluation Records</CardTitle>
+                        <CardDescription>
                             {{ safeHistory.total > 0
                             ? `Showing ${safeHistory.from}-${safeHistory.to} of ${safeHistory.total} results`
                             : 'No results found' }}
-                        </div>
+                        </CardDescription>
                     </div>
-                </div>
+                </CardHeader>
 
-                <!-- Empty State -->
-                <div v-if="groupedHistory.length === 0" class="p-8 text-center">
-                    <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    <h3 class="text-lg font-medium text-gray-900 mb-2">No Evaluation History</h3>
-                    <p class="text-sm text-gray-500 mb-4">
-                        {{ hasActiveFilters ? 'No evaluations found with the selected filters.' : 'There are no evaluation records to display.' }}
-                    </p>
-                    <div v-if="hasActiveFilters">
-                        <button
-                            @click="clearFilters"
-                            class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors duration-200 hover:bg-indigo-700"
-                        >
+                <CardContent class="p-0">
+                    <!-- Empty State -->
+                    <div v-if="groupedHistory.length === 0" class="p-8 text-center">
+                        <FileText class="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                        <CardTitle class="mb-2">No Evaluation History</CardTitle>
+                        <CardDescription class="mb-4">
+                            {{ hasActiveFilters ? 'No evaluations found with the selected filters.' : 'There are no evaluation records to display.' }}
+                        </CardDescription>
+                        <Button v-if="hasActiveFilters" @click="clearFilters">
                             Clear Filters
-                        </button>
+                        </Button>
                     </div>
-                </div>
 
-                <!-- History Items -->
-                <div v-else class="divide-y divide-gray-200">
-                    <div
-                        v-for="group in groupedHistory"
-                        :key="group.evaluation.id"
-                        class="p-6 hover:bg-gray-50 transition-colors duration-200"
-                    >
-                        <!-- Evaluation Header -->
-                        <div class="flex items-start justify-between mb-6">
-                            <div class="flex-1">
-                                <div class="flex items-center space-x-3 mb-2">
-                                    <h3 class="text-lg font-semibold text-gray-900">
-                                        {{ group.evaluation.user.name }}
-                                    </h3>
-                                    <span
-                                        class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border"
-                                        :class="getPerformanceLevel(group.evaluation.total_score).class"
-                                    >
-                                        {{ getPerformanceLevel(group.evaluation.total_score).label }}
-                                    </span>
+                    <!-- History Items -->
+                    <div v-else class="divide-y divide-border">
+                        <div
+                            v-for="group in groupedHistory"
+                            :key="group.evaluation.id"
+                            class="p-6 hover:bg-accent/50 transition-colors duration-200"
+                        >
+                            <!-- Evaluation Header -->
+                            <div class="flex items-start justify-between mb-6">
+                                <div class="flex-1">
+                                    <div class="flex items-center space-x-3 mb-2">
+                                        <CardTitle class="text-lg">
+                                            {{ group.evaluation.user.name }}
+                                        </CardTitle>
+                                        <Badge :variant="getPerformanceLevel(group.evaluation.total_score).variant">
+                                            {{ getPerformanceLevel(group.evaluation.total_score).label }}
+                                        </Badge>
+                                    </div>
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm text-muted-foreground">
+                                        <div>
+                                            <span class="font-medium">Email:</span> {{ group.evaluation.user.email }}
+                                        </div>
+                                        <div v-if="group.evaluation.course">
+                                            <span class="font-medium">Course:</span> {{ group.evaluation.course.name }}
+                                        </div>
+                                        <div v-if="group.evaluation.department">
+                                            <span class="font-medium">Department:</span> {{ group.evaluation.department.name }}
+                                        </div>
+                                        <div>
+                                            <span class="font-medium">Date:</span> {{ new Date(group.evaluation.created_at).toLocaleDateString() }}
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm text-gray-600">
-                                    <div>
-                                        <span class="font-medium">Email:</span> {{ group.evaluation.user.email }}
+
+                                <div class="flex items-center space-x-6">
+                                    <div class="text-right">
+                                        <div class="text-2xl font-bold">
+                                            {{ group.evaluation.total_score }}
+                                        </div>
+                                        <div class="text-sm text-muted-foreground">Total Score</div>
                                     </div>
-                                    <div v-if="group.evaluation.course">
-                                        <span class="font-medium">Course:</span> {{ group.evaluation.course.name }}
+                                    <div class="text-right">
+                                        <div class="text-xl font-bold text-green-600">
+                                            ${{ parseFloat(group.evaluation.incentive_amount.toString()).toFixed(2) }}
+                                        </div>
+                                        <div class="text-sm text-muted-foreground">Incentive</div>
                                     </div>
-                                    <div v-if="group.evaluation.department">
-                                        <span class="font-medium">Department:</span> {{ group.evaluation.department.name }}
-                                    </div>
-                                    <div>
-                                        <span class="font-medium">Date:</span> {{ new Date(group.evaluation.created_at).toLocaleDateString() }}
-                                    </div>
+                                    <Button @click="viewDetails(group.evaluation.id)">
+                                        <Eye class="mr-2 h-4 w-4" />
+                                        View Details
+                                    </Button>
                                 </div>
                             </div>
 
-                            <div class="flex items-center space-x-6">
-                                <div class="text-right">
-                                    <div class="text-2xl font-bold text-gray-900">
-                                        {{ group.evaluation.total_score }}
-                                    </div>
-                                    <div class="text-sm text-gray-500">Total Score</div>
-                                </div>
-                                <div class="text-right">
-                                    <div class="text-xl font-bold text-green-600">
-                                        ${{ parseFloat(group.evaluation.incentive_amount.toString()).toFixed(2) }}
-                                    </div>
-                                    <div class="text-sm text-gray-500">Incentive</div>
-                                </div>
-                                <button
-                                    @click="viewDetails(group.evaluation.id)"
-                                    class="inline-flex items-center rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white transition-colors duration-200 hover:bg-indigo-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
+                            <!-- Category Summary -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                <Card
+                                    v-for="item in group.items"
+                                    :key="item.id"
+                                    class="hover:shadow-sm transition-shadow duration-200"
                                 >
-                                    View Details
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Category Summary -->
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                            <div
-                                v-for="item in group.items"
-                                :key="item.id"
-                                class="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:shadow-sm transition-shadow duration-200"
-                            >
-                                <div class="flex items-center justify-between mb-2">
-                                    <h4 class="font-medium text-gray-900 text-sm">{{ item.category_name }}</h4>
-                                    <span
-                                        class="inline-flex items-center px-2 py-1 rounded text-xs font-bold border"
-                                        :class="getCategoryColor(item.score)"
-                                    >
-                                        {{ item.score }}
-                                    </span>
-                                </div>
-                                <p class="text-sm text-gray-600 mb-2">{{ item.type_name }}</p>
-                                <p v-if="item.comments" class="text-xs text-gray-500 line-clamp-2">{{ item.comments }}</p>
+                                    <CardContent class="p-4">
+                                        <div class="flex items-center justify-between mb-2">
+                                            <CardTitle class="text-sm">{{ item.category_name }}</CardTitle>
+                                            <Badge :variant="getCategoryVariant(item.score)">
+                                                {{ item.score }}
+                                            </Badge>
+                                        </div>
+                                        <p class="text-sm text-muted-foreground mb-2">{{ item.type_name }}</p>
+                                        <p v-if="item.comments" class="text-xs text-muted-foreground line-clamp-2">{{ item.comments }}</p>
+                                    </CardContent>
+                                </Card>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- Pagination -->
-                <div v-if="safeHistory.last_page > 1" class="px-6 py-4 border-t border-gray-200">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center space-x-2">
-                            <Link
-                                v-if="safeHistory.current_page > 1"
-                                :href="route('admin.evaluations.history', { ...filterForm.data, page: safeHistory.current_page - 1 })"
-                                class="inline-flex items-center rounded-lg bg-white border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                            >
-                                Previous
-                            </Link>
-                            <span v-else class="inline-flex items-center rounded-lg bg-gray-100 border border-gray-300 px-4 py-2 text-sm font-medium text-gray-400 cursor-not-allowed">
-                                Previous
-                            </span>
-                        </div>
-
-                        <div class="flex items-center space-x-1">
-                            <template v-for="page in Math.min(5, safeHistory.last_page)" :key="page">
-                                <Link
-                                    :href="route('admin.evaluations.history', { ...filterForm.data, page })"
-                                    class="inline-flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-200"
-                                    :class="page === safeHistory.current_page
-                                        ? 'bg-indigo-600 text-white'
-                                        : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'"
+                    <!-- Pagination -->
+                    <div v-if="safeHistory.last_page > 1" class="px-6 py-4 border-t border-border">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <Button
+                                    v-if="safeHistory.current_page > 1"
+                                    asChild
+                                    variant="outline"
                                 >
-                                    {{ page }}
-                                </Link>
-                            </template>
-                        </div>
+                                    <Link :href="route('admin.evaluations.history', { ...filterForm.data, page: safeHistory.current_page - 1 })">
+                                        Previous
+                                    </Link>
+                                </Button>
+                                <Button v-else variant="outline" disabled>
+                                    Previous
+                                </Button>
+                            </div>
 
-                        <div class="flex items-center space-x-2">
-                            <Link
-                                v-if="safeHistory.current_page < safeHistory.last_page"
-                                :href="route('admin.evaluations.history', { ...filterForm.data, page: safeHistory.current_page + 1 })"
-                                class="inline-flex items-center rounded-lg bg-white border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                            >
-                                Next
-                            </Link>
-                            <span v-else class="inline-flex items-center rounded-lg bg-gray-100 border border-gray-300 px-4 py-2 text-sm font-medium text-gray-400 cursor-not-allowed">
-                                Next
-                            </span>
+                            <div class="flex items-center space-x-1">
+                                <template v-for="page in Math.min(5, safeHistory.last_page)" :key="page">
+                                    <Button
+                                        asChild
+                                        :variant="page === safeHistory.current_page ? 'default' : 'outline'"
+                                        size="sm"
+                                    >
+                                        <Link :href="route('admin.evaluations.history', { ...filterForm.data, page })">
+                                            {{ page }}
+                                        </Link>
+                                    </Button>
+                                </template>
+                            </div>
+
+                            <div class="flex items-center space-x-2">
+                                <Button
+                                    v-if="safeHistory.current_page < safeHistory.last_page"
+                                    asChild
+                                    variant="outline"
+                                >
+                                    <Link :href="route('admin.evaluations.history', { ...filterForm.data, page: safeHistory.current_page + 1 })">
+                                        Next
+                                    </Link>
+                                </Button>
+                                <Button v-else variant="outline" disabled>
+                                    Next
+                                </Button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            </div>
+                </CardContent>
+            </Card>
         </div>
     </AdminLayout>
 </template>

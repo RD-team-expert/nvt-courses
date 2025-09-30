@@ -4,8 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
-use Auth;
 
 class ProfileController extends Controller
 {
@@ -52,6 +52,9 @@ class ProfileController extends Controller
                     'enrolled_at' => $registration->created_at->toISOString(),
                 ];
             });
+        $managerService = new \App\Services\ManagerHierarchyService();
+        $directManagers = $managerService->getManagersForDepartment($user->department->name ?? '', ['L2']);
+        $directManager = $directManagers['L2'][0] ?? null;
 
         return Inertia::render('User/Profile', [
             'user' => [
@@ -71,6 +74,12 @@ class ProfileController extends Controller
                     'code' => $user->level->code,
                     'name' => $user->level->name,
                     'hierarchy_level' => $user->level->hierarchy_level,
+                ] : null,
+                'direct_manager' => $directManager ? [
+                    'id' => $directManager['id'],
+                    'name' => $directManager['name'],
+                    'email' => $directManager['email'],
+                    'department' => $directManager['department'] ?? 'Unknown',
                 ] : null,
             ],
             'managerRoles' => $user->managerRoles->map(function ($role) {
@@ -103,6 +112,7 @@ class ProfileController extends Controller
                     'department' => $manager->department->name ?? null,
                 ];
             }),
+
             'evaluations' => $evaluations,
             'courses' => $courses,
         ]);

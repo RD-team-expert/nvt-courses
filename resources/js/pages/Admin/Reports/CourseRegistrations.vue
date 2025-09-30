@@ -1,229 +1,354 @@
+<!--
+  Course Registrations Report Page
+  Comprehensive reporting interface for tracking course registration statistics and user enrollment data
+-->
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { router } from '@inertiajs/vue3'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import { type BreadcrumbItemType } from '@/types'
 import { debounce } from 'lodash'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select'
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
+import {
+    Download,
+    Filter,
+    RotateCcw,
+    User,
+    GraduationCap,
+    Calendar,
+    Star,
+    CheckCircle,
+    Clock,
+    AlertCircle
+} from 'lucide-vue-next'
 
 const props = defineProps({
-  registrations: Array,
-  courses: Array,
-  filters: Object
+    registrations: Array,
+    courses: Array,
+    filters: Object
 })
 
 // Define breadcrumbs
 const breadcrumbs: BreadcrumbItemType[] = [
-  { name: 'Dashboard', href: route('dashboard') },
-  { name: 'Reports & Analytics', href: route('admin.reports.index') },
-  { name: 'Course Registrations', href: route('admin.reports.course-registrations') }
+    { name: 'Dashboard', href: route('dashboard') },
+    { name: 'Reports & Analytics', href: route('admin.reports.index') },
+    { name: 'Course Registrations', href: route('admin.reports.course-registrations') }
 ]
 
 // Filter state
 const filters = ref({
-  course_id: props.filters?.course_id || '',
-  status: props.filters?.status || '',
-  date_from: props.filters?.date_from || '',
-  date_to: props.filters?.date_to || ''
+    course_id: props.filters?.course_id || '',
+    status: props.filters?.status || '',
+    date_from: props.filters?.date_from || '',
+    date_to: props.filters?.date_to || ''
 })
+
+// Handle select changes
+const handleCourseChange = (value: string) => {
+    filters.value.course_id = value === 'all' ? '' : value
+}
+
+const handleStatusChange = (value: string) => {
+    filters.value.status = value === 'all' ? '' : value
+}
 
 // Apply filters with debounce
 const applyFilters = debounce(() => {
-  // Make a copy of the filters to avoid reactivity issues
-  const filterParams = { ...filters.value };
-  
-  // Format dates if needed
-  if (filterParams.date_from) {
-    filterParams.date_from = filterParams.date_from.trim();
-  }
-  if (filterParams.date_to) {
-    filterParams.date_to = filterParams.date_to.trim();
-  }
-  
-  router.get(route('admin.reports.course-registrations'), filterParams, {
-    preserveState: true,
-    replace: true
-  });
-}, 500);
+    // Make a copy of the filters to avoid reactivity issues
+    const filterParams = { ...filters.value }
+
+    // Format dates if needed
+    if (filterParams.date_from) {
+        filterParams.date_from = filterParams.date_from.trim()
+    }
+    if (filterParams.date_to) {
+        filterParams.date_to = filterParams.date_to.trim()
+    }
+
+    router.get(route('admin.reports.course-registrations'), filterParams, {
+        preserveState: true,
+        replace: true
+    })
+}, 500)
 
 // Watch for filter changes
 watch(filters, () => {
-  applyFilters()
+    applyFilters()
 }, { deep: true })
 
 // Reset filters
 const resetFilters = () => {
-  filters.value = {
-    course_id: '',
-    status: '',
-    date_from: '',
-    date_to: ''
-  }
-  applyFilters()
+    filters.value = {
+        course_id: '',
+        status: '',
+        date_from: '',
+        date_to: ''
+    }
+    applyFilters()
 }
 
 // Export to CSV
 const exportToCsv = () => {
-  const queryParams = new URLSearchParams(filters.value).toString();
-  window.location.href = route('admin.reports.export.course-registrations') + '?' + queryParams;
+    const queryParams = new URLSearchParams(filters.value).toString()
+    window.location.href = route('admin.reports.export.course-registrations') + '?' + queryParams
 }
 
 // Format date for display
 const formatDate = (dateString) => {
-  if (!dateString) return '—'
-  const date = new Date(dateString)
-  return date.toLocaleString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
+    if (!dateString) return '—'
+    const date = new Date(dateString)
+    return date.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    })
+}
+
+// Get status badge variant
+const getStatusVariant = (status) => {
+    switch (status) {
+        case 'pending':
+            return 'secondary'
+        case 'in_progress':
+            return 'default'
+        case 'completed':
+            return 'outline'
+        default:
+            return 'secondary'
+    }
+}
+
+// Get status icon
+const getStatusIcon = (status) => {
+    switch (status) {
+        case 'pending':
+            return AlertCircle
+        case 'in_progress':
+            return Clock
+        case 'completed':
+            return CheckCircle
+        default:
+            return AlertCircle
+    }
+}
+
+// Format status label
+const formatStatus = (status) => {
+    return status.replace('_', ' ').charAt(0).toUpperCase() + status.replace('_', ' ').slice(1)
+}
+
+// Generate stars for rating display
+const generateStars = (rating: number) => {
+    const stars = []
+    for (let i = 1; i <= 5; i++) {
+        stars.push(i <= rating ? 'filled' : 'empty')
+    }
+    return stars
 }
 </script>
 
 <template>
-  <AdminLayout :breadcrumbs="breadcrumbs">
-    <div class="flex justify-between items-center mb-6">
-      <h1 class="text-2xl font-bold">Course Registrations Report</h1>
-      <button 
-      @click="exportToCsv" 
-      class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition flex items-center"
-    >
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-      </svg>
-      Export to CSV
-    </button>
-  </div>
-  
-  <!-- Filters -->
-  <div class="bg-white p-6 rounded-lg shadow mb-6">
-    <h2 class="text-lg font-medium text-gray-900 mb-4">Filter Registrations</h2>
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-      <div>
-        <label for="course_filter" class="block text-sm font-medium text-gray-700 mb-1">Course</label>
-        <select
-          id="course_filter"
-          v-model="filters.course_id"
-          class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">All Courses</option>
-          <option v-for="course in courses" :key="course.id" :value="course.id">{{ course.name }}</option>
-        </select>
-      </div>
-      
-      <div>
-        <label for="status_filter" class="block text-sm font-medium text-gray-700 mb-1">Status</label>
-        <select
-          id="status_filter"
-          v-model="filters.status"
-          class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">All Statuses</option>
-          <option value="pending">Pending</option>
-          <option value="in_progress">In Progress</option>
-          <option value="completed">Completed</option>
-        </select>
-      </div>
-      
-      <div>
-        <label for="date_from" class="block text-sm font-medium text-gray-700 mb-1">Date From</label>
-        <input
-          id="date_from"
-          type="date"
-          v-model="filters.date_from"
-          class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-        />
-      </div>
-      
-      <div>
-        <label for="date_to" class="block text-sm font-medium text-gray-700 mb-1">Date To</label>
-        <input
-          id="date_to"
-          type="date"
-          v-model="filters.date_to"
-          class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-        />
-      </div>
-      
-      <div class="flex items-end md:col-span-4">
-        <button
-          @click="resetFilters"
-          class="inline-flex items-center px-4 py-2 bg-gray-100 border border-transparent rounded-md font-medium text-gray-700 hover:bg-gray-200 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition"
-        >
-          Reset Filters
-        </button>
-      </div>
-    </div>
-  </div>
-  
-  <!-- Registrations Table -->
-  <div class="bg-white rounded-lg shadow overflow-hidden">
-    <table class="min-w-full divide-y divide-gray-200">
-      <thead class="bg-gray-50">
-        <tr>
-          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-            User
-          </th>
-          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-            Course
-          </th>
-          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-            Status
-          </th>
-          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-            Registered At
-          </th>
-          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-            Completed At
-          </th>
-          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-            Rating
-          </th>
-        </tr>
-      </thead>
-      <tbody class="bg-white divide-y divide-gray-200">
-        <tr v-if="registrations.length === 0">
-          <td colspan="6" class="px-6 py-4 text-center text-gray-500">No registration records found</td>
-        </tr>
-        <tr v-else v-for="(record, i) in registrations" :key="i" class="hover:bg-gray-50">
-          <td class="px-6 py-4 whitespace-nowrap">
-            <div class="flex items-center">
-              <div>
-                <div class="text-sm font-medium text-gray-900">{{ record.user_name }}</div>
-                <div class="text-sm text-gray-500">{{ record.user_email }}</div>
-              </div>
+    <AdminLayout :breadcrumbs="breadcrumbs">
+        <div class="px-4 sm:px-0 space-y-6">
+            <!-- Header -->
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h1 class="text-xl sm:text-2xl font-bold text-foreground">Course Registrations Report</h1>
+                    <p class="text-sm text-muted-foreground mt-1">Comprehensive reporting interface for tracking course registration statistics and user enrollment data</p>
+                </div>
+                <Button @click="exportToCsv" class="w-full sm:w-auto">
+                    <Download class="mr-2 h-4 w-4" />
+                    Export to CSV
+                </Button>
             </div>
-          </td>
-          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ record.course_name }}</td>
-          <td class="px-6 py-4 whitespace-nowrap">
-            <span 
-              class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
-              :class="{
-                'bg-yellow-100 text-yellow-800': record.status === 'pending',
-                'bg-blue-100 text-blue-800': record.status === 'in_progress',
-                'bg-green-100 text-green-800': record.status === 'completed'
-              }"
-            >
-              {{ record.status.replace('_', ' ').charAt(0).toUpperCase() + record.status.replace('_', ' ').slice(1) }}
-            </span>
-          </td>
-          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatDate(record.registered_at) }}</td>
-          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ record.completed_at ? formatDate(record.completed_at) : '—' }}</td>
-          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-            <div v-if="record.rating" class="flex items-center">
-              <span>{{ record.rating }}/5</span>
-              <div class="ml-1 flex">
-                <svg v-for="i in 5" :key="i" class="h-4 w-4" :class="i <= record.rating ? 'text-yellow-400' : 'text-gray-300'" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                </svg>
-              </div>
-            </div>
-            <span v-else>—</span>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-</AdminLayout>
+
+            <!-- Filters -->
+            <Card>
+                <CardHeader>
+                    <div class="flex items-center">
+                        <Filter class="mr-2 h-5 w-5 text-primary" />
+                        <div>
+                            <CardTitle>Filter Registrations</CardTitle>
+                            <CardDescription>Use the filters below to narrow down the registration records</CardDescription>
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="space-y-2">
+                            <Label for="course_filter">Course</Label>
+                            <Select
+                                :model-value="filters.course_id || 'all'"
+                                @update:model-value="handleCourseChange"
+                            >
+                                <SelectTrigger id="course_filter">
+                                    <SelectValue placeholder="All Courses" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Courses</SelectItem>
+                                    <SelectItem v-for="course in courses" :key="course.id" :value="course.id.toString()">
+                                        {{ course.name }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div class="space-y-2">
+                            <Label for="status_filter">Status</Label>
+                            <Select
+                                :model-value="filters.status || 'all'"
+                                @update:model-value="handleStatusChange"
+                            >
+                                <SelectTrigger id="status_filter">
+                                    <SelectValue placeholder="All Statuses" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Statuses</SelectItem>
+                                    <SelectItem value="pending">Pending</SelectItem>
+                                    <SelectItem value="in_progress">In Progress</SelectItem>
+                                    <SelectItem value="completed">Completed</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div class="space-y-2">
+                            <Label for="date_from">Date From</Label>
+                            <Input
+                                id="date_from"
+                                type="date"
+                                v-model="filters.date_from"
+                            />
+                        </div>
+
+                        <div class="space-y-2">
+                            <Label for="date_to">Date To</Label>
+                            <Input
+                                id="date_to"
+                                type="date"
+                                v-model="filters.date_to"
+                            />
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end mt-4">
+                        <Button @click="resetFilters" variant="outline">
+                            <RotateCcw class="mr-2 h-4 w-4" />
+                            Reset Filters
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <!-- Registrations Table -->
+            <Card>
+                <div class="overflow-x-auto">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>
+                                    <div class="flex items-center">
+                                        <User class="mr-2 h-4 w-4" />
+                                        User
+                                    </div>
+                                </TableHead>
+                                <TableHead>
+                                    <div class="flex items-center">
+                                        <GraduationCap class="mr-2 h-4 w-4" />
+                                        Course
+                                    </div>
+                                </TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead>
+                                    <div class="flex items-center">
+                                        <Calendar class="mr-2 h-4 w-4" />
+                                        Registered At
+                                    </div>
+                                </TableHead>
+                                <TableHead>
+                                    <div class="flex items-center">
+                                        <CheckCircle class="mr-2 h-4 w-4" />
+                                        Completed At
+                                    </div>
+                                </TableHead>
+                                <TableHead>
+                                    <div class="flex items-center">
+                                        <Star class="mr-2 h-4 w-4" />
+                                        Rating
+                                    </div>
+                                </TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            <TableRow v-if="registrations.length === 0">
+                                <TableCell colspan="6" class="text-center text-muted-foreground py-8">
+                                    <div class="flex flex-col items-center">
+                                        <GraduationCap class="h-12 w-12 text-muted-foreground mb-2" />
+                                        No registration records found
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                            <TableRow v-else v-for="(record, i) in registrations" :key="i" class="hover:bg-muted/50">
+                                <TableCell>
+                                    <div class="space-y-1">
+                                        <div class="font-medium text-foreground">{{ record.user_name }}</div>
+                                        <div class="text-sm text-muted-foreground">{{ record.user_email }}</div>
+                                    </div>
+                                </TableCell>
+                                <TableCell>
+                                    <Badge variant="outline">{{ record.course_name }}</Badge>
+                                </TableCell>
+                                <TableCell>
+                                    <Badge :variant="getStatusVariant(record.status)" class="flex items-center w-fit">
+                                        <component :is="getStatusIcon(record.status)" class="mr-1 h-3 w-3" />
+                                        {{ formatStatus(record.status) }}
+                                    </Badge>
+                                </TableCell>
+                                <TableCell>
+                                    <div class="text-sm text-foreground">{{ formatDate(record.registered_at) }}</div>
+                                </TableCell>
+                                <TableCell>
+                                    <div class="text-sm text-foreground">{{ record.completed_at ? formatDate(record.completed_at) : '—' }}</div>
+                                </TableCell>
+                                <TableCell>
+                                    <div v-if="record.rating" class="flex items-center space-x-2">
+                                        <span class="text-sm font-medium">{{ record.rating }}/5</span>
+                                        <div class="flex">
+                                            <Star
+                                                v-for="(star, index) in generateStars(record.rating)"
+                                                :key="index"
+                                                class="h-4 w-4"
+                                                :class="star === 'filled' ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground'"
+                                            />
+                                        </div>
+                                    </div>
+                                    <span v-else class="text-muted-foreground">—</span>
+                                </TableCell>
+                            </TableRow>
+                        </TableBody>
+                    </Table>
+                </div>
+            </Card>
+        </div>
+    </AdminLayout>
 </template>

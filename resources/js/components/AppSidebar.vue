@@ -38,11 +38,17 @@ const mainNavItems: NavItem[] = [
         href: '/quizzes',
         icon: LayoutList
 
-    }, {
+    },
+    {
         title: 'Profile',
         href: '/profile',
         icon: LayoutList
 
+    },
+    {
+        title: ' audio',
+        href: '/audio',
+        icon: Clock,
     },
 ];
 
@@ -87,6 +93,11 @@ const adminNavItems: NavItem[] = [
     {
         title: ' User Evaluation',
         href: '/admin/evaluations/user-evaluation',
+        icon: Clock,
+    },
+    {
+        title: 'Admin audio',
+        href: '/admin/audio',
         icon: Clock,
     },
 

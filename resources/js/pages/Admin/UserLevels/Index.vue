@@ -1,29 +1,77 @@
+<!--
+  User Level Management Page
+  Interface for managing organizational hierarchy levels and their permissions
+-->
 <script setup lang="ts">
 import { Link, router } from '@inertiajs/vue3'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import { type BreadcrumbItemType } from '@/types'
+import { ref } from 'vue'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
+import {
+    Plus,
+    Tag,
+    Users,
+    UserCheck,
+    Eye,
+    Edit,
+    Trash2,
+    Shield
+} from 'lucide-vue-next'
 
 const props = defineProps({
     userLevels: Array,
     stats: Object,
 })
 
+const showDeleteDialog = ref(false)
+const levelToDelete = ref(null)
+
 // Delete user level
 const deleteUserLevel = (levelId: number) => {
-    if (!confirm('Are you sure you want to delete this user level? This action cannot be undone.')) {
-        return;
-    }
-
     router.delete(route('admin.user-levels.destroy', levelId), {
         preserveState: true,
         onSuccess: () => {
-            alert('User level deleted successfully!');
+            // Success handled by redirect
         },
         onError: (errors) => {
-            console.error('Delete failed:', errors);
-            alert('Failed to delete user level. Please try again.');
+            console.error('Delete failed:', errors)
+            // Error handling can be improved with toast notifications
         }
-    });
+    })
+}
+
+// Get level color scheme
+const getLevelColorScheme = (level: number) => {
+    switch (level) {
+        case 1: return { bg: 'bg-blue-100', text: 'text-blue-600', variant: 'secondary' }
+        case 2: return { bg: 'bg-green-100', text: 'text-green-600', variant: 'secondary' }
+        case 3: return { bg: 'bg-orange-100', text: 'text-orange-600', variant: 'outline' }
+        case 4: return { bg: 'bg-red-100', text: 'text-red-600', variant: 'destructive' }
+        default: return { bg: 'bg-purple-100', text: 'text-purple-600', variant: 'secondary' }
+    }
 }
 
 // Breadcrumbs
@@ -36,182 +84,196 @@ const breadcrumbs: BreadcrumbItemType[] = [
 
 <template>
     <AdminLayout :breadcrumbs="breadcrumbs">
-        <div class="px-4 sm:px-0">
-            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 gap-4">
-                <h1 class="text-xl sm:text-2xl font-bold">User Level Management</h1>
-
-                <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                    <Link
-                        :href="route('admin.user-levels.create')"
-                        class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition w-full sm:w-auto text-center"
-                    >
-                        Add New Level
-                    </Link>
+        <div class="px-4 sm:px-0 space-y-6">
+            <!-- Header -->
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h1 class="text-xl sm:text-2xl font-bold text-foreground">User Level Management</h1>
+                    <p class="text-sm text-muted-foreground mt-1">Manage organizational hierarchy levels and their permissions</p>
                 </div>
+
+                <Button :as="Link" :href="route('admin.user-levels.create')" class="w-full sm:w-auto">
+                    <Plus class="mr-2 h-4 w-4" />
+                    Add New Level
+                </Button>
             </div>
 
             <!-- Stats Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <div class="bg-white rounded-lg shadow p-6">
-                    <div class="flex items-center">
-                        <div class="shrink-0">
-                            <div class="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center">
-                                <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
-                                </svg>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card>
+                    <CardContent class="p-6">
+                        <div class="flex items-center">
+                            <div class="shrink-0">
+                                <div class="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+                                    <Tag class="h-5 w-5 text-primary-foreground" />
+                                </div>
+                            </div>
+                            <div class="ml-4 flex-1">
+                                <div class="text-sm font-medium text-muted-foreground">Total Levels</div>
+                                <div class="text-2xl font-bold text-foreground">{{ stats.total_levels || 0 }}</div>
                             </div>
                         </div>
-                        <div class="ml-5 w-0 flex-1">
-                            <dl>
-                                <dt class="text-sm font-medium text-gray-500 truncate">Total Levels</dt>
-                                <dd class="text-lg font-medium text-gray-900">{{ stats.total_levels || 0 }}</dd>
-                            </dl>
-                        </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
-                <div class="bg-white rounded-lg shadow p-6">
-                    <div class="flex items-center">
-                        <div class="shrink-0">
-                            <div class="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center">
-                                <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                                </svg>
+                <Card>
+                    <CardContent class="p-6">
+                        <div class="flex items-center">
+                            <div class="shrink-0">
+                                <div class="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center">
+                                    <Shield class="h-5 w-5 text-white" />
+                                </div>
+                            </div>
+                            <div class="ml-4 flex-1">
+                                <div class="text-sm font-medium text-muted-foreground">Management Levels</div>
+                                <div class="text-2xl font-bold text-foreground">{{ stats.management_levels || 0 }}</div>
                             </div>
                         </div>
-                        <div class="ml-5 w-0 flex-1">
-                            <dl>
-                                <dt class="text-sm font-medium text-gray-500 truncate">Management Levels</dt>
-                                <dd class="text-lg font-medium text-gray-900">{{ stats.management_levels || 0 }}</dd>
-                            </dl>
-                        </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
-                <div class="bg-white rounded-lg shadow p-6">
-                    <div class="flex items-center">
-                        <div class="shrink-0">
-                            <div class="w-8 h-8 bg-purple-500 rounded-md flex items-center justify-center">
-                                <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
-                                </svg>
+                <Card>
+                    <CardContent class="p-6">
+                        <div class="flex items-center">
+                            <div class="shrink-0">
+                                <div class="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                                    <UserCheck class="h-5 w-5 text-white" />
+                                </div>
+                            </div>
+                            <div class="ml-4 flex-1">
+                                <div class="text-sm font-medium text-muted-foreground">Users Assigned</div>
+                                <div class="text-2xl font-bold text-foreground">{{ stats.total_users_assigned || 0 }}</div>
                             </div>
                         </div>
-                        <div class="ml-5 w-0 flex-1">
-                            <dl>
-                                <dt class="text-sm font-medium text-gray-500 truncate">Users Assigned</dt>
-                                <dd class="text-lg font-medium text-gray-900">{{ stats.total_users_assigned || 0 }}</dd>
-                            </dl>
-                        </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
             </div>
 
             <!-- User Levels Table -->
-            <div class="bg-white rounded-lg shadow overflow-hidden overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Level
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Hierarchy
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Can Manage
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Users Count
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Actions
-                        </th>
-                    </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
-                    <tr v-for="level in userLevels" :key="level.id">
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="flex items-center">
-                                <div class="shrink-0 h-10 w-10">
-                                    <div class="h-10 w-10 rounded-full flex items-center justify-center"
-                                         :class="{
-                                             'bg-blue-100 text-blue-600': level.hierarchy_level === 1,
-                                             'bg-green-100 text-green-600': level.hierarchy_level === 2,
-                                             'bg-orange-100 text-orange-600': level.hierarchy_level === 3,
-                                             'bg-red-100 text-red-600': level.hierarchy_level === 4,
-                                         }">
-                                        <span class="text-sm font-bold">{{ level.code }}</span>
-                                    </div>
-                                </div>
-                                <div class="ml-4">
-                                    <div class="text-sm font-medium text-gray-900">{{ level.name }}</div>
-                                    <div class="text-sm text-gray-500">{{ level.description }}</div>
-                                </div>
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
-                                Level {{ level.hierarchy_level }}
-                            </span>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div v-if="level.can_manage_levels && level.can_manage_levels.length > 0" class="flex flex-wrap gap-1">
-                                <span v-for="managedLevel in level.can_manage_levels" :key="managedLevel"
-                                      class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                                    {{ managedLevel }}
-                                </span>
-                            </div>
-                            <div v-else class="text-sm text-gray-400">None</div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {{ level.users_count }} users
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <Link
-                                :href="route('admin.user-levels.show', level.id)"
-                                class="text-blue-600 hover:text-blue-900 mr-3 transition-colors"
-                            >
-                                View
-                            </Link>
-                            <Link
-                                :href="route('admin.user-levels.edit', level.id)"
-                                class="text-indigo-600 hover:text-indigo-900 mr-3 transition-colors"
-                            >
-                                Edit
-                            </Link>
-                            <button
-                                @click="deleteUserLevel(level.id)"
-                                class="text-red-600 hover:text-red-900 transition-colors"
-                                :disabled="level.users_count > 0"
-                                :class="{ 'opacity-50 cursor-not-allowed': level.users_count > 0 }"
-                            >
-                                Delete
-                            </button>
-                        </td>
-                    </tr>
-                    </tbody>
-                </table>
+            <Card>
+                <CardHeader>
+                    <CardTitle class="flex items-center">
+                        <Users class="mr-2 h-5 w-5" />
+                        Organizational Levels
+                    </CardTitle>
+                    <CardDescription>Manage hierarchy levels and their management permissions</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div class="overflow-x-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Level</TableHead>
+                                    <TableHead>Hierarchy</TableHead>
+                                    <TableHead>Can Manage</TableHead>
+                                    <TableHead>Users Count</TableHead>
+                                    <TableHead class="text-right">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                <TableRow v-for="level in userLevels" :key="level.id" class="hover:bg-muted/50">
+                                    <TableCell>
+                                        <div class="flex items-center space-x-3">
+                                            <Avatar class="h-10 w-10">
+                                                <AvatarFallback
+                                                    :class="[getLevelColorScheme(level.hierarchy_level).bg, getLevelColorScheme(level.hierarchy_level).text]"
+                                                    class="font-bold text-sm"
+                                                >
+                                                    {{ level.code }}
+                                                </AvatarFallback>
+                                            </Avatar>
+                                            <div>
+                                                <div class="font-medium text-foreground">{{ level.name }}</div>
+                                                <div class="text-sm text-muted-foreground">{{ level.description }}</div>
+                                            </div>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge variant="secondary">
+                                            Level {{ level.hierarchy_level }}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                        <div v-if="level.can_manage_levels && level.can_manage_levels.length > 0" class="flex flex-wrap gap-1">
+                                            <Badge v-for="managedLevel in level.can_manage_levels" :key="managedLevel" variant="outline" class="text-xs">
+                                                {{ managedLevel }}
+                                            </Badge>
+                                        </div>
+                                        <div v-else class="text-sm text-muted-foreground">None</div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge variant="secondary">{{ level.users_count }} users</Badge>
+                                    </TableCell>
+                                    <TableCell class="text-right">
+                                        <div class="flex items-center justify-end space-x-2">
+                                            <Button
+                                                :as="Link"
+                                                :href="route('admin.user-levels.show', level.id)"
+                                                variant="ghost"
+                                                size="sm"
+                                            >
+                                                <Eye class="h-4 w-4" />
+                                            </Button>
+                                            <Button
+                                                :as="Link"
+                                                :href="route('admin.user-levels.edit', level.id)"
+                                                variant="ghost"
+                                                size="sm"
+                                            >
+                                                <Edit class="h-4 w-4" />
+                                            </Button>
+                                            <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        :disabled="level.users_count > 0"
+                                                        class="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                    >
+                                                        <Trash2 class="h-4 w-4" />
+                                                    </Button>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent>
+                                                    <AlertDialogHeader>
+                                                        <AlertDialogTitle>Delete User Level</AlertDialogTitle>
+                                                        <AlertDialogDescription>
+                                                            Are you sure you want to delete the "{{ level.name }}" level? This action cannot be undone.
+                                                            <div v-if="level.users_count > 0" class="mt-2 p-2 bg-destructive/10 text-destructive text-sm rounded">
+                                                                <strong>Warning:</strong> This level has {{ level.users_count }} users assigned and cannot be deleted.
+                                                            </div>
+                                                        </AlertDialogDescription>
+                                                    </AlertDialogHeader>
+                                                    <AlertDialogFooter>
+                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                        <AlertDialogAction
+                                                            @click="deleteUserLevel(level.id)"
+                                                            :disabled="level.users_count > 0"
+                                                            class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                                        >
+                                                            Delete Level
+                                                        </AlertDialogAction>
+                                                    </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            </TableBody>
+                        </Table>
 
-                <!-- Empty state -->
-                <div v-if="!userLevels || userLevels.length === 0" class="text-center py-12">
-                    <div class="text-gray-500">
-                        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                        </svg>
-                        <h3 class="mt-2 text-sm font-medium text-gray-900">No user levels found</h3>
-                        <p class="mt-1 text-sm text-gray-500">Get started by creating organizational levels (L1, L2, L3, L4).</p>
-                        <div class="mt-6">
-                            <Link
-                                :href="route('admin.user-levels.create')"
-                                class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                            >
+                        <!-- Empty state -->
+                        <div v-if="!userLevels || userLevels.length === 0" class="text-center py-12">
+                            <Tag class="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                            <h3 class="text-lg font-medium text-foreground mb-2">No user levels found</h3>
+                            <p class="text-sm text-muted-foreground mb-6">Get started by creating organizational levels (L1, L2, L3, L4).</p>
+                            <Button :as="Link" :href="route('admin.user-levels.create')">
+                                <Plus class="mr-2 h-4 w-4" />
                                 Add New Level
-                            </Link>
+                            </Button>
                         </div>
                     </div>
-                </div>
-            </div>
+                </CardContent>
+            </Card>
         </div>
     </AdminLayout>
 </template>

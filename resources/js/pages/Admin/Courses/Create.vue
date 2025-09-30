@@ -369,7 +369,7 @@ function getProgressMessage() {
                     <form @submit.prevent="submit">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-6">
                     <!-- Course Name -->
-                    <div class="col-span-full">
+                    <div class="col-span-full ">
                         <Label for="name" class="mb-2">Course Name</Label>
                         <Input
                             id="name"
@@ -423,7 +423,7 @@ function getProgressMessage() {
                     <!-- Course Description -->
                     <div class="col-span-full">
                         <Label class="mb-2">Description</Label>
-                        <Editor
+                        <Editor class="dark"
                             v-model="form.description"
                             :disabled="form.processing"
                             :api-key="'r1racrxd2joy9wp9xp9sj91ka9j4m3humenifqvwtx9s6i3y'"
@@ -557,7 +557,7 @@ function getProgressMessage() {
                         </div>
 
                         <!-- Course Availabilities Section -->
-                        <div class="mb-6">
+                        <div class="mb-6 ">
                     <div class="flex justify-between items-center mb-4">
                         <h2 class="text-lg font-semibold">Course Session Schedules</h2>
                         <Button
@@ -569,11 +569,11 @@ function getProgressMessage() {
                         </Button>
                     </div>
 
-                    <div class="space-y-4">
+                    <div class="space-y-4 ">
                         <div
                             v-for="(availability, index) in form.availabilities"
                             :key="index"
-                            class="border border-gray-300 rounded-lg p-4 bg-gray-50"
+                            class="border border-gray-300 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-800"
                         >
                             <div class="flex justify-between items-center mb-3">
                                 <h3 class="font-medium">Session Schedule {{ index + 1 }}</h3>

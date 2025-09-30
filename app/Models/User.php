@@ -360,4 +360,25 @@ class User extends Authenticatable
      * User's organizational level (original method)
      */
 
+    public function audioProgress()
+    {
+        return $this->hasMany(AudioProgress::class);
+    }
+
+    /**
+     * Get audios created by this user
+     */
+    public function createdAudios()
+    {
+        return $this->hasMany(Audio::class, 'created_by');
+    }
+
+    /**
+     * Get progress for a specific audio
+     */
+    public function getAudioProgress(Audio $audio)
+    {
+        return $this->audioProgress()->where('audio_id', $audio->id)->first();
+    }
+
 }

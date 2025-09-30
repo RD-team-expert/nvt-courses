@@ -1,50 +1,89 @@
+<!--
+  Manager Role Details Page
+  View detailed information about a specific manager role assignment
+-->
 <script setup lang="ts">
 import { Link, router } from '@inertiajs/vue3'
 import AdminLayout from '@/layouts/AdminLayout.vue'
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { type BreadcrumbItemType } from '@/types'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Separator } from '@/components/ui/separator'
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
+import {
+    Edit,
+    List,
+    Grid3X3,
+    Trash2,
+    Building,
+    User,
+    Crown,
+    Calendar,
+    AlertTriangle
+} from 'lucide-vue-next'
 
 const props = defineProps({
     role: Object,
 })
 
+const showTerminateDialog = ref(false)
+
 // Terminate role
 const terminateRole = () => {
-    if (!confirm('Are you sure you want to terminate this manager role?')) {
-        return;
-    }
-
     router.delete(route('admin.manager-roles.destroy', props.role.id), {
         onSuccess: () => {
             // Will redirect to index page automatically
         },
         onError: (errors) => {
-            console.error('Terminate failed:', errors);
-            alert('Failed to terminate role. Please try again.');
+            console.error('Terminate failed:', errors)
+            // Error handling can be improved with toast notifications
         }
-    });
+    })
 }
 
-// Get role type color
-const getRoleTypeColor = (roleType: string) => {
-    const colors = {
-        'direct_manager': 'bg-blue-100 text-blue-800',
-        'project_manager': 'bg-green-100 text-green-800',
-        'department_head': 'bg-purple-100 text-purple-800',
-        'senior_manager': 'bg-red-100 text-red-800',
-        'team_lead': 'bg-yellow-100 text-yellow-800',
-    };
-    return colors[roleType] || 'bg-gray-100 text-gray-800';
+// Get role type badge variant
+const getRoleTypeVariant = (roleType: string) => {
+    const variants = {
+        'direct_manager': 'default',
+        'project_manager': 'secondary',
+        'department_head': 'outline',
+        'senior_manager': 'destructive',
+        'team_lead': 'secondary',
+    }
+    return variants[roleType] || 'outline'
 }
 
-// Get authority level color
-const getAuthorityColor = (level: number) => {
-    const colors = {
-        1: 'bg-red-100 text-red-800',    // High Authority
-        2: 'bg-yellow-100 text-yellow-800', // Medium Authority
-        3: 'bg-green-100 text-green-800',   // Low Authority
-    };
-    return colors[level] || 'bg-gray-100 text-gray-800';
+// Get authority level variant
+const getAuthorityVariant = (level: number) => {
+    const variants = {
+        1: 'destructive',    // High Authority
+        2: 'secondary',      // Medium Authority
+        3: 'default',        // Low Authority
+    }
+    return variants[level] || 'outline'
+}
+
+// Get authority level label
+const getAuthorityLabel = (level: number) => {
+    const labels = {
+        1: 'High Authority',
+        2: 'Medium Authority',
+        3: 'Low Authority',
+    }
+    return labels[level] || `Level ${level}`
 }
 
 // ✅ FIXED: Compute breadcrumbs to avoid route generation errors
@@ -54,282 +93,318 @@ const breadcrumbs = computed<BreadcrumbItemType[]>(() => {
             { name: 'Dashboard', href: route('dashboard') },
             { name: 'Manager Roles', href: route('admin.manager-roles.index') },
             { name: 'Role Details', href: '#' }
-        ];
+        ]
     }
 
     return [
         { name: 'Dashboard', href: route('dashboard') },
         { name: 'Manager Roles', href: route('admin.manager-roles.index') },
         { name: 'Role Details', href: route('admin.manager-roles.show', props.role.id) }
-    ];
-});
+    ]
+})
 </script>
 
 <template>
     <AdminLayout :breadcrumbs="breadcrumbs">
-        <div class="px-4 sm:px-0">
+        <div class="px-4 sm:px-0 space-y-6">
             <!-- Header -->
-            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                    <h1 class="text-xl sm:text-2xl font-bold">Manager Role Details</h1>
-                    <p class="text-sm text-gray-600 mt-1">
+                    <h1 class="text-xl sm:text-2xl font-bold text-foreground">Manager Role Details</h1>
+                    <p class="text-sm text-muted-foreground mt-1">
                         {{ role?.role_display || 'Unknown Role' }} assignment for {{ role?.manager?.name || 'Unknown User' }}
                     </p>
                 </div>
 
                 <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                    <Link
-                        :href="route('admin.manager-roles.edit', role.id)"
-                        class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition w-full sm:w-auto text-center"
+                    <Button
                         v-if="role?.id"
+                        :as="Link"
+                        :href="route('admin.manager-roles.edit', role.id)"
+                        class="w-full sm:w-auto"
                     >
+                        <Edit class="mr-2 h-4 w-4" />
                         Edit Role
-                    </Link>
-                    <button
-                        @click="terminateRole"
-                        class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition w-full sm:w-auto"
-                        v-if="role?.is_active"
-                    >
-                        Terminate Role
-                    </button>
+                    </Button>
+
+                    <AlertDialog v-if="role?.is_active">
+                        <AlertDialogTrigger asChild>
+                            <Button variant="destructive" class="w-full sm:w-auto">
+                                <Trash2 class="mr-2 h-4 w-4" />
+                                Terminate Role
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Terminate Manager Role</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    Are you sure you want to terminate this manager role? This action cannot be undone and will permanently remove the management assignment.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction @click="terminateRole" class="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                    Yes, Terminate Role
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6" v-if="role">
+            <div v-if="role" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <!-- Main Role Information -->
                 <div class="lg:col-span-2 space-y-6">
                     <!-- Role Overview Card -->
-                    <div class="bg-white rounded-lg shadow p-6">
-                        <h2 class="text-lg font-medium text-gray-900 mb-4">Role Overview</h2>
-
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <!-- Manager Info -->
-                            <div>
-                                <h3 class="text-sm font-medium text-gray-700 mb-3">Manager</h3>
-                                <div class="flex items-center space-x-4">
-                                    <div class="shrink-0 h-12 w-12">
-                                        <div class="h-12 w-12 rounded-full bg-gray-200 flex items-center justify-center">
-                                            <span class="text-lg font-medium text-gray-600">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Role Overview</CardTitle>
+                            <CardDescription>Basic information about the manager role assignment</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <!-- Manager Info -->
+                                <div class="space-y-3">
+                                    <h3 class="text-sm font-medium text-muted-foreground">Manager</h3>
+                                    <div class="flex items-center space-x-4">
+                                        <Avatar class="h-12 w-12">
+                                            <AvatarFallback class="text-lg">
                                                 {{ role.manager?.name ? role.manager.name.charAt(0).toUpperCase() : '?' }}
-                                            </span>
+                                            </AvatarFallback>
+                                        </Avatar>
+                                        <div>
+                                            <div class="font-medium text-foreground">{{ role.manager?.name || 'Unknown User' }}</div>
+                                            <div class="text-sm text-muted-foreground">{{ role.manager?.email || 'N/A' }}</div>
+                                            <div v-if="role.manager?.level" class="text-xs text-muted-foreground mt-1">{{ role.manager.level }}</div>
                                         </div>
                                     </div>
-                                    <div>
-                                        <div class="text-sm font-medium text-gray-900">{{ role.manager?.name || 'Unknown User' }}</div>
-                                        <div class="text-sm text-gray-500">{{ role.manager?.email || 'N/A' }}</div>
-                                        <div v-if="role.manager?.level" class="text-xs text-gray-400 mt-1">{{ role.manager.level }}</div>
-                                    </div>
                                 </div>
-                            </div>
 
-                            <!-- Department Info -->
-                            <div>
-                                <h3 class="text-sm font-medium text-gray-700 mb-3">Department</h3>
-                                <div class="flex items-center space-x-4">
-                                    <div class="shrink-0 h-12 w-12">
-                                        <div class="h-12 w-12 rounded-lg bg-blue-100 flex items-center justify-center">
-                                            <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
-                                            </svg>
+                                <!-- Department Info -->
+                                <div class="space-y-3">
+                                    <h3 class="text-sm font-medium text-muted-foreground">Department</h3>
+                                    <div class="flex items-center space-x-4">
+                                        <div class="shrink-0 h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                                            <Building class="w-6 h-6 text-primary" />
                                         </div>
-                                    </div>
-                                    <div>
-                                        <div class="text-sm font-medium text-gray-900">{{ role.department?.name || 'Unknown Department' }}</div>
-                                        <div class="text-sm text-gray-500">{{ role.department?.code || 'N/A' }}</div>
-                                        <div v-if="role.department?.parent" class="text-xs text-gray-400 mt-1">Parent: {{ role.department.parent }}</div>
+                                        <div>
+                                            <div class="font-medium text-foreground">{{ role.department?.name || 'Unknown Department' }}</div>
+                                            <div class="text-sm text-muted-foreground">{{ role.department?.code || 'N/A' }}</div>
+                                            <div v-if="role.department?.parent" class="text-xs text-muted-foreground mt-1">Parent: {{ role.department.parent }}</div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    </div>
+                        </CardContent>
+                    </Card>
 
                     <!-- Role Details Card -->
-                    <div class="bg-white rounded-lg shadow p-6">
-                        <h2 class="text-lg font-medium text-gray-900 mb-4">Role Details</h2>
-
-                        <dl class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <dt class="text-sm font-medium text-gray-700">Role Type</dt>
-                                <dd class="mt-1">
-                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
-                                          :class="getRoleTypeColor(role.role_type)">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Role Details</CardTitle>
+                            <CardDescription>Specific configuration and settings for this role</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div class="space-y-2">
+                                    <div class="text-sm font-medium text-muted-foreground">Role Type</div>
+                                    <Badge :variant="getRoleTypeVariant(role.role_type)">
                                         {{ role.role_display || 'Unknown Role' }}
-                                    </span>
-                                </dd>
-                            </div>
+                                    </Badge>
+                                </div>
 
-                            <div>
-                                <dt class="text-sm font-medium text-gray-700">Authority Level</dt>
-                                <dd class="mt-1">
-                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
-                                          :class="getAuthorityColor(role.authority_level)">
-                                        {{ role.authority_display || `Level ${role.authority_level}` }}
-                                    </span>
-                                </dd>
-                            </div>
+                                <div class="space-y-2">
+                                    <div class="text-sm font-medium text-muted-foreground">Authority Level</div>
+                                    <Badge :variant="getAuthorityVariant(role.authority_level)">
+                                        {{ getAuthorityLabel(role.authority_level) }}
+                                    </Badge>
+                                </div>
 
-                            <div>
-                                <dt class="text-sm font-medium text-gray-700">Primary Role</dt>
-                                <dd class="mt-1">
-                                    <span v-if="role.is_primary"
-                                          class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
-                                        Yes
-                                    </span>
-                                    <span v-else class="text-sm text-gray-500">No</span>
-                                </dd>
-                            </div>
+                                <div class="space-y-2">
+                                    <div class="text-sm font-medium text-muted-foreground">Primary Role</div>
+                                    <div>
+                                        <Badge v-if="role.is_primary" variant="default">
+                                            <Crown class="mr-1 h-3 w-3" />
+                                            Yes
+                                        </Badge>
+                                        <span v-else class="text-sm text-muted-foreground">No</span>
+                                    </div>
+                                </div>
 
-                            <div>
-                                <dt class="text-sm font-medium text-gray-700">Status</dt>
-                                <dd class="mt-1">
-                                    <span
-                                        class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
-                                        :class="{
-                                            'bg-green-100 text-green-800': role.is_active,
-                                            'bg-red-100 text-red-800': !role.is_active
-                                        }"
-                                    >
+                                <div class="space-y-2">
+                                    <div class="text-sm font-medium text-muted-foreground">Status</div>
+                                    <Badge :variant="role.is_active ? 'default' : 'destructive'">
                                         {{ role.is_active ? 'Active' : 'Terminated' }}
-                                    </span>
-                                </dd>
-                            </div>
+                                    </Badge>
+                                </div>
 
-                            <div>
-                                <dt class="text-sm font-medium text-gray-700">Start Date</dt>
-                                <dd class="mt-1 text-sm text-gray-900">{{ role.start_date || 'N/A' }}</dd>
-                            </div>
+                                <div class="space-y-2">
+                                    <div class="text-sm font-medium text-muted-foreground">Start Date</div>
+                                    <div class="text-sm text-foreground">{{ role.start_date || 'N/A' }}</div>
+                                </div>
 
-                            <div>
-                                <dt class="text-sm font-medium text-gray-700">End Date</dt>
-                                <dd class="mt-1 text-sm text-gray-900">{{ role.end_date || 'Permanent' }}</dd>
-                            </div>
-                        </dl>
-                    </div>
-
-                    <!-- Managed User Card -->
-                    <div v-if="role.managed_user" class="bg-white rounded-lg shadow p-6">
-                        <h2 class="text-lg font-medium text-gray-900 mb-4">Direct Report</h2>
-
-                        <div class="flex items-center space-x-4">
-                            <div class="shrink-0 h-12 w-12">
-                                <div class="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
-                                    <span class="text-lg font-medium text-green-600">
-                                        {{ role.managed_user.name.charAt(0).toUpperCase() }}
-                                    </span>
+                                <div class="space-y-2">
+                                    <div class="text-sm font-medium text-muted-foreground">End Date</div>
+                                    <div class="text-sm text-foreground">{{ role.end_date || 'Permanent' }}</div>
                                 </div>
                             </div>
-                            <div>
-                                <div class="text-sm font-medium text-gray-900">{{ role.managed_user.name }}</div>
-                                <div class="text-sm text-gray-500">{{ role.managed_user.email }}</div>
-                                <div v-if="role.managed_user.level" class="text-xs text-gray-400 mt-1">{{ role.managed_user.level }}</div>
-                            </div>
-                        </div>
-                    </div>
+                        </CardContent>
+                    </Card>
 
-                    <div v-else class="bg-white rounded-lg shadow p-6">
-                        <h2 class="text-lg font-medium text-gray-900 mb-4">Management Scope</h2>
-                        <div class="flex items-center space-x-3">
-                            <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
-                            </svg>
-                            <span class="text-sm text-gray-600">Department-wide management role</span>
-                        </div>
-                    </div>
+                    <!-- Managed User Card -->
+                    <Card v-if="role.managed_user">
+                        <CardHeader>
+                            <CardTitle>Direct Report</CardTitle>
+                            <CardDescription>Employee directly managed by this role</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div class="flex items-center space-x-4">
+                                <Avatar class="h-12 w-12">
+                                    <AvatarFallback class="bg-green-100 text-green-600">
+                                        {{ role.managed_user.name.charAt(0).toUpperCase() }}
+                                    </AvatarFallback>
+                                </Avatar>
+                                <div>
+                                    <div class="font-medium text-foreground">{{ role.managed_user.name }}</div>
+                                    <div class="text-sm text-muted-foreground">{{ role.managed_user.email }}</div>
+                                    <div v-if="role.managed_user.level" class="text-xs text-muted-foreground mt-1">{{ role.managed_user.level }}</div>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card v-else>
+                        <CardHeader>
+                            <CardTitle>Management Scope</CardTitle>
+                            <CardDescription>Area of responsibility for this management role</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div class="flex items-center space-x-3">
+                                <Building class="w-6 h-6 text-muted-foreground" />
+                                <span class="text-sm text-muted-foreground">Department-wide management role</span>
+                            </div>
+                        </CardContent>
+                    </Card>
 
                     <!-- Notes Card -->
-                    <div v-if="role.notes" class="bg-white rounded-lg shadow p-6">
-                        <h2 class="text-lg font-medium text-gray-900 mb-4">Notes</h2>
-                        <p class="text-sm text-gray-600 whitespace-pre-wrap">{{ role.notes }}</p>
-                    </div>
+                    <Card v-if="role.notes">
+                        <CardHeader>
+                            <CardTitle>Notes</CardTitle>
+                            <CardDescription>Additional information and comments</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <p class="text-sm text-muted-foreground whitespace-pre-wrap">{{ role.notes }}</p>
+                        </CardContent>
+                    </Card>
                 </div>
 
                 <!-- Sidebar -->
                 <div class="space-y-6">
                     <!-- Quick Actions -->
-                    <div class="bg-white rounded-lg shadow p-6">
-                        <h2 class="text-lg font-medium text-gray-900 mb-4">Quick Actions</h2>
-
-                        <div class="space-y-3">
-                            <Link
-                                :href="route('admin.manager-roles.edit', role.id)"
-                                class="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors w-full"
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Quick Actions</CardTitle>
+                            <CardDescription>Common actions for this role</CardDescription>
+                        </CardHeader>
+                        <CardContent class="space-y-3">
+                            <Button
                                 v-if="role.id"
+                                :as="Link"
+                                :href="route('admin.manager-roles.edit', role.id)"
+                                variant="outline"
+                                class="w-full justify-start"
                             >
-                                <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                                </svg>
+                                <Edit class="mr-3 h-4 w-4" />
                                 Edit Role
-                            </Link>
+                            </Button>
 
-                            <Link
+                            <Button
+                                :as="Link"
                                 :href="route('admin.manager-roles.index')"
-                                class="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors w-full"
+                                variant="outline"
+                                class="w-full justify-start"
                             >
-                                <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
-                                </svg>
+                                <List class="mr-3 h-4 w-4" />
                                 View All Roles
-                            </Link>
+                            </Button>
 
-                            <Link
+                            <Button
+                                :as="Link"
                                 :href="route('admin.manager-roles.matrix')"
-                                class="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors w-full"
+                                variant="outline"
+                                class="w-full justify-start"
                             >
-                                <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                                </svg>
+                                <Grid3X3 class="mr-3 h-4 w-4" />
                                 Matrix View
-                            </Link>
+                            </Button>
 
-                            <button
-                                @click="terminateRole"
-                                class="flex items-center px-3 py-2 text-sm font-medium text-red-700 bg-red-100 rounded-md hover:bg-red-200 transition-colors w-full"
-                                v-if="role.is_active"
-                            >
-                                <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                </svg>
-                                Terminate Role
-                            </button>
-                        </div>
-                    </div>
+                            <Separator />
+
+                            <AlertDialog v-if="role.is_active">
+                                <AlertDialogTrigger asChild>
+                                    <Button variant="outline" class="w-full justify-start text-destructive hover:text-destructive">
+                                        <Trash2 class="mr-3 h-4 w-4" />
+                                        Terminate Role
+                                    </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>Terminate Manager Role</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                            Are you sure you want to terminate this manager role? This action cannot be undone and will permanently remove the management assignment.
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction @click="terminateRole" class="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                            Yes, Terminate Role
+                                        </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                        </CardContent>
+                    </Card>
 
                     <!-- Role Metadata -->
-                    <div class="bg-white rounded-lg shadow p-6">
-                        <h2 class="text-lg font-medium text-gray-900 mb-4">Role Information</h2>
-
-                        <dl class="space-y-3">
-                            <div>
-                                <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Created By</dt>
-                                <dd class="mt-1 text-sm text-gray-900">{{ role.created_by || 'Unknown' }}</dd>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Role Information</CardTitle>
+                            <CardDescription>System metadata and tracking details</CardDescription>
+                        </CardHeader>
+                        <CardContent class="space-y-4">
+                            <div class="space-y-1">
+                                <div class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Created By</div>
+                                <div class="text-sm text-foreground">{{ role.created_by || 'Unknown' }}</div>
                             </div>
 
-                            <div>
-                                <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Created At</dt>
-                                <dd class="mt-1 text-sm text-gray-900">{{ role.created_at || 'N/A' }}</dd>
+                            <Separator />
+
+                            <div class="space-y-1">
+                                <div class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Created At</div>
+                                <div class="text-sm text-foreground">{{ role.created_at || 'N/A' }}</div>
                             </div>
 
-                            <div v-if="role.start_date">
-                                <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Duration</dt>
-                                <dd class="mt-1 text-sm text-gray-900">
+                            <Separator />
+
+                            <div v-if="role.start_date" class="space-y-1">
+                                <div class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Duration</div>
+                                <div class="text-sm text-foreground">
                                     {{ role.end_date ? `${role.start_date} to ${role.end_date}` : `Since ${role.start_date}` }}
-                                </dd>
+                                </div>
                             </div>
-                        </dl>
-                    </div>
+                        </CardContent>
+                    </Card>
                 </div>
             </div>
 
             <!-- Loading/Error State -->
-            <div v-else class="text-center py-12">
-                <div class="text-gray-500">
-                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.728-.833-2.498 0L4.316 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                    </svg>
-                    <h3 class="mt-2 text-sm font-medium text-gray-900">Role not found</h3>
-                    <p class="mt-1 text-sm text-gray-500">The requested manager role could not be loaded.</p>
-                </div>
-            </div>
+            <Card v-else>
+                <CardContent class="p-12 text-center">
+                    <AlertTriangle class="mx-auto h-12 w-12 text-muted-foreground" />
+                    <h3 class="mt-2 text-sm font-medium text-foreground">Role not found</h3>
+                    <p class="mt-1 text-sm text-muted-foreground">The requested manager role could not be loaded.</p>
+                </CardContent>
+            </Card>
         </div>
     </AdminLayout>
 </template>

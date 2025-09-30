@@ -79,7 +79,7 @@ const handlePageChange = (page) => {
 
 <template>
     <AdminLayout :breadcrumbs="breadcrumbs">
-        <div class="px-4 sm:px-0">
+        <div class="px-4 sm:px-0 dark">
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 gap-4">
                 <h1 class="text-xl sm:text-2xl font-bold">Manage Courses</h1>
 
@@ -138,12 +138,12 @@ const handlePageChange = (page) => {
                                 {{ course.privacy === 'public' ? '🌍 Public' : '🔒 Private' }}
                             </Badge>
                         </div>
-                        
+
                         <!-- Enrolled Count -->
                         <div class="text-sm text-muted-foreground">
                             {{ course.enrolled_count || 0 }} students enrolled
                         </div>
-                        
+
                         <!-- Actions -->
                         <div class="flex gap-2 pt-2">
                             <Button asChild variant="outline" size="sm" class="flex-1">
