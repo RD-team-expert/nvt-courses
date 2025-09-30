@@ -3,9 +3,56 @@ import { Link, router } from '@inertiajs/vue3'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import { ref } from 'vue'
 import { type BreadcrumbItemType } from '@/types'
-import NotificationModal from '@/components/modals/NotificationModal.vue'
-import ConfirmationModal from '@/components/modals/ConfirmationModal.vue'
-import LoadingModal from '@/components/modals/LoadingModal.vue'
+
+// shadcn-vue components
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle
+} from '@/components/ui/dialog'
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue
+} from '@/components/ui/select'
+import { Label } from '@/components/ui/label'
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle
+} from '@/components/ui/alert-dialog'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Separator } from '@/components/ui/separator'
+
+// Icons
+import {
+    User,
+    Users,
+    Building2,
+    BookOpen,
+    Plus,
+    Edit,
+    Trash2,
+    ExternalLink,
+    AlertCircle,
+    CheckCircle,
+    Info,
+    XCircle
+} from 'lucide-vue-next'
 
 const props = defineProps({
     department: Object,
@@ -113,7 +160,7 @@ const assignManager = () => {
     router.post(route('admin.departments.assign-manager', props.department.id), {
         user_id: selectedManager.value,
         role_type: selectedManagerType.value,
-        is_primary: selectedManagerType.value === 'department_head'
+        is_primary: selectedManagerType.value === 'director'
     }, {
         preserveState: true,
         onSuccess: () => {
@@ -154,29 +201,40 @@ const closeAddManagerModal = () => {
     selectedManagerType.value = ''
 }
 
-// Get role type badge color
-const getRoleTypeColor = (roleType: string) => {
-    const colors = {
-        'direct_manager': 'bg-blue-100 text-blue-800',
-        'project_manager': 'bg-green-100 text-green-800',
-        'department_head': 'bg-purple-100 text-purple-800',
-        'senior_manager': 'bg-red-100 text-red-800',
-        'team_lead': 'bg-yellow-100 text-yellow-800',
+// Get role type badge variant
+const getRoleTypeVariant = (roleType: string) => {
+    const variants = {
+        'direct_manager': 'secondary',
+        'project_manager': 'outline',
+        'director': 'default',
+        'senior_manager': 'destructive',
+        'supervisor': 'secondary',
     };
-    return colors[roleType] || 'bg-gray-100 text-gray-800';
+    return variants[roleType] || 'outline';
 }
 
-// Get level badge color
-const getLevelColor = (level) => {
-    if (!level) return 'bg-gray-100 text-gray-800';
+// Get level badge variant
+const getLevelVariant = (level) => {
+    if (!level) return 'outline';
 
-    const colors = {
-        'L1': 'bg-blue-100 text-blue-800',
-        'L2': 'bg-green-100 text-green-800',
-        'L3': 'bg-orange-100 text-orange-800',
-        'L4': 'bg-red-100 text-red-800',
+    const variants = {
+        'L1': 'secondary',
+        'L2': 'outline',
+        'L3': 'secondary',
+        'L4': 'destructive',
     };
-    return colors[level] || 'bg-gray-100 text-gray-800';
+    return variants[level] || 'outline';
+}
+
+// Get notification icon
+const getNotificationIcon = (type: string) => {
+    const icons = {
+        'success': CheckCircle,
+        'error': XCircle,
+        'warning': AlertCircle,
+        'info': Info
+    };
+    return icons[type] || Info;
 }
 
 // Breadcrumbs
@@ -189,417 +247,405 @@ const breadcrumbs: BreadcrumbItemType[] = [
 
 <template>
     <AdminLayout :breadcrumbs="breadcrumbs">
-        <div class="px-4 sm:px-0">
+        <div class="px-4 sm:px-0 space-y-6">
             <!-- Department Header -->
-            <div class="bg-white rounded-lg shadow p-6 mb-6">
-                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
-                    <div class="flex items-center space-x-4">
-                        <div class="shrink-0 h-16 w-16">
-                            <div class="h-16 w-16 rounded-full bg-blue-100 flex items-center justify-center">
-                                <span class="text-lg font-bold text-blue-600">
+            <Card>
+                <CardHeader>
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <div class="flex items-center space-x-4">
+                            <Avatar class="h-16 w-16">
+                                <AvatarFallback class="bg-primary/10 text-primary text-lg font-bold">
                                     {{ department.department_code }}
-                                </span>
+                                </AvatarFallback>
+                            </Avatar>
+                            <div>
+                                <CardTitle class="text-2xl">{{ department.name }}</CardTitle>
+                                <CardDescription class="mt-1">{{ department.description }}</CardDescription>
+                                <div class="mt-2 flex items-center flex-wrap gap-4 text-sm text-muted-foreground">
+                                    <span><strong>Code:</strong> {{ department.department_code }}</span>
+                                    <span v-if="department.parent_name">
+                                        <strong>Parent:</strong> {{ department.parent_name }}
+                                    </span>
+                                    <Badge :variant="department.is_active ? 'default' : 'destructive'">
+                                        {{ department.is_active ? 'Active' : 'Inactive' }}
+                                    </Badge>
+                                </div>
                             </div>
                         </div>
-                        <div>
-                            <h1 class="text-2xl font-bold text-gray-900">{{ department.name }}</h1>
-                            <p class="text-sm text-gray-600">{{ department.description }}</p>
-                            <div class="mt-2 flex items-center space-x-4">
-                                <span class="text-sm text-gray-500">
-                                    <strong>Code:</strong> {{ department.department_code }}
-                                </span>
-                                <span class="text-sm text-gray-500" v-if="department.parent_name">
-                                    <strong>Parent:</strong> {{ department.parent_name }}
-                                </span>
-                                <span
-                                    class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
-                                    :class="{
-                                        'bg-green-100 text-green-800': department.is_active,
-                                        'bg-red-100 text-red-800': !department.is_active
-                                    }"
-                                >
-                                    {{ department.is_active ? 'Active' : 'Inactive' }}
-                                </span>
-                            </div>
+
+                        <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                            <Button asChild class="w-full sm:w-auto">
+                                <Link :href="route('admin.departments.edit', department.id)">
+                                    <Edit class="h-4 w-4 mr-2" />
+                                    Edit Department
+                                </Link>
+                            </Button>
+                            <Button @click="loadManagerCandidates" variant="outline" class="w-full sm:w-auto">
+                                <Plus class="h-4 w-4 mr-2" />
+                                Add Manager
+                            </Button>
                         </div>
                     </div>
 
-                    <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                        <Link
-                            :href="route('admin.departments.edit', department.id)"
-                            class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition w-full sm:w-auto text-center"
-                        >
-                            Edit Department
-                        </Link>
-                        <button
-                            @click="loadManagerCandidates"
-                            class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition w-full sm:w-auto"
-                        >
-                            Add Manager
-                        </button>
+                    <!-- Hierarchy Path -->
+                    <div v-if="department.hierarchy_path">
+                        <Separator class="my-4" />
+                        <div class="text-sm text-muted-foreground">
+                            <strong>Hierarchy:</strong> {{ department.hierarchy_path }}
+                        </div>
                     </div>
-                </div>
-
-                <!-- Hierarchy Path -->
-                <div v-if="department.hierarchy_path" class="border-t pt-4">
-                    <div class="text-sm text-gray-600">
-                        <strong>Hierarchy:</strong> {{ department.hierarchy_path }}
-                    </div>
-                </div>
-            </div>
+                </CardHeader>
+            </Card>
 
             <!-- Stats Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                <div class="bg-white rounded-lg shadow p-6">
-                    <div class="flex items-center">
-                        <div class="shrink-0">
-                            <div class="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center">
-                                <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
-                                </svg>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <Card>
+                    <CardContent class="p-6">
+                        <div class="flex items-center">
+                            <div class="shrink-0">
+                                <div class="w-8 h-8 bg-primary rounded-md flex items-center justify-center">
+                                    <Users class="h-5 w-5 text-primary-foreground" />
+                                </div>
+                            </div>
+                            <div class="ml-5 w-0 flex-1">
+                                <p class="text-sm font-medium text-muted-foreground truncate">Total Users</p>
+                                <p class="text-lg font-medium">{{ users.length }}</p>
                             </div>
                         </div>
-                        <div class="ml-5 w-0 flex-1">
-                            <dl>
-                                <dt class="text-sm font-medium text-gray-500 truncate">Total Users</dt>
-                                <dd class="text-lg font-medium text-gray-900">{{ users.length }}</dd>
-                            </dl>
-                        </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
-                <div class="bg-white rounded-lg shadow p-6">
-                    <div class="flex items-center">
-                        <div class="shrink-0">
-                            <div class="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center">
-                                <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                                </svg>
+                <Card>
+                    <CardContent class="p-6">
+                        <div class="flex items-center">
+                            <div class="shrink-0">
+                                <div class="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center">
+                                    <User class="h-5 w-5 text-white" />
+                                </div>
+                            </div>
+                            <div class="ml-5 w-0 flex-1">
+                                <p class="text-sm font-medium text-muted-foreground truncate">Manager Roles</p>
+                                <p class="text-lg font-medium">{{ managerRoles.length }}</p>
                             </div>
                         </div>
-                        <div class="ml-5 w-0 flex-1">
-                            <dl>
-                                <dt class="text-sm font-medium text-gray-500 truncate">Manager Roles</dt>
-                                <dd class="text-lg font-medium text-gray-900">{{ managerRoles.length }}</dd>
-                            </dl>
-                        </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
-                <div class="bg-white rounded-lg shadow p-6">
-                    <div class="flex items-center">
-                        <div class="shrink-0">
-                            <div class="w-8 h-8 bg-purple-500 rounded-md flex items-center justify-center">
-                                <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
-                                </svg>
+                <Card>
+                    <CardContent class="p-6">
+                        <div class="flex items-center">
+                            <div class="shrink-0">
+                                <div class="w-8 h-8 bg-purple-500 rounded-md flex items-center justify-center">
+                                    <Building2 class="h-5 w-5 text-white" />
+                                </div>
+                            </div>
+                            <div class="ml-5 w-0 flex-1">
+                                <p class="text-sm font-medium text-muted-foreground truncate">Sub-Departments</p>
+                                <p class="text-lg font-medium">{{ department.children_count || 0 }}</p>
                             </div>
                         </div>
-                        <div class="ml-5 w-0 flex-1">
-                            <dl>
-                                <dt class="text-sm font-medium text-gray-500 truncate">Sub-Departments</dt>
-                                <dd class="text-lg font-medium text-gray-900">{{ department.children_count || 0 }}</dd>
-                            </dl>
-                        </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
-                <div class="bg-white rounded-lg shadow p-6">
-                    <div class="flex items-center">
-                        <div class="shrink-0">
-                            <div class="w-8 h-8 bg-orange-500 rounded-md flex items-center justify-center">
-                                <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                                </svg>
+                <Card>
+                    <CardContent class="p-6">
+                        <div class="flex items-center">
+                            <div class="shrink-0">
+                                <div class="w-8 h-8 bg-orange-500 rounded-md flex items-center justify-center">
+                                    <BookOpen class="h-5 w-5 text-white" />
+                                </div>
+                            </div>
+                            <div class="ml-5 w-0 flex-1">
+                                <p class="text-sm font-medium text-muted-foreground truncate">Active Courses</p>
+                                <p class="text-lg font-medium">{{ department.active_courses || 0 }}</p>
                             </div>
                         </div>
-                        <div class="ml-5 w-0 flex-1">
-                            <dl>
-                                <dt class="text-sm font-medium text-gray-500 truncate">Active Courses</dt>
-                                <dd class="text-lg font-medium text-gray-900">{{ department.active_courses || 0 }}</dd>
-                            </dl>
-                        </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <!-- Manager Roles Section -->
-                <div class="bg-white rounded-lg shadow">
-                    <div class="px-6 py-4 border-b border-gray-200">
-                        <h2 class="text-lg font-medium text-gray-900">Manager Roles</h2>
-                    </div>
-                    <div class="divide-y divide-gray-200">
-                        <div v-for="role in managerRoles" :key="role.id" class="p-6">
-                            <div class="flex items-center justify-between">
-                                <div class="flex items-center space-x-4">
-                                    <div class="shrink-0 h-10 w-10">
-                                        <div class="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
-                                            <span class="text-sm font-medium text-gray-600">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Manager Roles</CardTitle>
+                    </CardHeader>
+                    <CardContent class="p-0">
+                        <div class="divide-y divide-border">
+                            <div v-for="role in managerRoles" :key="role.id" class="p-6">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center space-x-4">
+                                        <Avatar>
+                                            <AvatarFallback>
                                                 {{ role.manager.name.charAt(0).toUpperCase() }}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div class="min-w-0 flex-1">
-                                        <div class="flex items-center space-x-2">
-                                            <p class="text-sm font-medium text-gray-900 truncate">
-                                                {{ role.manager.name }}
+                                            </AvatarFallback>
+                                        </Avatar>
+                                        <div class="min-w-0 flex-1">
+                                            <div class="flex items-center space-x-2">
+                                                <p class="text-sm font-medium truncate">
+                                                    {{ role.manager.name }}
+                                                </p>
+                                                <Badge v-if="role.is_primary" variant="default">
+                                                    Primary
+                                                </Badge>
+                                            </div>
+                                            <div class="mt-1 flex items-center space-x-2">
+                                                <Badge :variant="getRoleTypeVariant(role.role_type)">
+                                                    {{ role.role_display }}
+                                                </Badge>
+                                                <span class="text-xs text-muted-foreground">{{ role.manager.level }}</span>
+                                            </div>
+                                            <p class="text-xs text-muted-foreground mt-1">
+                                                {{ role.manager.email }}
                                             </p>
-                                            <span v-if="role.is_primary"
-                                                  class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
-                                                Primary
-                                            </span>
+                                            <p class="text-xs text-muted-foreground mt-1">
+                                                Started: {{ role.start_date }}
+                                            </p>
                                         </div>
-                                        <div class="mt-1 flex items-center space-x-2">
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
-                                                  :class="getRoleTypeColor(role.role_type)">
-                                                {{ role.role_display }}
-                                            </span>
-                                            <span class="text-xs text-gray-500">{{ role.manager.level }}</span>
-                                        </div>
-                                        <p class="text-xs text-gray-500 mt-1">
-                                            {{ role.manager.email }}
-                                        </p>
-                                        <p class="text-xs text-gray-400 mt-1">
-                                            Started: {{ role.start_date }}
-                                        </p>
                                     </div>
-                                </div>
-                                <div class="shrink-0">
-                                    <button
+                                    <Button
                                         @click="removeManagerRole(role.id)"
-                                        class="text-red-600 hover:text-red-900 text-sm font-medium transition-colors"
+                                        variant="ghost"
+                                        size="sm"
+                                        class="text-destructive hover:text-destructive"
                                     >
-                                        Remove
-                                    </button>
+                                        <Trash2 class="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </div>
+
+                            <!-- No managers state -->
+                            <div v-if="managerRoles.length === 0" class="p-6 text-center">
+                                <User class="mx-auto h-12 w-12 text-muted-foreground" />
+                                <CardTitle class="mt-2 text-sm">No managers assigned</CardTitle>
+                                <CardDescription class="mt-1">Start by adding a manager to this department.</CardDescription>
+                                <div class="mt-6">
+                                    <Button @click="loadManagerCandidates">
+                                        <Plus class="h-4 w-4 mr-2" />
+                                        Add Manager
+                                    </Button>
                                 </div>
                             </div>
                         </div>
-
-                        <!-- No managers state -->
-                        <div v-if="managerRoles.length === 0" class="p-6 text-center text-gray-500">
-                            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                            </svg>
-                            <h3 class="mt-2 text-sm font-medium text-gray-900">No managers assigned</h3>
-                            <p class="mt-1 text-sm text-gray-500">Start by adding a manager to this department.</p>
-                            <div class="mt-6">
-                                <button
-                                    @click="loadManagerCandidates"
-                                    class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-                                >
-                                    Add Manager
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
                 <!-- Department Users Section -->
-                <div class="bg-white rounded-lg shadow">
-                    <div class="px-6 py-4 border-b border-gray-200">
-                        <h2 class="text-lg font-medium text-gray-900">Department Users</h2>
-                    </div>
-                    <div class="divide-y divide-gray-200 max-h-96 overflow-y-auto">
-                        <div v-for="user in users" :key="user.id" class="p-6">
-                            <div class="flex items-center space-x-4">
-                                <div class="shrink-0 h-10 w-10">
-                                    <div class="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
-                                        <span class="text-sm font-medium text-gray-600">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Department Users</CardTitle>
+                    </CardHeader>
+                    <CardContent class="p-0">
+                        <div class="divide-y divide-border max-h-96 overflow-y-auto">
+                            <div v-for="user in users" :key="user.id" class="p-6">
+                                <div class="flex items-center space-x-4">
+                                    <Avatar>
+                                        <AvatarFallback>
                                             {{ user.name.charAt(0).toUpperCase() }}
-                                        </span>
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    <div class="min-w-0 flex-1">
+                                        <p class="text-sm font-medium truncate">
+                                            {{ user.name }}
+                                        </p>
+                                        <div class="mt-1 flex items-center space-x-2">
+                                            <Badge v-if="user.level" :variant="getLevelVariant(user.level)">
+                                                {{ user.level }}
+                                            </Badge>
+                                            <span v-if="user.employee_code" class="text-xs text-muted-foreground">
+                                                ID: {{ user.employee_code }}
+                                            </span>
+                                        </div>
+                                        <p class="text-xs text-muted-foreground mt-1">
+                                            {{ user.email }}
+                                        </p>
                                     </div>
-                                </div>
-                                <div class="min-w-0 flex-1">
-                                    <p class="text-sm font-medium text-gray-900 truncate">
-                                        {{ user.name }}
-                                    </p>
-                                    <div class="mt-1 flex items-center space-x-2">
-                                        <span v-if="user.level"
-                                              class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
-                                              :class="getLevelColor(user.level)">
-                                            {{ user.level }}
-                                        </span>
-                                        <span v-if="user.employee_code" class="text-xs text-gray-500">
-                                            ID: {{ user.employee_code }}
-                                        </span>
-                                    </div>
-                                    <p class="text-xs text-gray-500 mt-1">
-                                        {{ user.email }}
-                                    </p>
-                                </div>
-                                <div class="shrink-0">
-                                    <Link
-                                        :href="route('admin.users.organizational', user.id)"
-                                        class="text-blue-600 hover:text-blue-900 text-sm font-medium transition-colors"
-                                    >
-                                        View
-                                    </Link>
+                                    <Button asChild variant="ghost" size="sm">
+                                        <Link :href="route('admin.users.organizational', user.id)">
+                                            <ExternalLink class="h-4 w-4" />
+                                        </Link>
+                                    </Button>
                                 </div>
                             </div>
-                        </div>
 
-                        <!-- No users state -->
-                        <div v-if="users.length === 0" class="p-6 text-center text-gray-500">
-                            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-                            </svg>
-                            <h3 class="mt-2 text-sm font-medium text-gray-900">No users assigned</h3>
-                            <p class="mt-1 text-sm text-gray-500">Users need to be assigned to this department.</p>
-                            <div class="mt-6">
-                                <Link
-                                    :href="route('admin.users.assignment')"
-                                    class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-                                >
-                                    Assign Users
-                                </Link>
+                            <!-- No users state -->
+                            <div v-if="users.length === 0" class="p-6 text-center">
+                                <Users class="mx-auto h-12 w-12 text-muted-foreground" />
+                                <CardTitle class="mt-2 text-sm">No users assigned</CardTitle>
+                                <CardDescription class="mt-1">Users need to be assigned to this department.</CardDescription>
+                                <div class="mt-6">
+                                    <Button asChild>
+                                        <Link :href="route('admin.users.assignment')">
+                                            <Plus class="h-4 w-4 mr-2" />
+                                            Assign Users
+                                        </Link>
+                                    </Button>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
             </div>
 
             <!-- Sub-Departments Section -->
-            <div v-if="department.children && department.children.length > 0" class="mt-6">
-                <div class="bg-white rounded-lg shadow">
-                    <div class="px-6 py-4 border-b border-gray-200">
-                        <h2 class="text-lg font-medium text-gray-900">Sub-Departments</h2>
-                    </div>
-                    <div class="divide-y divide-gray-200">
+            <Card v-if="department.children && department.children.length > 0">
+                <CardHeader>
+                    <CardTitle>Sub-Departments</CardTitle>
+                </CardHeader>
+                <CardContent class="p-0">
+                    <div class="divide-y divide-border">
                         <div v-for="child in department.children" :key="child.id" class="p-6">
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center space-x-4">
-                                    <div class="shrink-0 h-10 w-10">
-                                        <div class="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                                            <span class="text-sm font-medium text-blue-600">
-                                                {{ child.department_code }}
-                                            </span>
-                                        </div>
-                                    </div>
+                                    <Avatar>
+                                        <AvatarFallback class="bg-primary/10 text-primary">
+                                            {{ child.department_code }}
+                                        </AvatarFallback>
+                                    </Avatar>
                                     <div class="min-w-0 flex-1">
-                                        <p class="text-sm font-medium text-gray-900">
+                                        <p class="text-sm font-medium">
                                             {{ child.name }}
                                         </p>
-                                        <p class="text-sm text-gray-500 mt-1">
+                                        <p class="text-sm text-muted-foreground mt-1">
                                             {{ child.description }}
                                         </p>
-                                        <div class="mt-2 flex items-center space-x-4 text-xs text-gray-500">
+                                        <div class="mt-2 flex items-center space-x-4 text-xs text-muted-foreground">
                                             <span>{{ child.users_count }} users</span>
                                             <span>{{ child.managers_count }} managers</span>
                                         </div>
                                     </div>
                                 </div>
-                                <div class="shrink-0">
-                                    <Link
-                                        :href="route('admin.departments.show', child.id)"
-                                        class="text-blue-600 hover:text-blue-900 text-sm font-medium transition-colors"
-                                    >
-                                        View Details
+                                <Button asChild variant="ghost" size="sm">
+                                    <Link :href="route('admin.departments.show', child.id)">
+                                        <ExternalLink class="h-4 w-4" />
                                     </Link>
-                                </div>
+                                </Button>
                             </div>
                         </div>
                     </div>
-                </div>
-            </div>
+                </CardContent>
+            </Card>
         </div>
 
         <!-- Add Manager Modal -->
-        <div v-if="showAddManagerModal" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-            <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-                <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" @click="closeAddManagerModal"></div>
+        <Dialog :open="showAddManagerModal" @update:open="closeAddManagerModal">
+            <DialogContent class="sm:max-w-[425px]">
+                <DialogHeader>
+                    <DialogTitle class="flex items-center">
+                        <User class="h-5 w-5 mr-2" />
+                        Add Manager to {{ department.name }}
+                    </DialogTitle>
+                    <DialogDescription>
+                        Select a manager and assign them a role in this department.
+                    </DialogDescription>
+                </DialogHeader>
 
-                <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-                    <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                        <div class="flex items-center mb-4">
-                            <div class="mx-auto shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10">
-                                <svg class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                </svg>
-                            </div>
-                            <h3 class="ml-4 text-lg leading-6 font-medium text-gray-900">
-                                Add Manager to {{ department.name }}
-                            </h3>
-                        </div>
-
-                        <div class="space-y-4">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Manager</label>
-                                <select
-                                    v-model="selectedManager"
-                                    class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                <div class="space-y-4 py-4">
+                    <div class="space-y-2">
+                        <Label for="manager">Manager</Label>
+                        <Select v-model="selectedManager">
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select Manager" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem
+                                    v-for="manager in availableManagers"
+                                    :key="manager.id"
+                                    :value="manager.id.toString()"
                                 >
-                                    <option value="">Select Manager</option>
-                                    <option v-for="manager in availableManagers" :key="manager.id" :value="manager.id">
-                                        {{ manager.name }} ({{ manager.level }}) - {{ manager.department }}
-                                    </option>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Role Type</label>
-                                <select
-                                    v-model="selectedManagerType"
-                                    class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                                >
-                                    <option value="">Select Role Type</option>
-                                    <option value="department_head">Department Head</option>
-                                    <option value="senior_manager">Senior Manager</option>
-                                    <option value="direct_manager">Direct Manager</option>
-                                    <option value="project_manager">Project Manager</option>
-                                    <option value="team_lead">Team Lead</option>
-                                </select>
-                            </div>
-                        </div>
+                                    {{ manager.name }} ({{ manager.level }}) - {{ manager.department }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
                     </div>
 
-                    <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                        <button
-                            @click="assignManager"
-                            type="button"
-                            class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm transition-colors"
-                            :disabled="!selectedManager || !selectedManagerType"
-                            :class="{ 'opacity-50 cursor-not-allowed': !selectedManager || !selectedManagerType }"
-                        >
-                            Assign Manager
-                        </button>
-                        <button
-                            @click="closeAddManagerModal"
-                            type="button"
-                            class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm transition-colors"
-                        >
-                            Cancel
-                        </button>
+                    <div class="space-y-2">
+                        <Label for="role-type">Role Type</Label>
+                        <Select v-model="selectedManagerType">
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select Role Type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="director">Director</SelectItem>
+                                <SelectItem value="senior_manager">Senior Manager</SelectItem>
+                                <SelectItem value="direct_manager">Direct Manager</SelectItem>
+                                <SelectItem value="project_manager">Project Manager</SelectItem>
+                                <SelectItem value="supervisor">Supervisor</SelectItem>
+                            </SelectContent>
+                        </Select>
                     </div>
                 </div>
-            </div>
-        </div>
 
-        <!-- Modal Components -->
-        <NotificationModal
-            :show="showNotification"
-            :type="notification.type"
-            :title="notification.title"
-            :message="notification.message"
-            :auto-close="true"
-            :duration="4000"
-            @close="closeNotification"
-        />
+                <DialogFooter>
+                    <Button variant="outline" @click="closeAddManagerModal">
+                        Cancel
+                    </Button>
+                    <Button
+                        @click="assignManager"
+                        :disabled="!selectedManager || !selectedManagerType"
+                    >
+                        Assign Manager
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
 
-        <ConfirmationModal
-            :show="showConfirmation"
-            :title="confirmation.title"
-            :message="confirmation.message"
-            confirm-text="Yes, Remove"
-            cancel-text="Cancel"
-            type="danger"
-            @confirm="handleConfirmation"
-            @cancel="closeConfirmation"
-        />
+        <!-- Notification Alert -->
+        <Dialog :open="showNotification" @update:open="closeNotification">
+            <DialogContent class="sm:max-w-[425px]">
+                <DialogHeader>
+                    <DialogTitle class="flex items-center">
+                        <component :is="getNotificationIcon(notification.type)" class="h-5 w-5 mr-2" />
+                        {{ notification.title }}
+                    </DialogTitle>
+                </DialogHeader>
+                <div class="py-4">
+                    <Alert>
+                        <component :is="getNotificationIcon(notification.type)" class="h-4 w-4" />
+                        <AlertDescription>
+                            {{ notification.message }}
+                        </AlertDescription>
+                    </Alert>
+                </div>
+                <DialogFooter>
+                    <Button @click="closeNotification">
+                        OK
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
 
-        <LoadingModal
-            :show="showLoading"
-            :message="loading.message"
-        />
+        <!-- Confirmation Dialog -->
+        <AlertDialog :open="showConfirmation" @update:open="closeConfirmation">
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle class="flex items-center">
+                        <AlertCircle class="h-5 w-5 mr-2 text-destructive" />
+                        {{ confirmation.title }}
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                        {{ confirmation.message }}
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel @click="closeConfirmation">
+                        Cancel
+                    </AlertDialogCancel>
+                    <AlertDialogAction @click="handleConfirmation" class="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                        Yes, Remove
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+
+        <!-- Loading Dialog -->
+        <Dialog :open="showLoading" @update:open="() => {}">
+            <DialogContent class="sm:max-w-[300px]">
+                <div class="flex items-center justify-center py-6">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mr-3"></div>
+                    <span>{{ loading.message }}</span>
+                </div>
+            </DialogContent>
+        </Dialog>
     </AdminLayout>
 </template>

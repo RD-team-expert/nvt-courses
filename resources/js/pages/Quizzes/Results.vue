@@ -1,321 +1,307 @@
 <template>
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="min-h-screen bg-linear-to-br from-slate-50 to-blue-50">
+        <div class="min-h-screen bg-gradient-to-br from-background to-muted/20">
             <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 <!-- Header Section -->
                 <div class="text-center mb-8">
-                    <h1 class="text-4xl font-bold text-gray-900 mb-2">Quiz Results</h1>
-                    <p class="text-lg text-gray-600">
-                        Performance review for <span class="font-semibold">"{{ attempt.quiz?.title || 'Quiz' }}"</span>
+                    <h1 class="text-4xl font-bold text-foreground mb-2">Quiz Results</h1>
+                    <p class="text-lg text-muted-foreground">
+                        Performance review for <span class="font-semibold text-foreground">"{{ attempt.quiz?.title || 'Quiz' }}"</span>
                     </p>
                 </div>
 
                 <!-- Score Overview Card -->
-                <div class="bg-white rounded-xl shadow-lg p-8 mb-8 border border-gray-100">
-                    <div class="text-center mb-6">
-                        <!-- Score Circle -->
-                        <div class="relative inline-flex items-center justify-center w-32 h-32 mb-4">
-                            <svg class="transform -rotate-90 w-32 h-32">
-                                <circle
-                                    cx="64" cy="64" r="56"
-                                    stroke="currentColor"
-                                    stroke-width="8"
-                                    fill="none"
-                                    class="text-gray-200"
-                                />
-                                <circle
-                                    cx="64" cy="64" r="56"
-                                    stroke="currentColor"
-                                    stroke-width="8"
-                                    fill="none"
-                                    :stroke-dasharray="circumference"
-                                    :stroke-dashoffset="circumference - (scorePercentage / 100) * circumference"
-                                    :class="scorePercentage >= (attempt.quiz?.pass_threshold || 70) ? 'text-green-500' : 'text-red-500'"
-                                    class="transition-all duration-1000 ease-out"
-                                />
-                            </svg>
-                            <div class="absolute inset-0 flex flex-col items-center justify-center">
-                                <span class="text-3xl font-bold text-gray-900">{{ Math.round(scorePercentage) }}%</span>
-                                <span class="text-sm text-gray-500">Score</span>
-                            </div>
-                        </div>
-
-                        <!-- Pass/Fail Status -->
-                        <div class="mb-4">
-                            <div :class="[
-                                'inline-flex items-center px-6 py-3 rounded-full text-lg font-semibold',
-                                attempt.passed
-                                    ? 'bg-green-100 text-green-800 border-2 border-green-300'
-                                    : 'bg-red-100 text-red-800 border-2 border-red-300'
-                            ]">
-                                <svg v-if="attempt.passed" class="w-6 h-6 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                <Card class="mb-8">
+                    <CardContent class="p-8">
+                        <div class="text-center mb-6">
+                            <!-- Score Circle -->
+                            <div class="relative inline-flex items-center justify-center w-32 h-32 mb-4">
+                                <svg class="transform -rotate-90 w-32 h-32">
+                                    <circle
+                                        cx="64" cy="64" r="56"
+                                        stroke="currentColor"
+                                        stroke-width="8"
+                                        fill="none"
+                                        class="text-border"
+                                    />
+                                    <circle
+                                        cx="64" cy="64" r="56"
+                                        stroke="currentColor"
+                                        stroke-width="8"
+                                        fill="none"
+                                        :stroke-dasharray="circumference"
+                                        :stroke-dashoffset="circumference - (scorePercentage / 100) * circumference"
+                                        :class="scorePercentage >= (attempt.quiz?.pass_threshold || 70) ? 'text-primary' : 'text-destructive'"
+                                        class="transition-all duration-1000 ease-out"
+                                    />
                                 </svg>
-                                <svg v-else class="w-6 h-6 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                </svg>
-                                {{ attempt.passed ? 'PASSED' : 'FAILED' }}
+                                <div class="absolute inset-0 flex flex-col items-center justify-center">
+                                    <span class="text-3xl font-bold text-foreground">{{ Math.round(scorePercentage) }}%</span>
+                                    <span class="text-sm text-muted-foreground">Score</span>
+                                </div>
                             </div>
-                        </div>
 
-                        <p class="text-gray-600">
-                            You scored <span class="font-bold text-gray-900">{{ attempt.total_score || 0 }}</span>
-                            out of <span class="font-bold text-gray-900">{{ attempt.quiz?.total_points || 0 }}</span> points
-                        </p>
-                    </div>
-                </div>
+                            <!-- Pass/Fail Status -->
+                            <div class="mb-4">
+                                <Badge
+                                    :variant="attempt.passed ? 'default' : 'destructive'"
+                                    class="px-6 py-3 text-lg font-semibold border-2"
+                                >
+                                    <CheckCircle v-if="attempt.passed" class="w-6 h-6 mr-2" />
+                                    <XCircle v-else class="w-6 h-6 mr-2" />
+                                    {{ attempt.passed ? 'PASSED' : 'FAILED' }}
+                                </Badge>
+                            </div>
+
+                            <p class="text-muted-foreground">
+                                You scored <span class="font-bold text-foreground">{{ attempt.total_score || 0 }}</span>
+                                out of <span class="font-bold text-foreground">{{ attempt.quiz?.total_points || 0 }}</span> points
+                            </p>
+                        </div>
+                    </CardContent>
+                </Card>
 
                 <!-- Detailed Summary Cards -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                     <!-- Score Card -->
-                    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                        <div class="flex items-center">
-                            <div class="p-3 rounded-full bg-blue-100 text-blue-600">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                                </svg>
+                    <Card>
+                        <CardContent class="p-6">
+                            <div class="flex items-center">
+                                <div class="p-3 rounded-full bg-primary/10 text-primary">
+                                    <BarChart3 class="w-6 h-6" />
+                                </div>
+                                <div class="ml-4">
+                                    <p class="text-sm font-medium text-muted-foreground">Final Score</p>
+                                    <p class="text-xl font-bold text-foreground">{{ attempt.total_score || 0 }}/{{ attempt.quiz?.total_points || 0 }}</p>
+                                </div>
                             </div>
-                            <div class="ml-4">
-                                <p class="text-sm font-medium text-gray-600">Final Score</p>
-                                <p class="text-xl font-bold text-gray-900">{{ attempt.total_score || 0 }}/{{ attempt.quiz?.total_points || 0 }}</p>
-                            </div>
-                        </div>
-                    </div>
+                        </CardContent>
+                    </Card>
 
                     <!-- Percentage Card -->
-                    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                        <div class="flex items-center">
-                            <div :class="[
-                                'p-3 rounded-full',
-                                scorePercentage >= (attempt.quiz?.pass_threshold || 70) ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
-                            ]">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-                                </svg>
+                    <Card>
+                        <CardContent class="p-6">
+                            <div class="flex items-center">
+                                <div :class="[
+                                    'p-3 rounded-full',
+                                    scorePercentage >= (attempt.quiz?.pass_threshold || 70)
+                                        ? 'bg-primary/10 text-primary'
+                                        : 'bg-destructive/10 text-destructive'
+                                ]">
+                                    <TrendingUp class="w-6 h-6" />
+                                </div>
+                                <div class="ml-4">
+                                    <p class="text-sm font-medium text-muted-foreground">Percentage</p>
+                                    <p class="text-xl font-bold text-foreground">{{ Math.round(scorePercentage) }}%</p>
+                                </div>
                             </div>
-                            <div class="ml-4">
-                                <p class="text-sm font-medium text-gray-600">Percentage</p>
-                                <p class="text-xl font-bold text-gray-900">{{ Math.round(scorePercentage) }}%</p>
-                            </div>
-                        </div>
-                    </div>
+                        </CardContent>
+                    </Card>
 
                     <!-- Attempt Number Card -->
-                    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                        <div class="flex items-center">
-                            <div class="p-3 rounded-full bg-purple-100 text-purple-600">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                </svg>
+                    <Card>
+                        <CardContent class="p-6">
+                            <div class="flex items-center">
+                                <div class="p-3 rounded-full bg-secondary text-secondary-foreground">
+                                    <Clock class="w-6 h-6" />
+                                </div>
+                                <div class="ml-4">
+                                    <p class="text-sm font-medium text-muted-foreground">Attempt</p>
+                                    <p class="text-xl font-bold text-foreground">{{ attempt.attempt_number || userAttempts.length }}/3</p>
+                                </div>
                             </div>
-                            <div class="ml-4">
-                                <p class="text-sm font-medium text-gray-600">Attempt</p>
-                                <p class="text-xl font-bold text-gray-900">{{ attempt.attempt_number || userAttempts.length }}/3</p>
-                            </div>
-                        </div>
-                    </div>
+                        </CardContent>
+                    </Card>
 
                     <!-- Attempts Left Card -->
-                    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                        <div class="flex items-center">
-                            <div class="p-3 rounded-full bg-yellow-100 text-yellow-600">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.001 8.001 0 01-15.356-2m15.356 2H15"></path>
-                                </svg>
+                    <Card>
+                        <CardContent class="p-6">
+                            <div class="flex items-center">
+                                <div class="p-3 rounded-full bg-accent text-accent-foreground">
+                                    <RotateCcw class="w-6 h-6" />
+                                </div>
+                                <div class="ml-4">
+                                    <p class="text-sm font-medium text-muted-foreground">Attempts Left</p>
+                                    <p class="text-xl font-bold text-foreground">{{ attemptsLeft }}</p>
+                                </div>
                             </div>
-                            <div class="ml-4">
-                                <p class="text-sm font-medium text-gray-600">Attempts Left</p>
-                                <p class="text-xl font-bold text-gray-900">{{ attemptsLeft }}</p>
-                            </div>
-                        </div>
-                    </div>
+                        </CardContent>
+                    </Card>
                 </div>
 
                 <!-- Additional Info Card -->
-                <div class="bg-white rounded-xl shadow-sm p-6 mb-8 border border-gray-100">
-                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Attempt Details</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div class="text-center md:text-left">
-                            <p class="text-sm text-gray-600 mb-1">Completed At</p>
-                            <p class="text-sm font-medium text-gray-900">
-                                {{ formatDate(attempt.completed_at) || 'Not completed' }}
-                            </p>
+                <Card class="mb-8">
+                    <CardHeader>
+                        <CardTitle>Attempt Details</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div class="text-center md:text-left">
+                                <p class="text-sm text-muted-foreground mb-1">Completed At</p>
+                                <p class="text-sm font-medium text-foreground">
+                                    {{ formatDate(attempt.completed_at) || 'Not completed' }}
+                                </p>
+                            </div>
+                            <div class="text-center md:text-left">
+                                <p class="text-sm text-muted-foreground mb-1">Pass Threshold</p>
+                                <p class="text-sm font-medium text-foreground">{{ attempt.quiz?.pass_threshold || 70 }}%</p>
+                            </div>
+                            <div class="text-center md:text-left">
+                                <p class="text-sm text-muted-foreground mb-1">Time Taken</p>
+                                <p class="text-sm font-medium text-foreground">{{ attempt.time_taken || 'N/A' }}</p>
+                            </div>
                         </div>
-                        <div class="text-center md:text-left">
-                            <p class="text-sm text-gray-600 mb-1">Pass Threshold</p>
-                            <p class="text-sm font-medium text-gray-900">{{ attempt.quiz?.pass_threshold || 70 }}%</p>
-                        </div>
-                        <div class="text-center md:text-left">
-                            <p class="text-sm text-gray-600 mb-1">Time Taken</p>
-                            <p class="text-sm font-medium text-gray-900">{{ attempt.time_taken || 'N/A' }}</p>
-                        </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
                 <!-- Action Buttons -->
                 <div class="flex flex-col sm:flex-row justify-center gap-4 mb-8">
-                    <button
+                    <Button
                         v-if="canRetry"
                         @click="retryQuiz"
-                        class="inline-flex items-center justify-center px-6 py-3 bg-linear-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 text-sm font-medium transition-all duration-200 shadow-lg hover:shadow-xl"
+                        class="shadow-lg hover:shadow-xl"
+                        size="lg"
                     >
-                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.001 8.001 0 01-15.356-2m15.356 2H15" />
-                        </svg>
+                        <RotateCcw class="w-5 h-5 mr-2" />
                         Retry Quiz
-                    </button>
+                    </Button>
 
-                    <Link
-                        :href="route('quizzes.index')"
-                        class="inline-flex items-center justify-center px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 focus:outline-hidden focus:ring-2 focus:ring-gray-300 text-sm font-medium transition-all duration-200"
+                    <Button
+                        asChild
+                        variant="outline"
+                        size="lg"
                     >
-                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                        </svg>
-                        Back to Quizzes
-                    </Link>
+                        <Link :href="route('quizzes.index')">
+                            <ArrowLeft class="w-5 h-5 mr-2" />
+                            Back to Quizzes
+                        </Link>
+                    </Button>
                 </div>
 
                 <!-- Questions Review Section -->
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                    <div class="bg-linear-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
+                <Card>
+                    <CardHeader class="bg-muted/50 border-b">
                         <div class="flex items-center justify-between">
-                            <h2 class="text-xl font-semibold text-gray-900">Question Review</h2>
+                            <CardTitle class="text-xl">Question Review</CardTitle>
                             <div class="flex items-center space-x-2">
-                                <!-- ✅ Show toggle button only when answers are available -->
-                                <button
+                                <!-- Show toggle button only when answers are available -->
+                                <Button
                                     v-if="showCorrectAnswersAllowed"
                                     @click="toggleCorrectAnswers"
-                                    class="text-sm px-3 py-1 bg-blue-100 text-blue-800 rounded-full hover:bg-blue-200 transition-colors"
+                                    variant="secondary"
+                                    size="sm"
                                 >
                                     {{ showAnswers ? 'Hide' : 'Show' }} Correct Answers
-                                </button>
-                                <div :class="[
-                                    'px-3 py-1 rounded-full text-xs font-medium',
-                                    showCorrectAnswersAllowed ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                                ]">
+                                </Button>
+                                <Badge :variant="showCorrectAnswersAllowed ? 'default' : 'secondary'">
                                     {{ showCorrectAnswersAllowed ? 'Answers Available' : 'Answers Locked' }}
-                                </div>
+                                </Badge>
                             </div>
                         </div>
 
-                        <!-- ✅ Show explanation when answers are available -->
-                        <div v-if="showCorrectAnswersAllowed" class="mt-2 text-sm text-gray-600">
+                        <!-- Show explanation when answers are available -->
+                        <div v-if="showCorrectAnswersAllowed" class="mt-2 text-sm text-muted-foreground">
                             <p class="flex items-center">
-                                <svg class="w-4 h-4 mr-1 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-                                </svg>
+                                <CheckCircle class="w-4 h-4 mr-1 text-primary" />
                                 Correct answers unlocked - {{ attempt.passed ? 'Quiz passed!' : 'Maximum attempts reached' }}
                             </p>
                         </div>
-                        <div v-else class="mt-2 text-sm text-gray-500">
+                        <div v-else class="mt-2 text-sm text-muted-foreground">
                             <p class="flex items-center">
-                                <svg class="w-4 h-4 mr-1 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
-                                </svg>
+                                <AlertTriangle class="w-4 h-4 mr-1 text-accent-foreground" />
                                 Correct answers will be shown after passing or reaching maximum attempts
                             </p>
                         </div>
-                    </div>
+                    </CardHeader>
 
-                    <div class="p-6">
+                    <CardContent class="p-6">
                         <div v-if="attempt.responses && attempt.responses.length" class="space-y-6">
-                            <div v-for="(response, index) in attempt.responses" :key="response.id || index"
-                                 class="border border-gray-200 rounded-lg overflow-hidden">
+                            <Card v-for="(response, index) in attempt.responses" :key="response.id || index">
                                 <!-- Question Header -->
-                                <div class="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                                <CardHeader class="bg-muted/30 border-b">
                                     <div class="flex items-center justify-between">
                                         <div class="flex items-center">
-                                            <div class="w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center text-sm font-bold mr-3">
+                                            <div class="w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-bold mr-3">
                                                 {{ index + 1 }}
                                             </div>
-                                            <span class="font-medium text-gray-900">
+                                            <span class="font-medium text-foreground">
                                                 Question {{ index + 1 }}
                                             </span>
                                         </div>
                                         <div class="flex items-center space-x-2">
-                                            <div class="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
+                                            <Badge variant="outline">
                                                 {{ response.question?.points || 0 }} pts
-                                            </div>
+                                            </Badge>
                                             <div :class="[
                                                 'w-3 h-3 rounded-full',
                                                 getStatusColor(response)
                                             ]"></div>
                                         </div>
                                     </div>
-                                </div>
+                                </CardHeader>
 
                                 <!-- Question Content -->
-                                <div class="p-4 space-y-4">
-                                    <div class="bg-gray-50 rounded-lg p-3">
-                                        <p class="text-gray-900 font-medium">
+                                <CardContent class="p-4 space-y-4">
+                                    <div class="bg-muted rounded-lg p-3">
+                                        <p class="text-foreground font-medium">
                                             {{ response.question?.question_text || 'Question not available' }}
                                         </p>
                                     </div>
 
                                     <!-- Your Answer -->
                                     <div>
-                                        <p class="text-sm font-medium text-gray-700 mb-2">Your Answer:</p>
-                                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                                            <p class="text-blue-900">{{ formatAnswer(response.answer) || 'Manually Graded' }}</p>
+                                        <p class="text-sm font-medium text-muted-foreground mb-2">Your Answer:</p>
+                                        <div class="bg-primary/5 border border-primary/20 rounded-lg p-3">
+                                            <p class="text-primary-foreground/90">{{ formatAnswer(response.answer) || 'Manually Graded' }}</p>
                                         </div>
                                     </div>
 
-                                    <!-- ✅ Correct Answer (safely accessed) -->
+                                    <!-- Correct Answer (safely accessed) -->
                                     <div v-if="showCorrectAnswersAllowed && showAnswers && response.question?.correct_answer">
-                                        <p class="text-sm font-medium text-gray-700 mb-2">Correct Answer(s):</p>
-                                        <div class="bg-green-50 border border-green-200 rounded-lg p-3">
-                                            <p class="text-green-900">
+                                        <p class="text-sm font-medium text-muted-foreground mb-2">Correct Answer(s):</p>
+                                        <div class="bg-primary/10 border border-primary/30 rounded-lg p-3">
+                                            <p class="text-primary">
                                                 {{ formatCorrectAnswer(response.question?.correct_answer) }}
                                             </p>
                                         </div>
                                     </div>
 
-                                    <!-- ✅ Answer Explanation (safely accessed) -->
+                                    <!-- Answer Explanation (safely accessed) -->
                                     <div v-if="showCorrectAnswersAllowed && showAnswers && response.question?.correct_answer_explanation">
-                                        <p class="text-sm font-medium text-gray-700 mb-2">Explanation:</p>
-                                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                                            <p class="text-yellow-900">
+                                        <p class="text-sm font-medium text-muted-foreground mb-2">Explanation:</p>
+                                        <div class="bg-accent/50 border border-accent rounded-lg p-3">
+                                            <p class="text-accent-foreground">
                                                 {{ response.question?.correct_answer_explanation }}
                                             </p>
                                         </div>
                                     </div>
 
                                     <!-- Status -->
-                                    <div class="flex items-center justify-between pt-2 border-t border-gray-200">
+                                    <div class="flex items-center justify-between pt-2 border-t border-border">
                                         <div class="flex items-center">
-                                            <span :class="[
-                                                'inline-flex items-center px-3 py-1 rounded-full text-xs font-medium',
-                                                getStatusBadge(response)
-                                            ]">
-                                                <svg class="w-3 h-3 mr-1" :class="getStatusIcon(response)" fill="currentColor" viewBox="0 0 20 20">
-                                                    <path v-if="response.is_correct" fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-                                                    <path v-else-if="response.is_correct === false" fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                                    <path v-else fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" />
-                                                </svg>
+                                            <Badge :variant="getStatusBadgeVariant(response)">
+                                                <component :is="getStatusIcon(response)" class="w-3 h-3 mr-1" />
                                                 {{ getStatusText(response) }}
-                                            </span>
+                                            </Badge>
                                         </div>
-                                        <div v-if="response.points_earned !== undefined" class="text-sm text-gray-600">
+                                        <div v-if="response.points_earned !== undefined" class="text-sm text-muted-foreground">
                                             Points: {{ response.points_earned }}/{{ response.question?.points || 0 }}
                                         </div>
                                     </div>
-                                </div>
-                            </div>
+                                </CardContent>
+                            </Card>
                         </div>
 
                         <!-- Empty State -->
                         <div v-else class="text-center py-12">
-                            <div class="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                                <svg class="w-12 h-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                </svg>
+                            <div class="mx-auto w-24 h-24 bg-muted rounded-full flex items-center justify-center mb-4">
+                                <FileText class="w-12 h-12 text-muted-foreground" />
                             </div>
-                            <h3 class="text-lg font-medium text-gray-900 mb-2">No responses found</h3>
-                            <p class="text-gray-500">This attempt has no recorded responses.</p>
+                            <CardTitle class="text-lg font-medium text-foreground mb-2">No responses found</CardTitle>
+                            <p class="text-muted-foreground">This attempt has no recorded responses.</p>
                         </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
             </div>
         </div>
     </AppLayout>
@@ -325,11 +311,42 @@
 import { Link, router } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import AppLayout from "@/layouts/AppLayout.vue";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+    CheckCircle,
+    XCircle,
+    BarChart3,
+    TrendingUp,
+    Clock,
+    RotateCcw,
+    ArrowLeft,
+    AlertTriangle,
+    FileText
+} from 'lucide-vue-next';
 
 export default {
     components: {
         AppLayout,
         Link,
+        Card,
+        CardContent,
+        CardDescription,
+        CardFooter,
+        CardHeader,
+        CardTitle,
+        Badge,
+        Button,
+        CheckCircle,
+        XCircle,
+        BarChart3,
+        TrendingUp,
+        Clock,
+        RotateCcw,
+        ArrowLeft,
+        AlertTriangle,
+        FileText,
     },
     props: {
         attempt: {
@@ -367,7 +384,7 @@ export default {
                 (props.attempt.attempt_number || 0) < 3;
         });
 
-        // ✅ Show correct answers if user passed OR reached maximum attempts (3)
+        // Show correct answers if user passed OR reached maximum attempts (3)
         const showCorrectAnswersAllowed = computed(() => {
             // Show answers if user passed OR reached exactly 3 attempts
             const hasReachedMaxAttempts = (props.attempt.attempt_number >= 3) || (props.userAttempts.length >= 3);
@@ -408,21 +425,21 @@ export default {
         };
 
         const getStatusColor = (response) => {
-            if (response.is_correct === true) return 'bg-green-500';
-            if (response.is_correct === false) return 'bg-red-500';
-            return 'bg-yellow-500';
+            if (response.is_correct === true) return 'bg-primary';
+            if (response.is_correct === false) return 'bg-destructive';
+            return 'bg-accent';
         };
 
-        const getStatusBadge = (response) => {
-            if (response.is_correct === true) return 'bg-green-100 text-green-800';
-            if (response.is_correct === false) return 'bg-red-100 text-red-800';
-            return 'bg-yellow-100 text-yellow-800';
+        const getStatusBadgeVariant = (response) => {
+            if (response.is_correct === true) return 'default';
+            if (response.is_correct === false) return 'destructive';
+            return 'secondary';
         };
 
         const getStatusIcon = (response) => {
-            if (response.is_correct === true) return 'text-green-500';
-            if (response.is_correct === false) return 'text-red-500';
-            return 'text-yellow-500';
+            if (response.is_correct === true) return CheckCircle;
+            if (response.is_correct === false) return XCircle;
+            return Clock;
         };
 
         const toggleCorrectAnswers = () => {
@@ -440,13 +457,13 @@ export default {
             scorePercentage,
             attemptsLeft,
             canRetry,
-            showCorrectAnswersAllowed, // ✅ New computed property
+            showCorrectAnswersAllowed,
             formatDate,
             formatAnswer,
             formatCorrectAnswer,
             getStatusText,
             getStatusColor,
-            getStatusBadge,
+            getStatusBadgeVariant,
             getStatusIcon,
             toggleCorrectAnswers,
             retryQuiz,
@@ -468,24 +485,19 @@ circle {
     transition-duration: 200ms;
 }
 
-/* Hover effects */
-.hover\:shadow-xl:hover {
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-}
-
 /* Print styles */
 @media print {
-    .bg-linear-to-br {
-        background: white !important;
+    .bg-gradient-to-br {
+        background: hsl(var(--background)) !important;
     }
 
     button:not(.print-visible) {
         display: none !important;
     }
 
-    .shadow-lg, .shadow-sm {
+    .shadow-lg {
         box-shadow: none !important;
-        border: 1px solid #e5e7eb !important;
+        border: 1px solid hsl(var(--border)) !important;
     }
 }
 

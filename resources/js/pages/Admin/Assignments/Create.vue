@@ -2,6 +2,26 @@
 import { useForm, Link } from '@inertiajs/vue3'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import { ref, computed } from 'vue'
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle
+} from '@/components/ui/dialog'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Progress } from '@/components/ui/progress'
 
 const props = defineProps({
     courses: Array,
@@ -81,6 +101,16 @@ function submit() {
 function closeProgressModal() {
     emailProgress.value.isVisible = false
 }
+
+// Select all users
+function selectAllUsers() {
+    form.user_ids = props.users.map(u => u.id)
+}
+
+// Clear all users
+function clearAllUsers() {
+    form.user_ids = []
+}
 </script>
 
 <template>
@@ -88,27 +118,29 @@ function closeProgressModal() {
         <div class="px-4 sm:px-0">
             <!-- Page Header -->
             <div class="mb-6">
-                <h1 class="text-xl sm:text-3xl font-bold text-gray-800 mb-2">Assign Course to Users</h1>
-                <p class="text-gray-600">Select a course and users to send course assignment notifications with login credentials.</p>
+                <h1 class="text-xl sm:text-3xl font-bold text-foreground mb-2">Assign Course to Users</h1>
+                <p class="text-muted-foreground">Select a course and users to send course assignment notifications with login credentials.</p>
             </div>
 
             <!-- Email Progress Modal/Overlay -->
-            <div
-                v-if="emailProgress.isVisible"
-                class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-                @click="emailProgress.status !== 'sending' ? closeProgressModal() : null"
-            >
-                <div
-                    class="bg-white rounded-xl p-8 max-w-md w-full mx-4 shadow-2xl"
-                    @click.stop
-                >
-                    <div class="text-center">
+            <Dialog v-model:open="emailProgress.isVisible">
+                <DialogContent class="sm:max-w-md" @interact-outside="emailProgress.status !== 'sending' ? closeProgressModal() : null">
+                    <DialogHeader>
+                        <DialogTitle>
+                            <span v-if="emailProgress.status === 'sending'">Sending Course Assignments</span>
+                            <span v-else-if="emailProgress.status === 'success'">Assignment Complete!</span>
+                            <span v-else-if="emailProgress.status === 'error'">Assignment Failed</span>
+                        </DialogTitle>
+                        <DialogDescription>{{ emailProgress.message }}</DialogDescription>
+                    </DialogHeader>
+
+                    <div class="space-y-6 py-4">
                         <!-- Progress Circle -->
-                        <div class="relative w-32 h-32 mx-auto mb-6">
+                        <div class="relative w-32 h-32 mx-auto">
                             <svg class="w-32 h-32 transform -rotate-90" viewBox="0 0 36 36">
                                 <!-- Background circle -->
                                 <path
-                                    class="text-gray-200"
+                                    class="text-muted"
                                     fill="none"
                                     stroke="currentColor"
                                     stroke-width="2"
@@ -117,9 +149,9 @@ function closeProgressModal() {
                                 <!-- Progress circle -->
                                 <path
                                     :class="{
-                                        'text-blue-500': emailProgress.status === 'sending',
+                                        'text-primary': emailProgress.status === 'sending',
                                         'text-green-500': emailProgress.status === 'success',
-                                        'text-red-500': emailProgress.status === 'error'
+                                        'text-destructive': emailProgress.status === 'error'
                                     }"
                                     fill="none"
                                     stroke="currentColor"
@@ -132,206 +164,177 @@ function closeProgressModal() {
                             </svg>
                             <!-- Percentage text -->
                             <div class="absolute inset-0 flex items-center justify-center">
-                                <span class="text-2xl font-bold text-gray-700">{{ progressPercentage }}%</span>
+                                <span class="text-2xl font-bold text-foreground">{{ progressPercentage }}%</span>
                             </div>
                         </div>
 
                         <!-- Status Icon -->
-                        <div class="mb-6">
+                        <div class="flex justify-center">
                             <!-- Sending spinner -->
-                            <div v-if="emailProgress.status === 'sending'" class="flex justify-center">
-                                <div class="relative">
-                                    <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                                        <svg class="animate-spin h-6 w-6 text-blue-500" fill="none" viewBox="0 0 24 24">
-                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                        </svg>
-                                    </div>
-                                </div>
+                            <div v-if="emailProgress.status === 'sending'" class="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
+                                <svg class="animate-spin h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
                             </div>
                             <!-- Success checkmark -->
-                            <div v-else-if="emailProgress.status === 'success'" class="flex justify-center">
-                                <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center animate-pulse">
-                                    <svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                                    </svg>
-                                </div>
+                            <div v-else-if="emailProgress.status === 'success'" class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center animate-pulse">
+                                <svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
                             </div>
                             <!-- Error X -->
-                            <div v-else-if="emailProgress.status === 'error'" class="flex justify-center">
-                                <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
-                                    <svg class="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                                    </svg>
-                                </div>
+                            <div v-else-if="emailProgress.status === 'error'" class="w-12 h-12 bg-destructive/10 rounded-full flex items-center justify-center">
+                                <svg class="w-8 h-8 text-destructive" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
                             </div>
                         </div>
 
-                        <!-- Status Message -->
-                        <h3 class="text-xl font-bold mb-3 text-gray-800">
-                            <span v-if="emailProgress.status === 'sending'">Sending Course Assignments</span>
-                            <span v-else-if="emailProgress.status === 'success'">Assignment Complete!</span>
-                            <span v-else-if="emailProgress.status === 'error'">Assignment Failed</span>
-                        </h3>
-
-                        <p class="text-gray-600 mb-4 leading-relaxed">{{ emailProgress.message }}</p>
-
-                        <!-- Progress details -->
-                        <div class="bg-gray-50 rounded-lg p-4 mb-6">
-                            <div class="flex justify-between text-sm text-gray-600 mb-2">
+                        <!-- Progress Details -->
+                        <div class="bg-muted rounded-lg p-4">
+                            <div class="flex justify-between text-sm text-muted-foreground mb-2">
                                 <span>Progress</span>
                                 <span>{{ emailProgress.current }} / {{ emailProgress.total }}</span>
                             </div>
-                            <div class="w-full bg-gray-200 rounded-full h-2">
-                                <div
-                                    class="h-2 rounded-full transition-all duration-300 ease-out"
-                                    :class="{
-                                        'bg-blue-500': emailProgress.status === 'sending',
-                                        'bg-green-500': emailProgress.status === 'success',
-                                        'bg-red-500': emailProgress.status === 'error'
-                                    }"
-                                    :style="{ width: progressPercentage + '%' }"
-                                ></div>
-                            </div>
+                            <Progress :value="progressPercentage" class="h-2" />
                         </div>
 
                         <!-- Action buttons -->
                         <div class="flex gap-3 justify-center">
                             <!-- Close button (only show when complete or error) -->
-                            <button
+                            <Button
                                 v-if="emailProgress.status !== 'sending'"
                                 @click="closeProgressModal"
-                                class="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition-colors duration-200 font-medium"
+                                variant="secondary"
                             >
                                 Close
-                            </button>
+                            </Button>
 
                             <!-- View assignments button on success -->
-                            <Link
+                            <Button
                                 v-if="emailProgress.status === 'success'"
+                                :as="Link"
                                 href="/admin/assignments"
-                                class="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition-colors duration-200 font-medium"
                                 @click="closeProgressModal"
                             >
                                 View Assignments
-                            </Link>
+                            </Button>
                         </div>
 
                         <!-- Cancel note for sending state -->
-                        <p v-if="emailProgress.status === 'sending'" class="text-xs text-gray-500 mt-4">
+                        <p v-if="emailProgress.status === 'sending'" class="text-xs text-muted-foreground text-center">
                             Please wait while we send the assignment emails...
                         </p>
                     </div>
-                </div>
-            </div>
+                </DialogContent>
+            </Dialog>
 
             <!-- Assignment Form -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                <div class="p-6 sm:p-8">
-                    <form @submit.prevent="submit" class="max-w-4xl">
+            <Card>
+                <CardContent class="p-6 sm:p-8">
+                    <form @submit.prevent="submit" class="max-w-4xl space-y-8">
                         <!-- Course Selection -->
-                        <div class="mb-8">
-                            <label class="block text-sm font-semibold text-gray-700 mb-3">Select Course *</label>
-                            <select
-                                v-model="form.course_id"
-                                class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                                required
-                                :disabled="form.processing"
-                            >
-                                <option value="">Choose a course to assign...</option>
-                                <option v-for="course in courses" :key="course.id" :value="course.id">
-                                    {{ course.name }}
-                                </option>
-                            </select>
-                            <div v-if="form.errors.course_id" class="text-red-600 text-sm mt-2">{{ form.errors.course_id }}</div>
+                        <div class="space-y-3">
+                            <Label for="course-select" class="text-sm font-semibold">Select Course *</Label>
+                            <Select v-model="form.course_id" :disabled="form.processing">
+                                <SelectTrigger id="course-select">
+                                    <SelectValue placeholder="Choose a course to assign..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem v-for="course in courses" :key="course.id" :value="course.id.toString()">
+                                        {{ course.name }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <div v-if="form.errors.course_id" class="text-destructive text-sm">{{ form.errors.course_id }}</div>
                         </div>
 
-                        <!-- Session Schedule Selection (if course has availabilities) -->
-
-
                         <!-- User Selection -->
-                        <div class="mb-8">
-                            <label class="block text-sm font-semibold text-gray-700 mb-3">Select Users *</label>
-                            <div class="border border-gray-300 rounded-lg p-4 bg-gray-50">
-                                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-80 overflow-y-auto">
-                                    <label
-                                        v-for="user in users"
-                                        :key="user.id"
-                                        class="flex items-center space-x-3 p-3 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors cursor-pointer"
-                                        :class="{ 'border-blue-500 bg-blue-50': form.user_ids.includes(user.id) }"
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            :value="user.id"
-                                            v-model="form.user_ids"
-                                            :disabled="form.processing"
-                                            class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        <div class="space-y-3">
+                            <Label class="text-sm font-semibold">Select Users *</Label>
+                            <Card class="bg-muted/50">
+                                <CardContent class="p-4">
+                                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-80 overflow-y-auto">
+                                        <div
+                                            v-for="user in users"
+                                            :key="user.id"
+                                            class="flex items-center space-x-3 p-3 bg-background rounded-lg border hover:border-primary/50 hover:bg-accent/50 transition-colors cursor-pointer"
+                                            :class="{ 'border-primary bg-accent': form.user_ids.includes(user.id) }"
                                         >
-                                        <div class="min-w-0 flex-1">
-                                            <span class="text-sm font-medium text-gray-900 block truncate">{{ user.name }}</span>
-                                            <span class="text-xs text-gray-500 block truncate">{{ user.email }}</span>
+                                            <Checkbox
+                                                :id="`user-${user.id}`"
+                                                :checked="form.user_ids.includes(user.id)"
+                                                @update:checked="(checked) => {
+                                                    if (checked) {
+                                                        form.user_ids.push(user.id)
+                                                    } else {
+                                                        form.user_ids = form.user_ids.filter(id => id !== user.id)
+                                                    }
+                                                }"
+                                                :disabled="form.processing"
+                                            />
+                                            <Label
+                                                :for="`user-${user.id}`"
+                                                class="min-w-0 flex-1 cursor-pointer"
+                                            >
+                                                <span class="text-sm font-medium text-foreground block truncate">{{ user.name }}</span>
+                                                <span class="text-xs text-muted-foreground block truncate">{{ user.email }}</span>
+                                            </Label>
                                         </div>
-                                    </label>
-                                </div>
-                            </div>
-                            <div v-if="form.errors.user_ids" class="text-red-600 text-sm mt-2">{{ form.errors.user_ids }}</div>
-                            <div class="flex justify-between items-center mt-3">
-                                <p class="text-sm text-gray-600">
+                                    </div>
+                                </CardContent>
+                            </Card>
+                            <div v-if="form.errors.user_ids" class="text-destructive text-sm">{{ form.errors.user_ids }}</div>
+                            <div class="flex justify-between items-center">
+                                <p class="text-sm text-muted-foreground">
                                     <span class="font-medium">{{ form.user_ids.length }}</span> user{{ form.user_ids.length !== 1 ? 's' : '' }} selected
                                 </p>
                                 <div class="flex gap-2">
-                                    <button
+                                    <Button
                                         type="button"
-                                        @click="form.user_ids = users.map(u => u.id)"
-                                        class="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                                        @click="selectAllUsers"
+                                        variant="link"
+                                        size="sm"
                                         :disabled="form.processing"
+                                        class="h-auto p-0 text-xs"
                                     >
                                         Select All
-                                    </button>
-                                    <span class="text-gray-300">|</span>
-                                    <button
+                                    </Button>
+                                    <span class="text-muted-foreground">|</span>
+                                    <Button
                                         type="button"
-                                        @click="form.user_ids = []"
-                                        class="text-xs text-gray-600 hover:text-gray-800 font-medium"
+                                        @click="clearAllUsers"
+                                        variant="link"
+                                        size="sm"
                                         :disabled="form.processing"
+                                        class="h-auto p-0 text-xs text-muted-foreground hover:text-foreground"
                                     >
                                         Clear All
-                                    </button>
+                                    </Button>
                                 </div>
                             </div>
                         </div>
 
                         <!-- Info Notice -->
-                        <div class="mb-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
-                            <div class="flex">
-                                <div class="shrink-0">
-                                    <svg class="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
-                                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
-                                    </svg>
-                                </div>
-                                <div class="ml-3">
-                                    <h3 class="text-sm font-medium text-blue-800">Assignment Information</h3>
-                                    <div class="mt-2 text-sm text-blue-700">
-                                        <ul class="list-disc list-inside space-y-1">
-                                            <li>Selected users will receive an email with course details and login credentials</li>
-                                            <li>New passwords will be automatically generated and sent to each user</li>
-                                            <li>Users can accept or decline the course assignment from their email</li>
-                                            <li>Email sending may take a few moments due to rate limiting</li>
-                                        </ul>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                        <Alert>
+                            <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                            </svg>
+                            <AlertDescription>
+                                <strong>Assignment Information:</strong> Selected users will receive an email with course details and login credentials. New passwords will be automatically generated and sent to each user. Users can accept or decline the course assignment from their email. Email sending may take a few moments due to rate limiting.
+                            </AlertDescription>
+                        </Alert>
 
                         <!-- Form Actions -->
-                        <div class="flex flex-col sm:flex-row gap-4 pt-6 border-t border-gray-200">
-                            <button
+                        <div class="flex flex-col sm:flex-row gap-4 pt-6 border-t">
+                            <Button
                                 type="submit"
-                                class="flex-1 sm:flex-none bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors duration-200 font-medium flex items-center justify-center gap-3"
+                                class="flex-1 sm:flex-none"
                                 :disabled="form.processing || form.user_ids.length === 0"
                             >
                                 <!-- Loading spinner -->
-                                <svg v-if="form.processing" class="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                                <svg v-if="form.processing" class="animate-spin h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24">
                                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                 </svg>
@@ -344,25 +347,27 @@ function closeProgressModal() {
                                 </span>
 
                                 <!-- Send icon -->
-                                <svg v-if="!form.processing && form.user_ids.length > 0" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg v-if="!form.processing && form.user_ids.length > 0" class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
                                 </svg>
-                            </button>
+                            </Button>
 
-                            <Link
+                            <Button
+                                :as="Link"
                                 href="/admin/assignments"
-                                class="flex-1 sm:flex-none bg-gray-100 text-gray-700 px-8 py-3 rounded-lg hover:bg-gray-200 focus:outline-hidden focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors duration-200 font-medium text-center flex items-center justify-center gap-2"
+                                variant="secondary"
+                                class="flex-1 sm:flex-none"
                                 :class="{ 'pointer-events-none opacity-50': form.processing }"
                             >
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
                                 </svg>
                                 Back to Assignments
-                            </Link>
+                            </Button>
                         </div>
                     </form>
-                </div>
-            </div>
+                </CardContent>
+            </Card>
         </div>
     </AdminLayout>
 </template>
@@ -374,23 +379,16 @@ function closeProgressModal() {
 }
 
 .overflow-y-auto::-webkit-scrollbar-track {
-    background: #f1f1f1;
+    background: hsl(var(--muted));
     border-radius: 3px;
 }
 
 .overflow-y-auto::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
+    background: hsl(var(--muted-foreground) / 0.3);
     border-radius: 3px;
 }
 
 .overflow-y-auto::-webkit-scrollbar-thumb:hover {
-    background: #a8a8a8;
-}
-
-/* Smooth transitions */
-* {
-    transition-property: color, background-color, border-color, fill, stroke, opacity, box-shadow, transform;
-    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-    transition-duration: 150ms;
+    background: hsl(var(--muted-foreground) / 0.5);
 }
 </style>

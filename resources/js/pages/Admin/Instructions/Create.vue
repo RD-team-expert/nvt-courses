@@ -1,125 +1,222 @@
+<!-- Create Instruction Page -->
+<script setup>
+import { useForm, Link } from '@inertiajs/vue3'
+import AppLayout from '@/Layouts/AppLayout.vue'
+
+// shadcn-vue components
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+
+// Icons
+import {
+    ArrowLeft,
+    Plus,
+    FileText,
+    Settings,
+    AlertCircle,
+    CheckCircle2
+} from 'lucide-vue-next'
+
+const form = useForm({
+    name: '',
+    type: '',
+    content: '',
+    is_active: true,
+    is_default: false
+})
+
+function submit() {
+    form.post(route('admin.instructions.store'))
+}
+</script>
+
 <template>
     <AppLayout title="Create Instruction">
         <template #header>
-            <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
-                Create New Instruction
-            </h2>
+            <div class="flex items-center gap-4">
+                <div class="flex items-center justify-center h-10 w-10 rounded-lg bg-primary/10">
+                    <FileText class="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                    <h2 class="text-xl font-semibold">Create New Instruction</h2>
+                    <p class="text-sm text-muted-foreground">Add a new instruction template for the system</p>
+                </div>
+            </div>
         </template>
 
-        <div class="py-12">
-            <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-                <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
-                    <div class="p-6 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-                        <form @submit.prevent="submit">
-                            <div class="mb-4">
-                                <Label for="name" value="Name" />
+        <div class="py-8">
+            <div class="max-w-4xl mx-auto sm:px-6 lg:px-8">
+                <Card>
+                    <CardHeader>
+                        <div class="flex items-center gap-3">
+                            <div class="flex items-center justify-center h-10 w-10 rounded-lg bg-blue-100">
+                                <Plus class="h-6 w-6 text-blue-600" />
+                            </div>
+                            <div>
+                                <CardTitle>Instruction Details</CardTitle>
+                                <p class="text-sm text-muted-foreground mt-1">
+                                    Fill in the information below to create a new instruction
+                                </p>
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <form @submit.prevent="submit" class="space-y-6">
+                            <!-- Name Field -->
+                            <div class="space-y-2">
+                                <Label for="name">
+                                    Name <span class="text-destructive">*</span>
+                                </Label>
                                 <Input
                                     id="name"
-                                    type="text"
-                                    class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                                     v-model="form.name"
+                                    type="text"
+                                    placeholder="Enter instruction name"
                                     required
                                     autofocus
                                 />
-                                <InputError :message="form.errors.name" class="mt-2" />
+                                <div v-if="form.errors.name" class="text-sm text-destructive flex items-center mt-2">
+                                    <AlertCircle class="mr-1 h-4 w-4" />
+                                    {{ form.errors.name }}
+                                </div>
                             </div>
 
-                            <div class="mb-4">
-                                <Label for="type" value="Type (used as identifier)" />
+                            <!-- Type Field -->
+                            <div class="space-y-2">
+                                <Label for="type">
+                                    Type (used as identifier) <span class="text-destructive">*</span>
+                                </Label>
                                 <Input
                                     id="type"
-                                    type="text"
-                                    class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                                     v-model="form.type"
+                                    type="text"
+                                    placeholder="e.g., coding, academic, general"
                                     required
                                 />
-                                <InputError :message="form.errors.type" class="mt-2" />
-                                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                <p class="text-sm text-muted-foreground">
                                     Use a unique identifier like 'coding', 'academic', etc.
                                 </p>
+                                <div v-if="form.errors.type" class="text-sm text-destructive flex items-center">
+                                    <AlertCircle class="mr-1 h-4 w-4" />
+                                    {{ form.errors.type }}
+                                </div>
                             </div>
 
-                            <div class="mb-4">
-                                <Label for="content" value="Instruction Content" />
-                                <textarea
+                            <!-- Content Field -->
+                            <div class="space-y-2">
+                                <Label for="content">
+                                    Instruction Content <span class="text-destructive">*</span>
+                                </Label>
+                                <Textarea
                                     id="content"
-                                    class="border px-3 py-2 rounded w-full focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                                     v-model="form.content"
                                     rows="6"
+                                    placeholder="Enter the detailed instruction content..."
                                     required
-                                ></textarea>
-                                <InputError :message="form.errors.content" class="mt-2" />
+                                    class="resize-none"
+                                />
+                                <div v-if="form.errors.content" class="text-sm text-destructive flex items-center">
+                                    <AlertCircle class="mr-1 h-4 w-4" />
+                                    {{ form.errors.content }}
+                                </div>
                             </div>
 
-                            <div class="mb-4 flex items-center">
-                                <Checkbox id="is_active" v-model:checked="form.is_active" />
-                                <Label for="is_active" value="Active" class="ml-2" />
-                                <InputError :message="form.errors.is_active" class="mt-2" />
+                            <!-- Settings Section -->
+                            <div class="space-y-4">
+                                <div class="flex items-center gap-2 mb-4">
+                                    <Settings class="h-5 w-5 text-primary" />
+                                    <Label class="text-base font-medium">Settings</Label>
+                                </div>
+
+                                <!-- Active Checkbox -->
+                                <div class="flex items-start space-x-3 p-4 border rounded-lg">
+                                    <Checkbox
+                                        id="is_active"
+                                        :checked="form.is_active"
+                                        @update:checked="form.is_active = $event"
+                                    />
+                                    <div class="flex-1">
+                                        <Label
+                                            for="is_active"
+                                            class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                        >
+                                            Active
+                                        </Label>
+                                        <p class="text-sm text-muted-foreground mt-1">
+                                            Enable this instruction for use in the system
+                                        </p>
+                                    </div>
+                                    <div v-if="form.errors.is_active" class="text-sm text-destructive flex items-center">
+                                        <AlertCircle class="mr-1 h-4 w-4" />
+                                        {{ form.errors.is_active }}
+                                    </div>
+                                </div>
+
+                                <!-- Default Checkbox -->
+                                <div class="flex items-start space-x-3 p-4 border rounded-lg">
+                                    <Checkbox
+                                        id="is_default"
+                                        :checked="form.is_default"
+                                        @update:checked="form.is_default = $event"
+                                    />
+                                    <div class="flex-1">
+                                        <Label
+                                            for="is_default"
+                                            class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                        >
+                                            Set as Default
+                                        </Label>
+                                        <p class="text-sm text-muted-foreground mt-1">
+                                            Only one instruction can be set as default.
+                                        </p>
+                                    </div>
+                                    <div v-if="form.errors.is_default" class="text-sm text-destructive flex items-center">
+                                        <AlertCircle class="mr-1 h-4 w-4" />
+                                        {{ form.errors.is_default }}
+                                    </div>
+                                </div>
                             </div>
 
-                            <div class="mb-4 flex items-center">
-                                <Checkbox id="is_default" v-model:checked="form.is_default" />
-                                <Label for="is_default" value="Set as Default" class="ml-2" />
-                                <InputError :message="form.errors.is_default" class="mt-2" />
-                                <p class="text-sm text-gray-500 dark:text-gray-400 ml-2">
-                                    Only one instruction can be set as default.
-                                </p>
-                            </div>
+                            <!-- Info Alert -->
+                            <Alert>
+                                <AlertCircle class="h-4 w-4" />
+                                <AlertDescription>
+                                    Instructions are used to guide the system behavior. Make sure the content is clear and well-defined.
+                                </AlertDescription>
+                            </Alert>
 
-                            <div class="flex items-center justify-end mt-4">
-                                <Link
-                                    :href="route('admin.instructions.index')"
-                                    class="mr-4 px-4 py-2 bg-gray-200 dark:bg-gray-700 border border-transparent rounded-md font-semibold text-xs text-gray-700 dark:text-gray-300 uppercase tracking-widest hover:bg-gray-300 dark:hover:bg-gray-600 active:bg-gray-400 dark:active:bg-gray-500 focus:outline-hidden focus:border-gray-900 focus:ring-3 ring-gray-300 disabled:opacity-25 transition"
+                            <!-- Action Buttons -->
+                            <div class="flex items-center justify-end gap-3 pt-6">
+                                <Button asChild variant="outline">
+                                    <Link :href="route('admin.instructions.index')">
+                                        <ArrowLeft class="mr-2 h-4 w-4" />
+                                        Cancel
+                                    </Link>
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    :disabled="form.processing"
+                                    class="min-w-24"
                                 >
-                                    Cancel
-                                </Link>
-                                <Button class="ml-4" :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
-                                    Create
+                                    <div v-if="form.processing" class="flex items-center">
+                                        <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                        Creating...
+                                    </div>
+                                    <div v-else class="flex items-center">
+                                        <CheckCircle2 class="mr-2 h-4 w-4" />
+                                        Create
+                                    </div>
                                 </Button>
                             </div>
                         </form>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
             </div>
         </div>
     </AppLayout>
 </template>
-
-<script>
-import { defineComponent } from 'vue';
-import AppLayout from '@/Layouts/AppLayout.vue';
-import { Link, useForm } from '@inertiajs/vue3';
-import Button from '@/Components/Button.vue';
-import Input from '@/Components/Input.vue';
-import Label from '@/Components/Label.vue';
-import InputError from '@/Components/InputError.vue';
-import Checkbox from '@/Components/Checkbox.vue';
-
-export default defineComponent({
-    components: {
-        AppLayout,
-        Link,
-        Button,
-        Input,
-        Label,
-        InputError,
-        Checkbox
-    },
-    setup() {
-        const form = useForm({
-            name: '',
-            type: '',
-            content: '',
-            is_active: true,
-            is_default: false
-        });
-
-        return { form };
-    },
-    methods: {
-        submit() {
-            this.form.post(route('admin.instructions.store'));
-        }
-    }
-});
-</script>

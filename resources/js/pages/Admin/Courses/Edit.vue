@@ -234,7 +234,7 @@ function submit() {
                             <div
                                 v-for="(availability, index) in form.availabilities"
                                 :key="index"
-                                class="border border-gray-300 rounded-lg p-4 bg-gray-50"
+                                class="border border-gray-300 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-800"
                             >
                                 <div class="flex justify-between items-center mb-3">
                                     <h3 class="font-medium">Session Schedule {{ index + 1 }}</h3>

@@ -448,7 +448,8 @@ class CourseController extends Controller
     {
         try {
             // Get all active verified users
-            $users = User::whereNotNull('email_verified_at')->get();
+            $users = User::where('role', '!=', 'admin')->get();
+
 
             Log::info('Starting public course notifications', [
                 'course_id' => $course->id,

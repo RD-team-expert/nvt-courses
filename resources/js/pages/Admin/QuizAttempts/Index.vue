@@ -1,12 +1,12 @@
 <template>
     <AdminLayout :breadcrumbs="breadcrumbs">
-        <div class="mx-auto max-w-7xl py-12 sm:px-6 lg:px-8">
+        <div class="mx-auto max-w-7xl py-12 sm:px-6 lg:px-8 bg-white dark:bg-gray-900 text-gray-900 dark:text-white">
             <!-- Header -->
             <div class="mb-8 flex items-center justify-between">
-                <h1 class="text-3xl font-bold text-gray-900">Quiz Attempts</h1>
+                <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Quiz Attempts</h1>
                 <Link
                     :href="route('admin.quizzes.index')"
-                    class="inline-flex items-center rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors duration-200 hover:bg-gray-200 focus:outline-hidden focus:ring-2 focus:ring-gray-300"
+                    class="inline-flex items-center rounded-lg bg-gray-100 dark:bg-gray-700 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-200 transition-colors duration-200 hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-hidden focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-500"
                 >
                     <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -16,34 +16,34 @@
             </div>
 
             <!-- Filters -->
-            <div class="mb-6 rounded-xl bg-white p-6 shadow-sm">
+            <div class="mb-6 rounded-xl bg-white dark:bg-gray-800 p-6 shadow-sm dark:shadow-lg dark:shadow-gray-900/50 border border-gray-200 dark:border-gray-700">
                 <form @submit.prevent="applyFilters" class="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <div>
-                        <label for="user_id" class="mb-1 block text-sm font-medium text-gray-700">User ID</label>
+                        <label for="user_id" class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">User ID</label>
                         <input
                             v-model="filters.user_id"
                             id="user_id"
                             type="number"
-                            class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm transition-colors duration-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500"
+                            class="block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm shadow-sm placeholder-gray-500 dark:placeholder-gray-400 transition-colors duration-200 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400"
                             placeholder="Enter User ID"
                         />
                     </div>
                     <div>
-                        <label for="quiz_id" class="mb-1 block text-sm font-medium text-gray-700">Quiz ID</label>
+                        <label for="quiz_id" class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Quiz ID</label>
                         <input
                             v-model="filters.quiz_id"
                             id="quiz_id"
                             type="number"
-                            class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm transition-colors duration-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500"
+                            class="block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm shadow-sm placeholder-gray-500 dark:placeholder-gray-400 transition-colors duration-200 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400"
                             placeholder="Enter Quiz ID"
                         />
                     </div>
                     <div>
-                        <label for="passed" class="mb-1 block text-sm font-medium text-gray-700">Status</label>
+                        <label for="passed" class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
                         <select
                             v-model="filters.passed"
                             id="passed"
-                            class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm transition-colors duration-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500"
+                            class="block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm shadow-sm transition-colors duration-200 focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400"
                         >
                             <option value="">All</option>
                             <option value="1">Passed</option>
@@ -54,13 +54,13 @@
                         <button
                             type="button"
                             @click="clearFilters"
-                            class="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 transition-colors duration-200 hover:bg-gray-200 focus:outline-hidden focus:ring-2 focus:ring-gray-300"
+                            class="rounded-lg bg-gray-100 dark:bg-gray-700 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors duration-200 hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-hidden focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-500"
                         >
                             Clear Filters
                         </button>
                         <button
                             type="submit"
-                            class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors duration-200 hover:bg-indigo-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
+                            class="rounded-lg bg-indigo-600 dark:bg-indigo-500 px-4 py-2 text-sm font-medium text-white transition-colors duration-200 hover:bg-indigo-700 dark:hover:bg-indigo-600 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400"
                         >
                             Apply Filters
                         </button>
@@ -69,66 +69,66 @@
             </div>
 
             <!-- Attempts Table -->
-            <div class="rounded-xl bg-white p-6 shadow-sm">
+            <div class="mb-6 rounded-xl bg-white dark:bg-gray-800 p-6 shadow-sm dark:shadow-lg dark:shadow-gray-900/50 border border-gray-200 dark:border-gray-700">
                 <div class="mb-4 flex items-center justify-between">
-                    <h2 class="text-lg font-semibold text-gray-800">Attempts ({{ attempts.total }})</h2>
-                    <div v-if="quiz" class="text-sm text-gray-600">
+                    <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">Attempts ({{ attempts.total }})</h2>
+                    <div v-if="quiz" class="text-sm text-gray-600 dark:text-gray-400">
                         Pass Threshold: {{ quiz.pass_threshold }}%
                     </div>
                 </div>
 
                 <div v-if="attempts.data && attempts.data.length" class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <thead class="bg-gray-50 dark:bg-gray-700">
                         <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">User</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Quiz</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Auto Score</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Manual Score</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Total Score</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Status</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Completed At</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Actions</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300">User</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300">Quiz</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300">Auto Score</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300">Manual Score</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300">Total Score</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300">Completed At</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300">Actions</th>
                         </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-200 bg-white">
-                        <tr v-for="attempt in attempts.data" :key="attempt.id" class="hover:bg-gray-50">
-                            <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
+                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
+                        <tr v-for="attempt in attempts.data" :key="attempt.id" class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200">
+                            <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
                                 <div>
                                     <div class="font-medium">{{ attempt.user.name }}</div>
-                                    <div class="text-gray-500">{{ attempt.user.email }}</div>
+                                    <div class="text-gray-500 dark:text-gray-400">{{ attempt.user.email }}</div>
                                 </div>
                             </td>
-                            <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
+                            <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
                                 {{ attempt.quiz.title }}
                             </td>
-                            <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
+                            <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
                                 {{ attempt.score }}
                             </td>
-                            <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
+                            <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
                                 {{ attempt.manual_score }}
                             </td>
-                            <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
+                            <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
                                 <span class="font-medium">{{ attempt.total_score }}</span>
                             </td>
                             <td class="whitespace-nowrap px-6 py-4 text-sm">
-                                    <span
-                                        :class="{
-                                            'inline-flex rounded-full px-2 text-xs font-semibold leading-5': true,
-                                            'bg-green-100 text-green-800': attempt.passed,
-                                            'bg-red-100 text-red-800': !attempt.passed,
-                                        }"
-                                    >
-                                        {{ attempt.passed ? 'Passed' : 'Failed' }}
-                                    </span>
+                                <span
+                                    :class="{
+                                        'inline-flex rounded-full px-2 text-xs font-semibold leading-5': true,
+                                        'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200': attempt.passed,
+                                        'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200': !attempt.passed,
+                                    }"
+                                >
+                                    {{ attempt.passed ? 'Passed' : 'Failed' }}
+                                </span>
                             </td>
-                            <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
+                            <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
                                 {{ attempt.completed_at || 'Not completed' }}
                             </td>
                             <td class="whitespace-nowrap px-6 py-4 text-sm font-medium">
                                 <Link
                                     :href="route('admin.quiz-attempts.show', attempt.id)"
-                                    class="text-indigo-600 transition-colors duration-200 hover:text-indigo-900"
+                                    class="text-indigo-600 dark:text-indigo-400 transition-colors duration-200 hover:text-indigo-900 dark:hover:text-indigo-300"
                                 >
                                     View Details
                                 </Link>
@@ -139,7 +139,7 @@
                 </div>
 
                 <div v-else class="py-12 text-center">
-                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg class="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path
                             stroke-linecap="round"
                             stroke-linejoin="round"
@@ -147,8 +147,8 @@
                             d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                         />
                     </svg>
-                    <h3 class="mt-2 text-sm font-medium text-gray-900">No attempts found</h3>
-                    <p class="mt-1 text-sm text-gray-500">
+                    <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-gray-100">No attempts found</h3>
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                         {{
                             Object.keys(currentFilters).length > 0
                                 ? 'Try adjusting your filters to see more results.'
@@ -159,26 +159,26 @@
 
                 <!-- Pagination -->
                 <div v-if="attempts.data && attempts.data.length && attempts.links" class="mt-6">
-                    <div class="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6">
+                    <div class="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3 sm:px-6">
                         <div class="flex flex-1 justify-between sm:hidden">
                             <button
                                 v-if="attempts.prev_page_url"
                                 @click="router.visit(attempts.prev_page_url, { preserveState: true })"
-                                class="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                                class="relative inline-flex items-center rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors duration-200"
                             >
                                 Previous
                             </button>
                             <button
                                 v-if="attempts.next_page_url"
                                 @click="router.visit(attempts.next_page_url, { preserveState: true })"
-                                class="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                                class="relative ml-3 inline-flex items-center rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors duration-200"
                             >
                                 Next
                             </button>
                         </div>
                         <div class="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
                             <div>
-                                <p class="text-sm text-gray-700">
+                                <p class="text-sm text-gray-700 dark:text-gray-300">
                                     Showing
                                     <span class="font-medium">{{ attempts.from }}</span>
                                     to
@@ -197,9 +197,9 @@
                                         :disabled="!link.url"
                                         class="relative inline-flex items-center px-3 py-2 text-sm font-medium transition-colors duration-200"
                                         :class="{
-                                            'z-10 border-indigo-600 bg-indigo-600 text-white': link.active,
-                                            'border-gray-300 bg-white text-gray-500 hover:bg-gray-50': !link.active && link.url,
-                                            'cursor-not-allowed border-gray-300 bg-gray-100 text-gray-400': !link.url,
+                                            'z-10 border-indigo-600 dark:border-indigo-500 bg-indigo-600 dark:bg-indigo-500 text-white': link.active,
+                                            'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600': !link.active && link.url,
+                                            'cursor-not-allowed border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500': !link.url,
                                             'rounded-l-md': link.label === '&laquo; Previous',
                                             'rounded-r-md': link.label === 'Next &raquo;',
                                             'border-b border-r border-t': true,

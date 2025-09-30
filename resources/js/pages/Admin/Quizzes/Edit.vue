@@ -97,9 +97,11 @@
                         <CardTitle>Questions ({{ form.questions.length }}/20)</CardTitle>
                     </CardHeader>
                     <CardContent>
-                             <div v-for="(question, index) in form.questions" :key="`question-${index}`" class="mb-6 rounded-lg bg-gray-50 p-4">
+                             <div v-for="(question, index) in form.questions" :key="`question-${index}`"
+                                  class="border border-gray-300 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-800"
+                             >
                             <div class="mb-4 flex items-center justify-between">
-                                <h3 class="text-sm font-medium text-gray-700">Question {{ index + 1 }}</h3>
+                                <h3 class="text-sm font-medium text-gray-100">Question {{ index + 1 }}</h3>
                                 <Button
                                     v-if="form.questions.length > 1"
                                     @click="removeQuestion(index)"
@@ -166,7 +168,7 @@
 
                         <!-- Only show options and correct answers for non-text questions -->
                         <div v-if="question.type !== 'text'" class="mt-4">
-                            <h4 class="mb-2 text-sm font-medium text-gray-700">Options</h4>
+                            <h4 class="mb-2 text-sm font-medium text-gray-100">Options</h4>
                             <div v-for="(option, optIndex) in question.options" :key="optIndex" class="mb-2 flex items-center">
                                 <Input
                                     v-model="question.options[optIndex]"
@@ -203,7 +205,7 @@
 
                             <!-- Correct answers section -->
                             <div class="mt-4">
-                                <label class="mb-1 block text-sm font-medium text-gray-700">Correct Answer(s)</label>
+                                <label class="mb-1 block text-sm font-medium text-gray-100">Correct Answer(s)</label>
                                 <div v-if="question.type === 'radio'" class="space-y-2">
                                     <div v-for="(option, optIndex) in question.options" :key="optIndex" class="flex items-center">
                                         <input
@@ -216,7 +218,7 @@
                                             :disabled="form.processing"
                                             @change="updateCorrectAnswer(index, option)"
                                         />
-                                        <label :for="`correct_answer_${index}_${optIndex}`" class="ml-2 text-sm text-gray-600">
+                                        <label :for="`correct_answer_${index}_${optIndex}`" class="ml-2 text-sm text-gray-300">
                                             {{ option || 'Option ' + (optIndex + 1) }}
                                         </label>
                                     </div>
@@ -235,7 +237,7 @@
                                             class="h-4 w-4 border-gray-300 border text-indigo-600 focus:ring-indigo-500"
                                             :disabled="form.processing"
                                         />
-                                        <label :for="`correct_answer_${index}_${optIndex}`" class="ml-2 text-sm text-gray-600">
+                                        <label :for="`correct_answer_${index}_${optIndex}`" class="ml-2 text-sm text-gray-300">
                                             {{ option || 'Option ' + (optIndex + 1) }}
                                         </label>
                                     </div>
@@ -267,8 +269,8 @@
                             </p>
                         </div>
                     </div>
-                    
-                
+
+
                 <Button
                         @click="addQuestion"
                         type="button"

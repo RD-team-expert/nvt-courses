@@ -125,9 +125,9 @@ class UserDepartmentRoleController extends Controller
             'roleTypes' => [
                 'direct_manager' => 'Direct Manager',
                 'project_manager' => 'Project Manager',
-                'department_head' => 'Department Head',
+                'director' => 'Director',
                 'senior_manager' => 'Senior Manager',
-                'team_lead' => 'Team Lead',
+                'supervisor ' => 'Supervisor ',
             ]
         ]);
     }
@@ -139,7 +139,7 @@ class UserDepartmentRoleController extends Controller
         $validated = $request->validate([
             'user_id' => 'required|exists:users,id',
             'department_id' => 'required|exists:departments,id',
-            'role_type' => 'required|in:direct_manager,project_manager,department_head,senior_manager,team_lead',
+            'role_type' => 'required|in:direct_manager,project_manager,director,senior_manager,supervisor',
             'manages_user_id' => 'nullable|exists:users,id',
             'is_primary' => 'boolean',
             'authority_level' => 'required|integer|min:1|max:3',
@@ -324,9 +324,9 @@ class UserDepartmentRoleController extends Controller
             'roleTypes' => [
                 'direct_manager' => 'Direct Manager',
                 'project_manager' => 'Project Manager',
-                'department_head' => 'Department Head',
+                'director' => 'Director',
                 'senior_manager' => 'Senior Manager',
-                'team_lead' => 'Team Lead',
+                'supervisor ' => 'Supervisor ',
             ]
         ]);
     }
@@ -338,7 +338,7 @@ class UserDepartmentRoleController extends Controller
         $validated = $request->validate([
             'user_id' => 'required|exists:users,id',
             'department_id' => 'required|exists:departments,id',
-            'role_type' => 'required|in:direct_manager,project_manager,department_head,senior_manager,team_lead',
+            'role_type' => 'required|in:direct_manager,project_manager,director,senior_manager,supervisor',
             'manages_user_id' => 'nullable|exists:users,id',
             'is_primary' => 'boolean',
             'authority_level' => 'required|integer|min:1|max:3',

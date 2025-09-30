@@ -123,4 +123,10 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    'google_drive' => [
+        'api_key' => env('GOOGLE_DRIVE_API_KEY'),
+        'api_base_url' => 'https://www.googleapis.com/drive/v3',
+    ],
+
+
 ];

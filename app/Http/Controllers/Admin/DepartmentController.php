@@ -267,13 +267,7 @@ class DepartmentController extends Controller
 
     public function assignManager(Request $request, Department $department)
     {
-        $validated = $request->validate([
-            'user_id' => 'required|exists:users,id',
-            'role_type' => 'required|string|in:department_head,senior_manager,direct_manager,project_manager,team_lead',
-            'is_primary' => 'boolean',
-            'start_date' => 'nullable|date',
-            'end_date' => 'nullable|date|after_or_equal:start_date',
-        ]);
+        $validated = $request;
 
         try {
             // Check if user already has a role in this department

@@ -1,8 +1,31 @@
+<!--
+  User Organizational Profile Page
+  Comprehensive view of a user's organizational structure, roles, and relationships
+-->
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import { computed } from 'vue'
 import { type BreadcrumbItemType } from '@/types'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import {
+    User,
+    Users,
+    Building2,
+    Crown,
+    GitBranch,
+    BarChart3,
+    Eye,
+    ArrowRight,
+    Star,
+    Calendar,
+    Mail,
+    IdCard,
+    UserCheck
+} from 'lucide-vue-next'
 
 const props = defineProps({
     user: Object,
@@ -11,27 +34,42 @@ const props = defineProps({
     managers: Array,
 })
 
-// Get level color
-const getLevelColor = (levelCode: string) => {
-    const colors = {
-        'L1': 'bg-blue-100 text-blue-800',
-        'L2': 'bg-green-100 text-green-800',
-        'L3': 'bg-orange-100 text-orange-800',
-        'L4': 'bg-red-100 text-red-800',
-    };
-    return colors[levelCode] || 'bg-gray-100 text-gray-800';
+// Get level badge variant
+const getLevelVariant = (levelCode: string) => {
+    const variants = {
+        'L1': 'secondary',
+        'L2': 'default',
+        'L3': 'outline',
+        'L4': 'destructive',
+    }
+    return variants[levelCode] || 'secondary'
 }
 
-// Get role type color
-const getRoleColor = (roleType: string) => {
-    const colors = {
-        'direct_manager': 'bg-blue-100 text-blue-800',
-        'project_manager': 'bg-green-100 text-green-800',
-        'department_head': 'bg-purple-100 text-purple-800',
-        'senior_manager': 'bg-red-100 text-red-800',
-        'team_lead': 'bg-yellow-100 text-yellow-800',
-    };
-    return colors[roleType] || 'bg-gray-100 text-gray-800';
+// Get role badge variant
+const getRoleVariant = (roleType: string) => {
+    const variants = {
+        'direct_manager': 'default',
+        'project_manager': 'secondary',
+        'department_head': 'outline',
+        'senior_manager': 'destructive',
+        'team_lead': 'secondary',
+    }
+    return variants[roleType] || 'secondary'
+}
+
+// Get user status variant
+const getStatusVariant = (status: string) => {
+    switch (status) {
+        case 'active': return 'default'
+        case 'inactive': return 'destructive'
+        case 'on_leave': return 'secondary'
+        default: return 'outline'
+    }
+}
+
+// Get user initials for avatar
+const getUserInitials = (name: string) => {
+    return name.split(' ').map(n => n.charAt(0).toUpperCase()).join('').slice(0, 2)
 }
 
 // Stats
@@ -52,331 +90,345 @@ const breadcrumbs: BreadcrumbItemType[] = [
 
 <template>
     <AdminLayout :breadcrumbs="breadcrumbs">
-        <div class="px-4 sm:px-0">
+        <div class="px-4 sm:px-0 space-y-6">
             <!-- User Header -->
-            <div class="bg-white rounded-lg shadow p-6 mb-6">
-                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
-                    <div class="flex items-center space-x-4">
-                        <div class="shrink-0 h-16 w-16">
-                            <div class="h-16 w-16 rounded-full bg-gray-200 flex items-center justify-center">
-                                <span class="text-xl font-bold text-gray-600">
-                                    {{ user?.name?.charAt(0).toUpperCase() || '?' }}
-                                </span>
+            <Card>
+                <CardContent class="p-6">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <div class="flex items-center space-x-4">
+                            <Avatar class="h-16 w-16">
+                                <AvatarFallback class="bg-muted text-muted-foreground text-xl font-bold">
+                                    {{ getUserInitials(user?.name || 'Unknown') }}
+                                </AvatarFallback>
+                            </Avatar>
+                            <div>
+                                <h1 class="text-2xl font-bold text-foreground">{{ user?.name || 'Unknown User' }}</h1>
+                                <p class="text-sm text-muted-foreground flex items-center">
+                                    <Mail class="mr-1 h-3 w-3" />
+                                    {{ user?.email || 'No email' }}
+                                </p>
+                                <div class="mt-2 flex items-center space-x-2 flex-wrap gap-1">
+                                    <Badge v-if="user?.employee_code" variant="outline" class="text-xs">
+                                        <IdCard class="mr-1 h-3 w-3" />
+                                        {{ user.employee_code }}
+                                    </Badge>
+                                    <Badge v-if="user?.level" :variant="getLevelVariant(user.level.code)">
+                                        {{ user.level.code }} - {{ user.level.name }}
+                                    </Badge>
+                                    <Badge :variant="getStatusVariant(user?.status)">
+                                        {{ user?.status || 'Unknown' }}
+                                    </Badge>
+                                </div>
                             </div>
                         </div>
-                        <div>
-                            <h1 class="text-2xl font-bold text-gray-900">{{ user?.name || 'Unknown User' }}</h1>
-                            <p class="text-sm text-gray-600">{{ user?.email || 'No email' }}</p>
-                            <div class="mt-2 flex items-center space-x-4">
-                                <span v-if="user?.employee_code" class="text-sm text-gray-500">
-                                    <strong>ID:</strong> {{ user.employee_code }}
-                                </span>
-                                <span v-if="user?.level"
-                                      class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
-                                      :class="getLevelColor(user.level.code)">
-                                    {{ user.level.code }} - {{ user.level.name }}
-                                </span>
-                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
-                                      :class="{
-                                          'bg-green-100 text-green-800': user?.status === 'active',
-                                          'bg-red-100 text-red-800': user?.status === 'inactive'
-                                      }">
-                                    {{ user?.status || 'Unknown' }}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
 
-                    <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                        <Link
-                            :href="route('admin.users.reporting-chain', user?.id)"
-                            class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600 transition w-full sm:w-auto text-center"
-                            v-if="user?.id"
-                        >
-                            View Reporting Chain
-                        </Link>
-                        <Link
-                            :href="route('admin.users.direct-reports', user?.id)"
-                            class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition w-full sm:w-auto text-center"
-                            v-if="stats.isManager && user?.id"
-                        >
-                            View Team ({{ stats.directReports }})
-                        </Link>
+                        <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                            <Button
+                                :as="Link"
+                                :href="route('admin.users.reporting-chain', user?.id)"
+                                v-if="user?.id"
+                                variant="outline"
+                            >
+                                <GitBranch class="mr-2 h-4 w-4" />
+                                Reporting Chain
+                            </Button>
+                            <Button
+                                :as="Link"
+                                :href="route('admin.users.direct-reports', user?.id)"
+                                v-if="stats.isManager && user?.id"
+                            >
+                                <Users class="mr-2 h-4 w-4" />
+                                View Team ({{ stats.directReports }})
+                            </Button>
+                        </div>
                     </div>
-                </div>
-            </div>
+                </CardContent>
+            </Card>
 
             <!-- Stats Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                <div class="bg-white rounded-lg shadow p-6">
-                    <div class="flex items-center">
-                        <div class="shrink-0">
-                            <div class="w-8 h-8 bg-purple-500 rounded-md flex items-center justify-center">
-                                <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
-                                </svg>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <Card>
+                    <CardContent class="p-6">
+                        <div class="flex items-center">
+                            <div class="shrink-0">
+                                <div class="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                                    <Crown class="h-5 w-5 text-white" />
+                                </div>
+                            </div>
+                            <div class="ml-4 flex-1">
+                                <div class="text-sm font-medium text-muted-foreground">Manager Roles</div>
+                                <div class="text-2xl font-bold text-foreground">{{ stats.managerRoles }}</div>
                             </div>
                         </div>
-                        <div class="ml-5 w-0 flex-1">
-                            <dl>
-                                <dt class="text-sm font-medium text-gray-500 truncate">Manager Roles</dt>
-                                <dd class="text-lg font-medium text-gray-900">{{ stats.managerRoles }}</dd>
-                            </dl>
-                        </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
-                <div class="bg-white rounded-lg shadow p-6">
-                    <div class="flex items-center">
-                        <div class="shrink-0">
-                            <div class="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center">
-                                <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                                </svg>
+                <Card>
+                    <CardContent class="p-6">
+                        <div class="flex items-center">
+                            <div class="shrink-0">
+                                <div class="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center">
+                                    <Users class="h-5 w-5 text-white" />
+                                </div>
+                            </div>
+                            <div class="ml-4 flex-1">
+                                <div class="text-sm font-medium text-muted-foreground">Direct Reports</div>
+                                <div class="text-2xl font-bold text-foreground">{{ stats.directReports }}</div>
                             </div>
                         </div>
-                        <div class="ml-5 w-0 flex-1">
-                            <dl>
-                                <dt class="text-sm font-medium text-gray-500 truncate">Direct Reports</dt>
-                                <dd class="text-lg font-medium text-gray-900">{{ stats.directReports }}</dd>
-                            </dl>
-                        </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
-                <div class="bg-white rounded-lg shadow p-6">
-                    <div class="flex items-center">
-                        <div class="shrink-0">
-                            <div class="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center">
-                                <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                                </svg>
+                <Card>
+                    <CardContent class="p-6">
+                        <div class="flex items-center">
+                            <div class="shrink-0">
+                                <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                                    <User class="h-5 w-5 text-white" />
+                                </div>
+                            </div>
+                            <div class="ml-4 flex-1">
+                                <div class="text-sm font-medium text-muted-foreground">Reports To</div>
+                                <div class="text-2xl font-bold text-foreground">{{ stats.managers }}</div>
                             </div>
                         </div>
-                        <div class="ml-5 w-0 flex-1">
-                            <dl>
-                                <dt class="text-sm font-medium text-gray-500 truncate">Reports To</dt>
-                                <dd class="text-lg font-medium text-gray-900">{{ stats.managers }}</dd>
-                            </dl>
-                        </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
-                <div class="bg-white rounded-lg shadow p-6">
-                    <div class="flex items-center">
-                        <div class="shrink-0">
-                            <div class="w-8 h-8 bg-orange-500 rounded-md flex items-center justify-center">
-                                <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                                </svg>
+                <Card>
+                    <CardContent class="p-6">
+                        <div class="flex items-center">
+                            <div class="shrink-0">
+                                <div class="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center">
+                                    <BarChart3 class="h-5 w-5 text-white" />
+                                </div>
+                            </div>
+                            <div class="ml-4 flex-1">
+                                <div class="text-sm font-medium text-muted-foreground">Hierarchy Level</div>
+                                <div class="text-2xl font-bold text-foreground">{{ user?.level?.hierarchy_level || 'N/A' }}</div>
                             </div>
                         </div>
-                        <div class="ml-5 w-0 flex-1">
-                            <dl>
-                                <dt class="text-sm font-medium text-gray-500 truncate">Hierarchy Level</dt>
-                                <dd class="text-lg font-medium text-gray-900">{{ user?.level?.hierarchy_level || 'N/A' }}</dd>
-                            </dl>
-                        </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <!-- User Details -->
-                <div class="bg-white rounded-lg shadow p-6">
-                    <h2 class="text-lg font-medium text-gray-900 mb-4">User Information</h2>
-
-                    <dl class="space-y-4">
-                        <div>
-                            <dt class="text-sm font-medium text-gray-700">Department</dt>
-                            <dd class="mt-1">
-                                <div v-if="user?.department" class="text-sm text-gray-900">
-                                    {{ user.department.name }} ({{ user.department.code }})
-                                    <span v-if="user.department.parent" class="text-gray-500 ml-2">
-                                        → {{ user.department.parent }}
+                <Card>
+                    <CardHeader>
+                        <CardTitle class="flex items-center">
+                            <User class="mr-2 h-5 w-5" />
+                            User Information
+                        </CardTitle>
+                        <CardDescription>Personal and organizational details</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div class="space-y-4">
+                            <div>
+                                <div class="text-sm font-medium text-muted-foreground mb-1">Department</div>
+                                <div v-if="user?.department" class="flex items-center">
+                                    <Building2 class="mr-2 h-4 w-4 text-muted-foreground" />
+                                    <span class="text-sm text-foreground">
+                                        {{ user.department.name }} ({{ user.department.code }})
+                                        <span v-if="user.department.parent" class="text-muted-foreground ml-2">
+                                            → {{ user.department.parent }}
+                                        </span>
                                     </span>
                                 </div>
-                                <div v-else class="text-sm text-gray-400 italic">No department assigned</div>
-                            </dd>
-                        </div>
+                                <div v-else class="text-sm text-muted-foreground italic">No department assigned</div>
+                            </div>
 
-                        <div>
-                            <dt class="text-sm font-medium text-gray-700">User Level</dt>
-                            <dd class="mt-1">
-                                <span v-if="user?.level"
-                                      class="inline-flex items-center px-2 py-0.5 rounded text-sm font-medium"
-                                      :class="getLevelColor(user.level.code)">
+                            <div>
+                                <div class="text-sm font-medium text-muted-foreground mb-1">User Level</div>
+                                <Badge v-if="user?.level" :variant="getLevelVariant(user.level.code)">
                                     {{ user.level.code }} - {{ user.level.name }} (Level {{ user.level.hierarchy_level }})
-                                </span>
-                                <span v-else class="text-sm text-gray-400 italic">No level assigned</span>
-                            </dd>
-                        </div>
+                                </Badge>
+                                <span v-else class="text-sm text-muted-foreground italic">No level assigned</span>
+                            </div>
 
-                        <div>
-                            <dt class="text-sm font-medium text-gray-700">Employee Code</dt>
-                            <dd class="mt-1 text-sm text-gray-900">{{ user?.employee_code || 'Not assigned' }}</dd>
-                        </div>
+                            <div>
+                                <div class="text-sm font-medium text-muted-foreground mb-1">Employee Code</div>
+                                <div class="flex items-center">
+                                    <IdCard class="mr-2 h-4 w-4 text-muted-foreground" />
+                                    <span class="text-sm text-foreground">{{ user?.employee_code || 'Not assigned' }}</span>
+                                </div>
+                            </div>
 
-                        <div>
-                            <dt class="text-sm font-medium text-gray-700">Join Date</dt>
-                            <dd class="mt-1 text-sm text-gray-900">{{ user?.created_at || 'Unknown' }}</dd>
-                        </div>
+                            <div>
+                                <div class="text-sm font-medium text-muted-foreground mb-1">Join Date</div>
+                                <div class="flex items-center">
+                                    <Calendar class="mr-2 h-4 w-4 text-muted-foreground" />
+                                    <span class="text-sm text-foreground">{{ user?.created_at || 'Unknown' }}</span>
+                                </div>
+                            </div>
 
-                        <div>
-                            <dt class="text-sm font-medium text-gray-700">Status</dt>
-                            <dd class="mt-1">
-                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
-                                      :class="{
-                                          'bg-green-100 text-green-800': user?.status === 'active',
-                                          'bg-red-100 text-red-800': user?.status === 'inactive',
-                                          'bg-yellow-100 text-yellow-800': user?.status === 'on_leave'
-                                      }">
+                            <div>
+                                <div class="text-sm font-medium text-muted-foreground mb-1">Status</div>
+                                <Badge :variant="getStatusVariant(user?.status)">
                                     {{ user?.status || 'Unknown' }}
-                                </span>
-                            </dd>
+                                </Badge>
+                            </div>
                         </div>
-                    </dl>
-                </div>
+                    </CardContent>
+                </Card>
 
                 <!-- Manager Roles -->
-                <div class="bg-white rounded-lg shadow p-6">
-                    <h2 class="text-lg font-medium text-gray-900 mb-4">
-                        Manager Roles ({{ stats.managerRoles }})
-                    </h2>
-
-                    <div v-if="managerRoles && managerRoles.length > 0" class="space-y-3">
-                        <div v-for="role in managerRoles" :key="role.id"
-                             class="border rounded-lg p-4"
-                             :class="{ 'border-blue-300 bg-blue-50': role.is_primary }">
-                            <div class="flex items-center justify-between mb-2">
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
-                                      :class="getRoleColor(role.role_type)">
-                                    {{ role.role_display }}
-                                </span>
-                                <span v-if="role.is_primary"
-                                      class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
-                                    Primary
-                                </span>
-                            </div>
-                            <div class="text-sm text-gray-900 mb-1">{{ role.department }}</div>
-                            <div class="flex items-center space-x-4 text-xs text-gray-500">
-                                <span>Authority Level {{ role.authority_level }}</span>
-                                <span v-if="role.start_date">Since {{ role.start_date }}</span>
-                                <span class="px-2 py-0.5 rounded"
-                                      :class="role.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'">
-                                    {{ role.is_active ? 'Active' : 'Inactive' }}
-                                </span>
+                <Card>
+                    <CardHeader>
+                        <CardTitle class="flex items-center">
+                            <Crown class="mr-2 h-5 w-5" />
+                            Manager Roles ({{ stats.managerRoles }})
+                        </CardTitle>
+                        <CardDescription>Management responsibilities and authority levels</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div v-if="managerRoles && managerRoles.length > 0" class="space-y-3">
+                            <div v-for="role in managerRoles" :key="role.id"
+                                 class="border rounded-lg p-4"
+                                 :class="{ 'border-primary bg-primary/5': role.is_primary }">
+                                <div class="flex items-center justify-between mb-2">
+                                    <Badge :variant="getRoleVariant(role.role_type)">
+                                        {{ role.role_display }}
+                                    </Badge>
+                                    <Badge v-if="role.is_primary" variant="default" class="text-xs">
+                                        <Star class="mr-1 h-3 w-3" />
+                                        Primary
+                                    </Badge>
+                                </div>
+                                <div class="text-sm font-medium text-foreground mb-1">{{ role.department }}</div>
+                                <div class="flex items-center space-x-4 text-xs text-muted-foreground">
+                                    <span>Authority Level {{ role.authority_level }}</span>
+                                    <span v-if="role.start_date">Since {{ role.start_date }}</span>
+                                    <Badge :variant="role.is_active ? 'default' : 'destructive'" class="text-xs">
+                                        {{ role.is_active ? 'Active' : 'Inactive' }}
+                                    </Badge>
+                                </div>
                             </div>
                         </div>
-                    </div>
 
-                    <div v-else class="text-center py-8 text-gray-500">
-                        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                        </svg>
-                        <h3 class="mt-2 text-sm font-medium text-gray-900">No manager roles</h3>
-                        <p class="mt-1 text-sm text-gray-500">This user is not assigned any management responsibilities.</p>
-                    </div>
-                </div>
+                        <div v-else class="text-center py-8">
+                            <Crown class="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                            <h3 class="text-sm font-medium text-foreground mb-2">No manager roles</h3>
+                            <p class="text-sm text-muted-foreground">This user is not assigned any management responsibilities.</p>
+                        </div>
+                    </CardContent>
+                </Card>
             </div>
 
             <!-- Reports and Managers Section -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <!-- Direct Reports -->
-                <div class="bg-white rounded-lg shadow p-6">
-                    <div class="flex items-center justify-between mb-4">
-                        <h2 class="text-lg font-medium text-gray-900">
-                            Direct Reports ({{ stats.directReports }})
-                        </h2>
-                        <Link
-                            v-if="stats.directReports > 0 && user?.id"
-                            :href="route('admin.users.direct-reports', user.id)"
-                            class="text-blue-600 hover:text-blue-900 text-sm transition-colors"
-                        >
-                            View All →
-                        </Link>
-                    </div>
-
-                    <div v-if="directReports && directReports.length > 0" class="space-y-3">
-                        <div v-for="report in directReports.slice(0, 5)" :key="report.id" class="flex items-center space-x-3 p-3 border rounded-lg">
-                            <div class="shrink-0 h-8 w-8">
-                                <div class="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center">
-                                    <span class="text-xs font-medium text-gray-600">
-                                        {{ report.name.charAt(0).toUpperCase() }}
-                                    </span>
-                                </div>
+                <Card>
+                    <CardHeader>
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <CardTitle class="flex items-center">
+                                    <Users class="mr-2 h-5 w-5" />
+                                    Direct Reports ({{ stats.directReports }})
+                                </CardTitle>
+                                <CardDescription>Team members directly reporting to this user</CardDescription>
                             </div>
-                            <div class="flex-1 min-w-0">
-                                <div class="text-sm font-medium text-gray-900">{{ report.name }}</div>
-                                <div class="text-sm text-gray-500">{{ report.email }}</div>
-                                <div class="flex items-center space-x-2 mt-1">
-                                    <span v-if="report.level" class="text-xs text-gray-400">{{ report.level }}</span>
-                                    <span v-if="report.department" class="text-xs text-gray-400">{{ report.department }}</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div v-if="directReports.length > 5" class="text-center pt-2">
-                            <Link
+                            <Button
+                                v-if="stats.directReports > 0 && user?.id"
+                                :as="Link"
                                 :href="route('admin.users.direct-reports', user.id)"
-                                class="text-blue-600 hover:text-blue-900 text-sm transition-colors"
+                                variant="ghost"
+                                size="sm"
                             >
-                                View {{ directReports.length - 5 }} more reports
-                            </Link>
+                                View All
+                                <ArrowRight class="ml-1 h-3 w-3" />
+                            </Button>
                         </div>
-                    </div>
+                    </CardHeader>
+                    <CardContent>
+                        <div v-if="directReports && directReports.length > 0" class="space-y-3">
+                            <div v-for="report in directReports.slice(0, 5)" :key="report.id"
+                                 class="flex items-center space-x-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                                <Avatar class="h-8 w-8">
+                                    <AvatarFallback class="bg-muted text-muted-foreground text-xs">
+                                        {{ getUserInitials(report.name) }}
+                                    </AvatarFallback>
+                                </Avatar>
+                                <div class="flex-1 min-w-0">
+                                    <div class="text-sm font-medium text-foreground">{{ report.name }}</div>
+                                    <div class="text-sm text-muted-foreground">{{ report.email }}</div>
+                                    <div class="flex items-center space-x-2 mt-1">
+                                        <Badge v-if="report.level" variant="outline" class="text-xs">{{ report.level }}</Badge>
+                                        <Badge v-if="report.department" variant="outline" class="text-xs">{{ report.department }}</Badge>
+                                    </div>
+                                </div>
+                            </div>
+                            <div v-if="directReports.length > 5" class="text-center pt-2">
+                                <Button
+                                    :as="Link"
+                                    :href="route('admin.users.direct-reports', user.id)"
+                                    variant="ghost"
+                                    size="sm"
+                                >
+                                    View {{ directReports.length - 5 }} more reports
+                                    <ArrowRight class="ml-1 h-3 w-3" />
+                                </Button>
+                            </div>
+                        </div>
 
-                    <div v-else class="text-center py-8 text-gray-500">
-                        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                        </svg>
-                        <h3 class="mt-2 text-sm font-medium text-gray-900">No direct reports</h3>
-                        <p class="mt-1 text-sm text-gray-500">This user doesn't manage anyone directly.</p>
-                    </div>
-                </div>
+                        <div v-else class="text-center py-8">
+                            <Users class="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                            <h3 class="text-sm font-medium text-foreground mb-2">No direct reports</h3>
+                            <p class="text-sm text-muted-foreground">This user doesn't manage anyone directly.</p>
+                        </div>
+                    </CardContent>
+                </Card>
 
                 <!-- Managers -->
-                <div class="bg-white rounded-lg shadow p-6">
-                    <div class="flex items-center justify-between mb-4">
-                        <h2 class="text-lg font-medium text-gray-900">
-                            Reports To ({{ stats.managers }})
-                        </h2>
-                        <Link
-                            v-if="user?.id"
-                            :href="route('admin.users.reporting-chain', user.id)"
-                            class="text-blue-600 hover:text-blue-900 text-sm transition-colors"
-                        >
-                            View Chain →
-                        </Link>
-                    </div>
-
-                    <div v-if="managers && managers.length > 0" class="space-y-3">
-                        <div v-for="manager in managers" :key="manager.id" class="flex items-center space-x-3 p-3 border rounded-lg">
-                            <div class="shrink-0 h-8 w-8">
-                                <div class="h-8 w-8 rounded-full bg-blue-200 flex items-center justify-center">
-                                    <span class="text-xs font-medium text-blue-600">
-                                        {{ manager.name.charAt(0).toUpperCase() }}
-                                    </span>
-                                </div>
+                <Card>
+                    <CardHeader>
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <CardTitle class="flex items-center">
+                                    <UserCheck class="mr-2 h-5 w-5" />
+                                    Reports To ({{ stats.managers }})
+                                </CardTitle>
+                                <CardDescription>Managers and supervisors this user reports to</CardDescription>
                             </div>
-                            <div class="flex-1 min-w-0">
-                                <div class="text-sm font-medium text-gray-900">{{ manager.name }}</div>
-                                <div class="text-sm text-gray-500">{{ manager.email }}</div>
-                                <div class="flex items-center space-x-2 mt-1">
-                                    <span v-if="manager.level" class="text-xs text-gray-400">{{ manager.level }}</span>
-                                    <span v-if="manager.department" class="text-xs text-gray-400">{{ manager.department }}</span>
+                            <Button
+                                v-if="user?.id"
+                                :as="Link"
+                                :href="route('admin.users.reporting-chain', user.id)"
+                                variant="ghost"
+                                size="sm"
+                            >
+                                View Chain
+                                <ArrowRight class="ml-1 h-3 w-3" />
+                            </Button>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <div v-if="managers && managers.length > 0" class="space-y-3">
+                            <div v-for="manager in managers" :key="manager.id"
+                                 class="flex items-center space-x-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                                <Avatar class="h-8 w-8">
+                                    <AvatarFallback class="bg-primary text-primary-foreground text-xs">
+                                        {{ getUserInitials(manager.name) }}
+                                    </AvatarFallback>
+                                </Avatar>
+                                <div class="flex-1 min-w-0">
+                                    <div class="text-sm font-medium text-foreground">{{ manager.name }}</div>
+                                    <div class="text-sm text-muted-foreground">{{ manager.email }}</div>
+                                    <div class="flex items-center space-x-2 mt-1">
+                                        <Badge v-if="manager.level" variant="outline" class="text-xs">{{ manager.level }}</Badge>
+                                        <Badge v-if="manager.department" variant="outline" class="text-xs">{{ manager.department }}</Badge>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
 
-                    <div v-else class="text-center py-8 text-gray-500">
-                        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                        <h3 class="mt-2 text-sm font-medium text-gray-900">No direct managers</h3>
-                        <p class="mt-1 text-sm text-gray-500">This user doesn't have assigned managers.</p>
-                    </div>
-                </div>
+                        <div v-else class="text-center py-8">
+                            <UserCheck class="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                            <h3 class="text-sm font-medium text-foreground mb-2">No direct managers</h3>
+                            <p class="text-sm text-muted-foreground">This user doesn't have assigned managers.</p>
+                        </div>
+                    </CardContent>
+                </Card>
             </div>
         </div>
     </AdminLayout>

@@ -18,6 +18,7 @@ use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\UserDepartmentRoleController;
 use App\Http\Controllers\Admin\UserEvaluationController;
 use App\Http\Controllers\Admin\UserLevelController;
+use App\Http\Controllers\AudioController;
 use App\Http\Controllers\AuthVaiEmailController;
 use App\Http\Controllers\ClockingController;
 use App\Http\Controllers\CourseController;
@@ -49,6 +50,12 @@ Route::middleware(['auth'])->group(function () {
     Route::get('quizzes', [\App\Http\Controllers\QuizController::class, 'index'])->name('quizzes.index');
     Route::get('quizzes/{quiz}', [\App\Http\Controllers\QuizController::class, 'show'])->name('quizzes.show');
     Route::get('quiz-attempts/{attempt}/results', [\App\Http\Controllers\QuizController::class, 'results'])->name('quiz-attempts.results');
+    Route::post('/audio/{audio}/progress', [AudioController::class, 'updateProgress'])->name('audio.progress');
+    Route::post('/audio/{audio}/complete', [AudioController::class, 'markCompleted'])->name('audio.complete');
+    Route::get('/audio', [AudioController::class, 'index'])->name('audio.index');
+    Route::get('/audio/{audio}', [AudioController::class, 'show'])->name('audio.show');
+
+
 });
 
 
@@ -62,6 +69,12 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/users/{user}/assign-level', [UserController::class, 'assignLevel'])->name('users.assign-level');
     Route::post('/users/{user}/assign-department', [UserController::class, 'assignDepartment'])->name('users.assign-department');
 
+    Route::resource('audio-categories', App\Http\Controllers\Admin\AudioCategoryController::class);
+    Route::post('audio-categories/{audioCategory}/toggle-active', [App\Http\Controllers\Admin\AudioCategoryController::class, 'toggleActive'])
+        ->name('audio-categories.toggle-active');
+
+    Route::resource('audio', App\Http\Controllers\Admin\AudioController::class);
+    Route::post('/audio/{audio}/toggle-active', [App\Http\Controllers\Admin\AudioController::class, 'toggleActive'])->name('audio.toggle-active');
 
 
     // Admin course routes
@@ -252,27 +265,27 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
 
     Route::get('/reports/monthly-kpi', [ReportController::class, 'monthlyKpiDashboard'])
-        ->name('admin.reports.monthly-kpi');
+        ->name('reports.monthly-kpi');
 
     // AJAX Endpoints for KPI Dashboard
     Route::get('/reports/kpi-data', [ReportController::class, 'getKpiData'])
-        ->name('admin.reports.kpi-data');
+        ->name('reports.kpi-data');
 
     Route::get('/reports/kpi-comparison', [ReportController::class, 'getKpiComparison'])
-        ->name('admin.reports.kpi-comparison');
+        ->name('reports.kpi-comparison');
 
     Route::get('/reports/kpi-section/{section}', [ReportController::class, 'getKpiSection'])
-        ->name('admin.reports.kpi-section');
+        ->name('reports.kpi-section');
 
     Route::get('/reports/kpi-trends', [ReportController::class, 'getKpiTrends'])
-        ->name('admin.reports.kpi-trends');
+        ->name('reports.kpi-trends');
 
     Route::get('/reports/live-kpi-stats', [ReportController::class, 'getLiveKpiStats'])
-        ->name('admin.reports.live-kpi-stats');
+        ->name('reports.live-kpi-stats');
 
     // Export Endpoints
     Route::post('/reports/export-monthly-kpi', [ReportController::class, 'exportMonthlyKpiReport'])
-        ->name('admin.reports.export-monthly-kpi');
+        ->name('reports.export-monthly-kpi');
 
 
 

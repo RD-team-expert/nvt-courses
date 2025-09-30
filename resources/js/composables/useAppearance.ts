@@ -9,8 +9,8 @@ export function updateTheme(value: Appearance) {
     }
 
     // Always use light mode
-    document.documentElement.classList.remove('dark');
-    
+    // document.documentElement.classList.remove('dark');
+
     /* Original dark mode code commented out
     if (value === 'system') {
         const mediaQueryList = window.matchMedia('(prefers-color-scheme: dark)');
@@ -29,8 +29,8 @@ export function initializeTheme() {
     }
 
     // Always initialize with light theme
-    document.documentElement.classList.remove('dark');
-    
+    document.documentElement.classList.remove('light');
+
     /* Original theme initialization commented out
     // Initialize theme from saved preference or default to system...
     const savedAppearance = getStoredAppearance();
@@ -74,7 +74,7 @@ const handleSystemThemeChange = () => {
 };
 
 export function useAppearance() {
-    const appearance = ref<Appearance>('system');
+    const appearance = ref<Appearance>('dark');
 
     onMounted(() => {
         initializeTheme();

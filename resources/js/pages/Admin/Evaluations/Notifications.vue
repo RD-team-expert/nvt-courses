@@ -1,8 +1,39 @@
+<!--
+  Evaluation Notifications Page
+  Send evaluation reports to department managers
+-->
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useForm, router, Link } from '@inertiajs/vue3'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import type { BreadcrumbItemType } from '@/types'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Badge } from '@/components/ui/badge'
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogOverlay,
+} from '@/components/ui/dialog'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { Separator } from '@/components/ui/separator'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Filter, Eye, Send, ChevronDown, X, Users, Mail, Calendar } from 'lucide-vue-next'
 
 const props = defineProps<{
     employees?: Array<{
@@ -69,6 +100,7 @@ const showFilters = ref(false)
 const showPreviewModal = ref(false)
 const showSendModal = ref(false)
 const targetLevels = ref<string[]>(['L2'])
+const isMounted = ref(true)
 
 // Forms
 const filterForm = useForm({
@@ -119,6 +151,10 @@ const canPreview = computed(() => {
     return selectedEmployees.value.length > 0 && targetLevels.value.length > 0
 })
 
+const activeFilterCount = computed(() => {
+    return [filterForm.department_id, filterForm.course_id, filterForm.start_date, filterForm.end_date, filterForm.search].filter(Boolean).length
+})
+
 // Watch for showPreview prop change
 if (props.showPreview && props.preview) {
     showPreviewModal.value = true
@@ -134,6 +170,8 @@ function toggleSelectAll() {
 }
 
 function applyFilters() {
+    if (!isMounted.value) return
+
     console.log('Starting filter application...')
     console.log('Current filter form data:', filterForm.data)
 
@@ -177,12 +215,13 @@ function applyFilters() {
 }
 
 function clearFilters() {
+    if (!isMounted.value) return
     filterForm.reset()
     router.get(route('admin.evaluations.notifications'))
 }
 
 function previewNotification() {
-    if (!canPreview.value) {
+    if (!canPreview.value || !isMounted.value) {
         console.log('Cannot preview - missing requirements')
         console.log('Selected employees:', selectedEmployees.value)
         console.log('Target levels:', targetLevels.value)
@@ -225,8 +264,9 @@ function previewNotification() {
         }
     })
 }
+
 function sendNotifications() {
-    if (!props.preview) return
+    if (!props.preview || !isMounted.value) return
 
     sendForm.employee_ids = selectedEmployees.value
     sendForm.target_manager_levels = targetLevels.value
@@ -281,11 +321,11 @@ function generateEmailSubject(): string {
 }
 
 function getPerformanceLevel(score: number) {
-    if (score >= 20) return { label: 'Exceptional', class: 'bg-emerald-100 text-emerald-800 border-emerald-200' }
-    if (score >= 15) return { label: 'Excellent', class: 'bg-green-100 text-green-800 border-green-200' }
-    if (score >= 10) return { label: 'Good', class: 'bg-blue-100 text-blue-800 border-blue-200' }
-    if (score >= 5) return { label: 'Average', class: 'bg-yellow-100 text-yellow-800 border-yellow-200' }
-    return { label: 'Needs Improvement', class: 'bg-red-100 text-red-800 border-red-200' }
+    if (score >= 20) return { label: 'Exceptional', variant: 'default' }
+    if (score >= 15) return { label: 'Excellent', variant: 'secondary' }
+    if (score >= 10) return { label: 'Good', variant: 'outline' }
+    if (score >= 5) return { label: 'Average', variant: 'secondary' }
+    return { label: 'Needs Improvement', variant: 'destructive' }
 }
 
 function formatCurrency(amount: number | string): string {
@@ -301,6 +341,8 @@ function formatCurrency(amount: number | string): string {
 }
 
 function closePreviewModal() {
+    if (!isMounted.value) return
+
     console.log('Closing preview modal...')
     showPreviewModal.value = false
     showSendModal.value = false
@@ -319,518 +361,510 @@ function closePreviewModal() {
     })
 }
 
+// Handle department filter change
+const handleDepartmentChange = (value: string) => {
+    if (!isMounted.value) return
+    filterForm.department_id = value === 'none' ? null : parseInt(value)
+}
+
+// Handle course filter change
+const handleCourseChange = (value: string) => {
+    if (!isMounted.value) return
+    filterForm.course_id = value === 'none' ? null : parseInt(value)
+}
+
+// Handle target level changes
+const handleTargetLevelChange = (level: string, checked: boolean) => {
+    if (!isMounted.value) return
+
+    if (checked) {
+        if (!targetLevels.value.includes(level)) {
+            targetLevels.value.push(level)
+        }
+    } else {
+        targetLevels.value = targetLevels.value.filter(l => l !== level)
+    }
+}
+
+// Handle employee selection
+const handleEmployeeSelection = (employeeId: number, checked: boolean) => {
+    if (!isMounted.value) return
+
+    if (checked) {
+        if (!selectedEmployees.value.includes(employeeId)) {
+            selectedEmployees.value.push(employeeId)
+        }
+    } else {
+        selectedEmployees.value = selectedEmployees.value.filter(id => id !== employeeId)
+    }
+}
+
 // Breadcrumbs
 const breadcrumbs: BreadcrumbItemType[] = [
     { name: 'Dashboard', href: route('dashboard') },
     { name: 'Evaluations', href: route('admin.evaluations.index') },
     { name: 'Notifications', href: null }
 ]
+
+// Cleanup on unmount
+onUnmounted(() => {
+    isMounted.value = false
+})
 </script>
 
 <template>
     <AdminLayout :breadcrumbs="breadcrumbs">
-        <div class="mx-auto max-w-7xl py-8 px-4 sm:px-6 lg:px-8">
+        <div class="mx-auto max-w-7xl py-8 px-4 sm:px-6 lg:px-8 space-y-8">
             <!-- Header -->
-            <div class="mb-8">
+            <div>
                 <div class="flex items-center justify-between">
                     <div>
-                        <h1 class="text-3xl font-bold text-gray-900">Evaluation Notifications</h1>
-                        <p class="mt-2 text-sm text-gray-600">
+                        <h1 class="text-3xl font-bold text-foreground">Evaluation Notifications</h1>
+                        <p class="mt-2 text-sm text-muted-foreground">
                             Send evaluation reports to department managers
                         </p>
                     </div>
                     <div class="flex space-x-3">
-                        <button
+                        <Button
                             @click="showFilters = !showFilters"
-                            class="inline-flex items-center rounded-lg px-4 py-2 text-sm font-semibold transition-colors duration-200 focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
-                            :class="hasActiveFilters
-                                ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
+                            variant="outline"
+                            class="relative"
+                            :class="hasActiveFilters ? 'border-primary text-primary' : ''"
                         >
-                            <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.414A1 1 0 013 6.707V4z" />
-                            </svg>
+                            <Filter class="mr-2 h-4 w-4" />
                             Filters
-                            <span v-if="hasActiveFilters" class="ml-2 inline-flex items-center justify-center w-5 h-5 text-xs bg-indigo-500 text-white rounded-full">
-                                {{ [filterForm.department_id, filterForm.course_id, filterForm.start_date, filterForm.end_date, filterForm.search].filter(Boolean).length }}
-                            </span>
-                        </button>
+                            <Badge v-if="hasActiveFilters" variant="secondary" class="ml-2">
+                                {{ activeFilterCount }}
+                            </Badge>
+                        </Button>
                     </div>
                 </div>
             </div>
 
             <!-- Filters Panel -->
-            <div v-if="showFilters" class="mb-6 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-lg font-semibold text-gray-900">Filter L1 Employees</h3>
-                    <div class="flex space-x-2">
-                        <button
-                            v-if="hasActiveFilters"
-                            @click="clearFilters"
-                            type="button"
-                            class="inline-flex items-center rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors duration-200 hover:bg-gray-200"
-                        >
-                            Clear All
-                        </button>
-                    </div>
-                </div>
+            <Collapsible v-model:open="showFilters">
+                <CollapsibleContent>
+                    <Card>
+                        <CardHeader>
+                            <div class="flex items-center justify-between">
+                                <CardTitle>Filter L1 Employees</CardTitle>
+                                <div class="flex space-x-2">
+                                    <Button
+                                        v-if="hasActiveFilters"
+                                        @click="clearFilters"
+                                        variant="outline"
+                                        size="sm"
+                                    >
+                                        Clear All
+                                    </Button>
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                                <!-- Department Filter -->
+                                <div class="space-y-2">
+                                    <Label>Department</Label>
+                                    <Select :model-value="filterForm.department_id?.toString() || 'none'" @update:model-value="handleDepartmentChange">
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="All Departments" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="none">All Departments</SelectItem>
+                                            <SelectItem v-for="dept in safeDepartments" :key="dept.id" :value="dept.id.toString()">
+                                                {{ dept.name }}
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
-                    <!-- Department Filter -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Department</label>
-                        <select
-                            v-model="filterForm.department_id"
-                            class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm transition-colors duration-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500"
-                        >
-                            <option :value="null">All Departments</option>
-                            <option v-for="dept in safeDepartments" :key="dept.id" :value="dept.id">
-                                {{ dept.name }}
-                            </option>
-                        </select>
-                    </div>
+                                <!-- Course Filter -->
+                                <div class="space-y-2">
+                                    <Label>Course</Label>
+                                    <Select :model-value="filterForm.course_id?.toString() || 'none'" @update:model-value="handleCourseChange">
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="All Courses" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="none">All Courses</SelectItem>
+                                            <SelectItem v-for="course in safeCourses" :key="course.id" :value="course.id.toString()">
+                                                {{ course.name }}
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
 
-                    <!-- Course Filter -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Course</label>
-                        <select
-                            v-model="filterForm.course_id"
-                            class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm transition-colors duration-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500"
-                        >
-                            <option :value="null">All Courses</option>
-                            <option v-for="course in safeCourses" :key="course.id" :value="course.id">
-                                {{ course.name }}
-                            </option>
-                        </select>
-                    </div>
+                                <!-- Start Date Filter -->
+                                <div class="space-y-2">
+                                    <Label>Start Date</Label>
+                                    <Input
+                                        type="date"
+                                        v-model="filterForm.start_date"
+                                    />
+                                </div>
 
-                    <!-- Start Date Filter -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
-                        <input
-                            type="date"
-                            v-model="filterForm.start_date"
-                            class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm transition-colors duration-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500"
-                        />
-                    </div>
+                                <!-- End Date Filter -->
+                                <div class="space-y-2">
+                                    <Label>End Date</Label>
+                                    <Input
+                                        type="date"
+                                        v-model="filterForm.end_date"
+                                    />
+                                </div>
 
-                    <!-- End Date Filter -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">End Date</label>
-                        <input
-                            type="date"
-                            v-model="filterForm.end_date"
-                            class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm transition-colors duration-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500"
-                        />
-                    </div>
+                                <!-- Search Filter -->
+                                <div class="space-y-2">
+                                    <Label>Search Employee</Label>
+                                    <Input
+                                        type="text"
+                                        v-model="filterForm.search"
+                                        placeholder="Search by name or email"
+                                    />
+                                </div>
+                            </div>
 
-                    <!-- Search Filter -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Search Employee</label>
-                        <input
-                            type="text"
-                            v-model="filterForm.search"
-                            placeholder="Search by name or email"
-                            class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm transition-colors duration-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500"
-                        />
-                    </div>
-                </div>
-
-                <div class="mt-4 flex justify-end">
-                    <button
-                        @click="applyFilters"
-                        type="button"
-                        class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors duration-200 hover:bg-indigo-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
-                        :disabled="filterForm.processing"
-                    >
-                        <svg v-if="filterForm.processing" class="mr-2 h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                        </svg>
-                        <span v-if="filterForm.processing">Applying...</span>
-                        <span v-else>Apply Filters</span>
-                    </button>
-                </div>
-            </div>
+                            <div class="mt-4 flex justify-end">
+                                <Button
+                                    @click="applyFilters"
+                                    :disabled="filterForm.processing"
+                                >
+                                    <span v-if="filterForm.processing">Applying...</span>
+                                    <span v-else>Apply Filters</span>
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </CollapsibleContent>
+            </Collapsible>
 
             <!-- Action Panel -->
-            <div v-if="safeEmployees.length > 0" class="mb-6 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center space-x-4">
-                        <div>
-                            <p class="text-sm text-gray-600">
-                                {{ selectedEmployees.length }} of {{ safeEmployees.length }} employees selected
-                            </p>
-                        </div>
+            <Card v-if="safeEmployees.length > 0">
+                <CardContent class="p-6">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <div>
+                                <p class="text-sm text-muted-foreground">
+                                    {{ selectedEmployees.length }} of {{ safeEmployees.length }} employees selected
+                                </p>
+                            </div>
 
-                        <!-- Target Manager Levels -->
-                        <div class="flex items-center space-x-2">
-                            <label class="text-sm font-medium text-gray-700">Send to:</label>
-                            <div class="flex space-x-2">
-                                <label class="inline-flex items-center">
-                                    <input
-                                        type="checkbox"
-                                        value="L2"
-                                        v-model="targetLevels"
-                                        class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500"
-                                    />
-                                    <span class="ml-2 text-sm text-gray-700">L2 Managers</span>
-                                </label>
-                                <label class="inline-flex items-center">
-                                    <input
-                                        type="checkbox"
-                                        value="L3"
-                                        v-model="targetLevels"
-                                        class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500"
-                                    />
-                                    <span class="ml-2 text-sm text-gray-700">L3 Managers</span>
-                                </label>
-                                <label class="inline-flex items-center">
-                                    <input
-                                        type="checkbox"
-                                        value="L4"
-                                        v-model="targetLevels"
-                                        class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500"
-                                    />
-                                    <span class="ml-2 text-sm text-gray-700">L4 Managers</span>
-                                </label>
+                            <!-- Target Manager Levels -->
+                            <div class="flex items-center space-x-2">
+                                <Label class="text-sm font-medium">Send to:</Label>
+                                <div class="flex space-x-4">
+                                    <div class="flex items-center space-x-2">
+                                        <Checkbox
+                                            id="l2"
+                                            :checked="targetLevels.includes('L2')"
+                                            @update:checked="(checked) => handleTargetLevelChange('L2', checked)"
+                                        />
+                                        <Label for="l2" class="text-sm">L2 Managers</Label>
+                                    </div>
+                                    <div class="flex items-center space-x-2">
+                                        <Checkbox
+                                            id="l3"
+                                            :checked="targetLevels.includes('L3')"
+                                            @update:checked="(checked) => handleTargetLevelChange('L3', checked)"
+                                        />
+                                        <Label for="l3" class="text-sm">L3 Managers</Label>
+                                    </div>
+                                    <div class="flex items-center space-x-2">
+                                        <Checkbox
+                                            id="l4"
+                                            :checked="targetLevels.includes('L4')"
+                                            @update:checked="(checked) => handleTargetLevelChange('L4', checked)"
+                                        />
+                                        <Label for="l4" class="text-sm">L4 Managers</Label>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    </div>
 
-                    <div class="flex space-x-3">
-                        <button
-                            @click="previewNotification"
-                            :disabled="!canPreview || previewForm.processing"
-                            class="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors duration-200 hover:bg-blue-700 focus:outline-hidden focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                            </svg>
-                            Preview Notification
-                        </button>
+                        <div class="flex space-x-3">
+                            <Button
+                                @click="previewNotification"
+                                :disabled="!canPreview || previewForm.processing"
+                                variant="outline"
+                            >
+                                <Eye class="mr-2 h-4 w-4" />
+                                Preview Notification
+                            </Button>
+                        </div>
                     </div>
-                </div>
-            </div>
+                </CardContent>
+            </Card>
 
             <!-- Employee List -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+            <Card>
                 <!-- List Header -->
-                <div class="px-6 py-4 border-b border-gray-200">
+                <CardHeader>
                     <div class="flex items-center justify-between">
-                        <h3 class="text-lg font-semibold text-gray-900">L1 Employees with Evaluations</h3>
-                        <div class="text-sm text-gray-500">
+                        <CardTitle>L1 Employees with Evaluations</CardTitle>
+                        <div class="text-sm text-muted-foreground">
                             {{ safeEmployees.length }} employees found
                         </div>
                     </div>
-                </div>
+                </CardHeader>
 
                 <!-- Empty State -->
-                <div v-if="safeEmployees.length === 0" class="p-8 text-center">
-                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
-                    <h3 class="mt-4 text-lg font-medium text-gray-900">No L1 Employees Found</h3>
-                    <p class="mt-2 text-sm text-gray-500">
+                <CardContent v-if="safeEmployees.length === 0" class="p-8 text-center">
+                    <Users class="mx-auto h-12 w-12 text-muted-foreground" />
+                    <h3 class="mt-4 text-lg font-medium text-foreground">No L1 Employees Found</h3>
+                    <p class="mt-2 text-sm text-muted-foreground">
                         {{ hasActiveFilters ? 'No employees match your filter criteria.' : 'There are no L1 employees with evaluations.' }}
                     </p>
                     <div v-if="hasActiveFilters" class="mt-4">
-                        <button
-                            @click="clearFilters"
-                            class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors duration-200 hover:bg-indigo-700"
-                        >
+                        <Button @click="clearFilters">
                             Clear Filters
-                        </button>
+                        </Button>
                     </div>
-                </div>
+                </CardContent>
 
                 <!-- Employee Table -->
                 <div v-else>
                     <!-- Table Header -->
-                    <div class="px-6 py-3 bg-gray-50 border-b border-gray-200">
-                        <div class="flex items-center">
-                            <input
-                                type="checkbox"
+                    <div class="px-6 py-3 bg-muted border-b">
+                        <div class="flex items-center space-x-3">
+                            <Checkbox
+                                id="select-all"
                                 :checked="allSelected"
                                 :indeterminate="someSelected"
-                                @change="toggleSelectAll"
-                                class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500"
+                                @update:checked="toggleSelectAll"
                             />
-                            <label class="ml-3 text-sm font-medium text-gray-700">
+                            <Label for="select-all" class="text-sm font-medium">
                                 Select All ({{ safeEmployees.length }})
-                            </label>
+                            </Label>
                         </div>
                     </div>
 
                     <!-- Employee Rows -->
-                    <div class="divide-y divide-gray-200">
+                    <div class="divide-y">
                         <div
                             v-for="employee in safeEmployees"
                             :key="employee.id"
-                            class="px-6 py-4 hover:bg-gray-50 transition-colors duration-200"
-                            :class="{ 'bg-blue-50': selectedEmployees.includes(employee.id) }"
+                            class="p-6 hover:bg-muted/50 transition-colors duration-200"
+                            :class="{ 'bg-primary/5': selectedEmployees.includes(employee.id) }"
                         >
                             <div class="flex items-start space-x-4">
                                 <!-- Checkbox -->
-                                <input
-                                    type="checkbox"
-                                    :value="employee.id"
-                                    v-model="selectedEmployees"
-                                    class="mt-1 rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500"
+                                <Checkbox
+                                    :id="`emp-${employee.id}`"
+                                    :checked="selectedEmployees.includes(employee.id)"
+                                    @update:checked="(checked) => handleEmployeeSelection(employee.id, checked)"
+                                    class="mt-1"
                                 />
 
                                 <!-- Employee Info -->
                                 <div class="flex-1">
                                     <div class="flex items-center justify-between">
                                         <div>
-                                            <h4 class="text-lg font-semibold text-gray-900">{{ employee.name }}</h4>
-                                            <p class="text-sm text-gray-600">{{ employee.email }}</p>
+                                            <h4 class="text-lg font-semibold text-foreground">{{ employee.name }}</h4>
+                                            <p class="text-sm text-muted-foreground">{{ employee.email }}</p>
                                         </div>
-                                        <div class="text-right">
-                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                                {{ employee.level }}
-                                            </span>
+                                        <div>
+                                            <Badge variant="outline">{{ employee.level }}</Badge>
                                         </div>
                                     </div>
 
                                     <div class="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
                                         <div>
-                                            <span class="font-medium text-gray-700">Department:</span>
-                                            <span class="text-gray-600">{{ employee.department }}</span>
+                                            <span class="font-medium text-foreground">Department:</span>
+                                            <span class="text-muted-foreground ml-1">{{ employee.department }}</span>
                                         </div>
                                         <div>
-                                            <span class="font-medium text-gray-700">Evaluations:</span>
-                                            <span class="text-gray-600">{{ employee.evaluation_count }}</span>
+                                            <span class="font-medium text-foreground">Evaluations:</span>
+                                            <span class="text-muted-foreground ml-1">{{ employee.evaluation_count }}</span>
                                         </div>
                                         <div v-if="employee.latest_evaluation">
-                                            <span class="font-medium text-gray-700">Latest:</span>
-                                            <span class="text-gray-600">{{ employee.latest_evaluation.created_at }}</span>
+                                            <span class="font-medium text-foreground">Latest:</span>
+                                            <span class="text-muted-foreground ml-1">{{ employee.latest_evaluation.created_at }}</span>
                                         </div>
                                     </div>
 
                                     <!-- Latest Evaluation Details -->
-                                    <div v-if="employee.latest_evaluation" class="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                                        <div class="flex items-center justify-between">
-                                            <div>
-                                                <p class="text-sm font-medium text-gray-900">{{ employee.latest_evaluation.course_name }}</p>
-                                                <p class="text-xs text-gray-600">Latest evaluation</p>
-                                            </div>
-                                            <div class="flex items-center space-x-3">
-                                                <div class="text-right">
-                                                    <div class="text-lg font-bold text-gray-900">{{ employee.latest_evaluation.total_score }}</div>
-                                                    <div class="text-xs text-gray-500">Score</div>
+                                    <Card v-if="employee.latest_evaluation" class="mt-3">
+                                        <CardContent class="p-3">
+                                            <div class="flex items-center justify-between">
+                                                <div>
+                                                    <p class="text-sm font-medium text-foreground">{{ employee.latest_evaluation.course_name }}</p>
+                                                    <p class="text-xs text-muted-foreground">Latest evaluation</p>
                                                 </div>
-                                                <div class="text-right">
-                                                    <div class="text-lg font-bold text-green-600">{{ formatCurrency(employee.latest_evaluation.incentive_amount) }}</div>
-                                                    <div class="text-xs text-gray-500">Incentive</div>
+                                                <div class="flex items-center space-x-3">
+                                                    <div class="text-right">
+                                                        <div class="text-lg font-bold text-foreground">{{ employee.latest_evaluation.total_score }}</div>
+                                                        <div class="text-xs text-muted-foreground">Score</div>
+                                                    </div>
+                                                    <div class="text-right">
+                                                        <div class="text-lg font-bold text-green-600">{{ formatCurrency(employee.latest_evaluation.incentive_amount) }}</div>
+                                                        <div class="text-xs text-muted-foreground">Incentive</div>
+                                                    </div>
+                                                    <Badge :variant="getPerformanceLevel(employee.latest_evaluation.total_score).variant">
+                                                        {{ getPerformanceLevel(employee.latest_evaluation.total_score).label }}
+                                                    </Badge>
                                                 </div>
-                                                <span
-                                                    class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border"
-                                                    :class="getPerformanceLevel(employee.latest_evaluation.total_score).class"
-                                                >
-                                                    {{ getPerformanceLevel(employee.latest_evaluation.total_score).label }}
-                                                </span>
                                             </div>
-                                        </div>
-                                    </div>
+                                        </CardContent>
+                                    </Card>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
+            </Card>
 
             <!-- Recent Notifications -->
-            <div v-if="safeRecentNotifications.length > 0" class="mt-8 bg-white rounded-xl shadow-sm border border-gray-200">
-                <div class="px-6 py-4 border-b border-gray-200">
+            <Card v-if="safeRecentNotifications.length > 0">
+                <CardHeader>
                     <div class="flex items-center justify-between">
-                        <h3 class="text-lg font-semibold text-gray-900">Recent Notifications</h3>
-                        <Link
-                            :href="route('admin.evaluations.notifications.history')"
-                            class="text-sm text-indigo-600 hover:text-indigo-500"
-                        >
+                        <CardTitle>Recent Notifications</CardTitle>
+                        <Button :as="Link" :href="route('admin.evaluations.notifications.history')" variant="link" size="sm">
                             View All →
-                        </Link>
+                        </Button>
                     </div>
-                </div>
+                </CardHeader>
+                <CardContent>
+                    <div class="divide-y">
+                        <div
+                            v-for="notification in safeRecentNotifications"
+                            :key="notification.id"
+                            class="py-4 first:pt-0 last:pb-0 hover:bg-muted/50 -mx-6 px-6 rounded-lg transition-colors duration-200"
+                        >
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-medium text-foreground">{{ notification.name }}</p>
+                                    <p class="text-sm text-muted-foreground">
+                                        {{ notification.department_name }} •
+                                        {{ notification.employee_count }} employees •
+                                        {{ notification.managers_notified }} managers ({{ notification.target_manager_level }})
+                                    </p>
+                                    <p class="text-xs text-muted-foreground">
+                                        Sent by {{ notification.sent_by }} on {{ notification.sent_at }}
+                                    </p>
+                                </div>
+                                <Badge :variant="notification.status === 'sent' ? 'default' : 'secondary'">
+                                    {{ notification.status_label }}
+                                </Badge>
+                            </div>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
 
-                <div class="divide-y divide-gray-200">
-                    <div
-                        v-for="notification in safeRecentNotifications"
-                        :key="notification.id"
-                        class="px-6 py-4 hover:bg-gray-50 transition-colors duration-200"
-                    >
-                        <div class="flex items-center justify-between">
+        <!-- Preview Modal - FIXED: Removed DialogOverlay and improved z-index -->
+        <Dialog v-model:open="showPreviewModal">
+            <DialogContent v-if="props.preview" class="sm:max-w-4xl z-[100]">
+                <DialogHeader>
+                    <DialogTitle>Preview Notification</DialogTitle>
+                    <DialogDescription>
+                        Review the notification details before sending
+                    </DialogDescription>
+                </DialogHeader>
+
+                <!-- Summary -->
+                <Alert>
+                    <Mail class="h-4 w-4" />
+                    <AlertDescription>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                             <div>
-                                <p class="text-sm font-medium text-gray-900">{{ notification.name }}</p>
-                                <p class="text-sm text-gray-600">
-                                    {{ notification.department_name }} •
-                                    {{ notification.employee_count }} employees •
-                                    {{ notification.managers_notified }} managers ({{ notification.target_manager_level }})
-                                </p>
-                                <p class="text-xs text-gray-500">
-                                    Sent by {{ notification.sent_by }} on {{ notification.sent_at }}
-                                </p>
+                                <span class="font-medium">Employees:</span>
+                                <span class="ml-1">{{ props.preview.summary.total_employees }}</span>
                             </div>
-                            <span
-                                class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                                :class="notification.status_class"
-                            >
-                                {{ notification.status_label }}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Preview Modal -->
-        <div v-if="showPreviewModal && props.preview" class="fixed inset-0 z-50 overflow-y-auto">
-            <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-                <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" @click="closePreviewModal"></div>
-
-                <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
-                    <!-- Modal Header -->
-                    <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                        <div class="flex items-center justify-between mb-4">
-                            <h3 class="text-lg font-medium text-gray-900">Preview Notification</h3>
-                            <button @click="closePreviewModal" class="text-gray-400 hover:text-gray-500">
-                                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
-                        </div>
-
-                        <!-- Summary -->
-                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-                            <h4 class="font-medium text-blue-900 mb-2">Summary</h4>
-                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                <div>
-                                    <span class="text-blue-700">Employees:</span>
-                                    <span class="font-medium text-blue-900">{{ props.preview.summary.total_employees }}</span>
-                                </div>
-                                <div>
-                                    <span class="text-blue-700">Managers:</span>
-                                    <span class="font-medium text-blue-900">{{ props.preview.summary.total_managers }}</span>
-                                </div>
-                                <div>
-                                    <span class="text-blue-700">Departments:</span>
-                                    <span class="font-medium text-blue-900">{{ props.preview.summary.departments.join(', ') }}</span>
-                                </div>
-                                <div>
-                                    <span class="text-blue-700">Levels:</span>
-                                    <span class="font-medium text-blue-900">{{ props.preview.summary.target_levels.join(', ') }}</span>
-                                </div>
+                            <div>
+                                <span class="font-medium">Managers:</span>
+                                <span class="ml-1">{{ props.preview.summary.total_managers }}</span>
+                            </div>
+                            <div>
+                                <span class="font-medium">Departments:</span>
+                                <span class="ml-1">{{ props.preview.summary.departments.join(', ') }}</span>
+                            </div>
+                            <div>
+                                <span class="font-medium">Levels:</span>
+                                <span class="ml-1">{{ props.preview.summary.target_levels.join(', ') }}</span>
                             </div>
                         </div>
+                    </AlertDescription>
+                </Alert>
 
-                        <!-- Managers who will receive emails -->
-                        <div class="space-y-4">
-                            <div v-for="(managers, level) in props.preview.managers" :key="level">
-                                <div v-if="managers.length > 0">
-                                    <h4 class="font-medium text-gray-900 mb-2">{{ level }} Managers ({{ managers.length }})</h4>
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                        <div
-                                            v-for="manager in managers"
-                                            :key="manager.id"
-                                            class="p-3 bg-gray-50 rounded-lg border border-gray-200"
-                                        >
-                                            <p class="font-medium text-gray-900">{{ manager.name }}</p>
-                                            <p class="text-sm text-gray-600">{{ manager.email }}</p>
-                                            <p class="text-xs text-gray-500">{{ manager.departments?.join(', ') }}</p>
-                                        </div>
+                <!-- Managers who will receive emails -->
+                <div class="space-y-4 max-h-96 overflow-y-auto">
+                    <div v-for="(managers, level) in props.preview.managers" :key="level">
+                        <div v-if="managers.length > 0">
+                            <h4 class="font-medium text-foreground mb-2">{{ level }} Managers ({{ managers.length }})</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <Card
+                                    v-for="manager in managers"
+                                    :key="manager.id"
+                                    class="p-3"
+                                >
+                                    <div>
+                                        <p class="font-medium text-foreground">{{ manager.name }}</p>
+                                        <p class="text-sm text-muted-foreground">{{ manager.email }}</p>
+                                        <p class="text-xs text-muted-foreground">{{ manager.departments?.join(', ') }}</p>
                                     </div>
-                                </div>
+                                </Card>
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    <!-- Modal Footer -->
-                    <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                        <button
-                            @click="showSendModal = true"
-                            class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:ml-3 sm:w-auto sm:text-sm"
-                        >
-                            Send Notifications
-                        </button>
-                        <button
-                            @click="closePreviewModal"
-                            class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
-                        >
+                <DialogFooter>
+                    <Button @click="closePreviewModal" variant="outline">
+                        Cancel
+                    </Button>
+                    <Button @click="showSendModal = true">
+                        <Send class="mr-2 h-4 w-4" />
+                        Send Notifications
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+
+        <!-- Send Modal - FIXED: Improved z-index -->
+        <Dialog v-model:open="showSendModal">
+            <DialogContent class="sm:max-w-lg z-[110]">
+                <form @submit.prevent="sendNotifications">
+                    <DialogHeader>
+                        <DialogTitle>Send Notifications</DialogTitle>
+                        <DialogDescription>
+                            Customize the notification before sending
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div class="space-y-4 py-4">
+                        <!-- Email Subject -->
+                        <div class="space-y-2">
+                            <Label for="email-subject">Email Subject</Label>
+                            <Input
+                                id="email-subject"
+                                v-model="sendForm.email_subject"
+                                :placeholder="generateEmailSubject()"
+                                required
+                            />
+                        </div>
+
+                        <!-- Custom Message -->
+                        <div class="space-y-2">
+                            <Label for="custom-message">Custom Message (Optional)</Label>
+                            <Textarea
+                                id="custom-message"
+                                v-model="sendForm.custom_message"
+                                rows="3"
+                                placeholder="Add any additional message for the managers..."
+                            />
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button @click="showSendModal = false" type="button" variant="outline">
                             Cancel
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Send Modal -->
-        <div v-if="showSendModal" class="fixed inset-0 z-50 overflow-y-auto">
-            <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-                <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" @click="showSendModal = false"></div>
-
-                <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-                    <form @submit.prevent="sendNotifications">
-                        <!-- Modal Header -->
-                        <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                            <div class="flex items-center justify-between mb-4">
-                                <h3 class="text-lg font-medium text-gray-900">Send Notifications</h3>
-                                <button @click="showSendModal = false" type="button" class="text-gray-400 hover:text-gray-500">
-                                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </button>
-                            </div>
-
-                            <!-- Email Subject -->
-                            <div class="mb-4">
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Email Subject</label>
-                                <input
-                                    type="text"
-                                    v-model="sendForm.email_subject"
-                                    :placeholder="generateEmailSubject()"
-                                    class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500"
-                                    required
-                                />
-                            </div>
-
-                            <!-- Custom Message -->
-                            <div class="mb-4">
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Custom Message (Optional)</label>
-                                <textarea
-                                    v-model="sendForm.custom_message"
-                                    rows="3"
-                                    placeholder="Add any additional message for the managers..."
-                                    class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500"
-                                ></textarea>
-                            </div>
-                        </div>
-
-                        <!-- Modal Footer -->
-                        <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                            <button
-                                type="submit"
-                                :disabled="sendForm.processing"
-                                class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50"
-                            >
-                                <svg v-if="sendForm.processing" class="mr-2 h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                                </svg>
-                                {{ sendForm.processing ? 'Sending...' : 'Send Now' }}
-                            </button>
-                            <button
-                                @click="showSendModal = false"
-                                type="button"
-                                class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
-                            >
-                                Cancel
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
+                        </Button>
+                        <Button type="submit" :disabled="sendForm.processing" class="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                            {{ sendForm.processing ? 'Sending...' : 'Send Now' }}
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
     </AdminLayout>
 </template>

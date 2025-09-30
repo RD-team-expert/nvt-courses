@@ -1,8 +1,36 @@
+<!-- User Evaluation Details Page -->
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { computed } from 'vue'
 import type { BreadcrumbItemType } from '@/types'
+
+// shadcn-vue components
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Separator } from '@/components/ui/separator'
+
+// Icons
+import {
+    ArrowLeft,
+    Trophy,
+    Star,
+    ThumbsUp,
+    BarChart3,
+    TrendingUp,
+    Zap,
+    DollarSign,
+    Calendar,
+    User,
+    BookOpen,
+    Target,
+    Award,
+    FileText,
+    MessageSquare
+} from 'lucide-vue-next'
 
 const props = defineProps({
     evaluation: Object, // Single evaluation object
@@ -39,32 +67,32 @@ const performance = computed(() => {
 
     if (percentage >= 80) return {
         label: 'Exceptional',
-        class: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-        icon: '🏆',
+        variant: 'default' as const,
+        icon: Trophy,
         description: 'Outstanding performance that exceeds expectations'
     }
     if (percentage >= 60) return {
         label: 'Excellent',
-        class: 'bg-green-100 text-green-800 border-green-200',
-        icon: '⭐',
+        variant: 'default' as const,
+        icon: Star,
         description: 'Consistently high performance'
     }
     if (percentage >= 40) return {
         label: 'Good',
-        class: 'bg-blue-100 text-blue-800 border-blue-200',
-        icon: '👍',
+        variant: 'secondary' as const,
+        icon: ThumbsUp,
         description: 'Solid performance meeting expectations'
     }
     if (percentage >= 20) return {
         label: 'Average',
-        class: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-        icon: '📊',
+        variant: 'secondary' as const,
+        icon: BarChart3,
         description: 'Performance meets basic requirements'
     }
     return {
         label: 'Needs Improvement',
-        class: 'bg-red-100 text-red-800 border-red-200',
-        icon: '📈',
+        variant: 'destructive' as const,
+        icon: TrendingUp,
         description: 'Performance requires development'
     }
 });
@@ -84,246 +112,295 @@ const formatDate = (dateString: string) => {
 
 <template>
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="px-4 sm:px-0 max-w-7xl mx-auto">
+        <div class="px-4 sm:px-0 max-w-7xl mx-auto space-y-6">
             <!-- Header -->
-            <div class="bg-white rounded-lg shadow p-6 mb-6 border border-gray-200">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <h1 class="text-3xl font-bold text-gray-900">{{ evaluation?.course.name }}</h1>
-                        <p class="mt-2 text-gray-600">Performance Evaluation Details</p>
-                        <div class="mt-4 flex items-center space-x-4">
-                            <span
-                                class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border"
-                                :class="performance.class"
-                            >
-                                {{ performance.icon }} {{ performance.label }}
-                            </span>
-                            <span class="text-sm text-gray-500">
-                                Evaluated on {{ formatDate(evaluation?.evaluation_date || evaluation?.created_at) }}
-                            </span>
+            <Card>
+                <CardContent class="p-6">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h1 class="text-3xl font-bold">{{ evaluation?.course.name }}</h1>
+                            <CardDescription class="mt-2 text-lg">Performance Evaluation Details</CardDescription>
+                            <div class="mt-4 flex items-center space-x-4">
+                                <Badge :variant="performance.variant" class="text-sm">
+                                    <component :is="performance.icon" class="h-4 w-4 mr-1" />
+                                    {{ performance.label }}
+                                </Badge>
+                                <div class="flex items-center text-sm text-muted-foreground">
+                                    <Calendar class="h-4 w-4 mr-1" />
+                                    Evaluated on {{ formatDate(evaluation?.evaluation_date || evaluation?.created_at) }}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex space-x-3">
+                            <Button asChild variant="outline">
+                                <Link :href="route('user.evaluations.index')">
+                                    <ArrowLeft class="h-4 w-4 mr-2" />
+                                    Back to Evaluations
+                                </Link>
+                            </Button>
                         </div>
                     </div>
-                    <div class="flex space-x-3">
-                        <Link
-                            :href="route('user.evaluations.index')"
-                            class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition"
-                        >
-                            ← Back to Evaluations
-                        </Link>
-                    </div>
-                </div>
-            </div>
+                </CardContent>
+            </Card>
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <!-- Main Content -->
                 <div class="lg:col-span-2 space-y-6">
                     <!-- Overall Performance -->
-                    <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
-                        <h2 class="text-xl font-semibold text-gray-900 mb-4">Overall Performance</h2>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle class="flex items-center gap-2">
+                                <Award class="h-6 w-6" />
+                                Overall Performance
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                                <Card class="bg-accent/50">
+                                    <CardContent class="text-center p-6">
+                                        <div class="text-4xl font-bold text-primary">{{ evaluation?.total_score || 0 }}</div>
+                                        <div class="text-sm text-muted-foreground mt-1">Total Score (out of 25)</div>
+                                        <div class="mt-3">
+                                            <Progress
+                                                :value="Math.round(((evaluation?.total_score || 0) / 25) * 100)"
+                                                class="w-full"
+                                            />
+                                        </div>
+                                    </CardContent>
+                                </Card>
 
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                            <div class="text-center p-6 bg-gray-50 rounded-lg">
-                                <div class="text-4xl font-bold text-blue-600">{{ evaluation?.total_score || 0 }}</div>
-                                <div class="text-sm text-gray-500 mt-1">Total Score (out of 25)</div>
-                                <div class="mt-3 w-full bg-gray-200 rounded-full h-3">
-                                    <div
-                                        class="h-3 rounded-full transition-all duration-500"
-                                        :class="{
-                                            'bg-emerald-500': (evaluation?.total_score || 0) >= 20,
-                                            'bg-green-500': (evaluation?.total_score || 0) >= 15 && (evaluation?.total_score || 0) < 20,
-                                            'bg-blue-500': (evaluation?.total_score || 0) >= 10 && (evaluation?.total_score || 0) < 15,
-                                            'bg-yellow-500': (evaluation?.total_score || 0) >= 5 && (evaluation?.total_score || 0) < 10,
-                                            'bg-red-500': (evaluation?.total_score || 0) < 5
-                                        }"
-                                        :style="`width: ${Math.round(((evaluation?.total_score || 0) / 25) * 100)}%`"
-                                    ></div>
-                                </div>
+                                <Card class="bg-green-50 border-green-200">
+                                    <CardContent class="text-center p-6">
+                                        <div class="text-4xl font-bold text-green-600">{{ formatCurrency(evaluation?.incentive_amount || 0) }}</div>
+                                        <div class="text-sm text-muted-foreground mt-1">Incentive Earned</div>
+                                        <div class="mt-2 text-xs text-green-700">
+                                            Based on your performance score
+                                        </div>
+                                    </CardContent>
+                                </Card>
                             </div>
 
-                            <div class="text-center p-6 bg-green-50 rounded-lg">
-                                <div class="text-4xl font-bold text-green-600">{{ formatCurrency(evaluation?.incentive_amount || 0) }}</div>
-                                <div class="text-sm text-gray-500 mt-1">Incentive Earned</div>
-                                <div class="mt-2 text-xs text-green-700">
-                                    Based on your performance score
-                                </div>
-                            </div>
-                        </div>
+                            <Separator class="my-4" />
 
-                        <div class="border-t border-gray-200 pt-4">
-                            <h3 class="font-medium text-gray-900 mb-2">Performance Level: {{ performance.label }}</h3>
-                            <p class="text-sm text-gray-600">{{ performance.description }}</p>
-                        </div>
-                    </div>
+                            <div>
+                                <h3 class="font-medium mb-2">Performance Level: {{ performance.label }}</h3>
+                                <p class="text-sm text-muted-foreground">{{ performance.description }}</p>
+                            </div>
+                        </CardContent>
+                    </Card>
 
                     <!-- Category Breakdown -->
-                    <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
-                        <h2 class="text-xl font-semibold text-gray-900 mb-4">Category Breakdown</h2>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle class="flex items-center gap-2">
+                                <Target class="h-6 w-6" />
+                                Category Breakdown
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div v-if="evaluation?.categories && evaluation.categories.length > 0" class="space-y-4">
+                                <Card
+                                    v-for="category in evaluation.categories"
+                                    :key="category.id"
+                                    class="hover:shadow-sm transition-shadow"
+                                >
+                                    <CardContent class="p-4">
+                                        <div class="flex items-center justify-between mb-3">
+                                            <h3 class="font-medium">{{ category.category_name }}</h3>
+                                            <div class="flex items-center space-x-2">
+                                                <Badge variant="outline">{{ category.score }} points</Badge>
+                                            </div>
+                                        </div>
 
-                        <div v-if="evaluation?.categories && evaluation.categories.length > 0" class="space-y-4">
-                            <div
-                                v-for="category in evaluation.categories"
-                                :key="category.id"
-                                class="border border-gray-200 rounded-lg p-4"
-                            >
-                                <div class="flex items-center justify-between mb-3">
-                                    <h3 class="font-medium text-gray-900">{{ category.category_name }}</h3>
-                                    <div class="flex items-center space-x-2">
-                                        <span class="font-bold text-lg text-blue-600">{{ category.score }}</span>
-                                        <span class="text-sm text-gray-500">points</span>
-                                    </div>
-                                </div>
+                                        <div class="mb-3">
+                                            <div class="flex items-center justify-between text-sm text-muted-foreground mb-2">
+                                                <span>{{ category.evaluation_type }}</span>
+                                                <span>{{ category.score }} points</span>
+                                            </div>
+                                            <Progress
+                                                :value="Math.min((category.score / 5) * 100, 100)"
+                                                class="w-full"
+                                            />
+                                        </div>
 
-                                <div class="mb-3">
-                                    <div class="flex items-center justify-between text-sm text-gray-600 mb-1">
-                                        <span>{{ category.evaluation_type }}</span>
-                                        <span>{{ category.score }} points</span>
-                                    </div>
-                                    <div class="w-full bg-gray-200 rounded-full h-2">
-                                        <div
-                                            class="h-2 rounded-full bg-blue-500 transition-all duration-300"
-                                            :style="`width: ${Math.min((category.score / 5) * 100, 100)}%`"
-                                        ></div>
-                                    </div>
-                                </div>
-
-                                <div v-if="category.comments" class="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                                    <p class="text-sm text-blue-800">
-                                        <strong>Feedback:</strong> {{ category.comments }}
-                                    </p>
-                                </div>
+                                        <Alert v-if="category.comments">
+                                            <MessageSquare class="h-4 w-4" />
+                                            <AlertDescription>
+                                                <strong>Feedback:</strong> {{ category.comments }}
+                                            </AlertDescription>
+                                        </Alert>
+                                    </CardContent>
+                                </Card>
                             </div>
-                        </div>
 
-                        <div v-else class="text-center py-8 text-gray-500">
-                            <p>No category details available for this evaluation.</p>
-                        </div>
-                    </div>
+                            <div v-else class="text-center py-8">
+                                <FileText class="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                                <p class="text-muted-foreground">No category details available for this evaluation.</p>
+                            </div>
+                        </CardContent>
+                    </Card>
 
                     <!-- Manager Notes -->
-                    <div v-if="evaluation?.notes" class="bg-white rounded-lg shadow p-6 border border-gray-200">
-                        <h2 class="text-xl font-semibold text-gray-900 mb-4">Manager's Overall Notes</h2>
-                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                            <p class="text-gray-800 whitespace-pre-line">{{ evaluation.notes }}</p>
-                        </div>
-                    </div>
+                    <Card v-if="evaluation?.notes">
+                        <CardHeader>
+                            <CardTitle class="flex items-center gap-2">
+                                <MessageSquare class="h-6 w-6" />
+                                Manager's Overall Notes
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <Alert>
+                                <FileText class="h-4 w-4" />
+                                <AlertDescription class="whitespace-pre-line">
+                                    {{ evaluation.notes }}
+                                </AlertDescription>
+                            </Alert>
+                        </CardContent>
+                    </Card>
                 </div>
 
                 <!-- Sidebar -->
                 <div class="space-y-6">
                     <!-- Evaluation Info -->
-                    <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Evaluation Information</h3>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle class="flex items-center gap-2">
+                                <FileText class="h-5 w-5" />
+                                Evaluation Information
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <dl class="space-y-4">
+                                <div>
+                                    <dt class="text-sm font-medium text-muted-foreground">Course</dt>
+                                    <dd class="text-sm font-medium flex items-center gap-1 mt-1">
+                                        <BookOpen class="h-4 w-4" />
+                                        {{ evaluation?.course.name }}
+                                    </dd>
+                                </div>
 
-                        <dl class="space-y-3">
-                            <div>
-                                <dt class="text-sm font-medium text-gray-700">Course</dt>
-                                <dd class="text-sm text-gray-900">{{ evaluation?.course.name }}</dd>
-                            </div>
+                                <Separator />
 
-                            <div>
-                                <dt class="text-sm font-medium text-gray-700">Evaluation Date</dt>
-                                <dd class="text-sm text-gray-900">{{ formatDate(evaluation?.evaluation_date || evaluation?.created_at) }}</dd>
-                            </div>
+                                <div>
+                                    <dt class="text-sm font-medium text-muted-foreground">Evaluation Date</dt>
+                                    <dd class="text-sm font-medium flex items-center gap-1 mt-1">
+                                        <Calendar class="h-4 w-4" />
+                                        {{ formatDate(evaluation?.evaluation_date || evaluation?.created_at) }}
+                                    </dd>
+                                </div>
 
-                            <div v-if="evaluation?.evaluated_by">
-                                <dt class="text-sm font-medium text-gray-700">Evaluated By</dt>
-                                <dd class="text-sm text-gray-900">{{ evaluation.evaluated_by.name }}</dd>
-                            </div>
+                                <div v-if="evaluation?.evaluated_by">
+                                    <dt class="text-sm font-medium text-muted-foreground">Evaluated By</dt>
+                                    <dd class="text-sm font-medium flex items-center gap-1 mt-1">
+                                        <User class="h-4 w-4" />
+                                        {{ evaluation.evaluated_by.name }}
+                                    </dd>
+                                </div>
 
-                            <div>
-                                <dt class="text-sm font-medium text-gray-700">Performance Level</dt>
-                                <dd>
-                                    <span
-                                        class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border mt-1"
-                                        :class="performance.class"
-                                    >
-                                        {{ performance.icon }} {{ performance.label }}
-                                    </span>
-                                </dd>
-                            </div>
+                                <Separator />
 
-                            <div>
-                                <dt class="text-sm font-medium text-gray-700">Score</dt>
-                                <dd class="text-lg font-bold text-blue-600">{{ evaluation?.total_score || 0 }}/25</dd>
-                            </div>
+                                <div>
+                                    <dt class="text-sm font-medium text-muted-foreground">Performance Level</dt>
+                                    <dd class="mt-1">
+                                        <Badge :variant="performance.variant">
+                                            <component :is="performance.icon" class="h-3 w-3 mr-1" />
+                                            {{ performance.label }}
+                                        </Badge>
+                                    </dd>
+                                </div>
 
-                            <div>
-                                <dt class="text-sm font-medium text-gray-700">Incentive Earned</dt>
-                                <dd class="text-lg font-bold text-green-600">{{ formatCurrency(evaluation?.incentive_amount || 0) }}</dd>
-                            </div>
-                        </dl>
-                    </div>
+                                <div>
+                                    <dt class="text-sm font-medium text-muted-foreground">Score</dt>
+                                    <dd class="text-lg font-bold text-primary">{{ evaluation?.total_score || 0 }}/25</dd>
+                                </div>
+
+                                <div>
+                                    <dt class="text-sm font-medium text-muted-foreground">Incentive Earned</dt>
+                                    <dd class="text-lg font-bold text-green-600">{{ formatCurrency(evaluation?.incentive_amount || 0) }}</dd>
+                                </div>
+                            </dl>
+                        </CardContent>
+                    </Card>
 
                     <!-- Performance Insights -->
-                    <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Performance Insights</h3>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle class="flex items-center gap-2">
+                                <BarChart3 class="h-5 w-5" />
+                                Performance Insights
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div class="space-y-4">
+                                <Card class="bg-blue-50 border-blue-200">
+                                    <CardContent class="flex items-center p-3">
+                                        <div class="shrink-0">
+                                            <Zap class="h-5 w-5 text-blue-600" />
+                                        </div>
+                                        <div class="ml-3">
+                                            <p class="text-sm font-medium text-blue-900">Score Percentage</p>
+                                            <p class="text-xs text-blue-700">{{ Math.round(((evaluation?.total_score || 0) / 25) * 100) }}% of maximum possible score</p>
+                                        </div>
+                                    </CardContent>
+                                </Card>
 
-                        <div class="space-y-4">
-                            <div class="flex items-center p-3 bg-blue-50 rounded-lg">
-                                <div class="shrink-0">
-                                    <svg class="h-5 w-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                    </svg>
-                                </div>
-                                <div class="ml-3">
-                                    <p class="text-sm font-medium text-blue-900">Score Percentage</p>
-                                    <p class="text-xs text-blue-700">{{ Math.round(((evaluation?.total_score || 0) / 25) * 100) }}% of maximum possible score</p>
-                                </div>
-                            </div>
+                                <Card class="bg-green-50 border-green-200">
+                                    <CardContent class="flex items-center p-3">
+                                        <div class="shrink-0">
+                                            <DollarSign class="h-5 w-5 text-green-600" />
+                                        </div>
+                                        <div class="ml-3">
+                                            <p class="text-sm font-medium text-green-900">Incentive Rate</p>
+                                            <p class="text-xs text-green-700">{{ formatCurrency((evaluation?.incentive_amount || 0) / (evaluation?.total_score || 1)) }} per point</p>
+                                        </div>
+                                    </CardContent>
+                                </Card>
 
-                            <div class="flex items-center p-3 bg-green-50 rounded-lg">
-                                <div class="shrink-0">
-                                    <svg class="h-5 w-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                                    </svg>
-                                </div>
-                                <div class="ml-3">
-                                    <p class="text-sm font-medium text-green-900">Incentive Rate</p>
-                                    <p class="text-xs text-green-700">{{ formatCurrency((evaluation?.incentive_amount || 0) / (evaluation?.total_score || 1)) }} per point</p>
-                                </div>
+                                <Card class="bg-purple-50 border-purple-200">
+                                    <CardContent class="flex items-center p-3">
+                                        <div class="shrink-0">
+                                            <Target class="h-5 w-5 text-purple-600" />
+                                        </div>
+                                        <div class="ml-3">
+                                            <p class="text-sm font-medium text-purple-900">Categories Evaluated</p>
+                                            <p class="text-xs text-purple-700">{{ evaluation?.categories?.length || 0 }} performance areas</p>
+                                        </div>
+                                    </CardContent>
+                                </Card>
                             </div>
-
-                            <div class="flex items-center p-3 bg-purple-50 rounded-lg">
-                                <div class="shrink-0">
-                                    <svg class="h-5 w-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                                    </svg>
-                                </div>
-                                <div class="ml-3">
-                                    <p class="text-sm font-medium text-purple-900">Categories Evaluated</p>
-                                    <p class="text-xs text-purple-700">{{ evaluation?.categories?.length || 0 }} performance areas</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                        </CardContent>
+                    </Card>
 
                     <!-- Quick Actions -->
-                    <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Quick Actions</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div class="space-y-3">
+                                <Button asChild class="w-full">
+                                    <Link :href="route('user.evaluations.index')">
+                                        <FileText class="h-4 w-4 mr-2" />
+                                        View All Evaluations
+                                    </Link>
+                                </Button>
 
-                        <div class="space-y-3">
-                            <Link
-                                :href="route('user.evaluations.index')"
-                                class="block w-full text-center bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition"
-                            >
-                                View All Evaluations
-                            </Link>
+                                <Button asChild variant="outline" class="w-full">
+                                    <Link :href="route('user.profile.index')">
+                                        <User class="h-4 w-4 mr-2" />
+                                        Back to Profile
+                                    </Link>
+                                </Button>
 
-                            <Link
-                                :href="route('user.profile.index')"
-                                class="block w-full text-center bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition"
-                            >
-                                Back to Profile
-                            </Link>
-
-                            <Link
-                                :href="route('courses.index')"
-                                class="block w-full text-center bg-green-100 text-green-700 px-4 py-2 rounded-lg hover:bg-green-200 transition"
-                            >
-                                Browse Courses
-                            </Link>
-                        </div>
-                    </div>
+                                <Button asChild variant="secondary" class="w-full">
+                                    <Link :href="route('courses.index')">
+                                        <BookOpen class="h-4 w-4 mr-2" />
+                                        Browse Courses
+                                    </Link>
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </div>
             </div>
         </div>
