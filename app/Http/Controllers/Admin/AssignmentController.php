@@ -10,6 +10,7 @@ use App\Models\CourseAssignment;
 use App\Models\Course;
 use App\Models\CourseRegistration;
 use App\Models\User;
+use App\Services\ManagerHierarchyService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -510,7 +511,7 @@ class AssignmentController extends Controller
                 })->toArray()
             ]);
 
-            $managerService = new \App\Services\ManagerHierarchyService();
+            $managerService = new ManagerHierarchyService();
             $managersData = [];
 
             foreach ($assignedUsers as $user) {
@@ -530,67 +531,64 @@ class AssignmentController extends Controller
                     continue;
                 }
 
-                $departmentName = $user->department->name;
+                // FIXED: Use the new flexible method instead of hardcoded one
+                $managers = $managerService->getDirectManagersForUser($user->id);
 
-                Log::info('🏢 Getting managers for department', [
-                    'department_name' => $departmentName,
+                Log::info('👔 Direct managers found for user', [
                     'user_id' => $user->id,
-                    'user_name' => $user->name
+                    'user_name' => $user->name,
+                    'user_department' => $user->department->name,
+                    'managers_count' => count($managers),
+                    'managers_found' => array_map(function($managerData) {
+                        return [
+                            'id' => $managerData['manager']->id,
+                            'name' => $managerData['manager']->name,
+                            'email' => $managerData['manager']->email,
+                            'level' => $managerData['level'],
+                            'relationship' => $managerData['relationship']
+                        ];
+                    }, $managers)
                 ]);
 
-                $managers = $managerService->getManagersForDepartment($departmentName, ['L2']);
+                // If no direct managers found, try getting department managers as fallback
+                if (empty($managers)) {
+                    Log::info('🔄 No direct managers found, trying department managers as fallback', [
+                        'user_id' => $user->id,
+                        'department' => $user->department->name
+                    ]);
 
-                Log::info('👔 Managers found for department', [
-                    'department_name' => $departmentName,
-                    'managers_count' => count($managers['L2']),
-                    'managers_found' => array_map(function($manager) {
-                        return $manager ? [
-                            'id' => $manager['id'],
-                            'name' => $manager['name'],
-                            'email' => $manager['email']
-                        ] : null;
-                    }, $managers['L2'])
-                ]);
+                    $managers = $managerService->getManagersForUser($user->id, ['L2', 'L3']);
 
-                foreach ($managers['L2'] as $manager) {
-                    if (!$manager) {
-                        Log::warning('⚠️ Null manager found, skipping');
-                        continue;
-                    }
+                    Log::info('🏢 Department managers found as fallback', [
+                        'user_id' => $user->id,
+                        'managers_count' => count($managers)
+                    ]);
+                }
 
-                    $managerId = $manager['id'];
+                foreach ($managers as $managerData) {
+                    $manager = $managerData['manager'];
+                    $managerId = $manager->id;
 
                     Log::info('📝 Processing manager for user', [
                         'manager_id' => $managerId,
-                        'manager_name' => $manager['name'],
-                        'manager_email' => $manager['email'],
+                        'manager_name' => $manager->name,
+                        'manager_email' => $manager->email,
                         'user_id' => $user->id,
                         'user_name' => $user->name,
-                        'department' => $departmentName
+                        'relationship_type' => $managerData['relationship'],
+                        'level' => $managerData['level']
                     ]);
 
-                    // Get actual User model instead of creating stdClass
                     if (!isset($managersData[$managerId])) {
-                        $managerUser = User::find($managerId);
-
-                        if (!$managerUser) {
-                            Log::error('❌ Manager user not found in database', [
-                                'manager_id' => $managerId,
-                                'expected_name' => $manager['name'],
-                                'expected_email' => $manager['email']
-                            ]);
-                            continue;
-                        }
-
-                        Log::info('✅ Manager user loaded from database', [
-                            'manager_id' => $managerUser->id,
-                            'manager_name' => $managerUser->name,
-                            'manager_email' => $managerUser->email,
-                            'manager_department' => $managerUser->department?->name ?? 'No Department'
+                        Log::info('✅ Manager added to notification list', [
+                            'manager_id' => $manager->id,
+                            'manager_name' => $manager->name,
+                            'manager_email' => $manager->email,
+                            'manager_department' => $manager->department?->name ?? 'No Department'
                         ]);
 
                         $managersData[$managerId] = [
-                            'manager' => $managerUser,
+                            'manager' => $manager,
                             'users' => collect()
                         ];
                     }
@@ -602,8 +600,8 @@ class AssignmentController extends Controller
                         'user_name' => $user->name,
                         'user_email' => $user->email,
                         'manager_id' => $managerId,
-                        'manager_name' => $managersData[$managerId]['manager']->name,
-                        'manager_email' => $managersData[$managerId]['manager']->email,
+                        'manager_name' => $manager->name,
+                        'manager_email' => $manager->email,
                         'total_team_members' => $managersData[$managerId]['users']->count()
                     ]);
                 }
@@ -628,6 +626,22 @@ class AssignmentController extends Controller
                 })->toArray()
             ]);
 
+            // FIXED: Check if any managers were found
+            if (empty($managersData)) {
+                Log::warning('⚠️ No managers found for any assigned users', [
+                    'course_id' => $course->id,
+                    'assigned_users_count' => $assignedUsers->count(),
+                    'users_without_managers' => $assignedUsers->map(function($user) {
+                        return [
+                            'id' => $user->id,
+                            'name' => $user->name,
+                            'department' => $user->department?->name ?? 'No Department'
+                        ];
+                    })->toArray()
+                ]);
+                return;
+            }
+
             // Send notifications to each manager
             $successCount = 0;
             $failureCount = 0;
@@ -642,7 +656,7 @@ class AssignmentController extends Controller
                     'manager_email' => $manager->email,
                     'team_members_count' => $teamMembers->count(),
                     'course_name' => $course->name,
-                    'course_privacy' => $course->privacy
+                    'course_privacy' => $course->privacy ?? 'unknown'
                 ]);
 
                 if ($teamMembers->count() === 0) {
@@ -663,6 +677,8 @@ class AssignmentController extends Controller
                         'team_members' => $teamMembers->pluck('email')->toArray(),
                         'mail_class' => 'CourseAssignmentManagerNotification'
                     ]);
+
+                    // FIXED: Make sure the Mailable class exists and is properly imported
                     Mail::to($manager->email)
                         ->send(new CourseAssignmentManagerNotification(
                             $course,
@@ -670,7 +686,7 @@ class AssignmentController extends Controller
                             $assignedBy,
                             $manager,
                             [
-                                'assignment_type' => $course->privacy,
+                                'assignment_type' => $course->privacy ?? 'course_assignment',
                                 'total_assignments' => $assignedUsers->count()
                             ]
                         ));
@@ -734,6 +750,5 @@ class AssignmentController extends Controller
             ]);
         }
     }
-
 
     }
