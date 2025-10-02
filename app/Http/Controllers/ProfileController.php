@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
+use App\Services\ManagerHierarchyService;
 
 class ProfileController extends Controller
 {
@@ -52,9 +53,11 @@ class ProfileController extends Controller
                     'enrolled_at' => $registration->created_at->toISOString(),
                 ];
             });
-        $managerService = new \App\Services\ManagerHierarchyService();
-        $directManagers = $managerService->getManagersForDepartment($user->department->name ?? '', ['L2']);
-        $directManager = $directManagers['L2'][0] ?? null;
+
+        // Get direct manager using the updated service
+        $managerService = new ManagerHierarchyService();
+        $directManagers = $managerService->getDirectManagersForUser($user->id);
+        $directManager = !empty($directManagers) ? $directManagers[0]['manager'] : null;
 
         return Inertia::render('User/Profile', [
             'user' => [
@@ -76,21 +79,21 @@ class ProfileController extends Controller
                     'hierarchy_level' => $user->level->hierarchy_level,
                 ] : null,
                 'direct_manager' => $directManager ? [
-                    'id' => $directManager['id'],
-                    'name' => $directManager['name'],
-                    'email' => $directManager['email'],
-                    'department' => $directManager['department'] ?? 'Unknown',
+                    'id' => $directManager->id,
+                    'name' => $directManager->name,
+                    'email' => $directManager->email,
+                    'department' => $directManager->department?->name ?? 'Unknown',
                 ] : null,
             ],
             'managerRoles' => $user->managerRoles->map(function ($role) {
                 return [
                     'id' => $role->id,
                     'role_type' => $role->role_type,
-                    'role_display' => $role->role_display,
+                    'role_display' => $role->getRoleDisplayName(),
                     'department' => $role->department->name ?? 'Unknown',
                     'authority_level' => $role->authority_level,
                     'is_primary' => $role->is_primary,
-                    'is_active' => $role->is_active,
+                    'is_active' => $role->isActive(),
                     'start_date' => $role->start_date?->toDateString(),
                 ];
             }),
@@ -112,7 +115,6 @@ class ProfileController extends Controller
                     'department' => $manager->department->name ?? null,
                 ];
             }),
-
             'evaluations' => $evaluations,
             'courses' => $courses,
         ]);

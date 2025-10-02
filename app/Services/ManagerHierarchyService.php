@@ -13,10 +13,7 @@ class ManagerHierarchyService
 {
     /**
      * Get managers for specific employees at target levels
-     *
-     * @param array $employeeIds - Array of L1 employee IDs
-     * @param array $targetLevels - Array of levels ['L2', 'L3', 'L4'] or ['all']
-     * @return array - Grouped managers by level and department
+     * Uses database relationships instead of hardcoded mappings
      */
     public function getManagersForEmployees(array $employeeIds, array $targetLevels = ['L2', 'L3', 'L4']): array
     {
@@ -31,16 +28,20 @@ class ManagerHierarchyService
         ];
 
         foreach ($employees as $employee) {
-            $departmentName = $employee->department?->name ?? 'Unknown Department';
+            $managers = $this->getManagersForUser($employee->id, $targetLevels);
 
-            $managers = $this->getManagersForDepartment($departmentName, $targetLevels);
-
-            foreach ($managers as $level => $levelManagers) {
+            foreach ($managers as $managerData) {
+                $level = $managerData['level'];
                 if (in_array($level, $targetLevels) || in_array('all', $targetLevels)) {
-                    foreach ($levelManagers as $manager) {
-                        // Avoid duplicates using manager ID as key
-                        $managersByLevel[$level][$manager['id']] = $manager;
-                    }
+                    $manager = $managerData['manager'];
+                    // Avoid duplicates using manager ID as key
+                    $managersByLevel[$level][$manager->id] = [
+                        'id' => $manager->id,
+                        'name' => $manager->name,
+                        'email' => $manager->email,
+                        'level' => $manager->userLevel?->name ?? 'Unknown',
+                        'departments' => [$manager->department?->name ?? 'No Department']
+                    ];
                 }
             }
         }
@@ -52,125 +53,255 @@ class ManagerHierarchyService
 
         return $managersByLevel;
     }
+
     /**
-     * Get managers for a specific department based on your hierarchy
-     *
-     * @param string $departmentName
-     * @param array $targetLevels
-     * @return array
+     * Get managers for a specific user based on database relationships
+     * Uses UserDepartmentRole to find assigned managers
      */
-    public function getManagersForDepartment(string $departmentName, array $targetLevels = ['L2', 'L3', 'L4']): array
+    public function getManagersForUser(int $userId, array $targetLevels = ['L2', 'L3', 'L4']): array
     {
-        $managers = [
-            'L2' => [],
-            'L3' => [],
-            'L4' => []
-        ];
+        $user = User::with(['department', 'userLevel'])->find($userId);
 
-        // Your specific hierarchy mappings based on the document
-        switch (strtolower($departmentName)) {
-            case 'real estate':
-                if (in_array('L3', $targetLevels) || in_array('all', $targetLevels)) {
-                    $managers['L3'][] = $this->getManagerByName('Batool');
-                }
-                if (in_array('L4', $targetLevels) || in_array('all', $targetLevels)) {
-                    $managers['L4'][] = $this->getManagerByName('Sam');
-                }
-                break;
-
-            case 'builders':
-                if (in_array('L2', $targetLevels) || in_array('all', $targetLevels)) {
-                    $managers['L2'][] = $this->getManagerByName('Hannah');
-                }
-                if (in_array('L3', $targetLevels) || in_array('all', $targetLevels)) {
-                    $managers['L3'][] = $this->getManagerByName('Batool');
-                }
-                if (in_array('L4', $targetLevels) || in_array('all', $targetLevels)) {
-                    $managers['L4'][] = $this->getManagerByName('Sam');
-                }
-                break;
-
-            case 'management':
-                if (in_array('L2', $targetLevels) || in_array('all', $targetLevels)) {
-                    $managers['L2'][] = $this->getManagerByName('Bia');
-                }
-                break;
-
-            case '3d design':
-                if (in_array('L2', $targetLevels) || in_array('all', $targetLevels)) {
-                    $managers['L2'][] = $this->getManagerByName('Kain');
-                }
-                break;
-
-            case 'r&d':
-            case 'research and development':
-                if (in_array('L2', $targetLevels) || in_array('all', $targetLevels)) {
-                    $managers['L2'][] = $this->getManagerByName('Jaden');
-                }
-                if (in_array('L3', $targetLevels) || in_array('all', $targetLevels)) {
-                    $managers['L3'][] = $this->getManagerByName('George');
-                }
-                if (in_array('L4', $targetLevels) || in_array('all', $targetLevels)) {
-                    $managers['L4'][] = $this->getManagerByName('Sam');
-                }
-                break;
-
-            case 'marketing':
-                if (in_array('L2', $targetLevels) || in_array('all', $targetLevels)) {
-                    $managers['L2'][] = $this->getManagerByName('Alina');
-                }
-                if (in_array('L3', $targetLevels) || in_array('all', $targetLevels)) {
-                    $managers['L3'][] = $this->getManagerByName('David');
-                }
-                if (in_array('L4', $targetLevels) || in_array('all', $targetLevels)) {
-                    $managers['L4'][] = $this->getManagerByName('Moe');
-                }
-                break;
+        if (!$user || !$user->department) {
+            return [];
         }
 
-        // Filter out null managers
-        foreach ($managers as $level => $levelManagers) {
-            $managers[$level] = array_filter($levelManagers, function($manager) {
-                return $manager !== null;
-            });
+        // Get managers from UserDepartmentRole relationships
+        $managers = $this->getManagersFromDepartmentRoles($user, $targetLevels);
+
+        // If no specific managers found, get department-level managers
+        if (empty($managers)) {
+            $managers = $this->getDepartmentManagers($user->department, $targetLevels);
         }
 
         return $managers;
     }
-    /**
-     * Get manager information by name
-     *
-     * @param string $name
-     * @return array|null
-     */
-    private function getManagerByName(string $name): ?array
-    {
-        $user = User::where('name', 'like', '%' . $name . '%')
-            ->with(['userLevel', 'department'])
-            ->first();
 
-        if (!$user) {
-            return null;
+    /**
+     * Get managers from UserDepartmentRole relationships
+     */
+    private function getManagersFromDepartmentRoles(User $user, array $targetLevels): array
+    {
+        $managers = [];
+
+        // Get active manager roles in the user's department
+        $managerRoles = UserDepartmentRole::with(['manager.userLevel', 'manager.department'])
+            ->where('department_id', $user->department_id)
+            ->active() // Uses the scope you already have
+            ->whereIn('role_type', $this->mapLevelsToRoleTypes($targetLevels))
+            ->get();
+
+        foreach ($managerRoles as $role) {
+            if (!$role->manager) continue;
+
+            $managerLevel = $this->getUserLevelCode($role->manager);
+
+            if (in_array($managerLevel, $targetLevels) || in_array('all', $targetLevels)) {
+                $managers[] = [
+                    'manager' => $role->manager,
+                    'level' => $managerLevel,
+                    'relationship' => 'department_role',
+                    'role_type' => $role->role_type,
+                    'is_primary' => $role->is_primary
+                ];
+            }
+        }
+
+        return $managers;
+    }
+
+    /**
+     * Get department-level managers as fallback
+     */
+    private function getDepartmentManagers(Department $department, array $targetLevels): array
+    {
+        $managers = [];
+
+        // Get users with manager roles in this department
+        $departmentManagers = $department->managers()
+            ->with(['userLevel'])
+            ->get();
+
+        foreach ($departmentManagers as $manager) {
+            $managerLevel = $this->getUserLevelCode($manager);
+
+            if (in_array($managerLevel, $targetLevels) || in_array('all', $targetLevels)) {
+                $managers[] = [
+                    'manager' => $manager,
+                    'level' => $managerLevel,
+                    'relationship' => 'department_manager',
+                    'role_type' => $manager->pivot->role_type ?? 'manager',
+                    'is_primary' => $manager->pivot->is_primary ?? false
+                ];
+            }
+        }
+
+        return $managers;
+    }
+
+    /**
+     * Map user levels to role types
+     */
+    private function mapLevelsToRoleTypes(array $levels): array
+    {
+        $roleTypes = [];
+
+        foreach ($levels as $level) {
+            switch ($level) {
+                case 'L2':
+                    $roleTypes[] = 'direct_manager';
+                    $roleTypes[] = 'project_manager';
+                    break;
+                case 'L3':
+                    $roleTypes[] = 'senior_manager';
+                    $roleTypes[] = 'department_head';
+                    break;
+                case 'L4':
+                    $roleTypes[] = 'executive';
+                    $roleTypes[] = 'director';
+                    break;
+            }
+        }
+
+        return array_unique($roleTypes);
+    }
+
+    /**
+     * Get user level code (L1, L2, L3, L4)
+     */
+    private function getUserLevelCode(User $user): string
+    {
+        if (!$user->userLevel) {
+            return 'Unknown';
+        }
+
+        // Map user_level_id to level codes
+        return match($user->user_level_id) {
+            1 => 'L1',
+            2 => 'L2',
+            3 => 'L3',
+            4 => 'L4',
+            default => $user->userLevel->code ?? 'Unknown'
+        };
+    }
+
+    /**
+     * Get direct managers for a user (L2 only)
+     */
+    public function getDirectManagersForUser(int $userId): array
+    {
+        return $this->getManagersForUser($userId, ['L2']);
+    }
+
+    /**
+     * Get managers for multiple users (optimized)
+     */
+    public function getManagersForMultipleUsers(array $userIds, array $targetLevels = ['L2']): array
+    {
+        $users = User::with(['department', 'userLevel'])
+            ->whereIn('id', $userIds)
+            ->get();
+
+        $managersByUser = [];
+
+        foreach ($users as $user) {
+            $managersByUser[$user->id] = $this->getManagersForUser($user->id, $targetLevels);
+        }
+
+        return $managersByUser;
+    }
+
+    /**
+     * Assign a manager to a user
+     */
+    public function assignManager(int $userId, int $managerId, string $roleType = 'direct_manager', ?int $departmentId = null): UserDepartmentRole
+    {
+        $user = User::findOrFail($userId);
+        $manager = User::findOrFail($managerId);
+
+        // Use user's department if not specified
+        $departmentId = $departmentId ?? $user->department_id;
+
+        if (!$departmentId) {
+            throw new \Exception('Department is required for manager assignment');
+        }
+
+        return UserDepartmentRole::create([
+            'user_id' => $managerId,
+            'department_id' => $departmentId,
+            'role_type' => $roleType,
+            'manages_user_id' => $userId,
+            'is_primary' => true,
+            'start_date' => now(),
+            'created_by' => auth()->id()
+        ]);
+    }
+
+    /**
+     * Remove manager assignment
+     */
+    public function removeManager(int $userId, int $managerId): bool
+    {
+        return UserDepartmentRole::where('user_id', $managerId)
+                ->where('manages_user_id', $userId)
+                ->active()
+                ->update(['end_date' => now()]) > 0;
+    }
+
+    /**
+     * Get all possible managers for assignment (users with management levels)
+     */
+    public function getAvailableManagers(?int $departmentId = null): Collection
+    {
+        $query = User::with(['userLevel', 'department'])
+            ->whereHas('userLevel', function($q) {
+                $q->where('hierarchy_level', '>', 1); // Above L1
+            });
+
+        if ($departmentId) {
+            $query->where('department_id', $departmentId);
+        }
+
+        return $query->orderBy('name')->get();
+    }
+
+    /**
+     * Validate that employees are L1 level
+     */
+    public function validateL1Employees(array $employeeIds): array
+    {
+        $employees = User::with('userLevel')
+            ->whereIn('id', $employeeIds)
+            ->get();
+
+        $valid = [];
+        $invalid = [];
+
+        foreach ($employees as $employee) {
+            if ($employee->user_level_id == 1) {
+                $valid[] = $employee->id;
+            } else {
+                $invalid[] = [
+                    'id' => $employee->id,
+                    'name' => $employee->name,
+                    'level' => $employee->userLevel?->name ?? 'Unknown'
+                ];
+            }
         }
 
         return [
-            'id' => $user->id,
-            'name' => $user->name,
-            'email' => $user->email,
-            'level' => $user->userLevel->name ?? 'Unknown',
-            'departments' => [$user->department?->name ?? 'No Department']
+            'valid' => $valid,
+            'invalid' => $invalid
         ];
     }
+
     /**
-     * Get all L1 employees with completed evaluations for filtering
-     *
-     * @param array $filters - department_id, course_id, date_range
-     * @return Collection
+     * Get L1 employees with completed evaluations for filtering
      */
     public function getL1EmployeesWithEvaluations(array $filters = []): Collection
     {
-        $query = User::with(['userLevel', 'department', 'evaluations.course', 'evaluations.history']) // FIXED: Changed evaluationHistory to history
-        ->where('user_level_id', 1)
+        $query = User::with(['userLevel', 'department', 'evaluations.course', 'evaluations.history'])
+            ->where('user_level_id', 1)
             ->whereHas('evaluations');
 
         // Apply filters
@@ -198,17 +329,14 @@ class ManagerHierarchyService
 
         return $query->get();
     }
+
     /**
      * Preview notification - show which managers will receive emails
-     *
-     * @param array $employeeIds
-     * @param array $targetLevels
-     * @return array
      */
     public function previewNotification(array $employeeIds, array $targetLevels): array
     {
-        $employees = User::with(['userLevel', 'department', 'evaluations.history']) // FIXED: Changed evaluationHistory to history
-        ->whereIn('id', $employeeIds)
+        $employees = User::with(['userLevel', 'department', 'evaluations.history'])
+            ->whereIn('id', $employeeIds)
             ->get();
 
         $managers = $this->getManagersForEmployees($employeeIds, $targetLevels);
@@ -234,210 +362,28 @@ class ManagerHierarchyService
         ];
 
         return $preview;
-    }    /**
-     * Validate that employees are L1 level
-     *
-     * @param array $employeeIds
-     * @return array - ['valid' => [...], 'invalid' => [...]]
-     */
-    public function validateL1Employees(array $employeeIds): array
-    {
-        $employees = User::with('userLevel')
-            ->whereIn('id', $employeeIds)
-            ->get();
-
-        $valid = [];
-        $invalid = [];
-
-        foreach ($employees as $employee) {
-            if ($employee->user_level_id == 1) { // Check user_level_id directly
-                $valid[] = $employee->id;
-            } else {
-                $invalid[] = [
-                    'id' => $employee->id,
-                    'name' => $employee->name,
-                    'level' => $employee->userLevel?->name ?? 'Unknown'
-                ];
-            }
-        }
-
-        return [
-            'valid' => $valid,
-            'invalid' => $invalid
-        ];
     }
+
     /**
      * Get department hierarchy chain for display
-     *
-     * @param string $departmentName
-     * @return array
      */
-    public function getDepartmentHierarchy(string $departmentName): array
+    public function getDepartmentHierarchy(int $departmentId): array
     {
         $hierarchy = [];
 
-        switch (strtolower($departmentName)) {
-            case 'real estate':
-                $hierarchy = [
-                    'L3' => 'Batool (Senior Manager)',
-                    'L4' => 'Sam (Executive)'
-                ];
-                break;
+        $managerRoles = UserDepartmentRole::with(['manager.userLevel'])
+            ->where('department_id', $departmentId)
+            ->active()
+            ->orderBy('authority_level')
+            ->get();
 
-            case 'builders':
-                $hierarchy = [
-                    'L2' => 'Hannah (Direct Manager)',
-                    'L3' => 'Batool (Senior Manager)',
-                    'L4' => 'Sam (Executive)'
-                ];
-                break;
+        foreach ($managerRoles as $role) {
+            if (!$role->manager) continue;
 
-            case 'r&d':
-                $hierarchy = [
-                    'L2' => 'Jaden (Direct Manager)',
-                    'L3' => 'George (Head of Department)',
-                    'L4' => 'Sam (Executive)'
-                ];
-                break;
-
-            case 'marketing':
-                $hierarchy = [
-                    'L2' => 'Alina (Project Manager)',
-                    'L3' => 'David (Head of Department)',
-                    'L4' => 'Moe (Executive)'
-                ];
-                break;
-
-            case 'management':
-                $hierarchy = [
-                    'L2' => 'Bia (Direct Manager)'
-                ];
-                break;
-
-            case '3d design':
-                $hierarchy = [
-                    'L2' => 'Kain (Direct Manager)'
-                ];
-                break;
+            $level = $this->getUserLevelCode($role->manager);
+            $hierarchy[$level] = $role->manager->name . ' (' . $role->getRoleDisplayName() . ')';
         }
 
         return $hierarchy;
-    }
-
-    public function getManagersForUser(int $userId, array $targetLevels = ['L2', 'L3', 'L4']): array
-    {
-        $user = User::with(['userLevel', 'department'])
-            ->find($userId);
-
-        if (!$user) {
-            return [];
-        }
-
-        $departmentName = $user->department?->name ?? 'Unknown Department';
-        $managers = $this->getManagersForDepartment($departmentName, $targetLevels);
-
-        // Convert to the format expected by the controller
-        $result = [];
-        foreach ($managers as $level => $levelManagers) {
-            foreach ($levelManagers as $manager) {
-                if ($manager) {
-                    $result[] = [
-                        'manager' => (object) [
-                            'id' => $manager['id'],
-                            'name' => $manager['name'],
-                            'email' => $manager['email'],
-                            'level' => $manager['level'],
-                            'departments' => $manager['departments']
-                        ],
-                        'level' => $level,
-                        'relationship' => 'department_hierarchy'
-                    ];
-                }
-            }
-        }
-
-        return $result;
-    }
-
-    /**
-     * 🎯 ALTERNATIVE: Get direct managers for a user (simpler approach)
-     *
-     * @param int $userId
-     * @return array
-     */
-    public function getDirectManagersForUser(int $userId): array
-    {
-        $user = User::with(['department'])->find($userId);
-
-        if (!$user) {
-            return [];
-        }
-
-        // Get L2 managers only (direct managers)
-        $departmentName = $user->department?->name ?? 'Unknown Department';
-        $managers = $this->getManagersForDepartment($departmentName, ['L2']);
-
-        $result = [];
-        foreach ($managers['L2'] as $manager) {
-            if ($manager) {
-                $result[] = [
-                    'manager' => (object) [
-                        'id' => $manager['id'],
-                        'name' => $manager['name'],
-                        'email' => $manager['email'],
-                        'level' => $manager['level'],
-                        'departments' => $manager['departments']
-                    ],
-                    'level' => 'L2',
-                    'relationship' => 'direct_manager'
-                ];
-            }
-        }
-
-        return $result;
-    }
-
-    /**
-     * 🎯 BULK VERSION: Get managers for multiple users (optimized)
-     *
-     * @param array $userIds
-     * @param array $targetLevels
-     * @return array
-     */
-    public function getManagersForMultipleUsers(array $userIds, array $targetLevels = ['L2']): array
-    {
-        $users = User::with(['department'])
-            ->whereIn('id', $userIds)
-            ->get();
-
-        $managersByUser = [];
-
-        foreach ($users as $user) {
-            $departmentName = $user->department?->name ?? 'Unknown Department';
-            $managers = $this->getManagersForDepartment($departmentName, $targetLevels);
-
-            $userManagers = [];
-            foreach ($managers as $level => $levelManagers) {
-                foreach ($levelManagers as $manager) {
-                    if ($manager) {
-                        $userManagers[] = [
-                            'manager' => (object) [
-                                'id' => $manager['id'],
-                                'name' => $manager['name'],
-                                'email' => $manager['email'],
-                                'level' => $manager['level'],
-                                'departments' => $manager['departments']
-                            ],
-                            'level' => $level,
-                            'relationship' => 'department_hierarchy'
-                        ];
-                    }
-                }
-            }
-
-            $managersByUser[$user->id] = $userManagers;
-        }
-
-        return $managersByUser;
     }
 }
