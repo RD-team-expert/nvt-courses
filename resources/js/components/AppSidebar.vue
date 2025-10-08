@@ -2,18 +2,51 @@
 import NavFooter from '@/components/NavFooter.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
-import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
+import {
+    Sidebar,
+    SidebarContent,
+    SidebarFooter,
+    SidebarHeader,
+    SidebarMenu,
+    SidebarMenuButton,
+    SidebarMenuItem,
+    SidebarMenuSub,
+    SidebarMenuSubItem,
+    SidebarMenuSubButton
+} from '@/components/ui/sidebar';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
-// Add the Reports icon import
-import { BookOpen, Folder, LayoutGrid, Clock, BookOpenCheck, Users, Settings, BarChart, Bot , LayoutList  } from 'lucide-vue-next';
-import { computed } from 'vue';
+import {
+    BookOpen,
+    Folder,
+    LayoutGrid,
+    Clock,
+    BookOpenCheck,
+    Users,
+    Settings,
+    BarChart,
+    Bot,
+    LayoutList,
+    ChevronDown,
+    Building2,
+    Shield,
+    UserCheck,
+    History,
+    Volume2
+} from 'lucide-vue-next';
+import { computed, ref } from 'vue';
 import AppLogo from './AppLogo.vue';
 
 // Get current user from Inertia page props with better error handling
 const page = usePage();
 const user = computed(() => page.props.auth?.user);
 const isAdmin = computed(() => user.value?.is_admin === true || user.value?.role === 'admin');
+
+// Track which submenus are open
+const openSubmenus = ref({
+    reportsAnalytics: false
+});
 
 // Common navigation items for all users
 const mainNavItems: NavItem[] = [
@@ -27,7 +60,6 @@ const mainNavItems: NavItem[] = [
         href: '/courses',
         icon: BookOpenCheck,
     },
-
     {
         title: 'Attendance',
         href: '/attendance',
@@ -37,24 +69,86 @@ const mainNavItems: NavItem[] = [
         title: 'Quizzes',
         href: '/quizzes',
         icon: LayoutList
-
     },
     {
         title: 'Profile',
         href: '/profile',
         icon: LayoutList
-
     },
     {
-        title: ' audio',
+        title: 'Audio books',
         href: '/audio',
         icon: Clock,
     },
+    {
+        title: 'Online courses',
+        href: '/courses-online',
+        icon: BookOpenCheck,
+    },
 ];
 
-// Admin-only navigation items
-// Add Reports to adminNavItems array
-const adminNavItems: NavItem[] = [
+// Reports & Analytics submenu items
+const reportsSubItems = [
+    {
+        title: 'Courses',
+        href: '/admin/courses',
+        icon: BookOpenCheck,
+    },
+    {
+        title: 'Quizzes',
+        href: '/admin/quizzes',
+        icon: LayoutList,
+    },
+    {
+        title: 'Users',
+        href: '/admin/users',
+        icon: Users,
+    },
+    {
+        title: 'Attendance',
+        href: '/admin/attendance',
+        icon: Clock,
+    },
+    {
+        title: 'Reports',
+        href: '/admin/reports',
+        icon: BarChart,
+    },
+    {
+        title: 'Departments',
+        href: '/admin/departments',
+        icon: Building2,
+    },
+    {
+        title: 'User Levels',
+        href: '/admin/user-levels',
+        icon: Shield,
+    },
+    {
+        title: 'Manager Roles',
+        href: '/admin/manager-roles',
+        icon: UserCheck,
+    },
+    {
+        title: 'User Assignment',
+        href: '/admin/users/assignment',
+        icon: Users,
+    },
+    {
+        title: 'History & Reports',
+        href: '/admin/evaluations/history',
+        icon: History,
+    },
+    {
+        title: 'Audio Categories',
+        href: '/admin/audio-categories',
+        icon: Volume2,
+    }
+];
+
+// Other Admin-only navigation items (non-Reports)
+const otherAdminNavItems: NavItem[] = [
+
     {
         title: 'Course Management',
         href: '/admin/courses',
@@ -64,16 +158,12 @@ const adminNavItems: NavItem[] = [
         title: 'User Management',
         href: '/admin/users',
         icon: Users,
+
     },
     {
         title: 'Attendance Management',
         href: '/admin/attendance',
         icon: Clock,
-    },
-    {
-        title: 'Reports & Analytics',
-        href: '/admin/reports',
-        icon: BarChart,
     },
     {
         title: 'Resend Login Links',
@@ -91,7 +181,7 @@ const adminNavItems: NavItem[] = [
         icon: Clock,
     },
     {
-        title: ' User Evaluation',
+        title: 'User Evaluation',
         href: '/admin/evaluations/user-evaluation',
         icon: Clock,
     },
@@ -100,19 +190,16 @@ const adminNavItems: NavItem[] = [
         href: '/admin/audio',
         icon: Clock,
     },
-
-
-
-    // {
-    //     title: 'Ai',
-    //     href: '/gemini',
-    //     icon: Bot,
-    // },
-    // {
-    //     title: 'Settings',
-    //     href: '/admin/settings',
-    //     icon: Settings,
-    // },
+    {
+        title: 'Admin online course',
+        href: '/admin/course-online',
+        icon: Clock,
+    },
+    {
+        title: 'Admin Video',
+        href: '/admin/videos',
+        icon: Clock,
+    },
 ];
 
 // External links for footer
@@ -130,6 +217,17 @@ const footerNavItems: NavItem[] = [
         external: true,
     },
 ];
+
+// Check if current URL matches any of the reports submenu items
+const isReportsSubmenuActive = computed(() => {
+    const currentUrl = page.url;
+    return reportsSubItems.some(item => currentUrl.includes(item.href));
+});
+
+// Auto-open Reports & Analytics if any sub-item is active
+if (isReportsSubmenuActive.value) {
+    openSubmenus.value.reportsAnalytics = true;
+}
 
 // For debugging - log user data to console
 console.log('User data:', user.value);
@@ -156,22 +254,55 @@ console.log('Is admin:', isAdmin.value);
 
             <!-- Admin Navigation (only shown to admins) -->
             <template v-if="isAdmin">
-                <!-- <div class="px-3 pt-2 pb-1">
-                    <div class="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Admin
-                    </div>
-                </div> -->
-                <NavMain :items="adminNavItems" label="Admin" />
+                <SidebarMenu>
+                    <!-- Reports & Analytics Collapsible Menu -->
+                    <Collapsible
+                        v-model:open="openSubmenus.reportsAnalytics"
+                        class="group/collapsible"
+                    >
+                        <SidebarMenuItem>
+                            <CollapsibleTrigger as-child>
+                                <SidebarMenuButton
+                                    :is-active="isReportsSubmenuActive"
+                                    class="w-full justify-between"
+                                >
+                                    <div class="flex items-center">
+                                        <BarChart class="h-4 w-4" />
+                                        <span>Reports & Analytics</span>
+                                    </div>
+                                    <ChevronDown class="h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                                </SidebarMenuButton>
+                            </CollapsibleTrigger>
+
+                            <CollapsibleContent>
+                                <SidebarMenuSub>
+                                    <SidebarMenuSubItem
+                                        v-for="item in reportsSubItems"
+                                        :key="item.href"
+                                    >
+                                        <SidebarMenuSubButton
+                                            as-child
+                                            :is-active="page.url.includes(item.href)"
+                                        >
+                                            <Link :href="item.href">
+                                                <component :is="item.icon" class="h-4 w-4" />
+                                                <span>{{ item.title }}</span>
+                                            </Link>
+                                        </SidebarMenuSubButton>
+                                    </SidebarMenuSubItem>
+                                </SidebarMenuSub>
+                            </CollapsibleContent>
+                        </SidebarMenuItem>
+                    </Collapsible>
+                </SidebarMenu>
+
+                <!-- Other Admin Navigation Items -->
+                <NavMain :items="otherAdminNavItems" label="Admin" />
             </template>
         </SidebarContent>
 
         <SidebarFooter>
-            <!-- <NavFooter :items="footerNavItems" /> -->
             <NavUser />
-            <!-- <div class="px-3 py-2 text-xs text-center text-gray-500 dark:text-gray-400">
-                Made with ❤️ by R&D team
-            </div> -->
-
         </SidebarFooter>
     </Sidebar>
     <slot />

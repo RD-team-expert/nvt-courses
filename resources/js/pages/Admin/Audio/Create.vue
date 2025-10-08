@@ -1,7 +1,6 @@
-<!-- Admin Create Audio - Complete with Image Upload -->
 <script setup lang="ts">
 import { Head, Link, useForm } from '@inertiajs/vue3'
-import { ref, nextTick } from 'vue'
+import { ref, nextTick, computed } from 'vue'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { type BreadcrumbItem } from '@/types'
 
@@ -38,7 +37,6 @@ const props = defineProps<{
 }>()
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Admin', href: '/admin' },
     { title: 'Audio Management', href: '/admin/audio' },
     { title: 'Create Audio', href: '#' }
 ]
@@ -47,9 +45,9 @@ const form = useForm({
     name: '',
     description: '',
     google_cloud_url: '',
-    duration: '',
-    thumbnail: null as File | null, // For file upload
-    thumbnail_url: '', // Fallback external URL
+    duration: '', // HH:MM:SS format
+    thumbnail: null as File | null,
+    thumbnail_url: '',
     audio_category_id: '',
     is_active: true
 })
@@ -57,21 +55,106 @@ const form = useForm({
 const isSubmitting = ref(false)
 const thumbnailPreview = ref<string | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
+const durationInput = ref<HTMLInputElement | null>(null)
 
-// Convert minutes to seconds
-const convertMinutesToSeconds = (minutes: number): number => {
-    return Math.round(minutes * 60)
+// Duration state
+const durationDisplay = ref('00:00:00')
+
+// Update form duration
+const updateFormDuration = () => {
+    form.duration = durationDisplay.value === '00:00:00' ? '' : durationDisplay.value
 }
 
-// Convert MM:SS to seconds
-const parseTimeToSeconds = (timeString: string): number => {
-    const parts = timeString.split(':')
-    if (parts.length === 2) {
-        const minutes = parseInt(parts[0]) || 0
-        const seconds = parseInt(parts[1]) || 0
-        return minutes * 60 + seconds
+// Enhanced input handler with better validation
+const handleDurationInput = (event: Event) => {
+    const target = event.target as HTMLInputElement
+    let input = target.value
+
+    // Remove all non-digits
+    let numbersOnly = input.replace(/\D/g, '')
+
+    // Limit to 6 digits maximum (HHMMSS)
+    if (numbersOnly.length > 6) {
+        numbersOnly = numbersOnly.substring(0, 6)
     }
-    return 0
+
+    // If empty or all zeros, reset to 00:00:00
+    if (!numbersOnly || numbersOnly === '0' || numbersOnly === '00' || numbersOnly === '000') {
+        durationDisplay.value = '00:00:00'
+        target.value = '00:00:00'
+        updateFormDuration()
+        return
+    }
+
+    // Pad with leading zeros to make it 6 digits for processing
+    const padded = numbersOnly.padStart(6, '0')
+
+    // Extract components
+    let hours = parseInt(padded.substring(0, 2))
+    let minutes = parseInt(padded.substring(2, 4))
+    let seconds = parseInt(padded.substring(4, 6))
+
+    // Validate and adjust ranges
+    if (hours > 23) hours = 23
+    if (minutes > 59) minutes = 59
+    if (seconds > 59) seconds = 59
+
+    // Format as HH:MM:SS
+    const formatted = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+
+    // Update values
+    durationDisplay.value = formatted
+    target.value = formatted
+    updateFormDuration()
+}
+
+// Format for readable display
+const formatDurationReadable = (timeString: string): string => {
+    if (!timeString || timeString === '00:00:00') return '0 seconds'
+
+    const [hours, minutes, seconds] = timeString.split(':').map(Number)
+    const parts = []
+
+    if (hours > 0) parts.push(`${hours} hour${hours !== 1 ? 's' : ''}`)
+    if (minutes > 0) parts.push(`${minutes} minute${minutes !== 1 ? 's' : ''}`)
+    if (seconds > 0) parts.push(`${seconds} second${seconds !== 1 ? 's' : ''}`)
+
+    if (parts.length === 0) return '0 seconds'
+    if (parts.length === 1) return parts[0]
+    if (parts.length === 2) return `${parts[0]} and ${parts[1]}`
+    return `${parts[0]}, ${parts[1]}, and ${parts[2]}`
+}
+
+// Handle paste events
+const handleDurationPaste = (event: ClipboardEvent) => {
+    event.preventDefault()
+    const pastedText = event.clipboardData?.getData('text') || ''
+
+    // Try to parse various formats
+    let numbersOnly = pastedText.replace(/\D/g, '')
+
+    if (numbersOnly.length <= 6) {
+        const fakeEvent = { target: { value: numbersOnly } }
+        handleDurationInput(fakeEvent as any)
+    }
+}
+
+// Set duration preset
+const setDurationPreset = (timeString: string) => {
+    durationDisplay.value = timeString
+    updateFormDuration()
+    if (durationInput.value) {
+        durationInput.value.value = timeString
+    }
+}
+
+// Clear duration
+const clearDuration = () => {
+    durationDisplay.value = '00:00:00'
+    updateFormDuration()
+    if (durationInput.value) {
+        durationInput.value.value = '00:00:00'
+    }
 }
 
 // Handle thumbnail file selection
@@ -124,27 +207,15 @@ function triggerFileInput() {
     fileInputRef.value?.click()
 }
 
+// Submit form
 const submit = async () => {
     isSubmitting.value = true
 
-    // Convert duration to seconds if it's provided
-    let durationInSeconds = null
-    if (form.duration) {
-        if (form.duration.includes(':')) {
-            // MM:SS format
-            durationInSeconds = parseTimeToSeconds(form.duration)
-        } else {
-            // Assume minutes
-            durationInSeconds = convertMinutesToSeconds(parseFloat(form.duration))
-        }
-    }
-
-    // Wait for next tick to ensure DOM is stable
     await nextTick()
 
     form.transform((data) => ({
         ...data,
-        duration: durationInSeconds,
+        duration: data.duration || null,
         audio_category_id: data.audio_category_id || null
     })).post('/admin/audio', {
         onFinish: () => {
@@ -152,6 +223,9 @@ const submit = async () => {
         }
     })
 }
+
+// Initialize form duration
+updateFormDuration()
 </script>
 
 <template>
@@ -269,13 +343,14 @@ const submit = async () => {
                             </div>
                         </div>
 
-                        <!-- Duration -->
+                        <!-- Enhanced Duration Input -->
                         <div class="space-y-2">
                             <Label for="duration">Duration</Label>
                             <Input
                                 id="duration"
                                 v-model="form.duration"
                                 type="text"
+                                step="1"
                                 placeholder="30 (minutes) or 30:45 (MM:SS)"
                                 :class="{ 'border-destructive': form.errors.duration }"
                             />
@@ -420,7 +495,7 @@ const submit = async () => {
                     <AlertTriangle class="h-4 w-4" />
                     <AlertDescription>
                         <strong>Important:</strong> Make sure your Google Drive file is set to "Anyone with the link can view"
-                        for proper audio streaming. Large audio files may take longer to process initially.
+                        for proper audio streaming. Duration should be entered in HH:MM:SS format (e.g., 01:30:45 for 1 hour, 30 minutes, 45 seconds).
                     </AlertDescription>
                 </Alert>
 

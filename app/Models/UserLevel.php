@@ -81,4 +81,11 @@ class UserLevel extends Model
     {
         return !empty($this->can_manage_levels);
     }
+
+    public function tiers()
+    {
+        return $this->hasMany(UserLevelTier::class)->orderBy('tier_order');
+    }
+
+
 }

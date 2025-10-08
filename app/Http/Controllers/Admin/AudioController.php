@@ -74,12 +74,13 @@ class AudioController extends Controller
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:2000',
             'google_cloud_url' => 'required|url|max:500',
-            'duration' => 'nullable|integer|min:1|max:86400',
-            // Change validation for thumbnail
-            'thumbnail' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048', // 2MB max
-            'thumbnail_url' => 'nullable|url|max:500', // Keep as fallback option
+            'duration' => 'nullable|string',
+            'thumbnail' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
+            'thumbnail_url' => 'nullable|url|max:500',
             'audio_category_id' => 'nullable|exists:audio_categories,id',
             'is_active' => 'boolean'
+        ], [
+            'duration.regex' => 'Duration must be in HH:MM:SS format (e.g., 01:30:45)'
         ]);
 
         // Handle thumbnail upload
@@ -89,13 +90,24 @@ class AudioController extends Controller
             Log::info('Thumbnail uploaded', ['path' => $thumbnailPath]);
         }
 
+        // Convert HH:MM:SS to seconds for database storage
+        $durationInSeconds = null;
+        if (!empty($validated['duration'])) {
+            $durationInSeconds = $this->convertTimeToSeconds($validated['duration']);
+
+            Log::info('Duration conversion', [
+                'input_format' => $validated['duration'],
+                'converted_seconds' => $durationInSeconds
+            ]);
+        }
+
         $audio = Audio::create([
             'name' => $validated['name'],
             'description' => $validated['description'],
             'google_cloud_url' => $validated['google_cloud_url'],
-            'duration' => $validated['duration'],
-            'thumbnail_path' => $thumbnailPath, // Store file path
-            'thumbnail_url' => $validated['thumbnail_url'], // Store external URL as fallback
+            'duration' => $durationInSeconds,
+            'thumbnail_path' => $thumbnailPath,
+            'thumbnail_url' => $validated['thumbnail_url'],
             'audio_category_id' => $validated['audio_category_id'],
             'is_active' => $validated['is_active'] ?? true,
             'created_by' => auth()->id(),
@@ -104,12 +116,48 @@ class AudioController extends Controller
         Log::info('Audio created successfully', [
             'audio_id' => $audio->id,
             'audio_name' => $audio->name,
+            'duration_seconds' => $durationInSeconds,
+            'duration_formatted' => $validated['duration'],
             'has_thumbnail' => !empty($thumbnailPath),
             'created_by' => auth()->id()
         ]);
 
         return redirect()->route('admin.audio.index')
             ->with('success', 'Audio created successfully.');
+    }
+
+    /**
+     * Convert HH:MM:SS to total seconds
+     */
+    private function convertTimeToSeconds(string $timeString): int
+    {
+        $parts = explode(':', $timeString);
+        $hours = (int) $parts[0];
+        $minutes = (int) $parts[1];
+        $seconds = (int) $parts[2];
+
+        return ($hours * 3600) + ($minutes * 60) + $seconds;
+    }
+
+    /**
+     * Convert HH:MM:SS duration format to seconds
+     */
+    private function convertDurationToSeconds(string $duration): int
+    {
+        list($hours, $minutes, $seconds) = explode(':', $duration);
+        return (int)$hours * 3600 + (int)$minutes * 60 + (int)$seconds;
+    }
+
+    /**
+     * Convert seconds to HH:MM:SS format
+     */
+    private function convertSecondsToHHMMSS(int $seconds): string
+    {
+        $hours = floor($seconds / 3600);
+        $minutes = floor(($seconds - ($hours * 3600)) / 60);
+        $seconds = $seconds - ($hours * 3600) - ($minutes * 60);
+
+        return sprintf('%02d:%02d:%02d', $hours, $minutes, $seconds);
     }
 
     /**

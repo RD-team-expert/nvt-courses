@@ -1,6 +1,6 @@
 <!--
-  User Performance Evaluation Page
-  Assess employee performance for completed courses using predefined evaluation criteria
+  Enhanced User Performance Evaluation Page with Level + Tier Support
+  Assess employee performance with Level + Tier based incentive calculations
 -->
 <script setup lang="ts">
 import { useForm, Link, router } from '@inertiajs/vue3'
@@ -33,7 +33,7 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Progress } from '@/components/ui/progress'
 import { Separator } from '@/components/ui/separator'
-import { User, BookOpen, Calendar, TrendingUp, Award, DollarSign, CheckCircle, RotateCcw, Send, Loader2 } from 'lucide-vue-next'
+import { User, BookOpen, Calendar, TrendingUp, Award, DollarSign, CheckCircle, RotateCcw, Send, Loader2, Layers, Target } from 'lucide-vue-next'
 
 const props = defineProps<{
     users?: Array<{
@@ -42,6 +42,17 @@ const props = defineProps<{
         email: string
         department?: { id: number; name: string }
         department_id?: number
+        // NEW: Level and Tier information
+        user_level?: {
+            id: number
+            name: string
+            code: string
+        }
+        user_level_tier?: {
+            id: number
+            tier_name: string
+            tier_order: number
+        }
         completed_courses: Array<{
             id: number
             title: string
@@ -70,11 +81,37 @@ const props = defineProps<{
         title: string
         description: string
     }>
+    // NEW: Enhanced incentives with Level + Tier data
     incentives?: Array<{
         id: number
+        user_level_id?: number
+        user_level_tier_id?: number
         min_score: number
         max_score: number
         incentive_amount: number
+        user_level?: {
+            id: number
+            name: string
+            code: string
+        }
+        user_level_tier?: {
+            id: number
+            tier_name: string
+            tier_order: number
+        }
+    }>
+    // NEW: User levels with tiers for reference
+    userLevels?: Array<{
+        id: number
+        code: string
+        name: string
+        hierarchy_level: number
+        tiers: Array<{
+            id: number
+            tier_name: string
+            tier_order: number
+            description?: string
+        }>
     }>
 }>()
 
@@ -84,6 +121,7 @@ const safeCategories = computed(() => props.categories || [])
 const safeDepartments = computed(() => props.departments || [])
 const safeCourses = computed(() => props.courses || [])
 const safeIncentives = computed(() => props.incentives || [])
+const safeUserLevels = computed(() => props.userLevels || [])
 
 // State management
 const showSubmitModal = ref(false)
@@ -140,7 +178,7 @@ const handleCourseChange = (value: string) => {
     form.course_id = value === 'none' ? null : parseInt(value)
 }
 
-// FIXED: Watch department selection to filter users
+// Watch department selection to filter users
 watch(() => form.department_id, async (newDepartmentId) => {
     if (!isMounted.value) return
 
@@ -171,7 +209,7 @@ watch(() => form.department_id, async (newDepartmentId) => {
     availableCourses.value = safeCourses.value
 })
 
-// FIXED: Watch user selection to filter courses
+// Watch user selection to filter courses
 watch(() => form.user_id, async (newUserId) => {
     if (!isMounted.value) return
 
@@ -228,45 +266,115 @@ const totalScore = computed(() => {
     }, 0)
 })
 
-// Calculate incentive amount based on total score and incentive ranges
+// NEW: Enhanced incentive calculation based on user's level and tier
 const totalIncentiveAmount = computed(() => {
-    if (totalScore.value === 0) return 0
+    if (totalScore.value === 0 || !selectedUser.value) return 0
 
-    const applicableIncentive = safeIncentives.value.find(incentive =>
-        totalScore.value >= incentive.min_score && totalScore.value <= incentive.max_score
+    const user = selectedUser.value
+
+    // Priority 1: Try to find Level + Tier specific incentive
+    if (user.user_level && user.user_level_tier) {
+        const levelTierIncentive = safeIncentives.value.find(incentive =>
+            incentive.user_level_id === user.user_level!.id &&
+            incentive.user_level_tier_id === user.user_level_tier!.id &&
+            totalScore.value >= incentive.min_score &&
+            totalScore.value <= incentive.max_score
+        )
+
+        if (levelTierIncentive) {
+            console.log('Found Level+Tier specific incentive:', levelTierIncentive.incentive_amount)
+            return parseFloat(levelTierIncentive.incentive_amount.toString())
+        }
+    }
+
+    // Priority 2: Try to find Level-only incentive
+    if (user.user_level) {
+        const levelIncentive = safeIncentives.value.find(incentive =>
+            incentive.user_level_id === user.user_level!.id &&
+            !incentive.user_level_tier_id &&
+            totalScore.value >= incentive.min_score &&
+            totalScore.value <= incentive.max_score
+        )
+
+        if (levelIncentive) {
+            console.log('Found Level-only incentive:', levelIncentive.incentive_amount)
+            return parseFloat(levelIncentive.incentive_amount.toString())
+        }
+    }
+
+    // Priority 3: Fallback to global incentives
+    const globalIncentive = safeIncentives.value.find(incentive =>
+        !incentive.user_level_id &&
+        !incentive.user_level_tier_id &&
+        totalScore.value >= incentive.min_score &&
+        totalScore.value <= incentive.max_score
     )
 
-    return applicableIncentive ? parseFloat(applicableIncentive.incentive_amount.toString()) : 0
+    return globalIncentive ? parseFloat(globalIncentive.incentive_amount.toString()) : 0
 })
 
-// Get incentive tier info for display
+// NEW: Get incentive tier info with level/tier context
 const getIncentiveTierInfo = computed(() => {
-    if (totalScore.value === 0) return null
+    if (totalScore.value === 0 || !selectedUser.value) return null
 
-    const incentive = safeIncentives.value.find(inc =>
-        totalScore.value >= inc.min_score && totalScore.value <= inc.max_score
-    )
+    const user = selectedUser.value
+    let applicableIncentive = null
 
-    if (!incentive) return null
+    // Find the applicable incentive (same logic as totalIncentiveAmount)
+    if (user.user_level && user.user_level_tier) {
+        applicableIncentive = safeIncentives.value.find(incentive =>
+            incentive.user_level_id === user.user_level!.id &&
+            incentive.user_level_tier_id === user.user_level_tier!.id &&
+            totalScore.value >= incentive.min_score &&
+            totalScore.value <= incentive.max_score
+        )
+    }
+
+    if (!applicableIncentive && user.user_level) {
+        applicableIncentive = safeIncentives.value.find(incentive =>
+            incentive.user_level_id === user.user_level!.id &&
+            !incentive.user_level_tier_id &&
+            totalScore.value >= incentive.min_score &&
+            totalScore.value <= incentive.max_score
+        )
+    }
+
+    if (!applicableIncentive) {
+        applicableIncentive = safeIncentives.value.find(incentive =>
+            !incentive.user_level_id &&
+            !incentive.user_level_tier_id &&
+            totalScore.value >= incentive.min_score &&
+            totalScore.value <= incentive.max_score
+        )
+    }
+
+    if (!applicableIncentive) return null
 
     return {
-        range: `${incentive.min_score}-${incentive.max_score}`,
-        amount: parseFloat(incentive.incentive_amount.toString()),
-        tier: getTierName(incentive.min_score, incentive.max_score)
+        range: `${applicableIncentive.min_score}-${applicableIncentive.max_score}`,
+        amount: parseFloat(applicableIncentive.incentive_amount.toString()),
+        tier: getTierName(applicableIncentive, user),
+        level_info: applicableIncentive.user_level ? applicableIncentive.user_level.name : 'Global',
+        tier_info: applicableIncentive.user_level_tier ? applicableIncentive.user_level_tier.tier_name : null
     }
 })
 
-// Get tier name based on position in sorted incentives array
-const getTierName = (minScore: number, maxScore: number) => {
-    const sortedIncentives = [...safeIncentives.value].sort((a, b) => b.min_score - a.min_score)
-    const currentIncentive = sortedIncentives.find(inc =>
-        inc.min_score === minScore && inc.max_score === maxScore
-    )
+// NEW: Enhanced tier name with level/tier context
+const getTierName = (incentive: any, user: any) => {
+    if (incentive.user_level && incentive.user_level_tier) {
+        return `${incentive.user_level.code} - ${incentive.user_level_tier.tier_name}`
+    }
+    if (incentive.user_level) {
+        return `${incentive.user_level.name} Level`
+    }
 
-    if (!currentIncentive) return 'Unknown Tier'
+    // Fallback to old naming system for global incentives
+    const sortedIncentives = [...safeIncentives.value]
+        .filter(inc => !inc.user_level_id && !inc.user_level_tier_id)
+        .sort((a, b) => b.min_score - a.min_score)
 
     const tierIndex = sortedIncentives.findIndex(inc =>
-        inc.min_score === minScore && inc.max_score === maxScore
+        inc.min_score === incentive.min_score && inc.max_score === incentive.max_score
     )
 
     const tierNames = [
@@ -279,11 +387,7 @@ const getTierName = (minScore: number, maxScore: number) => {
         'Very Poor Tier'
     ]
 
-    if (tierIndex < tierNames.length) {
-        return tierNames[tierIndex]
-    }
-
-    return `Tier ${tierIndex + 1}`
+    return tierIndex < tierNames.length ? tierNames[tierIndex] : `Tier ${tierIndex + 1}`
 }
 
 // Get performance level based on score
@@ -385,7 +489,7 @@ onUnmounted(() => {
                 <div class="flex items-center justify-between">
                     <div>
                         <h1 class="text-3xl font-bold text-foreground">User Performance Evaluation</h1>
-                        <p class="mt-2 text-sm text-muted-foreground">Assess employee performance for completed courses using predefined evaluation criteria.</p>
+                        <p class="mt-2 text-sm text-muted-foreground">Assess employee performance with Level + Tier based incentive calculations.</p>
                     </div>
                     <Button :as="Link" :href="route('admin.evaluations.index')" variant="outline">
                         <RotateCcw class="mr-2 h-4 w-4" />
@@ -512,11 +616,11 @@ onUnmounted(() => {
                             </div>
                         </div>
 
-                        <!-- Selected User and Course Info -->
+                        <!-- NEW: Enhanced Selected User Info with Level + Tier -->
                         <Alert v-if="selectedUser && selectedCourse" class="mt-6">
                             <CheckCircle class="h-4 w-4" />
                             <AlertDescription>
-                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 text-sm">
+                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 text-sm">
                                     <div>
                                         <span class="font-medium">Employee:</span>
                                         <p>{{ selectedUser.name }}</p>
@@ -533,9 +637,40 @@ onUnmounted(() => {
                                         <span class="font-medium">Department:</span>
                                         <p>{{ selectedUser.department.name }}</p>
                                     </div>
-                                    <div>
-                                        <span class="font-medium">Email:</span>
-                                        <p>{{ selectedUser.email }}</p>
+                                    <!-- NEW: Level Info -->
+                                    <div v-if="selectedUser.user_level">
+                                        <span class="font-medium">Level:</span>
+                                        <p>
+                                            <Badge variant="secondary" class="text-xs">
+                                                {{ selectedUser.user_level.code }} - {{ selectedUser.user_level.name }}
+                                            </Badge>
+                                        </p>
+                                    </div>
+                                    <!-- NEW: Tier Info -->
+                                    <div v-if="selectedUser.user_level_tier">
+                                        <span class="font-medium">Tier:</span>
+                                        <p>
+                                            <Badge variant="outline" class="text-xs">
+                                                {{ selectedUser.user_level_tier.tier_name }} (T{{ selectedUser.user_level_tier.tier_order }})
+                                            </Badge>
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- Warning if no level/tier assigned -->
+                                <div v-if="!selectedUser.user_level || !selectedUser.user_level_tier" class="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                                    <div class="flex items-center">
+                                        <Target class="h-4 w-4 text-yellow-600 mr-2" />
+                                        <div class="text-yellow-800 text-sm">
+                                            <p class="font-medium">Incomplete Assignment</p>
+                                            <p>
+                                                This employee is missing
+                                                {{ !selectedUser.user_level ? 'level assignment' : '' }}
+                                                {{ !selectedUser.user_level && !selectedUser.user_level_tier ? ' and ' : '' }}
+                                                {{ !selectedUser.user_level_tier ? 'tier assignment' : '' }}.
+                                                Incentive calculation may fall back to global rates.
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
                             </AlertDescription>
@@ -649,7 +784,7 @@ onUnmounted(() => {
                                     </div>
                                 </div>
 
-                                <!-- Comments Section - FIXED: Use proper Vue syntax for :for -->
+                                <!-- Comments Section -->
                                 <div class="mt-6 space-y-2">
                                     <Label :for="`comments_${evalCategory.category_id}`">Detailed Comments & Feedback</Label>
                                     <Textarea
@@ -668,7 +803,7 @@ onUnmounted(() => {
                     </div>
                 </div>
 
-                <!-- Overall Assessment Summary -->
+                <!-- Enhanced Overall Assessment Summary -->
                 <Card v-if="form.user_id && form.course_id && form.categories.some(cat => cat.evaluation_type_id !== null)">
                     <CardHeader>
                         <div class="flex items-center">
@@ -679,7 +814,7 @@ onUnmounted(() => {
                             </div>
                             <div>
                                 <CardTitle>Overall Assessment</CardTitle>
-                                <CardDescription>Summary of evaluation results and incentive information</CardDescription>
+                                <CardDescription>Summary with Level + Tier based incentive calculation</CardDescription>
                             </div>
                         </div>
                     </CardHeader>
@@ -736,15 +871,29 @@ onUnmounted(() => {
                             </Card>
                         </div>
 
-                        <!-- Incentive Tier Info -->
+                        <!-- NEW: Enhanced Incentive Tier Info with Level + Tier Context -->
                         <Alert v-if="getIncentiveTierInfo" class="mb-6 bg-gradient-to-r from-yellow-50 to-amber-50 border-yellow-200">
-                            <Award class="h-4 w-4" />
+                            <Layers class="h-4 w-4" />
                             <AlertDescription>
-                                <h4 class="font-semibold text-yellow-900">{{ getIncentiveTierInfo.tier }}</h4>
-                                <p class="text-sm text-yellow-700">
-                                    Score Range: {{ getIncentiveTierInfo.range }} |
-                                    Incentive: ${{ getIncentiveTierInfo.amount.toFixed(2) }}
-                                </p>
+                                <h4 class="font-semibold text-yellow-900 mb-2">{{ getIncentiveTierInfo.tier }}</h4>
+                                <div class="grid grid-cols-2 gap-4 text-sm text-yellow-700">
+                                    <div>
+                                        <span class="font-medium">Incentive Level:</span>
+                                        <p>{{ getIncentiveTierInfo.level_info }}</p>
+                                    </div>
+                                    <div v-if="getIncentiveTierInfo.tier_info">
+                                        <span class="font-medium">Performance Tier:</span>
+                                        <p>{{ getIncentiveTierInfo.tier_info }}</p>
+                                    </div>
+                                    <div>
+                                        <span class="font-medium">Score Range:</span>
+                                        <p>{{ getIncentiveTierInfo.range }} points</p>
+                                    </div>
+                                    <div>
+                                        <span class="font-medium">Reward Amount:</span>
+                                        <p class="font-bold">${{ getIncentiveTierInfo.amount.toFixed(2) }}</p>
+                                    </div>
+                                </div>
                             </AlertDescription>
                         </Alert>
 
@@ -788,7 +937,7 @@ onUnmounted(() => {
             </form>
         </div>
 
-        <!-- Confirmation Modal -->
+        <!-- Enhanced Confirmation Modal -->
         <Dialog v-model:open="showSubmitModal">
             <DialogContent class="sm:max-w-lg">
                 <DialogHeader>
@@ -832,6 +981,11 @@ onUnmounted(() => {
                                 <span class="text-muted-foreground">Incentive Amount:</span>
                                 <p class="font-medium">${{ totalIncentiveAmount.toFixed(2) }}</p>
                             </div>
+                            <!-- NEW: Level + Tier info in confirmation -->
+                            <div v-if="selectedUser?.user_level && selectedUser?.user_level_tier">
+                                <span class="text-muted-foreground">Level + Tier:</span>
+                                <p class="font-medium">{{ selectedUser.user_level.code }} - {{ selectedUser.user_level_tier.tier_name }}</p>
+                            </div>
                         </div>
                     </AlertDescription>
                 </Alert>
@@ -843,7 +997,7 @@ onUnmounted(() => {
                     <Button @click="confirmSubmit" :disabled="form.processing">
                         <Loader2 v-if="form.processing" class="mr-2 h-4 w-4 animate-spin" />
                         <span v-if="form.processing">Submitting...</span>
-                        <span v-else>Confirm & Submit</span>
+                        <span v-else">Confirm & Submit</span>
                     </Button>
                 </DialogFooter>
             </DialogContent>

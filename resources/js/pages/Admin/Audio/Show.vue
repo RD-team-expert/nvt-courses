@@ -95,7 +95,6 @@ const props = defineProps<{
 }>()
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Admin', href: '/admin' },
     { title: 'Audio Management', href: '/admin/audio' },
     { title: props.audio.name, href: '#' }
 ]
@@ -441,7 +440,7 @@ function deleteAudio() {
                                                     <CheckCircle class="h-3 w-3" />
                                                     Completed
                                                 </Badge>
-                                                <Badge v-else-if="activity.completion_percentage > 0" variant="secondary" class="gap-1 bg-background border-border">
+                                                <Badge v-else-if="activity.completion_percentage > 0" variant="secondary" class="gap-1 bg-blue-50 border-border">
                                                     <Play class="h-3 w-3" />
                                                     In Progress
                                                 </Badge>

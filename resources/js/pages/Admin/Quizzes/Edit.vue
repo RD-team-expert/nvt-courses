@@ -14,6 +14,53 @@
                 </Button>
             </div>
 
+            <!-- Enhanced Error Summary -->
+            <div v-if="hasErrors" class="mb-6 rounded-lg border border-red-200 bg-red-50 p-6 shadow-sm">
+                <div class="flex items-start">
+                    <div class="flex-shrink-0">
+                        <svg class="h-5 w-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                        </svg>
+                    </div>
+                    <div class="ml-3 flex-1">
+                        <h3 class="text-sm font-medium text-red-800">
+                            {{ errorSummary.title }}
+                        </h3>
+                        <div class="mt-2 text-sm text-red-700">
+                            <p class="mb-3">{{ errorSummary.message }}</p>
+                            <ul class="list-disc pl-5 space-y-1">
+                                <li v-for="(error, field) in allErrors" :key="field" class="break-words">
+                                    <span class="font-medium">{{ formatFieldName(field) }}:</span>
+                                    {{ Array.isArray(error) ? error[0] : error }}
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="ml-4 flex-shrink-0">
+                        <button
+                            @click="scrollToFirstError"
+                            class="inline-flex items-center rounded-md bg-red-100 px-3 py-1.5 text-xs font-medium text-red-800 hover:bg-red-200 transition-colors"
+                        >
+                            Go to first error
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Success Message -->
+            <div v-if="showSuccessMessage" class="mb-6 rounded-lg border border-green-200 bg-green-50 p-4 shadow-sm">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <svg class="h-5 w-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                    <p class="ml-3 text-sm text-green-700 font-medium">
+                        Quiz saved successfully!
+                    </p>
+                </div>
+            </div>
+
             <!-- Form -->
             <form @submit.prevent="submitQuiz" class="space-y-8">
                 <!-- Quiz Details -->
@@ -23,71 +70,119 @@
                     </CardHeader>
                     <CardContent class="space-y-6">
                         <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                        <div>
-                            <Label for="course_id">Course</Label>
-                            <Select v-model="form.course_id" :disabled="form.processing">
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select a Course" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem v-for="course in courses" :key="course.id" :value="course.id">
-                                        {{ course.name }}
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <span v-if="form.errors.course_id" class="mt-1 text-xs text-destructive">{{ form.errors.course_id }}</span>
+                            <div>
+                                <Label for="course_id" :class="getFieldError('course_id') ? 'text-red-700' : ''">
+                                    Course <span class="text-red-500">*</span>
+                                </Label>
+                                <Select
+                                    v-model="form.course_id"
+                                    :disabled="form.processing"
+                                    :class="getFieldError('course_id') ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''"
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select a Course" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem v-for="course in courses" :key="course.id" :value="course.id">
+                                            {{ course.name }}
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <div v-if="getFieldError('course_id')" class="mt-1 flex items-center text-sm text-red-600">
+                                    <svg class="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    {{ getFieldError('course_id') }}
+                                </div>
+                            </div>
+
+                            <div>
+                                <Label for="status" :class="getFieldError('status') ? 'text-red-700' : ''">
+                                    Status <span class="text-red-500">*</span>
+                                </Label>
+                                <Select
+                                    v-model="form.status"
+                                    :disabled="form.processing"
+                                    :class="getFieldError('status') ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''"
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select Status" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="draft">Draft</SelectItem>
+                                        <SelectItem value="published">Published</SelectItem>
+                                        <SelectItem value="archived">Archived</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <div v-if="getFieldError('status')" class="mt-1 flex items-center text-sm text-red-600">
+                                    <svg class="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    {{ getFieldError('status') }}
+                                </div>
+                            </div>
+
+                            <div class="sm:col-span-2">
+                                <Label for="title" :class="getFieldError('title') ? 'text-red-700' : ''">
+                                    Title <span class="text-red-500">*</span>
+                                </Label>
+                                <Input
+                                    id="title"
+                                    v-model="form.title"
+                                    type="text"
+                                    placeholder="Enter quiz title"
+                                    :disabled="form.processing"
+                                    :class="getFieldError('title') ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''"
+                                />
+                                <div v-if="getFieldError('title')" class="mt-1 flex items-center text-sm text-red-600">
+                                    <svg class="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    {{ getFieldError('title') }}
+                                </div>
+                            </div>
+
+                            <div class="sm:col-span-2">
+                                <Label for="description">Description</Label>
+                                <Textarea
+                                    id="description"
+                                    v-model="form.description"
+                                    rows="4"
+                                    placeholder="Enter quiz description (optional)"
+                                    :disabled="form.processing"
+                                    :class="getFieldError('description') ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''"
+                                />
+                                <div v-if="getFieldError('description')" class="mt-1 flex items-center text-sm text-red-600">
+                                    <svg class="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    {{ getFieldError('description') }}
+                                </div>
+                            </div>
+
+                            <div>
+                                <Label for="pass_threshold" :class="getFieldError('pass_threshold') ? 'text-red-700' : ''">
+                                    Pass Threshold (%) <span class="text-red-500">*</span>
+                                </Label>
+                                <Input
+                                    id="pass_threshold"
+                                    v-model.number="form.pass_threshold"
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    step="0.01"
+                                    placeholder="Enter pass threshold (e.g., 80.00)"
+                                    :disabled="form.processing"
+                                    :class="getFieldError('pass_threshold') ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''"
+                                />
+                                <div v-if="getFieldError('pass_threshold')" class="mt-1 flex items-center text-sm text-red-600">
+                                    <svg class="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    {{ getFieldError('pass_threshold') }}
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <Label for="status">Status</Label>
-                            <Select v-model="form.status" :disabled="form.processing">
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select Status" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="draft">Draft</SelectItem>
-                                    <SelectItem value="published">Published</SelectItem>
-                                    <SelectItem value="archived">Archived</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <span v-if="form.errors.status" class="mt-1 text-xs text-destructive">{{ form.errors.status }}</span>
-                        </div>
-                        <div class="sm:col-span-2">
-                            <Label for="title">Title</Label>
-                            <Input
-                                id="title"
-                                v-model="form.title"
-                                type="text"
-                                placeholder="Enter quiz title"
-                                :disabled="form.processing"
-                            />
-                            <span v-if="form.errors.title" class="mt-1 text-xs text-destructive">{{ form.errors.title }}</span>
-                        </div>
-                        <div class="sm:col-span-2">
-                            <Label for="description">Description</Label>
-                            <Textarea
-                                id="description"
-                                v-model="form.description"
-                                rows="4"
-                                placeholder="Enter quiz description (optional)"
-                                :disabled="form.processing"
-                            />
-                            <span v-if="form.errors.description" class="mt-1 text-xs text-destructive">{{ form.errors.description }}</span>
-                        </div>
-                        <div>
-                            <Label for="pass_threshold">Pass Threshold (%)</Label>
-                            <Input
-                                id="pass_threshold"
-                                v-model.number="form.pass_threshold"
-                                type="number"
-                                min="0"
-                                max="100"
-                                step="0.01"
-                                placeholder="Enter pass threshold (e.g., 80.00)"
-                                :disabled="form.processing"
-                            />
-                            <span v-if="form.errors.pass_threshold" class="mt-1 text-xs text-destructive">{{ form.errors.pass_threshold }}</span>
-                        </div>
-                    </div>
                     </CardContent>
                 </Card>
 
@@ -97,11 +192,19 @@
                         <CardTitle>Questions ({{ form.questions.length }}/20)</CardTitle>
                     </CardHeader>
                     <CardContent>
-                             <div v-for="(question, index) in form.questions" :key="`question-${index}`"
-                                  class="border border-gray-300 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-800"
-                             >
+                        <div v-for="(question, index) in form.questions" :key="`question-${index}`"
+                             class="border border-gray-300 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-800 mb-4"
+                             :class="hasQuestionErrors(index) ? 'border-red-300 bg-red-50' : ''">
                             <div class="mb-4 flex items-center justify-between">
-                                <h3 class="text-sm font-medium text-gray-100">Question {{ index + 1 }}</h3>
+                                <h3 class="text-sm font-medium" :class="hasQuestionErrors(index) ? 'text-red-900' : 'text-gray-900 dark:text-gray-100'">
+                                    Question {{ index + 1 }}
+                                    <span v-if="hasQuestionErrors(index)" class="inline-flex items-center ml-2 px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+                                        <svg class="mr-1 h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        Has errors
+                                    </span>
+                                </h3>
                                 <Button
                                     v-if="form.questions.length > 1"
                                     @click="removeQuestion(index)"
@@ -114,27 +217,38 @@
                                     Remove
                                 </Button>
                             </div>
+
                             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div class="sm:col-span-2">
-                                    <Label :for="`question_text_${index}`">Question Text</Label>
+                                    <Label :for="`question_text_${index}`" :class="getFieldError(`questions.${index}.question_text`) ? 'text-red-700' : ''">
+                                        Question Text <span class="text-red-500">*</span>
+                                    </Label>
                                     <Input
                                         :id="`question_text_${index}`"
                                         v-model="question.question_text"
                                         type="text"
                                         placeholder="Enter question text"
                                         :disabled="form.processing"
+                                        :class="getFieldError(`questions.${index}.question_text`) ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''"
                                     />
-                                    <span v-if="form.errors[`questions.${index}.question_text`]" class="mt-1 text-xs text-destructive">
-                                        {{ form.errors[`questions.${index}.question_text`] }}
-                                    </span>
+                                    <div v-if="getFieldError(`questions.${index}.question_text`)" class="mt-1 flex items-center text-sm text-red-600">
+                                        <svg class="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        {{ getFieldError(`questions.${index}.question_text`) }}
+                                    </div>
                                 </div>
+
                                 <div>
-                                    <Label :for="`type_${index}`">Type</Label>
+                                    <Label :for="`type_${index}`" :class="getFieldError(`questions.${index}.type`) ? 'text-red-700' : ''">
+                                        Type <span class="text-red-500">*</span>
+                                    </Label>
                                     <Select
                                         :id="`type_${index}`"
                                         v-model="question.type"
                                         :disabled="form.processing"
                                         @update:model-value="resetQuestionOptions(index)"
+                                        :class="getFieldError(`questions.${index}.type`) ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''"
                                     >
                                         <SelectTrigger>
                                             <SelectValue placeholder="Select question type" />
@@ -145,13 +259,18 @@
                                             <SelectItem value="text">Text (Open-ended)</SelectItem>
                                         </SelectContent>
                                     </Select>
-                                    <span v-if="form.errors[`questions.${index}.type`]" class="mt-1 text-xs text-destructive">
-                                        {{ form.errors[`questions.${index}.type`] }}
-                                    </span>
+                                    <div v-if="getFieldError(`questions.${index}.type`)" class="mt-1 flex items-center text-sm text-red-600">
+                                        <svg class="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        {{ getFieldError(`questions.${index}.type`) }}
+                                    </div>
                                 </div>
-                                <!-- Only show points field for non-text questions -->
+
                                 <div v-if="question.type !== 'text'">
-                                    <Label :for="`points_${index}`">Points</Label>
+                                    <Label :for="`points_${index}`" :class="getFieldError(`questions.${index}.points`) ? 'text-red-700' : ''">
+                                        Points <span class="text-red-500">*</span>
+                                    </Label>
                                     <Input
                                         :id="`points_${index}`"
                                         v-model.number="question.points"
@@ -159,133 +278,144 @@
                                         min="0"
                                         placeholder="Enter points"
                                         :disabled="form.processing"
+                                        :class="getFieldError(`questions.${index}.points`) ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''"
                                     />
-                                    <span v-if="form.errors[`questions.${index}.points`]" class="mt-1 text-xs text-destructive">
-                                        {{ form.errors[`questions.${index}.points`] }}
-                                    </span>
-                                </div>
-                            </div>
-
-                        <!-- Only show options and correct answers for non-text questions -->
-                        <div v-if="question.type !== 'text'" class="mt-4">
-                            <h4 class="mb-2 text-sm font-medium text-gray-100">Options</h4>
-                            <div v-for="(option, optIndex) in question.options" :key="optIndex" class="mb-2 flex items-center">
-                                <Input
-                                    v-model="question.options[optIndex]"
-                                    type="text"
-                                    class="flex-1"
-                                    :placeholder="`Option ${optIndex + 1}`"
-                                    :disabled="form.processing"
-                                />
-                                <Button
-                                    v-if="question.options.length > 2"
-                                    @click="removeOption(index, optIndex)"
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    class="ml-2 text-destructive"
-                                    :disabled="form.processing"
-                                >
-                                    Remove
-                                </Button>
-                            </div>
-                            <span v-if="form.errors[`questions.${index}.options`]" class="mt-1 text-xs text-destructive">
-                                {{ form.errors[`questions.${index}.options`] }}
-                            </span>
-                            <Button
-                                @click="addOption(index)"
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                class="mt-2"
-                                :disabled="form.processing || question.options.length >= 10"
-                            >
-                                Add Option
-                            </Button>
-
-                            <!-- Correct answers section -->
-                            <div class="mt-4">
-                                <label class="mb-1 block text-sm font-medium text-gray-100">Correct Answer(s)</label>
-                                <div v-if="question.type === 'radio'" class="space-y-2">
-                                    <div v-for="(option, optIndex) in question.options" :key="optIndex" class="flex items-center">
-                                        <input
-                                            :id="`correct_answer_${index}_${optIndex}`"
-                                            :checked="question.correct_answer.includes(option)"
-                                            :value="option"
-                                            type="radio"
-                                            :name="`correct_answer_${index}`"
-                                            class="h-4 w-4 border-gray-300 border text-indigo-600 focus:ring-indigo-500"
-                                            :disabled="form.processing"
-                                            @change="updateCorrectAnswer(index, option)"
-                                        />
-                                        <label :for="`correct_answer_${index}_${optIndex}`" class="ml-2 text-sm text-gray-300">
-                                            {{ option || 'Option ' + (optIndex + 1) }}
-                                        </label>
+                                    <div v-if="getFieldError(`questions.${index}.points`)" class="mt-1 flex items-center text-sm text-red-600">
+                                        <svg class="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        {{ getFieldError(`questions.${index}.points`) }}
                                     </div>
                                 </div>
-                                <div v-else-if="question.type === 'checkbox'" class="space-y-2">
-                                    <div
-                                        v-for="(option, optIndex) in question.options"
-                                        :key="`checkbox_${index}_${optIndex}_${option}`"
-                                        class="flex items-center"
+                            </div>
+
+                            <!-- Options and Correct Answers for non-text questions -->
+                            <div v-if="question.type !== 'text'" class="mt-4">
+                                <h4 class="mb-2 text-sm font-medium text-gray-900 dark:text-gray-100">Options</h4>
+                                <div v-for="(option, optIndex) in question.options" :key="`option-${index}-${optIndex}`" class="mb-2 flex items-center">
+                                    <Input
+                                        v-model="question.options[optIndex]"
+                                        type="text"
+                                        class="flex-1"
+                                        :placeholder="`Option ${optIndex + 1}`"
+                                        :disabled="form.processing"
+                                    />
+                                    <Button
+                                        v-if="question.options.length > 2"
+                                        @click="removeOption(index, optIndex)"
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        class="ml-2 text-destructive"
+                                        :disabled="form.processing"
                                     >
-                                        <input
-                                            :id="`correct_answer_${index}_${optIndex}`"
-                                            :value="option"
-                                            type="checkbox"
-                                            v-model="question.correct_answer"
-                                            class="h-4 w-4 border-gray-300 border text-indigo-600 focus:ring-indigo-500"
-                                            :disabled="form.processing"
-                                        />
-                                        <label :for="`correct_answer_${index}_${optIndex}`" class="ml-2 text-sm text-gray-300">
-                                            {{ option || 'Option ' + (optIndex + 1) }}
-                                        </label>
+                                        Remove
+                                    </Button>
+                                </div>
+                                <div v-if="getFieldError(`questions.${index}.options`)" class="mt-1 flex items-center text-sm text-red-600">
+                                    <svg class="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    {{ getFieldError(`questions.${index}.options`) }}
+                                </div>
+                                <Button
+                                    @click="addOption(index)"
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    class="mt-2"
+                                    :disabled="form.processing || question.options.length >= 10"
+                                >
+                                    Add Option
+                                </Button>
+
+                                <!-- Correct answers section -->
+                                <div class="mt-4">
+                                    <label class="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                                        Correct Answer(s) <span class="text-red-500">*</span>
+                                    </label>
+                                    <div v-if="question.type === 'radio'" class="space-y-2">
+                                        <div v-for="(option, optIndex) in question.options" :key="`radio-${index}-${optIndex}`" class="flex items-center">
+                                            <input
+                                                :id="`correct_answer_${index}_${optIndex}`"
+                                                :checked="question.correct_answer.includes(option)"
+                                                :value="option"
+                                                type="radio"
+                                                :name="`correct_answer_${index}`"
+                                                class="h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                                :disabled="form.processing"
+                                                @change="updateCorrectAnswer(index, option)"
+                                            />
+                                            <label :for="`correct_answer_${index}_${optIndex}`" class="ml-2 text-sm text-gray-900 dark:text-gray-300">
+                                                {{ option || `Option ${optIndex + 1}` }}
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div v-else-if="question.type === 'checkbox'" class="space-y-2">
+                                        <div v-for="(option, optIndex) in question.options" :key="`checkbox-${index}-${optIndex}`" class="flex items-center">
+                                            <input
+                                                :id="`correct_answer_${index}_${optIndex}`"
+                                                :value="option"
+                                                type="checkbox"
+                                                v-model="question.correct_answer"
+                                                class="h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                                :disabled="form.processing"
+                                            />
+                                            <label :for="`correct_answer_${index}_${optIndex}`" class="ml-2 text-sm text-gray-900 dark:text-gray-300">
+                                                {{ option || `Option ${optIndex + 1}` }}
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div v-if="getFieldError(`questions.${index}.correct_answer`)" class="mt-1 flex items-center text-sm text-red-600">
+                                        <svg class="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        {{ getFieldError(`questions.${index}.correct_answer`) }}
                                     </div>
                                 </div>
-                                <span v-if="form.errors[`questions.${index}.correct_answer`]" class="mt-1 text-xs text-destructive">
-                                    {{ form.errors[`questions.${index}.correct_answer`] }}
-                                </span>
+
+                                <!-- Correct Answer Explanation -->
+                                <div class="mt-4">
+                                    <Label :for="`correct_answer_explanation_${index}`">Correct Answer Explanation</Label>
+                                    <Textarea
+                                        :id="`correct_answer_explanation_${index}`"
+                                        v-model="question.correct_answer_explanation"
+                                        rows="2"
+                                        placeholder="Explain why this is correct (optional)"
+                                        :disabled="form.processing"
+                                    />
+                                    <div v-if="getFieldError(`questions.${index}.correct_answer_explanation`)" class="mt-1 flex items-center text-sm text-red-600">
+                                        <svg class="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        {{ getFieldError(`questions.${index}.correct_answer_explanation`) }}
+                                    </div>
+                                </div>
                             </div>
-                            <!-- Correct Answer Explanation -->
-                            <div class="mt-4">
-                                <Label :for="`correct_answer_explanation_${index}`">Correct Answer Explanation</Label>
-                                <Textarea
-                                    :id="`correct_answer_explanation_${index}`"
-                                    v-model="question.correct_answer_explanation"
-                                    rows="2"
-                                    placeholder="Explain why this is correct (optional)"
-                                    :disabled="form.processing"
-                                />
-                                <span v-if="form.errors[`questions.${index}.correct_answer_explanation`]" class="mt-1 text-xs text-destructive">
-                                    {{ form.errors[`questions.${index}.correct_answer_explanation`] }}
-                                </span>
+
+                            <!-- Note for text questions -->
+                            <div v-if="question.type === 'text'" class="mt-4 rounded-lg bg-blue-50 p-3">
+                                <p class="text-sm text-blue-700">
+                                    📝 This is an open-ended text question. Students will provide their own written response.
+                                </p>
                             </div>
                         </div>
 
-                        <!-- Show a note for text questions -->
-                        <div v-if="question.type === 'text'" class="mt-4 rounded-lg bg-blue-50 p-3">
-                            <p class="text-sm text-blue-700">
-                                📝 This is an open-ended text question. Students will provide their own written response.
-                            </p>
-                        </div>
-                    </div>
-
-
-                <Button
-                        @click="addQuestion"
-                        type="button"
-                        :disabled="form.processing || form.questions.length >= 20"
+                        <Button
+                            @click="addQuestion"
+                            type="button"
+                            :disabled="form.processing || form.questions.length >= 20"
                         >
-                        <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                        </svg>
-                        Add Question
-                    </Button>
-                </CardContent>
-            </Card>
+                            <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                            </svg>
+                            Add Question
+                        </Button>
+                    </CardContent>
+                </Card>
 
-            <!-- Form Actions -->
-            <div class="flex justify-end space-x-3">
+                <!-- Form Actions -->
+                <div class="flex justify-end space-x-3">
                     <Button
                         as-child
                         variant="outline"
@@ -300,7 +430,7 @@
                     </Button>
                     <Button
                         type="submit"
-                        :disabled="form.processing"
+                        :disabled="form.processing || hasErrors"
                     >
                         <span v-if="form.processing" class="flex items-center">
                             <svg class="mr-2 h-5 w-5 animate-spin text-white" fill="none" viewBox="0 0 24 24">
@@ -337,15 +467,46 @@
                     </div>
                 </div>
             </Modal>
+
+            <!-- Toast Container -->
+            <div v-if="toasts.length > 0" class="fixed top-4 right-4 z-50 space-y-2">
+                <div v-for="toast in toasts" :key="toast.id"
+                     class="transform transition-all duration-300 ease-in-out"
+                     :class="toast.show ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'">
+                    <div class="flex items-center w-full max-w-xs p-4 text-gray-500 bg-white rounded-lg shadow-lg border"
+                         :class="toastClasses[toast.type]">
+                        <div class="inline-flex items-center justify-center flex-shrink-0 w-8 h-8 rounded-lg"
+                             :class="toastIconClasses[toast.type]">
+                            <svg v-if="toast.type === 'success'" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                            </svg>
+                            <svg v-else-if="toast.type === 'error'" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                            </svg>
+                            <svg v-else class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+                            </svg>
+                        </div>
+                        <div class="ml-3 text-sm font-normal">{{ toast.message }}</div>
+                        <button @click="removeToast(toast.id)" type="button"
+                                class="ml-auto -mx-1.5 -my-1.5 bg-white text-gray-400 hover:text-gray-900 rounded-lg focus:ring-2 focus:ring-gray-300 p-1.5 hover:bg-gray-100 inline-flex h-8 w-8"
+                                aria-label="Close">
+                            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     </AdminLayout>
 </template>
 
 <script>
-import { Link, useForm } from '@inertiajs/vue3';
+import { Link, useForm, usePage } from '@inertiajs/vue3';
 import { router } from '@inertiajs/vue3';
 import Modal from '@/Components/Modal.vue';
-import { ref, watch } from 'vue';
+import { ref, computed, watch, nextTick } from 'vue';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -384,18 +545,31 @@ export default {
         },
     },
     setup(props) {
-        // Debug logging
-        console.log('=== SETUP START ===');
-        console.log('Quiz prop received:', props.quiz);
-        console.log('Quiz questions:', props.quiz?.questions);
-        console.log('Courses prop:', props.courses);
+        const page = usePage();
+        const showDiscardModal = ref(false);
+        const showSuccessMessage = ref(false);
+        const toasts = ref([]);
+        const toastIdCounter = ref(0);
+
+        // Toast styling
+        const toastClasses = {
+            success: 'border-green-200 bg-green-50',
+            error: 'border-red-200 bg-red-50',
+            info: 'border-blue-200 bg-blue-50'
+        };
+
+        const toastIconClasses = {
+            success: 'text-green-500 bg-green-100',
+            error: 'text-red-500 bg-red-100',
+            info: 'text-blue-500 bg-blue-100'
+        };
+
+        // Create a reactive reference for server errors
+        const serverErrors = ref({});
 
         // Helper function to safely process questions
         const processQuestions = (questions) => {
-            console.log('Processing questions:', questions);
-
             if (!questions || !Array.isArray(questions)) {
-                console.log('No questions found, returning default');
                 return [
                     {
                         question_text: '',
@@ -408,11 +582,8 @@ export default {
                 ];
             }
 
-            const processed = questions.map((question, index) => {
-                console.log(`Processing question ${index}:`, question);
-
+            return questions.map((question) => {
                 if (!question) {
-                    console.log(`Question ${index} is null/undefined`);
                     return {
                         question_text: '',
                         type: 'radio',
@@ -423,9 +594,7 @@ export default {
                     };
                 }
 
-                // Handle text questions differently
                 if (question.type === 'text') {
-                    console.log(`Question ${index} is text type`);
                     return {
                         question_text: question.question_text || '',
                         type: 'text',
@@ -436,25 +605,22 @@ export default {
                     };
                 }
 
-                // Handle radio/checkbox questions
                 let options = ['', ''];
                 if (question.options && Array.isArray(question.options)) {
-                    console.log(`Question ${index} options:`, question.options);
-                    options = question.options.map((option) => (typeof option === 'string' ? option : option?.option_text || ''));
+                    options = question.options.map((option) =>
+                        typeof option === 'string' ? option : option?.option_text || ''
+                    );
                     if (options.length < 2) options = [...options, '', ''].slice(0, 2);
-                } else {
-                    console.log(`Question ${index} has no valid options`);
                 }
 
                 let correctAnswer = [];
                 if (question.correct_answer && Array.isArray(question.correct_answer)) {
-                    console.log(`Question ${index} correct_answer:`, question.correct_answer);
-                    correctAnswer = question.correct_answer.map((answer) => (typeof answer === 'string' ? answer : answer?.option_text || ''));
-                } else {
-                    console.log(`Question ${index} has no valid correct_answer`);
+                    correctAnswer = question.correct_answer.map((answer) =>
+                        typeof answer === 'string' ? answer : answer?.option_text || ''
+                    );
                 }
 
-                const processedQuestion = {
+                return {
                     question_text: question.question_text || '',
                     type: question.type || 'radio',
                     points: question.points || 0,
@@ -462,44 +628,116 @@ export default {
                     correct_answer: correctAnswer,
                     correct_answer_explanation: question.correct_answer_explanation || '',
                 };
-
-                console.log(`Processed question ${index}:`, processedQuestion);
-                return processedQuestion;
             });
-
-            console.log('All processed questions:', processed);
-            return processed;
         };
 
-        // DECLARE form variable here - BEFORE any usage
-        let form;
+        // Initialize form
+        const form = useForm({
+            course_id: props.quiz?.course_id || '',
+            title: props.quiz?.title || '',
+            description: props.quiz?.description || '',
+            status: props.quiz?.status || 'draft',
+            pass_threshold: props.quiz?.pass_threshold || 80.00,
+            questions: processQuestions(props.quiz?.questions),
+        });
 
-        try {
-            console.log('Creating form...');
-            // Initialize form with existing quiz data
-            form = useForm({
-                course_id: props.quiz?.course_id || '',
-                title: props.quiz?.title || '',
-                description: props.quiz?.description || '',
-                status: props.quiz?.status || 'draft',
-                pass_threshold: props.quiz?.pass_threshold || 80.00, // New field for dynamic pass threshold
-                questions: processQuestions(props.quiz?.questions),
-                processing: false,
+        // Watch for server errors from Inertia page props
+        watch(
+            () => page.props.errors,
+            (newErrors) => {
+                serverErrors.value = newErrors || {};
+            },
+            { immediate: true, deep: true }
+        );
+
+        // Combined errors from both form and server
+        const allErrors = computed(() => {
+            return { ...form.errors, ...serverErrors.value };
+        });
+
+        // Computed properties
+        const hasErrors = computed(() => {
+            return Object.keys(allErrors.value).length > 0;
+        });
+
+        const errorSummary = computed(() => {
+            const errorCount = Object.keys(allErrors.value).length;
+            if (errorCount === 0) return { title: '', message: '' };
+
+            return {
+                title: errorCount === 1 ? 'Please fix the following issue:' : `Please fix the following ${errorCount} issues:`,
+                message: 'Review the highlighted fields below and correct any errors before saving.'
+            };
+        });
+
+        // Toast management
+        const addToast = (message, type = 'info', duration = 5000) => {
+            const id = ++toastIdCounter.value;
+            const toast = { id, message, type, show: false };
+            toasts.value.push(toast);
+
+            // Trigger animation
+            nextTick(() => {
+                const toastIndex = toasts.value.findIndex(t => t.id === id);
+                if (toastIndex !== -1) {
+                    toasts.value[toastIndex].show = true;
+                }
             });
 
-            console.log('Form created successfully:', form);
-        } catch (error) {
-            console.error('Error creating form:', error);
-            throw error;
-        }
+            // Auto remove after duration
+            if (duration > 0) {
+                setTimeout(() => removeToast(id), duration);
+            }
 
-        // State for discard modal
-        const showDiscardModal = ref(false);
+            return id;
+        };
 
-        // Add error handling to all functions
+        const removeToast = (id) => {
+            const toastIndex = toasts.value.findIndex(toast => toast.id === id);
+            if (toastIndex !== -1) {
+                toasts.value[toastIndex].show = false;
+                setTimeout(() => {
+                    const index = toasts.value.findIndex(toast => toast.id === id);
+                    if (index !== -1) {
+                        toasts.value.splice(index, 1);
+                    }
+                }, 300); // Wait for animation
+            }
+        };
+
+        // Helper functions
+        const formatFieldName = (field) => {
+            return field
+                .replace(/_/g, ' ')
+                .replace(/\b\w/g, l => l.toUpperCase())
+                .replace(/questions\.(\d+)\./, 'Question $1 ');
+        };
+
+        const getFieldError = (fieldName) => {
+            const error = allErrors.value[fieldName];
+            if (Array.isArray(error)) {
+                return error[0];
+            }
+            return error || null;
+        };
+
+        const hasQuestionErrors = (index) => {
+            const questionFields = [`questions.${index}.question_text`, `questions.${index}.type`, `questions.${index}.points`, `questions.${index}.options`, `questions.${index}.correct_answer`];
+            return questionFields.some(field => getFieldError(field));
+        };
+
+        const scrollToFirstError = () => {
+            nextTick(() => {
+                const firstError = document.querySelector('.text-red-600, .border-red-300');
+                if (firstError) {
+                    firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            });
+        };
+
+        // Question management functions
         const addQuestion = () => {
             try {
-                console.log('Adding new question...');
                 if (form.questions.length < 20) {
                     form.questions.push({
                         question_text: '',
@@ -507,122 +745,102 @@ export default {
                         points: 0,
                         options: ['', ''],
                         correct_answer: [],
-                        correct_answer_explanation: '', // Initialize with empty explanation
+                        correct_answer_explanation: '',
                     });
-                    console.log('Question added. Total questions:', form.questions.length);
                 }
             } catch (error) {
                 console.error('Error adding question:', error);
+                addToast('Failed to add question. Please try again.', 'error');
             }
         };
 
         const removeQuestion = (index) => {
             try {
-                console.log('Removing question at index:', index);
                 if (form.questions.length > 1) {
                     form.questions.splice(index, 1);
-                    console.log('Question removed. Remaining questions:', form.questions.length);
                 }
             } catch (error) {
                 console.error('Error removing question:', error);
+                addToast('Failed to remove question. Please try again.', 'error');
             }
         };
 
         const addOption = (questionIndex) => {
             try {
-                console.log('Adding option to question:', questionIndex);
                 if (form.questions[questionIndex].options.length < 10) {
                     form.questions[questionIndex].options.push('');
-                    console.log('Option added. Total options:', form.questions[questionIndex].options.length);
                 }
             } catch (error) {
                 console.error('Error adding option:', error);
+                addToast('Failed to add option. Please try again.', 'error');
             }
         };
 
         const removeOption = (questionIndex, optionIndex) => {
             try {
-                console.log('Removing option:', { questionIndex, optionIndex });
-                if (form.questions[questionIndex].options.length > 2) {
-                    const question = form.questions[questionIndex];
+                const question = form.questions[questionIndex];
+                if (question.options.length > 2) {
                     const removedOption = question.options[optionIndex];
                     question.options.splice(optionIndex, 1);
 
+                    // Remove from correct answers if present
                     if (Array.isArray(question.correct_answer)) {
-                        question.correct_answer = question.correct_answer.filter((opt) => opt !== removedOption);
+                        question.correct_answer = question.correct_answer.filter(opt => opt !== removedOption);
                     }
-                    console.log('Option removed successfully');
                 }
             } catch (error) {
                 console.error('Error removing option:', error);
+                addToast('Failed to remove option. Please try again.', 'error');
             }
         };
 
         const resetQuestionOptions = (index) => {
             try {
-                console.log('Resetting question options for index:', index);
                 const question = form.questions[index];
-                console.log('Question before reset:', question);
 
                 if (question.type === 'text') {
                     question.options = [];
                     question.correct_answer = [];
                     question.points = 0;
-                    question.correct_answer_explanation = ''; // Reset explanation for text
                 } else {
                     if (!question.options || question.options.length < 2) {
                         question.options = ['', ''];
                     }
                     question.correct_answer = [];
-                    question.correct_answer_explanation = ''; // Reset for non-text
                 }
-
-                console.log('Question after reset:', question);
+                question.correct_answer_explanation = '';
             } catch (error) {
                 console.error('Error resetting question options:', error);
+                addToast('Failed to reset question options. Please try again.', 'error');
             }
         };
 
         const updateCorrectAnswer = (index, option) => {
             try {
-                console.log('Updating correct answer:', { index, option });
                 const question = form.questions[index];
 
                 if (question.type === 'radio') {
                     question.correct_answer = [option];
-                } else if (question.type === 'checkbox') {
-                    // Ensure correct_answer is always an array for checkboxes
-                    if (!Array.isArray(question.correct_answer)) {
-                        question.correct_answer = [];
-                    }
-
-                    const indexInArray = question.correct_answer.findIndex((answer) => answer === option);
-                    if (indexInArray > -1) {
-                        // Remove the option if it's already selected
-                        question.correct_answer.splice(indexInArray, 1);
-                    } else {
-                        // Add the option if it's not selected
-                        question.correct_answer.push(option);
-                    }
                 }
-
-                console.log('Updated correct answer:', question.correct_answer);
             } catch (error) {
                 console.error('Error updating correct answer:', error);
+                addToast('Failed to update correct answer. Please try again.', 'error');
             }
         };
 
+        // Form submission with enhanced error handling
         const submitQuiz = () => {
             try {
-                console.log('=== SUBMITTING QUIZ ===');
-                console.log('Form data before submission:', form);
+                // Clear previous server errors and success messages
+                serverErrors.value = {};
+                showSuccessMessage.value = false;
 
                 const formData = {
                     course_id: form.course_id,
                     title: form.title,
                     description: form.description,
                     status: form.status,
-                    pass_threshold: form.pass_threshold, // Include new field
+                    pass_threshold: form.pass_threshold,
                     questions: form.questions.map((question) => ({
                         question_text: question.question_text,
                         type: question.type,
@@ -630,94 +848,104 @@ export default {
                         options: question.options,
                         correct_answer: Array.isArray(question.correct_answer)
                             ? question.correct_answer
-                            : question.correct_answer
-                                ? [question.correct_answer]
-                                : [],
-                        correct_answer_explanation: question.correct_answer_explanation || '', // Include new field
+                            : question.correct_answer ? [question.correct_answer] : [],
+                        correct_answer_explanation: question.correct_answer_explanation || '',
                     })),
                 };
 
-                console.log('Formatted data for submission:', formData);
-
-                router.put(route('admin.quizzes.update', props.quiz.id), formData, {
+                form.put(route('admin.quizzes.update', props.quiz.id), {
+                    preserveState: true,
+                    preserveScroll: true,
                     onStart: () => {
-                        console.log('Submission started');
-                    },
-                    onProgress: (progress) => {
-                        console.log('Submission progress:', progress);
+                        // Clear any existing toasts
+                        toasts.value.forEach(toast => removeToast(toast.id));
                     },
                     onSuccess: (page) => {
-                        console.log('Submission successful:', page);
-                        router.visit(route('admin.quizzes.index'), { replace: true });
+                        showSuccessMessage.value = true;
+                        addToast('Quiz updated successfully!', 'success', 4000);
+
+                        // Navigate after a short delay to show success message
+                        setTimeout(() => {
+                            router.visit(route('admin.quizzes.index'), { replace: true });
+                        }, 1500);
                     },
                     onError: (errors) => {
-                        console.error('Submission errors:', errors);
+                        serverErrors.value = errors;
+
+                        const errorCount = Object.keys(errors).length;
+                        const errorMessage = errorCount === 1
+                            ? 'Please correct the error below.'
+                            : `Please correct the ${errorCount} errors below.`;
+
+                        addToast(errorMessage, 'error', 8000);
+
+                        // Auto scroll to first error after a short delay
+                        setTimeout(() => {
+                            scrollToFirstError();
+                        }, 100);
                     },
                     onFinish: () => {
-                        console.log('Submission finished');
+                        // Optional: Add any cleanup logic here
                     },
                 });
             } catch (error) {
-                console.error('Error in submitQuiz:', error);
+                console.error('Critical error in submitQuiz:', error);
+                addToast('An unexpected error occurred. Please try again.', 'error');
             }
         };
 
+        // Discard functionality
         const confirmDiscard = () => {
-            try {
-                console.log('Confirming discard, form is dirty:', form.isDirty);
-                if (form.isDirty) {
-                    showDiscardModal.value = true;
-                } else {
-                    discardChanges();
-                }
-            } catch (error) {
-                console.error('Error in confirmDiscard:', error);
+            if (form.isDirty) {
+                showDiscardModal.value = true;
+            } else {
+                discardChanges();
             }
         };
 
         const discardChanges = () => {
-            try {
-                console.log('Discarding changes');
-                form.reset();
-                showDiscardModal.value = false;
-                router.visit(route('admin.quizzes.index'));
-            } catch (error) {
-                console.error('Error discarding changes:', error);
-            }
+            form.reset();
+            serverErrors.value = {};
+            showDiscardModal.value = false;
+            showSuccessMessage.value = false;
+            router.visit(route('admin.quizzes.index'));
         };
 
-        // Watch for changes with error handling
+        // Watch for prop changes
         watch(
             () => props.quiz,
             (newQuiz) => {
-                try {
-                    console.log('Quiz prop changed:', newQuiz);
-                    if (newQuiz) {
-                        form.course_id = newQuiz.course_id || '';
-                        form.title = newQuiz.title || '';
-                        form.description = newQuiz.description || '';
-                        form.status = newQuiz.status || 'draft';
-                        form.pass_threshold = newQuiz.pass_threshold || 80.00; // Update pass threshold
-                        form.questions = processQuestions(newQuiz.questions);
-                        console.log('Form updated from prop change');
-                    }
-                } catch (error) {
-                    console.error('Error in quiz watch:', error);
+                if (newQuiz) {
+                    form.course_id = newQuiz.course_id || '';
+                    form.title = newQuiz.title || '';
+                    form.description = newQuiz.description || '';
+                    form.status = newQuiz.status || 'draft';
+                    form.pass_threshold = newQuiz.pass_threshold || 80.00;
+                    form.questions = processQuestions(newQuiz.questions);
                 }
             },
-            { deep: true },
+            { deep: true }
         );
 
-        // Breadcrumbs
         const breadcrumbs = [
             { name: 'Quizzes', route: 'admin.quizzes.index' },
             { name: 'Edit', route: null },
         ];
 
-        console.log('=== SETUP COMPLETE ===');
-
         return {
             form,
+            hasErrors,
+            allErrors,
+            errorSummary,
+            showDiscardModal,
+            showSuccessMessage,
+            toasts,
+            toastClasses,
+            toastIconClasses,
+            formatFieldName,
+            getFieldError,
+            hasQuestionErrors,
+            scrollToFirstError,
             addQuestion,
             removeQuestion,
             addOption,
@@ -725,9 +953,10 @@ export default {
             resetQuestionOptions,
             updateCorrectAnswer,
             submitQuiz,
-            showDiscardModal,
             confirmDiscard,
             discardChanges,
+            addToast,
+            removeToast,
             breadcrumbs,
         };
     },
@@ -769,6 +998,36 @@ a {
     @apply transition-colors duration-200;
 }
 
+/* Error styling with enhanced visual feedback */
+.text-red-600 {
+    @apply text-red-600 font-medium;
+}
+
+.border-red-300 {
+    @apply border-red-300 shadow-sm;
+}
+
+.border-red-300:focus {
+    @apply border-red-500 ring-2 ring-red-200;
+}
+
+/* Success styling */
+.text-green-600 {
+    @apply text-green-600 font-medium;
+}
+
+/* Enhanced focus states for accessibility */
+input:focus,
+select:focus,
+textarea:focus {
+    @apply ring-2 ring-offset-2;
+}
+
+/* Toast animations */
+.transform {
+    transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
+}
+
 /* Responsive Adjustments */
 @media (max-width: 640px) {
     .grid-cols-1 {
@@ -790,10 +1049,43 @@ a {
     .text-sm {
         @apply text-xs;
     }
+
+    /* Adjust toast positioning on mobile */
+    .fixed.top-4.right-4 {
+        @apply top-2 right-2 left-2;
+    }
+
+    .max-w-xs {
+        @apply max-w-none;
+    }
 }
 
-/* Modal Styling */
-.modal-content {
-    @apply transform transition-all duration-200;
+/* Loading states */
+.animate-spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Enhanced hover states */
+button:hover:not(:disabled) {
+    @apply transform scale-105;
+}
+
+/* Error field highlighting */
+.border-red-300 {
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+/* Success field highlighting */
+.border-green-300 {
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
 }
 </style>

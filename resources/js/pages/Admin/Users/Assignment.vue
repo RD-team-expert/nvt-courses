@@ -36,13 +36,14 @@ import {
     ChevronLeft,
     ChevronRight,
     UserPlus,
-    Tag
+    Tag,
+    Layers
 } from 'lucide-vue-next'
 
 const props = defineProps({
     users: Array,
     departments: Array,
-    userLevels: Array,
+    userLevels: Array, // Enhanced with tiers
     stats: Object,
 })
 
@@ -50,11 +51,42 @@ const props = defineProps({
 const selectedUsers = ref([])
 const selectedDepartment = ref('')
 const selectedLevel = ref('')
+const selectedTier = ref('') // NEW: Selected tier for assignment
 const searchQuery = ref('')
 const filterDepartment = ref('')
 const filterLevel = ref('')
+const filterTier = ref('') // NEW: Filter by tier
 const currentPage = ref(1)
 const usersPerPage = 20
+
+// NEW: Available tiers for selected level
+const availableTiers = computed(() => {
+    if (!selectedLevel.value || !props.userLevels) return []
+    const level = props.userLevels.find(l => l.id.toString() === selectedLevel.value)
+    return level?.tiers || []
+})
+
+// NEW: Available tiers for filter (all tiers from all levels)
+const allAvailableTiers = computed(() => {
+    if (!props.userLevels) return []
+    const tiers = []
+    props.userLevels.forEach(level => {
+        if (level.tiers) {
+            level.tiers.forEach(tier => {
+                tiers.push({
+                    ...tier,
+                    display_name: `${level.code} - ${tier.tier_name}`
+                })
+            })
+        }
+    })
+    return tiers
+})
+
+// Watch for level changes to reset tier selection
+watch(selectedLevel, () => {
+    selectedTier.value = ''
+})
 
 // Watch selectedUsers to ensure it's always an array
 watch(selectedUsers, (newValue) => {
@@ -63,7 +95,7 @@ watch(selectedUsers, (newValue) => {
     }
 }, { deep: true, immediate: true })
 
-// ✅ Filtered users
+// ✅ Enhanced filtered users with tier support
 const filteredUsers = computed(() => {
     let filtered = props.users || []
 
@@ -82,6 +114,11 @@ const filteredUsers = computed(() => {
 
     if (filterLevel.value) {
         filtered = filtered.filter(user => user.level_code === filterLevel.value)
+    }
+
+    // NEW: Filter by tier
+    if (filterTier.value) {
+        filtered = filtered.filter(user => user.tier === filterTier.value)
     }
 
     return filtered
@@ -168,7 +205,7 @@ const toggleSelectAll = () => {
     }
 }
 
-// ✅ Bulk assignment
+// ✅ Enhanced bulk assignment with tier support
 const bulkAssignUsers = () => {
     if (!Array.isArray(selectedUsers.value) || selectedUsers.value.length === 0) {
         alert('Please select at least one user')
@@ -192,12 +229,18 @@ const bulkAssignUsers = () => {
         data.user_level_id = selectedLevel.value
     }
 
+    // NEW: Include tier if selected
+    if (selectedTier.value) {
+        data.user_level_tier_id = selectedTier.value
+    }
+
     router.post(route('admin.users.bulk-assign'), data, {
         preserveState: true,
         onSuccess: () => {
             selectedUsers.value = []
             selectedDepartment.value = ''
             selectedLevel.value = ''
+            selectedTier.value = '' // NEW: Reset tier
         },
         onError: (errors) => {
             console.error('Assignment failed:', errors)
@@ -211,6 +254,7 @@ const clearFilters = () => {
     searchQuery.value = ''
     filterDepartment.value = ''
     filterLevel.value = ''
+    filterTier.value = '' // NEW: Clear tier filter
     currentPage.value = 1
 }
 
@@ -223,6 +267,11 @@ const handleLevelChange = (value) => {
     selectedLevel.value = value === 'select' ? '' : value
 }
 
+// NEW: Handle tier change
+const handleTierChange = (value) => {
+    selectedTier.value = value === 'select' ? '' : value
+}
+
 const handleFilterDepartmentChange = (value) => {
     filterDepartment.value = value === 'all' ? '' : value
 }
@@ -231,11 +280,26 @@ const handleFilterLevelChange = (value) => {
     filterLevel.value = value === 'all' ? '' : value
 }
 
+// NEW: Handle tier filter change
+const handleFilterTierChange = (value) => {
+    filterTier.value = value === 'all' ? '' : value
+}
+
 // Get user status variant
 const getUserStatusVariant = (status) => {
     switch (status) {
         case 'active': return 'default'
         case 'inactive': return 'destructive'
+        default: return 'secondary'
+    }
+}
+
+// NEW: Get tier badge variant
+const getTierBadgeVariant = (tierOrder) => {
+    switch (tierOrder) {
+        case 1: return 'secondary'
+        case 2: return 'default'
+        case 3: return 'outline'
         default: return 'secondary'
     }
 }
@@ -254,11 +318,11 @@ const breadcrumbs: BreadcrumbItemType[] = [
             <!-- Header -->
             <div>
                 <h1 class="text-xl sm:text-2xl font-bold text-foreground">User Assignment</h1>
-                <p class="text-sm text-muted-foreground mt-1">Assign users to departments and organizational levels with bulk operations</p>
+                <p class="text-sm text-muted-foreground mt-1">Assign users to departments, organizational levels and performance tiers</p>
             </div>
 
-            <!-- Stats Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <!-- Enhanced Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
                 <Card>
                     <CardContent class="p-6">
                         <div class="flex items-center">
@@ -307,6 +371,23 @@ const breadcrumbs: BreadcrumbItemType[] = [
                     </CardContent>
                 </Card>
 
+                <!-- NEW: Tiers Stats Card -->
+                <Card>
+                    <CardContent class="p-6">
+                        <div class="flex items-center">
+                            <div class="shrink-0">
+                                <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                                    <Layers class="h-5 w-5 text-white" />
+                                </div>
+                            </div>
+                            <div class="ml-4 flex-1">
+                                <div class="text-sm font-medium text-muted-foreground">With Tiers</div>
+                                <div class="text-2xl font-bold text-foreground">{{ stats?.with_tiers || 0 }}</div>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
                 <Card>
                     <CardContent class="p-6">
                         <div class="flex items-center">
@@ -324,17 +405,17 @@ const breadcrumbs: BreadcrumbItemType[] = [
                 </Card>
             </div>
 
-            <!-- Bulk Assignment Panel -->
+            <!-- Enhanced Bulk Assignment Panel -->
             <Card>
                 <CardHeader>
                     <CardTitle class="flex items-center">
                         <UserPlus class="mr-2 h-5 w-5" />
                         Bulk Assignment
                     </CardTitle>
-                    <CardDescription>Assign multiple users to departments and levels simultaneously</CardDescription>
+                    <CardDescription>Assign multiple users to departments, levels and tiers simultaneously</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                    <div class="grid grid-cols-1 lg:grid-cols-5 gap-4">
                         <div class="space-y-2">
                             <Label>Department</Label>
                             <Select :model-value="selectedDepartment || 'select'" @update:model-value="handleDepartmentChange">
@@ -365,6 +446,26 @@ const breadcrumbs: BreadcrumbItemType[] = [
                             </Select>
                         </div>
 
+                        <!-- NEW: Tier Selection -->
+                        <div class="space-y-2">
+                            <Label>Performance Tier</Label>
+                            <Select
+                                :model-value="selectedTier || 'select'"
+                                @update:model-value="handleTierChange"
+                                :disabled="!selectedLevel"
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select Tier" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="select">Select Tier</SelectItem>
+                                    <SelectItem v-for="tier in availableTiers" :key="tier.id" :value="tier.id.toString()">
+                                        {{ tier.tier_name }} (T{{ tier.tier_order }})
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
                         <div class="flex items-end">
                             <Button
                                 @click="bulkAssignUsers"
@@ -384,17 +485,17 @@ const breadcrumbs: BreadcrumbItemType[] = [
                 </CardContent>
             </Card>
 
-            <!-- Filters and Search -->
+            <!-- Enhanced Filters and Search -->
             <Card>
                 <CardHeader>
                     <CardTitle class="flex items-center">
                         <Search class="mr-2 h-5 w-5" />
                         Filters & Search
                     </CardTitle>
-                    <CardDescription>Filter and search users by various criteria</CardDescription>
+                    <CardDescription>Filter and search users by various criteria including tiers</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
                         <div class="space-y-2">
                             <Label>Search</Label>
                             <div class="relative">
@@ -437,6 +538,22 @@ const breadcrumbs: BreadcrumbItemType[] = [
                             </Select>
                         </div>
 
+                        <!-- NEW: Filter by Tier -->
+                        <div class="space-y-2">
+                            <Label>Filter by Tier</Label>
+                            <Select :model-value="filterTier || 'all'" @update:model-value="handleFilterTierChange">
+                                <SelectTrigger>
+                                    <SelectValue placeholder="All Tiers" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Tiers</SelectItem>
+                                    <SelectItem v-for="tier in allAvailableTiers" :key="tier.id" :value="tier.tier_name">
+                                        {{ tier.display_name }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
                         <div class="flex items-end">
                             <Button @click="clearFilters" variant="outline" class="w-full">
                                 <X class="mr-2 h-4 w-4" />
@@ -447,7 +564,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                 </CardContent>
             </Card>
 
-            <!-- Users Table -->
+            <!-- Enhanced Users Table -->
             <Card>
                 <CardHeader>
                     <div class="flex items-center justify-between">
@@ -456,7 +573,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                                 <Users class="mr-2 h-5 w-5" />
                                 Users
                             </CardTitle>
-                            <CardDescription>Manage user assignments and organizational structure</CardDescription>
+                            <CardDescription>Manage user assignments and organizational structure with tier support</CardDescription>
                         </div>
                         <div class="flex items-center space-x-4">
                             <div class="flex items-center space-x-2">
@@ -483,6 +600,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                                     </TableHead>
                                     <TableHead>User</TableHead>
                                     <TableHead>Level</TableHead>
+                                    <TableHead>Tier</TableHead> <!-- NEW: Tier column -->
                                     <TableHead>Department</TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead class="text-right">Actions</TableHead>
@@ -512,9 +630,20 @@ const breadcrumbs: BreadcrumbItemType[] = [
                                     </TableCell>
                                     <TableCell>
                                         <Badge v-if="user.level" variant="secondary">
-                                            {{ user.level }}
+                                            {{ user.level_code }} - {{ user.level }}
                                         </Badge>
                                         <span v-else class="text-sm text-muted-foreground italic">No level</span>
+                                    </TableCell>
+                                    <!-- NEW: Tier column -->
+                                    <TableCell>
+                                        <Badge
+                                            v-if="user.tier"
+                                            :variant="getTierBadgeVariant(user.tier_order)"
+                                            class="text-xs"
+                                        >
+                                            {{ user.tier }} (T{{ user.tier_order }})
+                                        </Badge>
+                                        <span v-else class="text-sm text-muted-foreground italic">No tier</span>
                                     </TableCell>
                                     <TableCell>
                                         <span v-if="user.department" class="text-foreground">{{ user.department }}</span>
