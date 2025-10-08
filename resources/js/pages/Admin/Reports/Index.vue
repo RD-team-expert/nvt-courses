@@ -4,13 +4,15 @@
 -->
 <template>
     <AdminLayout :breadcrumbs="breadcrumbs">
-        <div class="px-4 sm:px-0 space-y-6">
+        <div class="px-4 sm:px-6 lg:px-8 space-y-6 max-w-7xl mx-auto">
             <!-- Header -->
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                     <h1 class="text-xl sm:text-2xl font-bold text-foreground">Reports & Analytics</h1>
                     <p class="text-sm text-muted-foreground mt-1">Comprehensive analytics and reporting interface for tracking system performance</p>
                 </div>
+
+                <!-- ✅ UPDATED: Report Buttons with Course Online Dropdown -->
                 <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
                     <Button :as="'a'" :href="route('admin.reports.course-registrations')" variant="outline" class="w-full sm:w-auto">
                         <BookOpen class="mr-2 h-4 w-4" />
@@ -24,6 +26,45 @@
                         <CheckCircle class="mr-2 h-4 w-4" />
                         Course Completion
                     </Button>
+
+                    <!-- ✅ NEW: Course Online Dropdown -->
+                    <DropdownMenu>
+                        <DropdownMenuTrigger as-child>
+                            <Button variant="outline" class="w-full sm:w-auto">
+                                <Monitor class="mr-2 h-4 w-4" />
+                                Course Online
+                                <ChevronDown class="ml-2 h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" class="w-48">
+                            <DropdownMenuItem as-child>
+                                <Link :href="route('admin.reports.course-online.progress')" class="flex items-center">
+                                    <BarChart3 class="mr-2 h-4 w-4" />
+                                    Progress Report
+                                </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem as-child>
+                                <Link :href="route('admin.reports.course-online.learning-sessions')" class="flex items-center">
+                                    <Activity class="mr-2 h-4 w-4" />
+                                    Learning Sessions
+                                </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem as-child>
+                                <Link :href="route('admin.reports.course-online.user-performance')" class="flex items-center">
+                                    <Users class="mr-2 h-4 w-4" />
+                                    User Performance
+                                </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem as-child>
+                                <Link href="/admin/analytics/cheating-detection" class="flex items-center">
+                                    <Shield class="mr-2 h-4 w-4" />
+                                    Cheating Detection
+                                </Link>
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+
                     <Button :as="'a'" :href="route('admin.reports.quiz-attempts')" variant="outline" class="w-full sm:w-auto">
                         <FileText class="mr-2 h-4 w-4" />
                         Quiz Attempts
@@ -398,14 +439,14 @@
                 </CardContent>
             </Card>
 
-            <!-- Report Links -->
+            <!-- ✅ UPDATED: Report Links -->
             <Card>
                 <CardHeader>
                     <CardTitle>Detailed Reports</CardTitle>
                     <CardDescription>Access comprehensive reports and export data</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                         <Button
                             :as="'a'"
                             :href="route('admin.reports.course-registrations')"
@@ -445,6 +486,64 @@
                             </div>
                         </Button>
 
+                        <!-- ✅ NEW: Course Online Reports Card -->
+                        <DropdownMenu>
+                            <DropdownMenuTrigger as-child>
+                                <Button
+                                    variant="outline"
+                                    class="h-auto p-4 flex flex-col items-center text-center space-y-2"
+                                >
+                                    <div class="relative">
+                                        <Monitor class="h-8 w-8 text-primary" />
+                                        <ChevronDown class="absolute -bottom-1 -right-1 h-4 w-4 text-primary" />
+                                    </div>
+                                    <div>
+                                        <div class="font-medium">Course Online</div>
+                                        <p class="text-sm text-muted-foreground">Online learning analytics</p>
+                                    </div>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="center" class="w-52">
+                                <DropdownMenuItem as-child>
+                                    <Link :href="route('admin.reports.course-online.progress')" class="flex items-center">
+                                        <BarChart3 class="mr-2 h-4 w-4" />
+                                        <div>
+                                            <div class="font-medium">Progress Report</div>
+                                            <div class="text-xs text-muted-foreground">Assignment tracking</div>
+                                        </div>
+                                    </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem as-child>
+                                    <Link :href="route('admin.reports.course-online.learning-sessions')" class="flex items-center">
+                                        <Activity class="mr-2 h-4 w-4" />
+                                        <div>
+                                            <div class="font-medium">Learning Sessions</div>
+                                            <div class="text-xs text-muted-foreground">User activity logs</div>
+                                        </div>
+                                    </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem as-child>
+                                    <Link :href="route('admin.reports.course-online.user-performance')" class="flex items-center">
+                                        <Users class="mr-2 h-4 w-4" />
+                                        <div>
+                                            <div class="font-medium">User Performance</div>
+                                            <div class="text-xs text-muted-foreground">Comprehensive analysis</div>
+                                        </div>
+                                    </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem as-child>
+                                    <Link href="/admin/analytics/cheating-detection" class="flex items-center">
+                                        <Shield class="mr-2 h-4 w-4" />
+                                        <div>
+                                            <div class="font-medium">Cheating Detection</div>
+                                            <div class="text-xs text-muted-foreground">Security monitoring</div>
+                                        </div>
+                                    </Link>
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
                         <Button
                             :as="'a'"
                             :href="route('admin.reports.quiz-attempts')"
@@ -474,7 +573,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { router } from '@inertiajs/vue3'
+import { router, Link } from '@inertiajs/vue3'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import { type BreadcrumbItemType } from '@/types'
 import BarChart from '@/components/Charts/BarChart.vue'
@@ -492,6 +591,13 @@ import {
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
     Filter,
     RotateCcw,
     CheckCircle,
@@ -504,7 +610,11 @@ import {
     PieChart,
     FileText,
     XCircle,
-    Loader2
+    Loader2,
+    Monitor,
+    ChevronDown,
+    Activity,
+    Shield
 } from 'lucide-vue-next'
 
 const props = defineProps({

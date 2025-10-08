@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\UserLevel;
+use App\Models\UserLevelTier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -19,7 +20,10 @@ class UserLevelController extends Controller
      */
     public function index(): Response
     {
-        $userLevels = UserLevel::withCount('users')
+        $userLevels = UserLevel::withCount('users') // Users stay in levels
+        ->with(['tiers' => function($query) {
+            $query->orderBy('tier_order');
+        }])
             ->orderBy('hierarchy_level')
             ->get()
             ->map(function ($level) {
@@ -30,21 +34,32 @@ class UserLevelController extends Controller
                     'hierarchy_level' => $level->hierarchy_level,
                     'description' => $level->description,
                     'can_manage_levels' => $level->can_manage_levels,
-                    'users_count' => $level->users_count,
+                    'users_count' => $level->users_count, // Users in the level
                     'is_management_level' => $level->isManagementLevel(),
+                    'tiers' => $level->tiers->map(function($tier) {
+                        return [
+                            'id' => $tier->id,
+                            'tier_name' => $tier->tier_name,
+                            'tier_order' => $tier->tier_order,
+                            'description' => $tier->description,
+                            // No users_count for tiers - they're just for evaluations
+                        ];
+                    }),
                 ];
             });
+
+        $totalTiers = UserLevelTier::count();
 
         return Inertia::render('Admin/UserLevels/Index', [
             'userLevels' => $userLevels,
             'stats' => [
                 'total_levels' => UserLevel::count(),
+                'total_tiers' => $totalTiers,
                 'management_levels' => UserLevel::whereNotNull('can_manage_levels')->count(),
                 'total_users_assigned' => UserLevel::withCount('users')->get()->sum('users_count'),
             ]
         ]);
     }
-
     /**
      * Show create user level form
      */
@@ -65,7 +80,7 @@ class UserLevelController extends Controller
         $validated = $request->validate([
             'code' => 'required|string|max:10|unique:user_levels',
             'name' => 'required|string|max:100',
-            'hierarchy_level' => 'required|integer|min:1|max:10|unique:user_levels',
+            'hierarchy_level' => 'required|integer|min:0|max:10|unique:user_levels',
             'description' => 'nullable|string',
             'can_manage_levels' => 'nullable|array',
             'can_manage_levels.*' => 'exists:user_levels,code',

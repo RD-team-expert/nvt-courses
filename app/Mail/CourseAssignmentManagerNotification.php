@@ -31,6 +31,33 @@ class CourseAssignmentManagerNotification extends Mailable
 
     public function build()
     {
+        // ✅ Load course with availabilities and scheduling data
+        $this->course->load('availabilities');
+
+        // ✅ Process availabilities with scheduling data for email display
+        $processedAvailabilities = $this->course->availabilities->map(function ($availability) {
+            return [
+                'id' => $availability->id,
+                'start_date' => $availability->start_date,
+                'end_date' => $availability->end_date,
+                'formatted_date_range' => $availability->formatted_date_range ?? 'TBD',
+                'capacity' => $availability->capacity,
+                'sessions' => $availability->sessions,
+                'available_spots' => $availability->available_spots ?? $availability->sessions,
+                'notes' => $availability->notes,
+
+                // ✅ NEW: Scheduling fields
+                'days_of_week' => $availability->days_of_week,
+                'selected_days' => $availability->selected_days ?? [], // Array format
+                'formatted_days' => $availability->formatted_days ?? 'TBD', // "Mon, Wed, Fri"
+                'duration_weeks' => $availability->duration_weeks,
+                'session_time' => $availability->session_time,
+                'formatted_session_time' => $availability->formatted_session_time, // "09:00"
+                'session_duration_minutes' => $availability->session_duration_minutes,
+                'formatted_session_duration' => $availability->formatted_session_duration ?? 'TBD', // "2h 30m"
+            ];
+        });
+
         $userCount = $this->assignedUsers->count();
         $userNames = $this->assignedUsers->take(3)->pluck('name')->join(', ');
 
@@ -38,7 +65,7 @@ class CourseAssignmentManagerNotification extends Mailable
             $userNames .= " and " . ($userCount - 3) . " more";
         }
 
-        return $this->subject("Team Course Assignment: {$this->course->name}")
+        return $this->subject("Course Assignment: {$this->course->name} - {$userNames}")
             ->view('emails.course-assignment-manager-notification')
             ->with([
                 'course' => $this->course,
@@ -49,6 +76,9 @@ class CourseAssignmentManagerNotification extends Mailable
                 'userNames' => $userNames,
                 'assignmentDate' => Carbon::now()->format('F j, Y'),
                 'assignmentDetails' => $this->assignmentDetails,
+
+                // ✅ NEW: Pass processed availabilities with scheduling data
+                'availabilities' => $processedAvailabilities,
             ]);
     }
 }

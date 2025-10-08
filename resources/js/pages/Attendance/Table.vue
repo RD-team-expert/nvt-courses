@@ -78,7 +78,7 @@ function formatHumanDuration(minutes: number | null | undefined): string {
 </script>
 
 <template>
-    <AttendanceLayout title="My Attendance Records">
+    <AttendanceLayout title="My Attendance Records" >
         <template #actions>
             <Button asChild>
                 <Link href="/attendance/clock">

@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 class Incentive extends Model
 {
     protected $fillable = [
+        'user_level_id',        // NEW
+        'user_level_tier_id',   // NEW
         'min_score',
         'max_score',
         'incentive_amount',
@@ -24,5 +26,16 @@ class Incentive extends Model
     public function evaluationConfig()
     {
         return $this->belongsTo(EvaluationConfig::class, 'evaluation_config_id');
+    }
+    // NEW: Get the user level
+    public function userLevel()
+    {
+        return $this->belongsTo(UserLevel::class);
+    }
+
+    // NEW: Get the tier
+    public function userLevelTier()
+    {
+        return $this->belongsTo(UserLevelTier::class);
     }
 }

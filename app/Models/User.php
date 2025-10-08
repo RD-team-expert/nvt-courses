@@ -381,4 +381,43 @@ class User extends Authenticatable
         return $this->audioProgress()->where('audio_id', $audio->id)->first();
     }
 
+    public function courseAssignments()
+    {
+        return $this->hasMany(CourseOnlineAssignment::class);
+    }
+
+    /**
+     * User Content Progress relationship
+     */
+    public function userContentProgress()
+    {
+        return $this->hasMany(UserContentProgress::class);
+    }
+
+    /**
+     * Learning Sessions relationship
+     */
+    public function learningSessions()
+    {
+        return $this->hasMany(LearningSession::class);
+    }
+    public function courseOnlineAssignments()
+    {
+        return $this->hasMany(CourseOnlineAssignment::class, 'user_id');
+    }
+
+    /**
+     * ✅ ADD: Relationship to LearningSession (if not already exists)
+     */
+    public function userLevelTier()
+    {
+        return $this->belongsTo(UserLevelTier::class);
+    }
+
+
+    /**
+     * Get the user level through the tier
+     */
+
+
 }
