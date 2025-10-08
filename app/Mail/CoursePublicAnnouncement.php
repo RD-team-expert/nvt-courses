@@ -26,7 +26,6 @@ class CoursePublicAnnouncement extends Mailable
         $this->course = $course;
         $this->user = $user;
         $this->loginLink = $loginLink;
-
     }
 
     /**
@@ -35,7 +34,7 @@ class CoursePublicAnnouncement extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'New Course Announcement: ' . $this->course->name,
+            subject: 'Course Now Available: ' . $this->course->name,
         );
     }
 
@@ -44,11 +43,32 @@ class CoursePublicAnnouncement extends Mailable
      */
     public function content(): Content
     {
-        // ✅ Load course availabilities to get proper dates
+        // ✅ Load course availabilities with scheduling data
         $this->course->load('availabilities');
 
-        // ✅ Generate temporary password (customize this as needed)
-//        $tempPassword = 'Course' . date('Y') . rand(1000, 9999);
+        // ✅ Process scheduling data for email display
+        $processedAvailabilities = $this->course->availabilities->map(function ($availability) {
+            return [
+                'id' => $availability->id,
+                'start_date' => $availability->start_date,
+                'end_date' => $availability->end_date,
+                'formatted_date_range' => $availability->formatted_date_range ?? 'TBD',
+                'capacity' => $availability->capacity,
+                'sessions' => $availability->sessions,
+                'available_spots' => $availability->available_spots ?? $availability->sessions,
+                'notes' => $availability->notes,
+
+                // ✅ NEW: Scheduling fields
+                'days_of_week' => $availability->days_of_week,
+                'selected_days' => $availability->selected_days ?? [], // Array format
+                'formatted_days' => $availability->formatted_days ?? 'TBD', // "Mon, Wed, Fri"
+                'duration_weeks' => $availability->duration_weeks,
+                'session_time' => $availability->session_time,
+                'formatted_session_time' => $availability->formatted_session_time, // "09:00"
+                'session_duration_minutes' => $availability->session_duration_minutes,
+                'formatted_session_duration' => $availability->formatted_session_duration ?? 'TBD', // "2h 30m"
+            ];
+        });
 
         return new Content(
             view: 'emails.course-public-announcement',
@@ -58,11 +78,13 @@ class CoursePublicAnnouncement extends Mailable
                 'courseName' => $this->course->name,
                 'userName' => $this->user->name,
                 'userEmail' => $this->user->email,
-                'loginLink' => $this->loginLink, // ✅ Login link for one-click access
+                'loginLink' => $this->loginLink,
                 'description' => $this->course->description,
-                'availabilities' => $this->course->availabilities,
 
-                // ✅ Fixed: Access start_date properly
+                // ✅ NEW: Pass processed availabilities with scheduling data
+                'availabilities' => $processedAvailabilities,
+
+                // ✅ Keep backward compatibility for single dates
                 'startDate' => $this->course->availabilities->first()
                     ? $this->course->availabilities->first()->start_date->format('F j, Y')
                     : 'TBD',

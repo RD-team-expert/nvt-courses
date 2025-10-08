@@ -23,8 +23,9 @@ class EvaluationNotificationController extends Controller
 
     public function __construct(
         ManagerHierarchyService $hierarchyService,
-        EvaluationEmailService $emailService
-    ) {
+        EvaluationEmailService  $emailService
+    )
+    {
         $this->hierarchyService = $hierarchyService;
         $this->emailService = $emailService;
     }
@@ -55,7 +56,7 @@ class EvaluationNotificationController extends Controller
             ->orderBy('sent_at', 'desc')
             ->limit(10)
             ->get()
-            ->map(function($notification) {
+            ->map(function ($notification) {
                 return [
                     'id' => $notification->id,
                     'name' => $notification->name,
@@ -97,6 +98,7 @@ class EvaluationNotificationController extends Controller
         // Redirect to index with filters as query parameters
         return redirect()->route('admin.evaluations.notifications', $validated);
     }
+
     /**
      * Preview notification - show which managers will receive emails
      */
@@ -153,7 +155,7 @@ class EvaluationNotificationController extends Controller
                 ->orderBy('sent_at', 'desc')
                 ->limit(10)
                 ->get()
-                ->map(function($notification) {
+                ->map(function ($notification) {
                     return [
                         'id' => $notification->id,
                         'name' => $notification->name,
@@ -410,7 +412,7 @@ class EvaluationNotificationController extends Controller
             ->paginate(15)
             ->withQueryString();
 
-        $notifications->getCollection()->transform(function($notification) {
+        $notifications->getCollection()->transform(function ($notification) {
             return [
                 'id' => $notification->id,
                 'name' => $notification->name,
@@ -452,7 +454,7 @@ class EvaluationNotificationController extends Controller
             $evaluations = Evaluation::with(['user', 'course', 'department', 'history']) // FIXED: Changed evaluationHistory to history
             ->whereIn('id', $evaluationIds)
                 ->get()
-                ->map(function($evaluation) {
+                ->map(function ($evaluation) {
                     return [
                         'id' => $evaluation->id,
                         'user' => $evaluation->user,
@@ -461,7 +463,7 @@ class EvaluationNotificationController extends Controller
                         'total_score' => $evaluation->total_score,
                         'incentive_amount' => $evaluation->incentive_amount,
                         'created_at' => $evaluation->created_at->format('M d, Y'),
-                        'categories' => $evaluation->history->map(function($history) { // FIXED: Changed evaluationHistory to history
+                        'categories' => $evaluation->history->map(function ($history) { // FIXED: Changed evaluationHistory to history
                             return [
                                 'category_name' => $history->category_name,
                                 'type_name' => $history->type_name,
@@ -501,11 +503,53 @@ class EvaluationNotificationController extends Controller
     /**
      * Get filtered L1 employees with evaluations
      */
+    /**
+     * Get filtered employees with evaluations (ALL LEVELS - not just L1)
+     */
     private function getFilteredL1Employees(array $filters = []): array
     {
-        $employees = $this->hierarchyService->getL1EmployeesWithEvaluations($filters);
+        // CHANGED: Get ALL employees with evaluations, not just L1
+        $query = User::with(['userLevel', 'evaluations.course', 'department'])
+            ->has('evaluations') // Only users with evaluations
+            ->where('status', 'active'); // Only active users
 
-        return $employees->map(function($employee) {
+        // Apply department filter
+        if (!empty($filters['department_id'])) {
+            $query->where('department_id', $filters['department_id']);
+        }
+
+        // Apply course filter (through evaluations)
+        if (!empty($filters['course_id'])) {
+            $query->whereHas('evaluations', function ($q) use ($filters) {
+                $q->where('course_id', $filters['course_id']);
+            });
+        }
+
+        // Apply date filters (through evaluations)
+        if (!empty($filters['start_date']) || !empty($filters['end_date'])) {
+            $query->whereHas('evaluations', function ($q) use ($filters) {
+                if (!empty($filters['start_date'])) {
+                    $q->whereDate('created_at', '>=', $filters['start_date']);
+                }
+                if (!empty($filters['end_date'])) {
+                    $q->whereDate('created_at', '<=', $filters['end_date']);
+                }
+            });
+        }
+
+        // Apply search filter
+        if (!empty($filters['search'])) {
+            $search = $filters['search'];
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('employee_code', 'like', "%{$search}%");
+            });
+        }
+
+        $employees = $query->get();
+
+        return $employees->map(function ($employee) {
             $latestEvaluation = $employee->evaluations->sortByDesc('created_at')->first();
 
             return [
@@ -525,4 +569,5 @@ class EvaluationNotificationController extends Controller
                 ] : null
             ];
         })->values()->toArray();
-    }}
+    }
+}

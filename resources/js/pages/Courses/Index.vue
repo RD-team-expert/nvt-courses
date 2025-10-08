@@ -1,6 +1,7 @@
 <!--
   Courses Index Page
   Display available courses in a grid layout with pagination and status information
+  Updated to show scheduling data (days, duration, session times)
 -->
 <script setup lang="ts">
 import { Link, Head } from '@inertiajs/vue3'
@@ -18,7 +19,9 @@ import {
     ArrowRight,
     UserCheck,
     CheckCircle,
-    ClipboardList
+    ClipboardList,
+    CalendarDays,
+    Timer
 } from 'lucide-vue-next'
 
 // Log the entire courses prop to inspect the data
@@ -92,6 +95,56 @@ const formatSessions = (totalSessions, enrolledSessions = 0) => {
     return `${totalSessions} seats`
 }
 
+// NEW: Get course schedule summary from availabilities
+const getCourseScheduleSummary = (course) => {
+    if (!course.availabilities || course.availabilities.length === 0) {
+        return null;
+    }
+
+    // Get unique days from all availabilities
+    const allDays = new Set();
+    let totalWeeks = 0;
+    let commonSessionTime = null;
+    let sessionDuration = null;
+
+    course.availabilities.forEach(availability => {
+        if (availability.selected_days && availability.selected_days.length > 0) {
+            availability.selected_days.forEach(day => allDays.add(day));
+        }
+        if (availability.duration_weeks) {
+            totalWeeks = Math.max(totalWeeks, availability.duration_weeks);
+        }
+        if (availability.formatted_session_time) {
+            commonSessionTime = availability.formatted_session_time;
+        }
+        if (availability.formatted_session_duration) {
+            sessionDuration = availability.formatted_session_duration;
+        }
+    });
+
+    // Format unique days
+    const dayNames = {
+        'monday': 'Mon',
+        'tuesday': 'Tue',
+        'wednesday': 'Wed',
+        'thursday': 'Thu',
+        'friday': 'Fri',
+        'saturday': 'Sat',
+        'sunday': 'Sun'
+    };
+
+    const formattedDays = Array.from(allDays)
+        .map(day => dayNames[day] || day)
+        .join(', ');
+
+    return {
+        days: formattedDays || 'TBD',
+        weeks: totalWeeks || null,
+        sessionTime: commonSessionTime,
+        sessionDuration: sessionDuration
+    };
+}
+
 // Define breadcrumbs with proper typing
 const breadcrumbs: BreadcrumbItemType[] = [
     { name: 'Dashboard', href: route('dashboard') },
@@ -139,8 +192,18 @@ const breadcrumbs: BreadcrumbItemType[] = [
 
                             <!-- Course Status Badge -->
                             <div class="absolute top-3 right-3">
-                                <Badge :variant="getStatusVariant(course.status)" class="backdrop-blur-sm bg-background/80">
+                                <Badge :variant="getStatusVariant(course.status)" class="backdrop-blur-sm bg-blue-50">
                                     {{ formatStatus(course.status) }}
+                                </Badge>
+                            </div>
+
+                            <!-- Privacy Badge -->
+                            <div class="absolute top-3 left-3">
+                                <Badge
+                                    :variant="course.privacy === 'public' ? 'default' : 'secondary'"
+                                    class="backdrop-blur-sm bg-blue-50 text-black"
+                                >
+                                    {{ course.privacy === 'public' ? '🌍 Public' : '🔒 Private' }}
                                 </Badge>
                             </div>
                         </div>
@@ -153,6 +216,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
 
                             <!-- Course Info -->
                             <div class="space-y-2 mb-4 flex-grow text-sm text-muted-foreground">
+                                <!-- Course Dates -->
                                 <div class="flex items-center">
                                     <Calendar class="w-4 h-4 mr-2 text-muted-foreground" />
                                     <span class="font-medium mr-2 min-w-[3rem]">Start:</span>
@@ -163,17 +227,60 @@ const breadcrumbs: BreadcrumbItemType[] = [
                                     <span class="font-medium mr-2 min-w-[3rem]">End:</span>
                                     <span>{{ formatDate(course.end_date) }}</span>
                                 </div>
-                                <div v-if="course.level" class="flex items-center">
+
+                                <!-- NEW: Course Schedule Information -->
+                                <template v-if="getCourseScheduleSummary(course)">
+                                    <div class="border-t pt-2 mt-3">
+                                        <h4 class="text-xs font-semibold text-foreground mb-2">Schedule</h4>
+
+                                        <!-- Days of Week -->
+                                        <div v-if="getCourseScheduleSummary(course).days !== 'TBD'" class="flex items-center mb-1">
+                                            <CalendarDays class="w-4 h-4 mr-2 text-muted-foreground" />
+                                            <span class="font-medium mr-2 min-w-[3rem]">Days:</span>
+                                            <Badge variant="outline" class="text-xs">
+                                                {{ getCourseScheduleSummary(course).days }}
+                                            </Badge>
+                                        </div>
+
+                                        <!-- Duration in Weeks -->
+                                        <div v-if="getCourseScheduleSummary(course).weeks" class="flex items-center mb-1">
+                                            <Clock class="w-4 h-4 mr-2 text-muted-foreground" />
+                                            <span class="font-medium mr-2 min-w-[3rem]">Duration:</span>
+                                            <span>{{ getCourseScheduleSummary(course).weeks }} weeks</span>
+                                        </div>
+
+                                        <!-- Session Time -->
+                                        <div v-if="getCourseScheduleSummary(course).sessionTime" class="flex items-center mb-1">
+                                            <Timer class="w-4 h-4 mr-2 text-muted-foreground" />
+                                            <span class="font-medium mr-2 min-w-[3rem]">Time:</span>
+                                            <span>{{ getCourseScheduleSummary(course).sessionTime }}</span>
+                                        </div>
+
+                                        <!-- Session Duration -->
+                                        <div v-if="getCourseScheduleSummary(course).sessionDuration" class="flex items-center">
+                                            <Clock class="w-4 h-4 mr-2 text-muted-foreground" />
+                                            <span class="font-medium mr-2 min-w-[3rem]">Length:</span>
+                                            <span>{{ getCourseScheduleSummary(course).sessionDuration }}</span>
+                                        </div>
+                                    </div>
+                                </template>
+
+                                <!-- Course Level -->
+                                <div v-if="course.level" class="flex items-center pt-2">
                                     <Badge variant="outline" class="text-xs">{{ course.level }}</Badge>
                                 </div>
+
+                                <!-- Total Course Duration -->
                                 <div v-if="course.duration" class="flex items-center">
                                     <Clock class="w-4 h-4 mr-2 text-muted-foreground" />
-                                    <span class="font-medium mr-2 min-w-[3rem]">Duration:</span>
+                                    <span class="font-medium mr-2 min-w-[3rem]">Total:</span>
                                     <span>{{ course.duration }} hours</span>
                                 </div>
+
+                                <!-- Availability -->
                                 <div v-if="course.total_capacity" class="flex items-center">
                                     <Users class="w-4 h-4 mr-2 text-muted-foreground" />
-                                    <span class="font-medium mr-2 min-w-[4rem]">Availability:</span>
+                                    <span class="font-medium mr-2 min-w-[4rem]">Seats:</span>
                                     <span>{{ formatSessions(course.total_capacity) }}</span>
                                 </div>
                             </div>

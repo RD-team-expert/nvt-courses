@@ -29,9 +29,9 @@ class EventServiceProvider extends ServiceProvider
         CourseCompleted::class => [
             SendCourseCompletionEmail::class,
         ],
-        CourseAssigned::class => [
-            SendCourseNotification::class,
-        ],
+//        CourseAssigned::class => [
+//            SendCourseNotification::class,
+//        ],
     ];
 
     /**

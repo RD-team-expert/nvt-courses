@@ -11,6 +11,8 @@ use App\Models\Course;
 use App\Models\Department;
 use App\Models\Incentive;
 use App\Models\EvaluationHistory;
+use App\Models\UserLevel;
+use App\Models\UserLevelTier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -21,9 +23,9 @@ class UserEvaluationController extends Controller
     public function index()
     {
         try {
-            // Get all users with their departments and completed courses
-            $users = User::with(['department'])
-                ->select(['id', 'name', 'email', 'department_id'])
+            // Enhanced: Get all users with their departments, levels, and tiers
+            $users = User::with(['department', 'userLevel', 'userLevelTier'])
+                ->select(['id', 'name', 'email', 'department_id', 'user_level_id', 'user_level_tier_id'])
                 ->get()
                 ->map(function ($user) {
                     // Get actual completed courses for this user
@@ -82,6 +84,17 @@ class UserEvaluationController extends Controller
                         'email' => $user->email,
                         'department' => $user->department,
                         'department_id' => $user->department_id,
+                        // NEW: Include level and tier information
+                        'user_level' => $user->userLevel ? [
+                            'id' => $user->userLevel->id,
+                            'name' => $user->userLevel->name,
+                            'code' => $user->userLevel->code,
+                        ] : null,
+                        'user_level_tier' => $user->userLevelTier ? [
+                            'id' => $user->userLevelTier->id,
+                            'tier_name' => $user->userLevelTier->tier_name,
+                            'tier_order' => $user->userLevelTier->tier_order,
+                        ] : null,
                         'completed_courses' => $completedCourses
                     ];
                 });
@@ -124,15 +137,63 @@ class UserEvaluationController extends Controller
                     ];
                 });
 
-            // Get all incentive ranges
-            $incentives = Incentive::orderBy('min_score', 'desc')->get();
+            // NEW: Get Level + Tier based incentives with relationship data
+            $incentives = Incentive::with(['userLevel', 'userLevelTier'])
+                ->orderBy('user_level_id')
+                ->orderBy('user_level_tier_id')
+                ->orderBy('min_score')
+                ->get()
+                ->map(function ($incentive) {
+                    return [
+                        'id' => $incentive->id,
+                        'user_level_id' => $incentive->user_level_id,
+                        'user_level_tier_id' => $incentive->user_level_tier_id,
+                        'min_score' => $incentive->min_score,
+                        'max_score' => $incentive->max_score,
+                        'incentive_amount' => $incentive->incentive_amount,
+                        'user_level' => $incentive->userLevel ? [
+                            'id' => $incentive->userLevel->id,
+                            'name' => $incentive->userLevel->name,
+                            'code' => $incentive->userLevel->code,
+                        ] : null,
+                        'user_level_tier' => $incentive->userLevelTier ? [
+                            'id' => $incentive->userLevelTier->id,
+                            'tier_name' => $incentive->userLevelTier->tier_name,
+                            'tier_order' => $incentive->userLevelTier->tier_order,
+                        ] : null,
+                    ];
+                });
+
+            // NEW: Get user levels with tiers for frontend reference
+            $userLevels = UserLevel::with(['tiers' => function($query) {
+                $query->orderBy('tier_order');
+            }])
+                ->orderBy('hierarchy_level')
+                ->get()
+                ->map(function ($level) {
+                    return [
+                        'id' => $level->id,
+                        'code' => $level->code,
+                        'name' => $level->name,
+                        'hierarchy_level' => $level->hierarchy_level,
+                        'tiers' => $level->tiers->map(function ($tier) {
+                            return [
+                                'id' => $tier->id,
+                                'tier_name' => $tier->tier_name,
+                                'tier_order' => $tier->tier_order,
+                                'description' => $tier->description,
+                            ];
+                        }),
+                    ];
+                });
 
             Log::info('UserEvaluation index data loaded', [
                 'users_count' => $users->count(),
                 'courses_count' => $courses->count(),
                 'categories_count' => $categories->count(),
                 'departments_count' => $departments->count(),
-                'incentives_count' => $incentives->count()
+                'incentives_count' => $incentives->count(),
+                'user_levels_count' => $userLevels->count()
             ]);
 
             return inertia('Admin/Evaluations/UserEvaluation', [
@@ -141,6 +202,7 @@ class UserEvaluationController extends Controller
                 'departments' => $departments,
                 'courses' => $courses,
                 'incentives' => $incentives,
+                'userLevels' => $userLevels, // NEW: For frontend reference
             ]);
 
         } catch (Exception $e) {
@@ -155,12 +217,13 @@ class UserEvaluationController extends Controller
                 'departments' => [],
                 'courses' => [],
                 'incentives' => [],
+                'userLevels' => [],
                 'error' => 'Failed to load evaluation data: ' . $e->getMessage()
             ]);
         }
     }
 
-    // Get users by department
+    // Enhanced: Get users by department with level/tier info
     public function getUsersByDepartment(Request $request)
     {
         $departmentId = $request->get('department_id');
@@ -170,9 +233,9 @@ class UserEvaluationController extends Controller
         }
 
         try {
-            $users = User::with(['department'])
+            $users = User::with(['department', 'userLevel', 'userLevelTier'])
                 ->where('department_id', $departmentId)
-                ->select(['id', 'name', 'email', 'department_id'])
+                ->select(['id', 'name', 'email', 'department_id', 'user_level_id', 'user_level_tier_id'])
                 ->get()
                 ->map(function ($user) {
                     // Get completed courses for each user
@@ -211,6 +274,17 @@ class UserEvaluationController extends Controller
                         'email' => $user->email,
                         'department' => $user->department,
                         'department_id' => $user->department_id,
+                        // NEW: Include level and tier information
+                        'user_level' => $user->userLevel ? [
+                            'id' => $user->userLevel->id,
+                            'name' => $user->userLevel->name,
+                            'code' => $user->userLevel->code,
+                        ] : null,
+                        'user_level_tier' => $user->userLevelTier ? [
+                            'id' => $user->userLevelTier->id,
+                            'tier_name' => $user->userLevelTier->tier_name,
+                            'tier_order' => $user->userLevelTier->tier_order,
+                        ] : null,
                         'completed_courses' => $completedCourses
                     ];
                 });
@@ -227,7 +301,7 @@ class UserEvaluationController extends Controller
         }
     }
 
-    // Get completed courses for a specific user
+    // Enhanced: Get completed courses for a specific user with level/tier info
     public function getUserCourses(Request $request)
     {
         $userId = $request->get('user_id');
@@ -299,8 +373,8 @@ class UserEvaluationController extends Controller
         try {
             $totalScore = 0;
 
-            // Check if user exists
-            $user = User::with(['department'])->find($validated['user_id']);
+            // Enhanced: Check if user exists with level and tier information
+            $user = User::with(['department', 'userLevel', 'userLevelTier'])->find($validated['user_id']);
             if (!$user) {
                 throw new Exception('Selected user not found.');
             }
@@ -370,10 +444,13 @@ class UserEvaluationController extends Controller
                 $evaluation->history()->create($historyData);
             }
 
-            // Calculate incentive amount using your function
-            $incentiveAmount = $this->calculateIncentiveAmount($totalScore);
+            // NEW: Calculate incentive amount using enhanced Level + Tier based system
+            $incentiveAmount = $this->calculateLevelTierIncentiveAmount($user, $totalScore);
 
-            Log::info('Calculated incentive', [
+            Log::info('Calculated Level+Tier incentive', [
+                'user_id' => $user->id,
+                'user_level' => $user->userLevel?->name,
+                'user_tier' => $user->userLevelTier?->tier_name,
                 'total_score' => $totalScore,
                 'incentive_amount' => $incentiveAmount
             ]);
@@ -387,9 +464,13 @@ class UserEvaluationController extends Controller
             DB::commit();
 
             $message = $existingEvaluation ? 'updated' : 'created';
+            $levelTierInfo = '';
+            if ($user->userLevel && $user->userLevelTier) {
+                $levelTierInfo = ' (' . $user->userLevel->name . ' - ' . $user->userLevelTier->tier_name . ')';
+            }
 
             return redirect()->route('admin.evaluations.user-evaluation')
-                ->with('success', 'User evaluation ' . $message . ' successfully! Total Score: ' . $totalScore . ', Incentive: $' . number_format($incentiveAmount, 2));
+                ->with('success', 'User evaluation ' . $message . ' successfully!' . $levelTierInfo . ' Total Score: ' . $totalScore . ', Incentive: $' . number_format($incentiveAmount, 2));
 
         } catch (Exception $e) {
             DB::rollBack();
@@ -405,6 +486,83 @@ class UserEvaluationController extends Controller
         }
     }
 
+    /**
+     * NEW: Enhanced incentive calculation based on User Level + Tier + Score
+     */
+    private function calculateLevelTierIncentiveAmount($user, $totalScore)
+    {
+        try {
+            if ($totalScore <= 0) {
+                return 0;
+            }
+
+            // Check if user has level and tier assigned
+            if (!$user->userLevel || !$user->userLevelTier) {
+                Log::warning('User missing level or tier assignment', [
+                    'user_id' => $user->id,
+                    'has_level' => !!$user->userLevel,
+                    'has_tier' => !!$user->userLevelTier
+                ]);
+
+                // Fallback to old system if no level/tier
+                return $this->calculateIncentiveAmount($totalScore);
+            }
+
+            // Find specific incentive for user's level + tier + score range
+            $incentive = Incentive::where('user_level_id', $user->userLevel->id)
+                ->where('user_level_tier_id', $user->userLevelTier->id)
+                ->where('min_score', '<=', $totalScore)
+                ->where('max_score', '>=', $totalScore)
+                ->orderBy('incentive_amount', 'desc')
+                ->first();
+
+            if ($incentive) {
+                Log::info('Found Level+Tier specific incentive', [
+                    'user_level' => $user->userLevel->name,
+                    'user_tier' => $user->userLevelTier->tier_name,
+                    'score_range' => $incentive->min_score . '-' . $incentive->max_score,
+                    'incentive_amount' => $incentive->incentive_amount
+                ]);
+
+                return (float)$incentive->incentive_amount;
+            }
+
+            // Fallback: Try to find incentive for just the level (any tier)
+            $levelIncentive = Incentive::where('user_level_id', $user->userLevel->id)
+                ->whereNull('user_level_tier_id')
+                ->where('min_score', '<=', $totalScore)
+                ->where('max_score', '>=', $totalScore)
+                ->orderBy('incentive_amount', 'desc')
+                ->first();
+
+            if ($levelIncentive) {
+                Log::info('Found Level-only incentive as fallback', [
+                    'user_level' => $user->userLevel->name,
+                    'incentive_amount' => $levelIncentive->incentive_amount
+                ]);
+
+                return (float)$levelIncentive->incentive_amount;
+            }
+
+            // Final fallback: Use old system
+            Log::info('No Level+Tier incentive found, falling back to old system');
+            return $this->calculateIncentiveAmount($totalScore);
+
+        } catch (Exception $e) {
+            Log::error('Level+Tier incentive calculation error', [
+                'user_id' => $user->id,
+                'total_score' => $totalScore,
+                'error' => $e->getMessage()
+            ]);
+
+            // Fallback to old system on error
+            return $this->calculateIncentiveAmount($totalScore);
+        }
+    }
+
+    /**
+     * Legacy incentive calculation (fallback)
+     */
     private function calculateIncentiveAmount($totalScore)
     {
         try {
@@ -412,7 +570,9 @@ class UserEvaluationController extends Controller
                 return 0;
             }
 
-            $incentive = Incentive::where('min_score', '<=', $totalScore)
+            $incentive = Incentive::whereNull('user_level_id')
+                ->whereNull('user_level_tier_id')
+                ->where('min_score', '<=', $totalScore)
                 ->where('max_score', '>=', $totalScore)
                 ->orderBy('incentive_amount', 'desc')
                 ->first();
@@ -420,7 +580,7 @@ class UserEvaluationController extends Controller
             return $incentive ? (float)$incentive->incentive_amount : 0;
 
         } catch (Exception $e) {
-            Log::error('Incentive calculation error', [
+            Log::error('Legacy incentive calculation error', [
                 'total_score' => $totalScore,
                 'error' => $e->getMessage()
             ]);

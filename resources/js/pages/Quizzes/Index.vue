@@ -25,7 +25,8 @@ import {
     Search,
     List,
     Grid3X3,
-    Brain
+    Brain,
+    BarChart3
 } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -108,6 +109,11 @@ const canTakeQuiz = (quiz) => {
     return quiz.attempts < 3
 }
 
+const isQuizCompleted = (quiz) => {
+    // ✅ Quiz is completed if passed or reached max attempts
+    return quiz.has_passed || quiz.attempts >= 3
+}
+
 const getQuizStatus = (quiz) => {
     // ✅ Show "Passed" if user has passed
     if (quiz.has_passed) return 'Passed'
@@ -132,10 +138,8 @@ const getQuizStatusVariant = (quiz) => {
     return 'outline'
 }
 
-const getButtonText = (quiz) => {
-    // ✅ Show appropriate button text
-    if (quiz.has_passed) return 'View Results'
-    if (quiz.attempts >= 3) return 'View Results'
+const getActiveButtonText = (quiz) => {
+    // ✅ Show appropriate button text for active quizzes
     if (quiz.attempts > 0) return 'Continue Quiz'
     return 'Start Quiz'
 }
@@ -312,28 +316,44 @@ const getButtonText = (quiz) => {
                                         </span>
                                     </div>
 
-                                    <!-- Action Button - FIXED VERSION -->
-                                    <Button
-                                        v-if="canTakeQuiz(quiz)"
-                                        asChild
-                                        class="w-full"
-                                    >
-                                        <Link :href="route('quizzes.show', quiz.id)">
-                                            <Brain class="w-4 h-4 mr-2" />
-                                            {{ getButtonText(quiz) }}
-                                        </Link>
-                                    </Button>
+                                    <!-- Action Buttons - UPDATED VERSION -->
+                                    <div class="space-y-2">
+                                        <!-- Active Quiz Button (Start/Continue) -->
+                                        <Button
+                                            v-if="canTakeQuiz(quiz)"
+                                            asChild
+                                            class="w-full"
+                                        >
+                                            <Link :href="route('quizzes.show', quiz.id)">
+                                                <Brain class="w-4 h-4 mr-2" />
+                                                {{ getActiveButtonText(quiz) }}
+                                            </Link>
+                                        </Button>
 
-                                    <!-- Disabled Button for completed/failed quizzes -->
-                                    <Button
-                                        v-else
-                                        variant="secondary"
-                                        disabled
-                                        class="w-full"
-                                    >
-                                        <Brain class="w-4 h-4 mr-2" />
-                                        {{ getButtonText(quiz) }}
-                                    </Button>
+                                        <!-- View Results Button (For completed/failed quizzes) -->
+                                        <Button
+                                            v-else-if="isQuizCompleted(quiz)"
+                                            asChild
+                                            variant="secondary"
+                                            class="w-full"
+                                        >
+                                            <Link :href="route('quiz-attempts.results', quiz.id)">
+                                                <BarChart3 class="w-4 h-4 mr-2" />
+                                                View Results
+                                            </Link>
+                                        </Button>
+
+                                        <!-- Fallback disabled button (should not normally show) -->
+                                        <Button
+                                            v-else
+                                            variant="ghost"
+                                            disabled
+                                            class="w-full"
+                                        >
+                                            <Brain class="w-4 h-4 mr-2" />
+                                            Unavailable
+                                        </Button>
+                                    </div>
                                 </CardContent>
                             </div>
                         </Card>

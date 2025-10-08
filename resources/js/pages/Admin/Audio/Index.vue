@@ -74,7 +74,6 @@ const props = defineProps<{
 }>()
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Admin', href: '/admin' },
     { title: 'Audio Management', href: '/admin/audio' }
 ]
 

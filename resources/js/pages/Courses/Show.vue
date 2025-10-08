@@ -1,6 +1,7 @@
 <!--
   Course Details Page
   Comprehensive course information with enrollment, rating, and assignment functionality
+  Updated to show new scheduling data (days, weeks, session times)
 -->
 <script setup lang="ts">
 import { Link, useForm, router } from '@inertiajs/vue3'
@@ -32,7 +33,9 @@ import {
     ClipboardList,
     Trophy,
     MapPin,
-    Loader2
+    Loader2,
+    CalendarDays,
+    Timer
 } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -326,7 +329,18 @@ const breadcrumbs: BreadcrumbItemType[] = [
         <div class="container px-4 mx-auto py-6 sm:py-8 max-w-7xl space-y-6">
             <!-- Course Header -->
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <h1 class="text-2xl sm:text-3xl font-bold text-foreground">{{ course.name }}</h1>
+                <div>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-foreground">{{ course.name }}</h1>
+                    <!-- Privacy Badge -->
+                    <div class="mt-2">
+                        <Badge
+                            :variant="course.privacy === 'public' ? 'default' : 'secondary'"
+                            class="text-xs"
+                        >
+                            {{ course.privacy === 'public' ? '🌍 Public Course' : '🔒 Private Course' }}
+                        </Badge>
+                    </div>
+                </div>
                 <Badge :variant="getStatusVariant(course.status)">
                     {{ formatStatus(course.status) }}
                 </Badge>
@@ -439,7 +453,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                             <Card v-if="course.duration" class="p-4">
                                 <div class="flex items-center space-x-2 text-muted-foreground mb-2">
                                     <Clock class="h-4 w-4" />
-                                    <span class="text-sm font-medium">Duration</span>
+                                    <span class="text-sm font-medium">Total Duration</span>
                                 </div>
                                 <p class="font-semibold text-foreground">{{ course.duration }} hours</p>
                             </Card>
@@ -490,7 +504,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                                 </p>
                             </div>
 
-                            <!-- ✅ Available Session Schedules -->
+                            <!-- ✅ Available Session Schedules with NEW SCHEDULING DATA -->
                             <div v-if="availabilities && availabilities.length > 0" class="space-y-4" :class="{ 'opacity-50': userAssignment && userAssignment.status === 'pending' }">
                                 <Label class="text-base font-semibold">Available Session Schedules:</Label>
 
@@ -513,36 +527,76 @@ const breadcrumbs: BreadcrumbItemType[] = [
                                             'border-primary': enrollForm.course_availability_id === availability.id.toString(),
                                             'opacity-50': isAvailabilityDisabled(availability)
                                         }">
-                                            <div class="flex justify-between items-start">
-                                                <div>
-                                                    <p class="font-medium text-foreground">
-                                                        {{ availability.formatted_date_range }}
-                                                    </p>
-                                                    <p class="text-sm text-muted-foreground mt-1">
-                                                        {{ formatDateTime(availability.start_date) }} - {{ formatDateTime(availability.end_date) }}
-                                                    </p>
-                                                    <p v-if="availability.notes" class="text-sm text-muted-foreground mt-1">
-                                                        {{ availability.notes }}
-                                                    </p>
+                                            <div class="space-y-3">
+                                                <!-- Date Range -->
+                                                <div class="flex justify-between items-start">
+                                                    <div>
+                                                        <p class="font-medium text-foreground">
+                                                            {{ availability.formatted_date_range }}
+                                                        </p>
+                                                        <p class="text-sm text-muted-foreground mt-1">
+                                                            {{ formatDateTime(availability.start_date) }} - {{ formatDateTime(availability.end_date) }}
+                                                        </p>
+                                                    </div>
+                                                    <Badge :variant="getAvailabilityStatusVariant(availability)">
+                                                        {{ getAvailabilityStatusText(availability) }}
+                                                    </Badge>
+                                                </div>
 
-                                                    <!-- ✅ Show BOTH capacity and sessions -->
-                                                    <div class="mt-2 space-y-1">
-                                                        <p class="text-sm text-primary font-medium">
-                                                            {{ formatCapacity(availability.capacity) }}
-                                                        </p>
-                                                        <p class="text-sm text-green-600 font-medium">
-                                                            {{ formatSessions(availability.sessions) }}
-                                                        </p>
-                                                        <p v-if="(availability.capacity - availability.sessions) > 0" class="text-xs text-muted-foreground">
-                                                            {{ (availability.capacity - availability.sessions) }} sessions enrolled
-                                                        </p>
+                                                <!-- NEW: Scheduling Information -->
+                                                <div class="border-t pt-3 space-y-2">
+                                                    <h4 class="text-xs font-semibold text-foreground uppercase tracking-wide">Schedule Details</h4>
+
+                                                    <!-- Days of Week -->
+                                                    <div v-if="availability.formatted_days && availability.formatted_days !== 'N/A'" class="flex items-center space-x-2">
+                                                        <CalendarDays class="h-4 w-4 text-muted-foreground" />
+                                                        <span class="text-sm text-muted-foreground">Days:</span>
+                                                        <Badge variant="outline" class="text-xs">
+                                                            {{ availability.formatted_days }}
+                                                        </Badge>
+                                                    </div>
+
+                                                    <!-- Duration in Weeks -->
+                                                    <div v-if="availability.duration_weeks" class="flex items-center space-x-2">
+                                                        <Calendar class="h-4 w-4 text-muted-foreground" />
+                                                        <span class="text-sm text-muted-foreground">Duration:</span>
+                                                        <span class="text-sm font-medium text-foreground">{{ availability.duration_weeks }} weeks</span>
+                                                    </div>
+
+                                                    <!-- Session Time -->
+                                                    <div v-if="availability.formatted_session_time" class="flex items-center space-x-2">
+                                                        <Timer class="h-4 w-4 text-muted-foreground" />
+                                                        <span class="text-sm text-muted-foreground">Time:</span>
+                                                        <span class="text-sm font-medium text-foreground">{{ availability.formatted_session_time }}</span>
+                                                    </div>
+
+                                                    <!-- Session Duration -->
+                                                    <div v-if="availability.formatted_session_duration" class="flex items-center space-x-2">
+                                                        <Clock class="h-4 w-4 text-muted-foreground" />
+                                                        <span class="text-sm text-muted-foreground">Length:</span>
+                                                        <span class="text-sm font-medium text-foreground">{{ availability.formatted_session_duration }}</span>
                                                     </div>
                                                 </div>
 
-                                                <!-- ✅ Availability status based on sessions -->
-                                                <Badge :variant="getAvailabilityStatusVariant(availability)">
-                                                    {{ getAvailabilityStatusText(availability) }}
-                                                </Badge>
+                                                <!-- Availability Numbers -->
+                                                <div class="border-t pt-3 space-y-1">
+                                                    <p class="text-sm text-primary font-medium">
+                                                        {{ formatCapacity(availability.capacity) }}
+                                                    </p>
+                                                    <p class="text-sm text-green-600 font-medium">
+                                                        {{ formatSessions(availability.sessions) }}
+                                                    </p>
+                                                    <p v-if="(availability.capacity - availability.sessions) > 0" class="text-xs text-muted-foreground">
+                                                        {{ (availability.capacity - availability.sessions) }} sessions enrolled
+                                                    </p>
+                                                </div>
+
+                                                <!-- Notes -->
+                                                <div v-if="availability.notes" class="border-t pt-3">
+                                                    <p class="text-sm text-muted-foreground">
+                                                        <span class="font-medium">Notes:</span> {{ availability.notes }}
+                                                    </p>
+                                                </div>
                                             </div>
                                         </Card>
                                     </div>
@@ -558,7 +612,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
 
                             <Button
                                 @click="enroll"
-                                class="w-full"
+                                class=" mt-6  w-full"
                                 :disabled="enrollForm.processing || (availabilities && availabilities.length > 0 && !enrollForm.course_availability_id) || (userAssignment && userAssignment.status === 'pending')"
                             >
                                 <Loader2 v-if="enrollForm.processing" class="mr-2 h-4 w-4 animate-spin" />
@@ -695,29 +749,70 @@ const breadcrumbs: BreadcrumbItemType[] = [
                                     </Button>
                                 </Alert>
 
-                                <!-- ✅ Show selected session schedule -->
+                                <!-- ✅ Show selected session schedule with NEW SCHEDULING DATA -->
                                 <Card v-if="selectedAvailability" class="bg-primary/5 border-primary/20">
                                     <CardContent class="p-4">
-                                        <div class="flex items-center space-x-2 mb-2">
+                                        <div class="flex items-center space-x-2 mb-3">
                                             <MapPin class="h-4 w-4 text-primary" />
-                                            <span class="text-sm font-medium text-primary">Your Selected Session Schedule:</span>
+                                            <span class="text-sm font-medium text-primary">Your Selected Session Schedule</span>
                                         </div>
-                                        <p class="font-semibold text-foreground">{{ selectedAvailability.formatted_date_range }}</p>
-                                        <p class="text-sm text-muted-foreground mt-1">
-                                            {{ formatDateTime(selectedAvailability.start_date) }} - {{ formatDateTime(selectedAvailability.end_date) }}
-                                        </p>
 
-                                        <!-- ✅ Display BOTH capacity and sessions -->
-                                        <div class="mt-2 space-y-1 text-xs">
-                                            <p class="text-primary font-medium">
-                                                Total Capacity: {{ selectedAvailability.capacity }} sessions
-                                            </p>
-                                            <p class="text-green-600 font-medium">
-                                                Available: {{ selectedAvailability.sessions }} sessions
-                                            </p>
-                                            <p class="text-muted-foreground">
-                                                Enrolled: {{ (selectedAvailability.capacity - selectedAvailability.sessions) }} sessions
-                                            </p>
+                                        <div class="space-y-3">
+                                            <!-- Date Range -->
+                                            <div>
+                                                <p class="font-semibold text-foreground">{{ selectedAvailability.formatted_date_range }}</p>
+                                                <p class="text-sm text-muted-foreground">
+                                                    {{ formatDateTime(selectedAvailability.start_date) }} - {{ formatDateTime(selectedAvailability.end_date) }}
+                                                </p>
+                                            </div>
+
+                                            <!-- NEW: Scheduling Information -->
+                                            <div class="border-t pt-3 space-y-2 text-sm">
+                                                <h4 class="text-xs font-semibold text-foreground uppercase tracking-wide">Schedule Details</h4>
+
+                                                <!-- Days of Week -->
+                                                <div v-if="selectedAvailability.formatted_days && selectedAvailability.formatted_days !== 'N/A'" class="flex items-center space-x-2">
+                                                    <CalendarDays class="h-4 w-4 text-muted-foreground" />
+                                                    <span class="text-muted-foreground">Days:</span>
+                                                    <Badge variant="outline" class="text-xs">
+                                                        {{ selectedAvailability.formatted_days }}
+                                                    </Badge>
+                                                </div>
+
+                                                <!-- Duration in Weeks -->
+                                                <div v-if="selectedAvailability.duration_weeks" class="flex items-center space-x-2">
+                                                    <Calendar class="h-4 w-4 text-muted-foreground" />
+                                                    <span class="text-muted-foreground">Duration:</span>
+                                                    <span class="font-medium text-foreground">{{ selectedAvailability.duration_weeks }} weeks</span>
+                                                </div>
+
+                                                <!-- Session Time -->
+                                                <div v-if="selectedAvailability.formatted_session_time" class="flex items-center space-x-2">
+                                                    <Timer class="h-4 w-4 text-muted-foreground" />
+                                                    <span class="text-muted-foreground">Time:</span>
+                                                    <span class="font-medium text-foreground">{{ selectedAvailability.formatted_session_time }}</span>
+                                                </div>
+
+                                                <!-- Session Duration -->
+                                                <div v-if="selectedAvailability.formatted_session_duration" class="flex items-center space-x-2">
+                                                    <Clock class="h-4 w-4 text-muted-foreground" />
+                                                    <span class="text-muted-foreground">Length:</span>
+                                                    <span class="font-medium text-foreground">{{ selectedAvailability.formatted_session_duration }}</span>
+                                                </div>
+                                            </div>
+
+                                            <!-- ✅ Display BOTH capacity and sessions -->
+                                            <div class="border-t pt-3 space-y-1 text-xs">
+                                                <p class="text-primary font-medium">
+                                                    Total Capacity: {{ selectedAvailability.capacity }} sessions
+                                                </p>
+                                                <p class="text-green-600 font-medium">
+                                                    Available: {{ selectedAvailability.sessions }} sessions
+                                                </p>
+                                                <p class="text-muted-foreground">
+                                                    Enrolled: {{ (selectedAvailability.capacity - selectedAvailability.sessions) }} sessions
+                                                </p>
+                                            </div>
                                         </div>
                                     </CardContent>
                                 </Card>

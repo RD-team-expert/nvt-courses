@@ -92,14 +92,8 @@ class CourseController extends Controller
         ]);
     }
 
-
-
-
     /**
      * Enhanced enroll method with course availability selection
-     */
-    /**
-     * Enhanced enroll method with course availability selection and manager notifications
      */
     public function enroll(Request $request, Course $course)
     {
@@ -160,15 +154,6 @@ class CourseController extends Controller
                     return back()->withErrors(['message' => 'No sessions available for this schedule. Fully booked!']);
                 }
 
-                // Log the enrollment attempt
-                Log::info('📝 Proceeding with enrollment', [
-                    'user_id' => $user->id,
-                    'course_id' => $course->id,
-                    'availability_id' => $availability->id,
-                    'sessions_before' => $availability->sessions,
-                    'capacity_before' => $availability->capacity
-                ]);
-
                 // Check if already enrolled
                 $existingEnrollment = CourseRegistration::where('course_id', $course->id)
                     ->where('user_id', $user->id)
@@ -206,27 +191,10 @@ class CourseController extends Controller
                     'capacity_after' => $availability->capacity - 1
                 ]);
 
-                // 🎯 NEW: Send manager notification for public course enrollment
+                // 🎯 Send manager notification for public course enrollment
                 if ($course->privacy === 'public') {
-                    Log::info('📧 Course is public, sending manager notifications', [
-                        'course_privacy' => $course->privacy,
-                        'user_department' => $user->department?->name ?? 'No Department'
-                    ]);
-
                     $this->notifyManagersOnPublicEnrollment($course, $user);
-                } else {
-                    Log::info('ℹ️ Course is private, skipping public enrollment manager notifications', [
-                        'course_privacy' => $course->privacy
-                    ]);
                 }
-
-                Log::info('🏁 Enrollment process completed successfully', [
-                    'user_id' => $user->id,
-                    'course_id' => $course->id,
-                    'enrollment_id' => $enrollment->id,
-                    'manager_notification' => $course->privacy === 'public' ? 'sent' : 'skipped',
-                    'redirect_to' => 'courses.show'
-                ]);
 
                 return redirect()->route('courses.show', $course->id)
                     ->with('success', 'Successfully enrolled in the course for ' . $availability->formatted_date_range . '!');
@@ -248,45 +216,7 @@ class CourseController extends Controller
     }
 
     /**
-     * 🎯 NEW: Notify managers about public course enrollments
-     */
-
-
-    /**
-     * A user can mark their course as completed
-     */
-    public function markCompleted(Request $request, Course $course)
-    {
-        $user = auth()->user();
-
-        // Check if user has rated the course first
-        $completion = CourseCompletion::where('user_id', $user->id)
-            ->where('course_id', $course->id)
-            ->first();
-
-        if (!$completion || $completion->rating === null) {
-            return redirect()->route('courses.show', $course->id)
-                ->with('error', 'You must rate this course before marking it as completed.');
-        }
-
-        // ✅ Update the pivot table directly using updateExistingPivot
-        $course->users()->updateExistingPivot($user->id, [
-            'status' => 'completed',
-            'completed_at' => now(),
-            'updated_at' => now()
-        ]);
-
-        // Optional: Fire the event
-         event(new \App\Events\CourseCompleted($course, $user));
-
-        return redirect()->route('courses.show', $course->id)
-            ->with('success', 'Course marked as completed!');
-    }
-
-
-
-    /**
-     * Enhanced show method with course availability and assignment data
+     * Enhanced show method with NEW SCHEDULING DATA
      */
     public function show(Course $course)
     {
@@ -323,34 +253,67 @@ class CourseController extends Controller
                 ->with('courseAvailability')
                 ->first();
 
-            if ($enrollment) {
-                $selectedAvailability = $enrollment->courseAvailability;
+            if ($enrollment && $enrollment->courseAvailability) {
+                $availability = $enrollment->courseAvailability;
+
+                // ✅ UPDATED: Include NEW scheduling fields in selected availability
+                $selectedAvailability = [
+                    'id' => $availability->id,
+                    'start_date' => $availability->start_date,
+                    'end_date' => $availability->end_date,
+                    'formatted_date_range' => $availability->formatted_date_range ?? 'TBD',
+                    'capacity' => $availability->capacity ?? 50,
+                    'sessions' => $availability->sessions ?? 0,
+                    'notes' => $availability->notes,
+
+                    // ✅ NEW SCHEDULING FIELDS
+                    'days_of_week' => $availability->days_of_week,
+                    'selected_days' => $availability->selected_days ?? [], // Array format
+                    'formatted_days' => $availability->formatted_days ?? 'N/A',
+                    'duration_weeks' => $availability->duration_weeks,
+                    'session_time' => $availability->session_time,
+                    'formatted_session_time' => $availability->formatted_session_time,
+                    'session_duration_minutes' => $availability->session_duration_minutes,
+                    'formatted_session_duration' => $availability->formatted_session_duration ?? '1 hour',
+                ];
             }
         }
 
-        // ✅ Format availabilities with BOTH capacity and sessions
+        // ✅ UPDATED: Format availabilities with NEW scheduling data
         $availabilities = $course->availabilities->map(function ($availability) {
             return [
                 'id' => $availability->id,
                 'start_date' => $availability->start_date,
                 'end_date' => $availability->end_date,
                 'formatted_date_range' => $availability->formatted_date_range ?? 'TBD',
-                'capacity' => $availability->capacity ?? 50,          // ✅ Total capacity
-                'sessions' => $availability->sessions ?? 0,           // ✅ Available sessions
-                'enrolled_count' => ($availability->capacity ?? 50) - ($availability->sessions ?? 0), // Calculate enrolled
-                'available_spots' => $availability->sessions ?? 0,   // Same as sessions
-                'is_available' => ($availability->sessions ?? 0) > 0, // Available if sessions > 0
-                'is_full' => ($availability->sessions ?? 0) <= 0,    // Full if no sessions left
+                'capacity' => $availability->capacity ?? 50,
+                'sessions' => $availability->sessions ?? 0,
+                'enrolled_count' => ($availability->capacity ?? 50) - ($availability->sessions ?? 0),
+                'available_spots' => $availability->sessions ?? 0,
+                'is_available' => ($availability->sessions ?? 0) > 0,
+                'is_full' => ($availability->sessions ?? 0) <= 0,
                 'is_expired' => false,
-                'notes' => $availability->notes
+                'notes' => $availability->notes,
+
+                // ✅ NEW SCHEDULING FIELDS FOR USER DISPLAY
+                'days_of_week' => $availability->days_of_week, // Raw SET data
+                'selected_days' => $availability->selected_days ?? [], // Array format from model accessor
+                'formatted_days' => $availability->formatted_days ?? 'N/A', // "Mon, Wed, Fri"
+                'duration_weeks' => $availability->duration_weeks ?? 1,
+                'session_time' => $availability->session_time,
+                'formatted_session_time' => $availability->formatted_session_time ?? null, // "09:00"
+                'session_duration_minutes' => $availability->session_duration_minutes ?? 60,
+                'formatted_session_duration' => $availability->formatted_session_duration ?? '1 hour', // "2h 30m"
             ];
         });
 
-        Log::info('Returning data', [
+        Log::info('Returning data with NEW scheduling fields', [
             'isEnrolled' => $isEnrolled,
             'userStatus' => $userStatus,
             'completion_exists' => !!$completion,
-            'completion_rating' => $completion ? $completion->rating : null
+            'selectedAvailability_has_scheduling' => $selectedAvailability ? isset($selectedAvailability['formatted_days']) : false,
+            'availabilities_count' => $availabilities->count(),
+            'first_availability_days' => $availabilities->first()['formatted_days'] ?? 'none'
         ]);
 
         return Inertia::render('Courses/Show', [
@@ -358,18 +321,43 @@ class CourseController extends Controller
             'isEnrolled' => $isEnrolled,
             'userStatus' => $userStatus,
             'completion' => $completion,
-            'selectedAvailability' => $selectedAvailability,
-            'availabilities' => $availabilities, // ✅ Now includes both capacity and sessions
+            'selectedAvailability' => $selectedAvailability, // ✅ Now includes scheduling data
+            'availabilities' => $availabilities, // ✅ Now includes scheduling data
             'userAssignment' => $userAssignment,
         ]);
     }
 
-
-
-
     /**
-     * Check if user can view a course
+     * A user can mark their course as completed
      */
+    public function markCompleted(Request $request, Course $course)
+    {
+        $user = auth()->user();
+
+        // Check if user has rated the course first
+        $completion = CourseCompletion::where('user_id', $user->id)
+            ->where('course_id', $course->id)
+            ->first();
+
+        if (!$completion || $completion->rating === null) {
+            return redirect()->route('courses.show', $course->id)
+                ->with('error', 'You must rate this course before marking it as completed.');
+        }
+
+        // ✅ Update the pivot table directly using updateExistingPivot
+        $course->users()->updateExistingPivot($user->id, [
+            'status' => 'completed',
+            'completed_at' => now(),
+            'updated_at' => now()
+        ]);
+
+        // Optional: Fire the event
+        event(new \App\Events\CourseCompleted($course, $user));
+
+        return redirect()->route('courses.show', $course->id)
+            ->with('success', 'Course marked as completed!');
+    }
+
     /**
      * Check if user can view a course
      */
@@ -393,7 +381,7 @@ class CourseController extends Controller
                 ->where('user_id', $user->id)
                 ->exists();
 
-            // ✅ ADD THIS: Check if course is assigned to the user
+            // ✅ Check if course is assigned to the user
             $isAssigned = CourseAssignment::where('course_id', $course->id)
                 ->where('user_id', $user->id)
                 ->exists();
@@ -401,12 +389,11 @@ class CourseController extends Controller
             // Check if user is admin
             $isAdmin = $user->is_admin ?? false;
 
-            return $isEnrolled || $isAssigned || $isAdmin; // ✅ Added $isAssigned
+            return $isEnrolled || $isAssigned || $isAdmin;
         }
 
         return false;
     }
-
 
     /**
      * Show the course completion page with rating form
@@ -451,12 +438,6 @@ class CourseController extends Controller
         $course = Course::findOrFail($id);
 
         // ✅ Allow rating for enrolled users (not just completed)
-        $enrollment = $course->users()
-            ->where('user_id', $user->id)
-            ->wherePivot('status', ['pending', 'in_progress', 'active']) // Multiple statuses
-            ->first();
-
-        // OR use direct database query
         $enrollment = CourseRegistration::where('course_id', $course->id)
             ->where('user_id', $user->id)
             ->whereIn('status', ['pending', 'in_progress', 'active'])
@@ -479,6 +460,7 @@ class CourseController extends Controller
         return redirect()->route('courses.show', $id)
             ->with('success', 'Thank you for your rating!');
     }
+
     private function notifyManagersOnPublicEnrollment(Course $course, User $enrolledUser)
     {
         try {
@@ -500,18 +482,33 @@ class CourseController extends Controller
             }
 
             $managerService = new \App\Services\ManagerHierarchyService();
-            $departmentName = $enrolledUser->department->name;
-            $managers = $managerService->getManagersForDepartment($departmentName, ['L2']);
+
+            // ✅ FIXED: Use the correct method that exists in your service
+            // Get managers for this specific user (not department name)
+            $managerResults = $managerService->getManagersForUser($enrolledUser->id, ['L2']);
+
+            // ✅ Transform the results to match your expected format
+            $managers = ['L2' => []];
+
+            foreach ($managerResults as $managerData) {
+                if ($managerData['level'] === 'L2') {
+                    $managers['L2'][] = [
+                        'id' => $managerData['manager']->id,
+                        'name' => $managerData['manager']->name,
+                        'email' => $managerData['manager']->email
+                    ];
+                }
+            }
 
             Log::info('👔 Managers found for public enrollment', [
-                'department_name' => $departmentName,
+                'department_name' => $enrolledUser->department->name,
                 'managers_count' => count($managers['L2']),
                 'managers_found' => array_map(function($manager) {
-                    return $manager ? [
+                    return [
                         'id' => $manager['id'],
                         'name' => $manager['name'],
                         'email' => $manager['email']
-                    ] : null;
+                    ];
                 }, $managers['L2'])
             ]);
 
@@ -585,9 +582,10 @@ class CourseController extends Controller
             Log::error('💥 Public enrollment notification process failed', [
                 'course_id' => $course->id,
                 'enrolled_user_id' => $enrolledUser->id,
-                'error_message' => $e->getMessage()
+                'error_message' => $e->getMessage(),
+                'error_file' => $e->getFile(),
+                'error_line' => $e->getLine()
             ]);
         }
     }
-
 }

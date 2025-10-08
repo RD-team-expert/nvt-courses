@@ -16,7 +16,6 @@ import { Switch } from '@/components/ui/switch'
 import { ArrowLeft, Save, BookOpen, Hash, Settings } from 'lucide-vue-next'
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Admin', href: '/admin' },
     { title: 'Audio Categories', href: '/admin/audio-categories' },
     { title: 'Create Category', href: '#' }
 ]

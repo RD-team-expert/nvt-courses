@@ -229,8 +229,8 @@
                             @if($availability->end_date && $availability->start_date != $availability->end_date)
                                 - {{ \Carbon\Carbon::parse($availability->end_date)->format('g:i A') }}
                             @endif
-                            @if($availability->capacity)
-                                • {{ $availability->capacity }} sessions available
+                            @if($availability->sessions)
+                                • {{ $availability->sessions }} sessions available
                             @endif
                         </small>
                         @if($availability->notes)
