@@ -9,71 +9,72 @@
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                     <h1 class="text-xl sm:text-2xl font-bold text-foreground">Reports & Analytics</h1>
-                    <p class="text-sm text-muted-foreground mt-1">Comprehensive analytics and reporting interface for tracking system performance</p>
+                    <p class="text-sm text-wrap max-w-11/12 text-muted-foreground mt-1">Comprehensive analytics and reporting interface for tracking system performance</p>
                 </div>
 
-                <!-- ✅ UPDATED: Report Buttons with Course Online Dropdown -->
-                <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
-                    <Button :as="'a'" :href="route('admin.reports.course-registrations')" variant="outline" class="w-full sm:w-auto">
-                        <BookOpen class="mr-2 h-4 w-4" />
-                        Course Registrations
-                    </Button>
-                    <Button :as="'a'" :href="route('admin.reports.attendance')" variant="outline" class="w-full sm:w-auto">
-                        <Clock class="mr-2 h-4 w-4" />
-                        Attendance Records
-                    </Button>
-                    <Button :as="'a'" :href="route('admin.reports.course-completion')" variant="outline" class="w-full sm:w-auto">
-                        <CheckCircle class="mr-2 h-4 w-4" />
-                        Course Completion
-                    </Button>
 
-                    <!-- ✅ NEW: Course Online Dropdown -->
-                    <DropdownMenu>
-                        <DropdownMenuTrigger as-child>
-                            <Button variant="outline" class="w-full sm:w-auto">
-                                <Monitor class="mr-2 h-4 w-4" />
-                                Course Online
-                                <ChevronDown class="ml-2 h-4 w-4" />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" class="w-48">
-                            <DropdownMenuItem as-child>
-                                <Link :href="route('admin.reports.course-online.progress')" class="flex items-center">
-                                    <BarChart3 class="mr-2 h-4 w-4" />
-                                    Progress Report
-                                </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem as-child>
-                                <Link :href="route('admin.reports.course-online.learning-sessions')" class="flex items-center">
-                                    <Activity class="mr-2 h-4 w-4" />
-                                    Learning Sessions
-                                </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem as-child>
-                                <Link :href="route('admin.reports.course-online.user-performance')" class="flex items-center">
-                                    <Users class="mr-2 h-4 w-4" />
-                                    User Performance
-                                </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem as-child>
-                                <Link href="/admin/analytics/cheating-detection" class="flex items-center">
-                                    <Shield class="mr-2 h-4 w-4" />
-                                    Cheating Detection
-                                </Link>
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+            </div>
+            <!-- ✅ UPDATED: Report Buttons with Course Online Dropdown -->
+            <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
+                <Button :as="'a'" :href="route('admin.reports.course-registrations')" variant="outline" class="w-full sm:w-auto">
+                    <BookOpen class="mr-2 h-4 w-4" />
+                    Course Registrations
+                </Button>
+                <Button :as="'a'" :href="route('admin.reports.attendance')" variant="outline" class="w-full sm:w-auto">
+                    <Clock class="mr-2 h-4 w-4" />
+                    Attendance Records
+                </Button>
+                <Button :as="'a'" :href="route('admin.reports.course-completion')" variant="outline" class="w-full sm:w-auto">
+                    <CheckCircle class="mr-2 h-4 w-4" />
+                    Course Completion
+                </Button>
 
-                    <Button :as="'a'" :href="route('admin.reports.quiz-attempts')" variant="outline" class="w-full sm:w-auto">
-                        <FileText class="mr-2 h-4 w-4" />
-                        Quiz Attempts
-                    </Button>
-                    <Button :as="'a'" :href="route('admin.reports.monthly-kpi')" variant="outline" class="w-full sm:w-auto">
-                        <FileText class="mr-2 h-4 w-4" />
-                        Monthly-kpi
-                    </Button>
-                </div>
+                <!-- ✅ NEW: Course Online Dropdown -->
+                <DropdownMenu>
+                    <DropdownMenuTrigger as-child>
+                        <Button variant="outline" class="w-full sm:w-auto">
+                            <Monitor class="mr-2 h-4 w-4" />
+                            Course Online
+                            <ChevronDown class="ml-2 h-4 w-4" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" class="w-48">
+                        <DropdownMenuItem as-child>
+                            <Link :href="route('admin.reports.course-online.progress')" class="flex items-center">
+                                <BarChart3 class="mr-2 h-4 w-4" />
+                                Progress Report
+                            </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem as-child>
+                            <Link :href="route('admin.reports.course-online.learning-sessions')" class="flex items-center">
+                                <Activity class="mr-2 h-4 w-4" />
+                                Learning Sessions
+                            </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem as-child>
+                            <Link :href="route('admin.reports.course-online.user-performance')" class="flex items-center">
+                                <Users class="mr-2 h-4 w-4" />
+                                User Performance
+                            </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem as-child>
+                            <Link href="/admin/analytics/cheating-detection" class="flex items-center">
+                                <Shield class="mr-2 h-4 w-4" />
+                                Cheating Detection
+                            </Link>
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+
+                <Button :as="'a'" :href="route('admin.reports.quiz-attempts')" variant="outline" class="w-full sm:w-auto">
+                    <FileText class="mr-2 h-4 w-4" />
+                    Quiz Attempts
+                </Button>
+                <Button :as="'a'" :href="route('admin.reports.monthly-kpi')" variant="outline" class="w-full sm:w-auto">
+                    <FileText class="mr-2 h-4 w-4" />
+                    Monthly-kpi
+                </Button>
             </div>
 
             <!-- Enhanced Filters Section -->
@@ -160,7 +161,7 @@
                                 <RotateCcw class="mr-2 h-4 w-4" />
                                 Clear Filters
                             </Button>
-                            <div v-if="hasActiveFilters" class="text-sm text-muted-foreground ml-4 flex items-center">
+                            <div v-if="hasActiveFilters" class="text-sm text-wrap max-w-11/12 text-muted-foreground ml-4 flex items-center">
                                 <CheckCircle class="h-4 w-4 mr-1 text-green-600" />
                                 Filters applied to all sections
                             </div>
@@ -185,11 +186,11 @@
                         <div class="flex justify-between items-end">
                             <div>
                                 <p class="text-3xl font-bold text-primary">{{ analytics.users && analytics.users.total ? analytics.users.total : 0 }}</p>
-                                <p class="text-sm text-muted-foreground">Total Users</p>
+                                <p class="text-sm text-wrap max-w-11/12 text-muted-foreground">Total Users</p>
                             </div>
                             <div class="text-right">
                                 <p class="text-xl font-semibold text-foreground">{{ analytics.users && analytics.users.active ? analytics.users.active : 0 }}</p>
-                                <p class="text-sm text-muted-foreground">Active (30d)</p>
+                                <p class="text-sm text-wrap max-w-11/12 text-muted-foreground">Active (30d)</p>
                                 <Badge :variant="(analytics.users && analytics.users.active_percentage ? analytics.users.active_percentage : 0) >= 50 ? 'default' : 'secondary'" class="mt-1">
                                     {{ analytics.users && analytics.users.active_percentage ? analytics.users.active_percentage : 0 }}% Active
                                 </Badge>
@@ -212,20 +213,20 @@
                         <div class="flex justify-between items-end">
                             <div>
                                 <p class="text-3xl font-bold text-primary">{{ analytics.courses && analytics.courses.total ? analytics.courses.total : 0 }}</p>
-                                <p class="text-sm text-muted-foreground">Total Courses</p>
+                                <p class="text-sm text-wrap max-w-11/12 text-muted-foreground">Total Courses</p>
                             </div>
                             <div class="text-right space-y-1">
                                 <div class="flex items-center justify-end">
                                     <div class="inline-block w-3 h-3 rounded-full bg-green-500 mr-2"></div>
                                     <p class="text-xl font-semibold text-foreground">{{ analytics.courses && analytics.courses.active ? analytics.courses.active : 0 }}</p>
                                 </div>
-                                <p class="text-sm text-muted-foreground">Active</p>
+                                <p class="text-sm text-wrap max-w-11/12 text-muted-foreground">Active</p>
 
                                 <div class="flex items-center justify-end mt-1">
                                     <div class="inline-block w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
                                     <p class="text-xl font-semibold text-foreground">{{ analytics.courses && analytics.courses.completed ? analytics.courses.completed : 0 }}</p>
                                 </div>
-                                <p class="text-sm text-muted-foreground">Completed</p>
+                                <p class="text-sm text-wrap max-w-11/12 text-muted-foreground">Completed</p>
                             </div>
                         </div>
                     </CardContent>
@@ -245,11 +246,11 @@
                         <div class="flex justify-between items-end">
                             <div>
                                 <p class="text-3xl font-bold text-primary">{{ analytics.registrations && analytics.registrations.total ? analytics.registrations.total : 0 }}</p>
-                                <p class="text-sm text-muted-foreground">Total Registrations</p>
+                                <p class="text-sm text-wrap max-w-11/12 text-muted-foreground">Total Registrations</p>
                             </div>
                             <div class="text-right">
                                 <p class="text-xl font-semibold text-foreground">{{ analytics.registrations && analytics.registrations.completed ? analytics.registrations.completed : 0 }}</p>
-                                <p class="text-sm text-muted-foreground">Completed</p>
+                                <p class="text-sm text-wrap max-w-11/12 text-muted-foreground">Completed</p>
                                 <Badge :variant="(analytics.registrations && analytics.registrations.completion_rate ? analytics.registrations.completion_rate : 0) >= 50 ? 'default' : 'secondary'" class="mt-1">
                                     {{ analytics.registrations && analytics.registrations.completion_rate ? analytics.registrations.completion_rate : 0 }}% Completion
                                 </Badge>
@@ -272,11 +273,11 @@
                         <div class="flex justify-between items-end">
                             <div>
                                 <p class="text-3xl font-bold text-primary">{{ analytics.attendance && analytics.attendance.total_clockings ? analytics.attendance.total_clockings : 0 }}</p>
-                                <p class="text-sm text-muted-foreground">Total Clockings</p>
+                                <p class="text-sm text-wrap max-w-11/12 text-muted-foreground">Total Clockings</p>
                             </div>
                             <div class="text-right">
                                 <p class="text-xl font-semibold text-foreground">{{ analytics.attendance && analytics.attendance.average_duration ? analytics.attendance.average_duration : 0 }} min</p>
-                                <p class="text-sm text-muted-foreground">Avg. Duration</p>
+                                <p class="text-sm text-wrap max-w-11/12 text-muted-foreground">Avg. Duration</p>
                                 <div class="flex items-center justify-end mt-2">
                                     <span class="text-sm font-medium text-muted-foreground mr-1">Rating:</span>
                                     <div class="flex">
@@ -389,7 +390,7 @@
                                 <FileText class="h-8 w-8 text-primary" />
                             </div>
                             <p class="text-3xl font-bold text-primary mb-1">{{ analytics.quiz.total_attempts || 0 }}</p>
-                            <p class="text-sm text-muted-foreground">Total Attempts</p>
+                            <p class="text-sm text-wrap max-w-11/12 text-muted-foreground">Total Attempts</p>
                         </div>
 
                         <div class="text-center">
@@ -397,7 +398,7 @@
                                 <CheckCircle class="h-8 w-8 text-green-600" />
                             </div>
                             <p class="text-3xl font-bold text-green-600 mb-1">{{ analytics.quiz.passed_attempts || 0 }}</p>
-                            <p class="text-sm text-muted-foreground">Passed</p>
+                            <p class="text-sm text-wrap max-w-11/12 text-muted-foreground">Passed</p>
                         </div>
 
                         <div class="text-center">
@@ -405,7 +406,7 @@
                                 <XCircle class="h-8 w-8 text-red-600" />
                             </div>
                             <p class="text-3xl font-bold text-red-600 mb-1">{{ analytics.quiz.failed_attempts || 0 }}</p>
-                            <p class="text-sm text-muted-foreground">Failed</p>
+                            <p class="text-sm text-wrap max-w-11/12 text-muted-foreground">Failed</p>
                         </div>
 
                         <div class="text-center">
@@ -413,7 +414,7 @@
                                 <BarChart3 class="h-8 w-8 text-blue-600" />
                             </div>
                             <p class="text-3xl font-bold text-blue-600 mb-1">{{ analytics.quiz.average_score || 0 }}%</p>
-                            <p class="text-sm text-muted-foreground">Average Score</p>
+                            <p class="text-sm text-wrap max-w-11/12 text-muted-foreground">Average Score</p>
                         </div>
                     </div>
 
@@ -426,7 +427,7 @@
                                     <div class="flex items-center justify-between">
                                         <div>
                                             <p class="font-medium text-foreground">{{ quiz.quiz_title }}</p>
-                                            <p class="text-sm text-muted-foreground">{{ quiz.attempt_count }} attempts</p>
+                                            <p class="text-sm text-wrap max-w-11/12 text-muted-foreground">{{ quiz.attempt_count }} attempts</p>
                                         </div>
                                         <div class="text-right">
                                             <Badge variant="secondary">{{ quiz.avg_score }}% avg</Badge>
@@ -456,7 +457,7 @@
                             <ClipboardList class="h-8 w-8 text-primary" />
                             <div>
                                 <div class="font-medium">Course Registrations</div>
-                                <p class="text-sm text-muted-foreground">View and export course registration data</p>
+                                <p class="text-sm text-wrap max-w-11/12 text-muted-foreground">View and export course registration data</p>
                             </div>
                         </Button>
 
@@ -469,7 +470,7 @@
                             <Clock class="h-8 w-8 text-primary" />
                             <div>
                                 <div class="font-medium">Attendance Records</div>
-                                <p class="text-sm text-muted-foreground">View and export attendance data</p>
+                                <p class="text-sm text-wrap max-w-11/12 text-muted-foreground">View and export attendance data</p>
                             </div>
                         </Button>
 
@@ -482,7 +483,7 @@
                             <CheckCircle class="h-8 w-8 text-primary" />
                             <div>
                                 <div class="font-medium">Course Completion</div>
-                                <p class="text-sm text-muted-foreground">View and export course completion data</p>
+                                <p class="text-sm text-wrap max-w-11/12 text-muted-foreground">View and export course completion data</p>
                             </div>
                         </Button>
 
@@ -499,7 +500,7 @@
                                     </div>
                                     <div>
                                         <div class="font-medium">Course Online</div>
-                                        <p class="text-sm text-muted-foreground">Online learning analytics</p>
+                                        <p class="text-sm text-wrap max-w-11/12 text-muted-foreground">Online learning analytics</p>
                                     </div>
                                 </Button>
                             </DropdownMenuTrigger>
@@ -553,7 +554,7 @@
                             <FileText class="h-8 w-8 text-primary" />
                             <div>
                                 <div class="font-medium">Quiz Attempts</div>
-                                <p class="text-sm text-muted-foreground">View and export quiz attempt data</p>
+                                <p class="text-sm text-wrap max-w-11/12 text-muted-foreground">View and export quiz attempt data</p>
                             </div>
                         </Button>
                     </div>

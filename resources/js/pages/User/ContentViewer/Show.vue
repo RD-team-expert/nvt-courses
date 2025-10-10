@@ -5,6 +5,9 @@ import AppLayout from '@/layouts/AppLayout.vue'
 import { type BreadcrumbItem } from '@/types'
 import axios from 'axios'
 
+// ✅ vue-pdf-embed import
+import VuePdfEmbed from 'vue-pdf-embed'
+
 // shadcn-vue components
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -45,6 +48,7 @@ import {
     Loader2
 } from 'lucide-vue-next'
 
+// ✅ ENHANCED: Interface with PDF page count
 interface Content {
     id: number
     title: string
@@ -60,6 +64,9 @@ interface Content {
     } | null
     pdf_name?: string | null
     file_url?: string | null
+    pdf_page_count?: number | null  // ✅ NEW: PDF page count from database
+    has_pdf_page_count?: boolean    // ✅ NEW: Helper property
+    estimated_reading_time?: number | null  // ✅ NEW: Estimated reading time
 }
 
 interface Module {
@@ -132,13 +139,11 @@ const currentTime = ref(0)
 const duration = ref(0)
 const volume = ref(1)
 const isFullscreen = ref(false)
-// ✅ NEW: Video loading states
 const isVideoLoading = ref(true)
 const isVideoReady = ref(false)
 
 // ========== PDF STATE ==========
 const pdfContainer = ref<HTMLDivElement | null>(null)
-const pdfIframe = ref<HTMLIFrameElement | null>(null)
 const currentPage = ref(1)
 const totalPages = ref(0)
 const pdfZoom = ref(100)
@@ -150,6 +155,10 @@ const pdfScrollPercentage = ref(0)
 const estimatedReadingTime = ref(0)
 const averageReadingSpeed = ref(200) // words per minute
 const pdfLoadingError = ref(false)
+
+// ✅ SIMPLIFIED: Removed complex loading strategies
+const loadingStrategy = ref('vue-pdf-embed')
+const errorMessage = ref('')
 
 // ========== SHARED STATE ==========
 const sessionId = ref<number | null>(null)
@@ -179,7 +188,6 @@ const progressPercentage = computed(() => {
 const contentIcon = computed(() => props.content.content_type === 'video' ? Video : FileText)
 
 // ========== PDF SOURCE DETECTION ==========
-// ✅ MERGED: Smart PDF source detection
 const detectPdfSource = (url: string) => {
     if (!url) return 'unknown'
 
@@ -196,8 +204,9 @@ const detectPdfSource = (url: string) => {
     return 'external'
 }
 
-// ✅ MERGED: Smart PDF viewer URL generator
-const getPdfViewerUrl = () => {
+// ✅ ENHANCED: Get PDF source for vue-pdf-embed
+// ✅ ENHANCED: Google Drive PDF source handler with embed support
+const pdfSource = computed(() => {
     if (!props.content.file_url) return ''
 
     const url = props.content.file_url
@@ -207,24 +216,23 @@ const getPdfViewerUrl = () => {
 
     switch (source) {
         case 'google_drive':
-            // Handle Google Drive URLs
+            // ✅ FIX: For Google Drive, we'll use the iframe embed method
+            // Don't return direct download URL as it causes CORS issues
             const fileIdMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) ||
                 url.match(/id=([a-zA-Z0-9_-]+)/) ||
                 url.match(/open\?id=([a-zA-Z0-9_-]+)/)
 
             if (fileIdMatch && fileIdMatch[1]) {
                 const fileId = fileIdMatch[1]
+                // Return embed URL instead of download URL
                 return `https://drive.google.com/file/d/${fileId}/preview`
             }
-
-            // Fallback for Google Drive
-            return `https://docs.google.com/viewer?embedded=true&url=${encodeURIComponent(url)}`
+            return url
 
         case 'storage':
-            // Handle Laravel storage URLs
+            // Handle Laravel storage URLs (these work fine)
             let storageUrl = url
 
-            // Convert to proper storage path
             if (!storageUrl.startsWith('http://') && !storageUrl.startsWith('https://')) {
                 if (storageUrl.startsWith('/storage/')) {
                     storageUrl = storageUrl
@@ -236,15 +244,21 @@ const getPdfViewerUrl = () => {
                     storageUrl = `/storage/${storageUrl}`
                 }
             }
-
-            // For storage files, return direct URL with parameters
-            return `${storageUrl}#page=${currentPage.value}&zoom=${pdfZoom.value}`
+            return storageUrl
 
         case 'external':
         default:
-            // Handle external URLs
-            return `${url}#page=${currentPage.value}&zoom=${pdfZoom.value}`
+            return url
     }
+})
+
+// ✅ Extract Google Drive file ID
+const extractGoogleDriveId = (url) => {
+    if (!url) return ''
+    const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) ||
+        url.match(/id=([a-zA-Z0-9_-]+)/) ||
+        url.match(/open\?id=([a-zA-Z0-9_-]+)/)
+    return match ? match[1] : ''
 }
 
 // ========== UTILITY METHODS ==========
@@ -289,7 +303,7 @@ const updateProgress = async () => {
     if (!sessionId.value) return
 
     const now = Date.now()
-    if (now - lastProgressUpdate.value < 5000) return // Throttle to every 5 seconds
+    if (now - lastProgressUpdate.value < 5000) return
 
     lastProgressUpdate.value = now
 
@@ -335,15 +349,6 @@ const updateProgress = async () => {
 
     } catch (error) {
         console.error('❌ Failed to update progress:', error)
-
-        if (error.response) {
-            console.error('Response status:', error.response.status)
-            console.error('Response data:', error.response.data)
-
-            if (error.response.status === 422 && error.response.data?.errors) {
-                console.error('🔴 Validation errors:', error.response.data.errors)
-            }
-        }
     }
 }
 
@@ -461,205 +466,169 @@ const toggleFullscreen = async () => {
 }
 
 // ========== PDF METHODS ==========
-// ✅ MERGED: Intelligent PDF loading based on source
-const loadRealPdfData = async () => {
-    if (!props.content.file_url) {
-        console.error('❌ No PDF URL available')
-        pdfLoadingError.value = true
-        return
+const tryAlternativeLoad = () => {
+    console.log('🔄 Trying alternative loading method...')
+
+    const sourceType = detectPdfSource(props.content.file_url || '')
+
+    if (sourceType === 'google_drive') {
+        loadingStrategy.value = 'google-embed'
+        console.log('📄 Switching to Google Drive embed')
+    } else {
+        loadingStrategy.value = 'iframe'
+        console.log('📄 Switching to iframe loading')
     }
 
-    try {
-        isLoading.value = true
-        console.log('📄 Loading PDF data from:', props.content.file_url)
+    pdfLoadingError.value = false
+    isLoading.value = true
+}
 
-        const url = props.content.file_url
-        const source = detectPdfSource(url)
+const tryDirectUrl = () => {
+    if (pdfSource.value) {
+        window.open(pdfSource.value, '_blank')
+    }
+}
 
-        console.log(`🔍 Detected PDF source: ${source}`)
+const tryIframeLoad = () => {
+    loadingStrategy.value = 'iframe'
+    pdfLoadingError.value = false
+    isLoading.value = true
+    console.log('📄 Trying iframe loading strategy')
+}
 
-        switch (source) {
-            case 'google_drive':
-                await handleGoogleDrivePdf()
-                break
+// ✅ SIMPLIFIED: PDF loaded handler - DATABASE ONLY
+const onPdfLoaded = async (pdf: any) => {
+    console.log('✅ PDF loaded successfully via vue-pdf-embed:', pdf)
 
-            case 'storage':
-                await handleStoragePdf(url)
-                break
+    // ✅ PRIORITY 1: Always use database page count (admin-provided)
+    if (props.content.pdf_page_count && props.content.pdf_page_count > 0) {
+        totalPages.value = props.content.pdf_page_count
+        console.log('🎯 Using database page count:', props.content.pdf_page_count)
+    }
+    // ✅ FALLBACK: For local storage PDFs, use vue-pdf-embed if no database count
+    else if (detectPdfSource(props.content.file_url || '') === 'storage' && pdf.numPages > 0) {
+        totalPages.value = pdf.numPages
+        console.log('📄 Using vue-pdf-embed page count for local PDF:', pdf.numPages)
+    }
+    // ✅ FINAL FALLBACK: Default value
+    else {
+        totalPages.value = 10
+        console.warn('⚠️ No database page count found, using default: 10')
+    }
 
-            case 'external':
-            default:
-                await handleExternalPdf(url)
-                break
+    // Calculate reading time based on database page count
+    estimatedReadingTime.value = Math.ceil((totalPages.value * 2)) // 2 minutes per page
+    isPdfLoaded.value = true
+    pdfLoadingError.value = false
+    isLoading.value = false
+
+    // Set current page from user progress
+    currentPage.value = Math.max(1, Math.min(totalPages.value, safeUserProgress.value.current_position || 1))
+
+    console.log('📊 Final PDF Data:', {
+        totalPages: totalPages.value,
+        currentPage: currentPage.value,
+        estimatedReadingTime: estimatedReadingTime.value,
+        source: 'database_priority',
+        database_count: props.content.pdf_page_count,
+        vue_pdf_count: pdf.numPages
+    })
+
+    // Start session
+    if (!sessionId.value) {
+        startSession()
+    }
+}
+
+const onPdfLoadingFailed = (error: any) => {
+    console.error('❌ vue-pdf-embed loading failed:', error)
+
+    errorMessage.value = error.message || 'Failed to load PDF with vue-pdf-embed'
+    pdfLoadingError.value = true
+    isPdfLoaded.value = false
+    isLoading.value = false
+
+    // ✅ EVEN WITH ERROR: Use database page count if available
+    if (props.content.pdf_page_count && props.content.pdf_page_count > 0) {
+        totalPages.value = props.content.pdf_page_count
+        estimatedReadingTime.value = Math.ceil((totalPages.value * 2))
+        isPdfLoaded.value = true // Allow progress tracking even if PDF doesn't display
+        pdfLoadingError.value = false
+
+        console.log('✅ Using database page count despite loading failure:', totalPages.value)
+
+        if (!sessionId.value) {
+            startSession()
         }
+    } else {
+        // Auto-try alternative method after a short delay
+        setTimeout(() => {
+            console.log('🔄 Auto-trying alternative loading method...')
+            tryAlternativeLoad()
+        }, 2000)
+    }
+}
 
-    } catch (error) {
-        console.error('❌ Failed to load PDF data:', error)
-        await handlePdfError(error)
-    } finally {
+const onPdfRendered = () => {
+    console.log('📄 PDF page rendered successfully')
+    isLoading.value = false
+}
+
+const onIframeLoad = () => {
+    console.log('✅ Iframe PDF loaded successfully')
+
+    // ✅ EVEN WITH IFRAME: Use database page count if available
+    if (props.content.pdf_page_count && props.content.pdf_page_count > 0) {
+        totalPages.value = props.content.pdf_page_count
+        console.log('🎯 Using database page count for iframe:', totalPages.value)
+    } else {
+        totalPages.value = 10 // Default for iframe
+    }
+
+    estimatedReadingTime.value = Math.ceil((totalPages.value * 2))
+    isPdfLoaded.value = true
+    pdfLoadingError.value = false
+    isLoading.value = false
+
+    if (!sessionId.value) {
+        startSession()
+    }
+}
+
+const onIframeError = () => {
+    console.error('❌ Iframe PDF loading failed')
+
+    if (detectPdfSource(props.content.file_url || '') === 'google_drive') {
+        console.log('🔄 Trying Google Drive embed...')
+        loadingStrategy.value = 'google-embed'
+    } else {
+        pdfLoadingError.value = true
+        errorMessage.value = 'Iframe loading failed'
         isLoading.value = false
     }
 }
 
-// ✅ MERGED: Handle Google Drive PDFs
-const handleGoogleDrivePdf = async () => {
-    console.log('📱 Handling Google Drive PDF')
+// ✅ SIMPLIFIED: Google Drive embed handler with database priority
+const onGoogleEmbedLoad = async () => {
+    console.log('✅ Google Drive embed loaded')
 
-    // Set default values for Google Drive PDFs
-    totalPages.value = 5 // Default estimate
-    estimatedReadingTime.value = Math.ceil((totalPages.value * 250) / averageReadingSpeed.value)
+    // ✅ ALWAYS USE DATABASE PAGE COUNT FIRST
+    if (props.content.pdf_page_count && props.content.pdf_page_count > 0) {
+        totalPages.value = props.content.pdf_page_count
+        console.log('🎯 Using database page count for Google Drive:', totalPages.value)
+    } else {
+        totalPages.value = 15 // Default for Google Drive embed
+        console.log('📊 Using default page count for Google Drive embed:', totalPages.value)
+    }
+
+    estimatedReadingTime.value = Math.ceil((totalPages.value * 2))
     isPdfLoaded.value = true
-    currentPage.value = Math.max(1, safeUserProgress.value.current_position || 1)
+    pdfLoadingError.value = false
+    isLoading.value = false
 
-    console.log('✅ Google Drive PDF loaded with defaults:', {
-        totalPages: totalPages.value,
-        currentPage: currentPage.value,
-        estimatedReadingTime: estimatedReadingTime.value
-    })
-
-    await startSession()
-}
-
-// ✅ MERGED: Handle Laravel storage PDFs
-const handleStoragePdf = async (url: string) => {
-    console.log('🗃️ Handling Laravel storage PDF')
-
-    try {
-        // Try to load with PDF.js for storage files
-        if (!window.pdfjsLib) {
-            await loadPdfJsLibrary()
-        }
-
-        // Convert to proper storage URL
-        let storageUrl = url
-        if (!storageUrl.startsWith('http')) {
-            if (storageUrl.startsWith('/storage/')) {
-                storageUrl = storageUrl
-            } else if (storageUrl.includes('app/public/')) {
-                storageUrl = storageUrl.replace(/.*app\/public\//, '/storage/')
-            } else if (storageUrl.startsWith('/')) {
-                storageUrl = storageUrl
-            } else {
-                storageUrl = `/storage/${storageUrl}`
-            }
-        }
-
-        const pdf = await window.pdfjsLib.getDocument(storageUrl).promise
-
-        totalPages.value = pdf.numPages
-        estimatedReadingTime.value = Math.ceil((totalPages.value * 250) / averageReadingSpeed.value)
-        isPdfLoaded.value = true
-        currentPage.value = Math.max(1, Math.min(totalPages.value, safeUserProgress.value.current_position || 1))
-
-        console.log('✅ Storage PDF loaded with PDF.js:', {
-            totalPages: totalPages.value,
-            currentPage: currentPage.value,
-            url: storageUrl
-        })
-
-        await startSession()
-
-    } catch (error) {
-        console.warn('⚠️ PDF.js failed for storage PDF, using fallback:', error)
-
-        // Fallback for storage PDFs
-        totalPages.value = 5
-        estimatedReadingTime.value = Math.ceil((totalPages.value * 250) / averageReadingSpeed.value)
-        isPdfLoaded.value = true
-        currentPage.value = Math.max(1, safeUserProgress.value.current_position || 1)
-
-        console.log('✅ Storage PDF loaded with fallback')
-        await startSession()
+    if (!sessionId.value) {
+        startSession()
     }
-}
-
-// ✅ MERGED: Handle external PDFs
-const handleExternalPdf = async (url: string) => {
-    console.log('🌐 Handling external PDF')
-
-    if (!window.pdfjsLib) {
-        await loadPdfJsLibrary()
-    }
-
-    const pdf = await window.pdfjsLib.getDocument(url).promise
-
-    totalPages.value = pdf.numPages
-    estimatedReadingTime.value = Math.ceil((totalPages.value * 250) / averageReadingSpeed.value)
-    isPdfLoaded.value = true
-    currentPage.value = Math.max(1, Math.min(totalPages.value, safeUserProgress.value.current_position || 1))
-
-    console.log('✅ External PDF loaded with PDF.js:', {
-        totalPages: totalPages.value,
-        currentPage: currentPage.value,
-        url: url
-    })
-
-    await startSession()
-}
-
-// ✅ MERGED: Handle PDF loading errors
-const handlePdfError = async (error: any) => {
-    console.log('🔄 PDF loading failed, trying fallback methods')
-
-    if (error.name === 'InvalidPDFException' || error.message?.includes('CORS')) {
-        console.log('🔄 CORS/Invalid PDF error, using fallback')
-
-        // Try fallback data
-        totalPages.value = 5
-        estimatedReadingTime.value = Math.ceil((totalPages.value * 250) / averageReadingSpeed.value)
-        isPdfLoaded.value = true
-        currentPage.value = Math.max(1, safeUserProgress.value.current_position || 1)
-
-        console.log('✅ PDF fallback activated')
-        await startSession()
-        return
-    }
-
-    pdfLoadingError.value = true
-    setTimeout(() => {
-        tryIframePageExtraction()
-    }, 2000)
-}
-
-// ✅ MERGED: Fallback iframe extraction
-const tryIframePageExtraction = () => {
-    try {
-        if (pdfIframe.value) {
-            pdfIframe.value.onload = () => {
-                console.log('📄 PDF iframe loaded, using fallback data')
-                totalPages.value = 5
-                estimatedReadingTime.value = Math.ceil((totalPages.value * 250) / averageReadingSpeed.value)
-                isPdfLoaded.value = true
-                currentPage.value = Math.max(1, safeUserProgress.value.current_position || 1)
-
-                if (!sessionId.value) {
-                    startSession()
-                }
-            }
-        }
-    } catch (error) {
-        console.error('❌ Fallback PDF loading failed:', error)
-    }
-}
-
-// ✅ Load PDF.js library
-const loadPdfJsLibrary = () => {
-    return new Promise((resolve, reject) => {
-        if (window.pdfjsLib) {
-            resolve(window.pdfjsLib)
-            return
-        }
-
-        const script = document.createElement('script')
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'
-        script.onload = () => {
-            window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
-            console.log('✅ PDF.js library loaded')
-            resolve(window.pdfjsLib)
-        }
-        script.onerror = reject
-        document.head.appendChild(script)
-    })
 }
 
 const nextPdfPage = () => {
@@ -733,7 +702,6 @@ const navigateContent = (contentId: number) => {
 }
 
 // ========== VIDEO EVENT HANDLERS ==========
-// ✅ NEW: Enhanced video event handlers with loading states
 const onLoadStart = () => {
     console.log('📹 Video loading started')
     isVideoLoading.value = true
@@ -812,11 +780,20 @@ onMounted(async () => {
 
     // Initialize based on content type
     if (props.content.content_type === 'pdf') {
-        await loadRealPdfData()
+        console.log('📄 Initializing PDF viewer with database page count priority')
+
+        // ✅ IMMEDIATELY SET DATABASE PAGE COUNT IF AVAILABLE
+        if (props.content.pdf_page_count && props.content.pdf_page_count > 0) {
+            totalPages.value = props.content.pdf_page_count
+            estimatedReadingTime.value = Math.ceil((totalPages.value * 2))
+            console.log('✅ Pre-loaded database page count:', totalPages.value)
+        }
+
+        isLoading.value = true
 
         // Track reading time
         const readingTimer = setInterval(() => {
-            if (isPdfLoaded.value) {
+            if (isPdfLoaded.value || totalPages.value > 0) {
                 pdfReadingTime.value++
             }
         }, 1000)
@@ -832,7 +809,7 @@ onMounted(async () => {
     // Progress tracking interval
     const progressInterval = setInterval(() => {
         if ((props.content.content_type === 'video' && isPlaying.value) ||
-            (props.content.content_type === 'pdf' && isPdfLoaded.value)) {
+            (props.content.content_type === 'pdf' && (isPdfLoaded.value || totalPages.value > 0))) {
             updateProgress()
         }
     }, 15000)
@@ -855,20 +832,8 @@ onMounted(async () => {
 
 // Watch for page changes in PDF
 watch(currentPage, (newPage) => {
-    if (props.content.content_type === 'pdf' && isPdfLoaded.value) {
+    if (props.content.content_type === 'pdf' && (isPdfLoaded.value || totalPages.value > 0)) {
         updatePdfProgress()
-    }
-})
-
-// ✅ MERGED: Watch for zoom changes to refresh iframe for some sources
-watch(pdfZoom, () => {
-    if (props.content.content_type === 'pdf' && isPdfLoaded.value && pdfIframe.value) {
-        const source = detectPdfSource(props.content.file_url || '')
-
-        // Only refresh for storage files
-        if (source === 'storage') {
-            pdfIframe.value.src = getPdfViewerUrl()
-        }
     }
 })
 </script>
@@ -909,13 +874,20 @@ watch(pdfZoom, () => {
                                             'External PDF'
                                 }}
                             </Badge>
+                            <!-- ✅ NEW: Show database page count status -->
+                            <Badge v-if="content.content_type === 'pdf' && content.pdf_page_count"
+                                   variant="outline"
+                                   class="text-xs bg-green-50 text-green-700">
+                                {{ content.pdf_page_count }} pages (DB)
+                            </Badge>
+
                             <span v-if="content.content_type === 'video' && content.video?.duration" class="text-xs text-muted-foreground flex items-center gap-1">
                                 <Clock class="h-3 w-3" />
                                 {{ Math.ceil(content.video.duration / 60) }} min
                             </span>
                             <span v-if="content.content_type === 'pdf' && totalPages > 0" class="text-xs text-muted-foreground flex items-center gap-1">
                                 <BookOpen class="h-3 w-3" />
-                                {{ totalPages }} pages • ~{{ estimatedReadingTime }}min read
+                                {{ totalPages }} pages • ~{{ Math.ceil(totalPages * 2) }}min read
                             </span>
                         </div>
                     </div>
@@ -928,11 +900,11 @@ watch(pdfZoom, () => {
                 </Button>
             </div>
 
-            <!-- ✅ NEW: Split Layout - 3/4 for content, 1/4 for sidebar -->
+            <!-- Split Layout - 3/4 for content, 1/4 for sidebar -->
             <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                <!-- ✅ NEW: Main Content Area (3/4 width) -->
+                <!-- Main Content Area (3/4 width) -->
                 <div class="lg:col-span-3">
-                    <!-- ✅ NEW: Enhanced Video Player with Loading State -->
+                    <!-- Enhanced Video Player with Loading State -->
                     <Card v-if="content.content_type === 'video'" class="overflow-hidden">
                         <CardContent class="p-0">
                             <div class="relative bg-black aspect-video">
@@ -958,7 +930,7 @@ watch(pdfZoom, () => {
                                     Your browser does not support the video tag.
                                 </video>
 
-                                <!-- ✅ NEW: Video Loading Overlay -->
+                                <!-- Video Loading Overlay -->
                                 <div v-if="isVideoLoading || !isVideoReady" class="absolute inset-0 flex flex-col items-center justify-center bg-black/70 z-10">
                                     <div class="text-center text-white">
                                         <Loader2 class="h-12 w-12 animate-spin mx-auto mb-4" />
@@ -1025,7 +997,7 @@ watch(pdfZoom, () => {
                         </CardContent>
                     </Card>
 
-                    <!-- Smart Multi-Source PDF Viewer -->
+                    <!-- ✅ SIMPLIFIED: Database-Priority PDF Viewer -->
                     <Card v-if="content.content_type === 'pdf'" class="overflow-hidden">
                         <CardHeader>
                             <div class="flex items-center justify-between">
@@ -1034,51 +1006,58 @@ watch(pdfZoom, () => {
                                     {{ content.pdf_name || content.title }}
                                 </CardTitle>
                                 <div class="flex items-center gap-2">
-                                    <TooltipProvider>
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <Button @click="downloadPdf" variant="outline" size="sm">
-                                                    <Download class="h-4 w-4" />
-                                                </Button>
-                                            </TooltipTrigger>
-                                            <TooltipContent>Download PDF</TooltipContent>
-                                        </Tooltip>
-                                    </TooltipProvider>
+                                    <Button @click="downloadPdf" variant="outline" size="sm">
+                                        <Download class="h-4 w-4" />
+                                    </Button>
                                 </div>
+                            </div>
+                            <!-- ✅ ENHANCED: Show database page count status -->
+                            <div class="text-xs text-muted-foreground">
+                                <span v-if="content.pdf_page_count" class="text-green-700 font-medium">
+                                    ✅ Page count from database: {{ content.pdf_page_count }} pages
+                                </span>
+                                <span v-else class="text-amber-700">
+                                    ⚠️ No page count in database - using detection/fallback
+                                </span>
+                                • Source: {{ detectPdfSource(content.file_url || '') }}
                             </div>
                         </CardHeader>
 
                         <!-- PDF Loading State -->
-                        <div v-if="isLoading && !isPdfLoaded" class="flex items-center justify-center py-16">
+                        <div v-if="isLoading && !isPdfLoaded && !pdfLoadingError && totalPages === 0" class="flex items-center justify-center py-16">
                             <div class="text-center">
                                 <Loader2 class="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
-                                <p class="text-muted-foreground">Loading PDF data...</p>
+                                <p class="text-muted-foreground">Loading PDF...</p>
                                 <p class="text-xs text-muted-foreground mt-2">
-                                    Reading {{ content.pdf_name }} •
-                                    {{
-                                        detectPdfSource(content.file_url || '') === 'google_drive' ? 'Google Drive' :
-                                            detectPdfSource(content.file_url || '') === 'storage' ? 'Local Storage' :
-                                                'External PDF'
-                                    }}
+                                    {{ content.pdf_name }} • {{ detectPdfSource(content.file_url || '') }}
                                 </p>
                             </div>
                         </div>
 
-                        <!-- PDF Error State -->
-                        <div v-else-if="pdfLoadingError && !isPdfLoaded" class="flex items-center justify-center py-16">
-                            <div class="text-center">
+                        <!-- PDF Error State with Solutions -->
+                        <div v-else-if="pdfLoadingError && totalPages === 0" class="flex items-center justify-center py-16">
+                            <div class="text-center max-w-md">
                                 <AlertCircle class="h-12 w-12 text-destructive mx-auto mb-4" />
-                                <p class="text-destructive">Failed to load PDF metadata</p>
-                                <p class="text-xs text-muted-foreground mt-2">Using fallback viewer</p>
-                                <Button @click="loadRealPdfData" variant="outline" size="sm" class="mt-4">
-                                    <RotateCcw class="h-4 w-4 mr-2" />
-                                    Retry
-                                </Button>
+                                <p class="text-destructive font-medium">Failed to load PDF</p>
+                                <p class="text-xs text-muted-foreground mt-2 mb-4">
+                                    {{ errorMessage || 'PDF loading failed. Trying alternative methods...' }}
+                                </p>
+
+                                <div class="space-y-2">
+                                    <Button @click="tryDirectUrl" variant="outline" size="sm" class="w-full">
+                                        <Eye class="h-4 w-4 mr-2" />
+                                        Open in New Tab
+                                    </Button>
+                                    <Button @click="tryIframeLoad" variant="outline" size="sm" class="w-full">
+                                        <FileText class="h-4 w-4 mr-2" />
+                                        Try Iframe Load
+                                    </Button>
+                                </div>
                             </div>
                         </div>
 
-                        <!-- PDF Controls -->
-                        <div v-if="isPdfLoaded || totalPages > 0" class="px-6 pb-4 flex items-center justify-between border-b">
+                        <!-- PDF Controls (show when we have page count) -->
+                        <div v-if="totalPages > 0" class="px-6 pb-4 flex items-center justify-between border-b">
                             <div class="flex items-center gap-2">
                                 <Button @click="prevPdfPage" variant="outline" size="sm" :disabled="currentPage <= 1">
                                     <ChevronLeft class="h-4 w-4" />
@@ -1125,36 +1104,91 @@ watch(pdfZoom, () => {
                             </div>
                         </div>
 
+                        <!-- ✅ FIXED: Google Drive Compatible PDF Viewer -->
                         <CardContent class="p-0">
                             <div
                                 ref="pdfContainer"
                                 class="relative bg-gray-100 dark:bg-gray-800"
                                 :style="{ minHeight: isPdfFullscreen ? '100vh' : '800px' }"
                             >
-                                <div v-if="isPdfLoaded || totalPages > 0" class="flex items-center justify-center p-4">
+                                <!-- Strategy 1: For Local Storage PDFs ONLY - Use vue-pdf-embed -->
+                                <div v-if="detectPdfSource(content.file_url || '') === 'storage' && pdfSource"
+                                     class="flex items-center justify-center p-4">
                                     <div
                                         class="bg-white shadow-lg transition-transform duration-300"
                                         :style="{
-                                            transform: `scale(${pdfZoom / 100}) rotate(${pdfRotation}deg)`,
-                                            transformOrigin: 'center center'
-                                        }"
+                    transform: `scale(${pdfZoom / 100}) rotate(${pdfRotation}deg)`,
+                    transformOrigin: 'center center'
+                }"
                                     >
-                                        <!-- Smart iframe that handles all PDF sources -->
-                                        <iframe
-                                            v-if="content.file_url"
-                                            ref="pdfIframe"
-                                            :src="getPdfViewerUrl()"
-                                            class="w-full border-0"
-                                            :style="{ height: isPdfFullscreen ? '90vh' : '700px', width: '100%', minWidth: '800px' }"
-                                            title="PDF Viewer"
-                                            @load="tryIframePageExtraction"
-                                        ></iframe>
-                                        <div v-else class="flex items-center justify-center h-96 w-full bg-muted">
-                                            <div class="text-center">
-                                                <AlertCircle class="h-12 w-12 text-muted-foreground mx-auto mb-2" />
-                                                <p class="text-muted-foreground">PDF not available</p>
-                                            </div>
+                                        <VuePdfEmbed
+                                            :source="pdfSource"
+                                            :page="currentPage"
+                                            :style="{
+                        height: isPdfFullscreen ? '90vh' : '700px',
+                        width: '100%',
+                        minWidth: '800px'
+                    }"
+                                            @loaded="onPdfLoaded"
+                                            @loading-failed="onPdfLoadingFailed"
+                                            @rendered="onPdfRendered"
+                                        />
+                                    </div>
+                                </div>
+
+                                <!-- Strategy 2: For Google Drive PDFs - Use iframe ONLY (no vue-pdf-embed) -->
+                                <div v-else-if="detectPdfSource(content.file_url || '') === 'google_drive' && pdfSource"
+                                     class="w-full h-full">
+                                    <iframe
+                                        :src="pdfSource"
+                                        class="w-full h-full border-0"
+                                        :style="{ height: isPdfFullscreen ? '90vh' : '700px' }"
+                                        @load="onGoogleEmbedLoad"
+                                        allow="autoplay"
+                                        sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+                                        title="Google Drive PDF Viewer"
+                                    />
+                                </div>
+
+                                <!-- Strategy 3: For External PDFs - Try iframe -->
+                                <div v-else-if="detectPdfSource(content.file_url || '') === 'external' && pdfSource"
+                                     class="w-full h-full">
+                                    <iframe
+                                        :src="pdfSource"
+                                        class="w-full h-full border-0"
+                                        :style="{ height: isPdfFullscreen ? '90vh' : '700px' }"
+                                        @load="onIframeLoad"
+                                        @error="onIframeError"
+                                        title="External PDF Viewer"
+                                    />
+                                </div>
+
+                                <!-- Fallback: Database Page Count Available - Show Progress Even if PDF Fails -->
+                                <div v-else-if="content.pdf_page_count && content.pdf_page_count > 0"
+                                     class="flex items-center justify-center h-96 w-full bg-muted">
+                                    <div class="text-center max-w-md">
+                                        <BookOpen class="h-16 w-16 text-primary mx-auto mb-4" />
+                                        <h3 class="text-lg font-medium mb-2">PDF Preview Not Available</h3>
+                                        <p class="text-muted-foreground mb-4">
+                                            The PDF cannot be displayed in the viewer, but you can still track your progress through the {{ content.pdf_page_count }} pages from the database.
+                                        </p>
+                                        <div class="space-y-2">
+                                            <Button @click="tryDirectUrl" variant="outline" class="w-full">
+                                                <Eye class="h-4 w-4 mr-2" />
+                                                Open PDF in New Tab
+                                            </Button>
+                                            <p class="text-xs text-muted-foreground">
+                                                Progress tracking will work based on the {{ content.pdf_page_count }} pages stored in the database.
+                                            </p>
                                         </div>
+                                    </div>
+                                </div>
+
+                                <!-- No Strategy Available -->
+                                <div v-else class="flex items-center justify-center h-96 w-full bg-muted">
+                                    <div class="text-center">
+                                        <AlertCircle class="h-12 w-12 text-muted-foreground mx-auto mb-2" />
+                                        <p class="text-muted-foreground">PDF source not available</p>
                                     </div>
                                 </div>
                             </div>
@@ -1162,7 +1196,7 @@ watch(pdfZoom, () => {
                     </Card>
                 </div>
 
-                <!-- ✅ NEW: Sidebar Cards (1/4 width) -->
+                <!-- Sidebar Cards (1/4 width) -->
                 <div class="lg:col-span-1 space-y-4">
                     <!-- Progress Card -->
                     <Card>
@@ -1183,6 +1217,7 @@ watch(pdfZoom, () => {
                                 </span>
                                 <span v-else-if="content.content_type === 'pdf' && totalPages > 0">
                                     Page {{ currentPage }} of {{ totalPages }}
+                                    <span v-if="content.pdf_page_count" class="text-green-600">(Database)</span>
                                 </span>
                                 <span v-else-if="content.content_type === 'pdf'">
                                     Loading pages...
@@ -1228,7 +1263,7 @@ watch(pdfZoom, () => {
                         </CardContent>
                     </Card>
 
-                    <!-- ✅ NEW: Complete Button Card -->
+                    <!-- Complete Button Card -->
                     <Card v-if="!isCompleted && (progressPercentage >= 90 || completionPercentage >= 90)">
                         <CardContent class="p-4">
                             <Button
@@ -1244,7 +1279,7 @@ watch(pdfZoom, () => {
                         </CardContent>
                     </Card>
 
-                    <!-- ✅ NEW: Completion Badge Card -->
+                    <!-- Completion Badge Card -->
                     <Card v-if="isCompleted">
                         <CardContent class="p-4 text-center">
                             <Badge variant="outline" class="px-4 py-2 text-green-600 border-green-200 bg-green-50 w-full justify-center">
@@ -1256,8 +1291,7 @@ watch(pdfZoom, () => {
                 </div>
             </div>
 
-            <!-- ✅ NEW: Navigation Section -->
-            <!-- ✅ Simple Enhanced Navigation Section -->
+            <!-- Navigation Section -->
             <div class="flex items-center justify-between pt-6">
                 <div class="flex-1">
                     <Button
@@ -1308,18 +1342,19 @@ watch(pdfZoom, () => {
                 </AlertDescription>
             </Alert>
 
-            <!-- PDF Reading Tips -->
+            <!-- ✅ ENHANCED: PDF Reading Tips with Database Status -->
             <Alert v-if="content.content_type === 'pdf' && !isCompleted && totalPages > 0" class="border-blue-200 bg-blue-50 dark:bg-blue-950">
                 <Eye class="h-4 w-4 text-blue-600" />
                 <AlertDescription>
                     <strong class="text-blue-800 dark:text-blue-200">Reading Progress:</strong>
                     Your progress is automatically tracked as you navigate through the {{ totalPages }} pages.
                     Current page: {{ currentPage }}/{{ totalPages }} ({{ Math.round(progressPercentage) }}% complete) •
-                    Source: {{
-                        detectPdfSource(content.file_url || '') === 'google_drive' ? 'Google Drive' :
-                            detectPdfSource(content.file_url || '') === 'storage' ? 'Local Storage' :
-                                'External PDF'
-                    }}
+                    <span v-if="content.pdf_page_count" class="text-green-700 font-medium">
+                        Page count from database ✅
+                    </span>
+                    <span v-else class="text-amber-700">
+                        Using detected/fallback count ⚠️
+                    </span>
                 </AlertDescription>
             </Alert>
         </div>
@@ -1344,11 +1379,6 @@ watch(pdfZoom, () => {
     cursor: pointer;
     background: rgba(255,255,255,0.3);
     border-radius: 2px;
-}
-
-/* PDF viewer enhancements */
-iframe {
-    transition: transform 0.3s ease;
 }
 
 /* Responsive adjustments */

@@ -50,7 +50,8 @@ import {
     Clock,
     AlertCircle,
     XCircle,
-    Pause
+    Pause,
+    CalendarDays
 } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -166,6 +167,16 @@ const getStatusLabel = (status) => {
     }
 }
 
+// Reset filters
+const resetFilters = () => {
+    filters.value = {
+        course_id: '',
+        date_from: '',
+        date_to: ''
+    }
+    applyFilters()
+}
+
 // Apply filters with debounce
 const applyFilters = debounce(() => {
     router.get(route('admin.reports.course-completion'), filters.value, {
@@ -178,16 +189,6 @@ const applyFilters = debounce(() => {
 watch(filters, () => {
     applyFilters()
 }, { deep: true })
-
-// Reset filters
-const resetFilters = () => {
-    filters.value = {
-        course_id: '',
-        date_from: '',
-        date_to: ''
-    }
-    applyFilters()
-}
 
 // Export to CSV
 const exportToCsv = () => {
@@ -206,6 +207,56 @@ const formatDate = (dateString) => {
         hour: '2-digit',
         minute: '2-digit'
     })
+}
+
+// Format availability days
+const formatAvailabilityDays = (daysString: string | null): string => {
+    if (!daysString) return ''
+
+    const dayNames: Record<string, string> = {
+        'monday': 'Mon',
+        'tuesday': 'Tue',
+        'wednesday': 'Wed',
+        'thursday': 'Thu',
+        'friday': 'Fri',
+        'saturday': 'Sat',
+        'sunday': 'Sun'
+    }
+
+    const days = daysString.split(',').map(day => dayNames[day.trim().toLowerCase()] || day)
+    return days.join(', ')
+}
+
+// Format session time
+const formatSessionTime = (timeString: string | null): string => {
+    if (!timeString) return ''
+
+    try {
+        const time = new Date(`2000-01-01 ${timeString}`)
+        return time.toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+        })
+    } catch {
+        return timeString
+    }
+}
+
+// Format duration in minutes
+const formatDuration = (minutes: number | null): string => {
+    if (!minutes) return ''
+
+    const hours = Math.floor(minutes / 60)
+    const mins = minutes % 60
+
+    if (hours > 0 && mins > 0) {
+        return `${hours}h ${mins}m`
+    } else if (hours > 0) {
+        return `${hours} hour${hours > 1 ? 's' : ''}`
+    } else {
+        return `${mins} minute${mins > 1 ? 's' : ''}`
+    }
 }
 
 // Handle pagination
@@ -357,6 +408,13 @@ const generateStars = (rating: number) => {
                                     </div>
                                 </TableHead>
                                 <TableHead>Status</TableHead>
+                                <!-- NEW: Course Availability Column -->
+                                <TableHead class="hidden lg:table-cell">
+                                    <div class="flex items-center">
+                                        <CalendarDays class="mr-2 h-4 w-4" />
+                                        Course Schedule
+                                    </div>
+                                </TableHead>
                                 <TableHead class="hidden md:table-cell">
                                     <div class="flex items-center">
                                         <Calendar class="mr-2 h-4 w-4" />
@@ -391,7 +449,7 @@ const generateStars = (rating: number) => {
                         </TableHeader>
                         <TableBody>
                             <TableRow v-if="completions.data.length === 0">
-                                <TableCell colspan="8" class="text-center text-muted-foreground py-8">
+                                <TableCell colspan="9" class="text-center text-muted-foreground py-8">
                                     <div class="flex flex-col items-center">
                                         <CheckCircle class="h-12 w-12 text-muted-foreground mb-2" />
                                         No completion records found
@@ -399,31 +457,58 @@ const generateStars = (rating: number) => {
                                 </TableCell>
                             </TableRow>
                             <TableRow v-else v-for="(record, i) in completions.data" :key="i" class="hover:bg-muted/50">
+                                <!-- User Cell -->
                                 <TableCell>
                                     <div class="space-y-1">
-                                        <div class="font-medium text-foreground">{{ record.user_name }}</div>
-                                        <div class="text-xs text-muted-foreground hidden sm:block">{{ record.user_email }}</div>
-                                        <div class="text-xs text-muted-foreground sm:hidden">{{ record.course_name }}</div>
+                                        <div class="font-medium text-foreground">{{ record.username }}</div>
+                                        <div class="text-xs text-muted-foreground hidden sm:block">{{ record.useremail }}</div>
+                                        <div class="text-xs text-muted-foreground sm:hidden">{{ record.coursename }}</div>
                                     </div>
                                 </TableCell>
+
+                                <!-- Course Cell -->
                                 <TableCell class="hidden sm:table-cell">
-                                    <Badge variant="outline">{{ record.course_name }}</Badge>
+                                    <Badge variant="outline">{{ record.coursename }}</Badge>
                                 </TableCell>
 
-                                <!-- ✅ STATUS CELL -->
+                                <!-- Status Cell -->
                                 <TableCell>
-                                    <Badge :variant="getStatusBadgeVariant(record.course_status)" class="flex items-center w-fit">
-                                        <component :is="getStatusIcon(record.course_status)" class="mr-1 h-3 w-3" />
-                                        {{ getStatusLabel(record.course_status) }}
+                                    <Badge :variant="getStatusBadgeVariant(record.coursestatus)" class="flex items-center w-fit">
+                                        <component :is="getStatusIcon(record.coursestatus)" class="mr-1 h-3 w-3" />
+                                        {{ getStatusLabel(record.coursestatus) }}
                                     </Badge>
                                 </TableCell>
 
+                                <!-- NEW: Course Availability Cell -->
+                                <TableCell class="hidden lg:table-cell">
+                                    <div class="space-y-1 max-w-xs">
+                                        <div v-if="record.availability_daterange" class="text-sm text-foreground">
+                                            {{ record.availability_daterange }}
+                                        </div>
+                                        <div v-if="record.availability_days" class="text-xs text-muted-foreground">
+                                            {{ formatAvailabilityDays(record.availability_days) }}
+                                        </div>
+                                        <div v-if="record.availability_sessiontime" class="text-xs text-muted-foreground">
+                                            {{ formatSessionTime(record.availability_sessiontime) }}
+                                            <span v-if="record.availability_duration">
+                                                ({{ formatDuration(record.availability_duration) }})
+                                            </span>
+                                        </div>
+                                        <span v-if="!record.availability_daterange" class="text-muted-foreground text-sm">—</span>
+                                    </div>
+                                </TableCell>
+
+                                <!-- Registered Cell -->
                                 <TableCell class="hidden md:table-cell">
-                                    <div class="text-sm text-foreground">{{ formatDate(record.registered_at) }}</div>
+                                    <div class="text-sm text-foreground">{{ formatDate(record.registeredat) }}</div>
                                 </TableCell>
+
+                                <!-- Completed Cell -->
                                 <TableCell>
-                                    <div class="text-sm text-foreground">{{ formatDate(record.completed_at) }}</div>
+                                    <div class="text-sm text-foreground">{{ formatDate(record.completedat) }}</div>
                                 </TableCell>
+
+                                <!-- Rating Cell -->
                                 <TableCell class="hidden md:table-cell">
                                     <div v-if="record.rating" class="flex items-center space-x-2">
                                         <span class="text-sm font-medium">{{ record.rating }}/5</span>
@@ -438,30 +523,34 @@ const generateStars = (rating: number) => {
                                     </div>
                                     <span v-else class="text-muted-foreground">—</span>
                                 </TableCell>
+
+                                <!-- Feedback Cell -->
                                 <TableCell class="hidden lg:table-cell">
                                     <div class="max-w-xs">
                                         <Button
                                             v-if="record.feedback"
-                                            @click="showFeedback(record.feedback, record.user_name)"
+                                            @click="showFeedback(record.feedback, record.username)"
                                             variant="link"
                                             size="sm"
                                             class="h-auto p-0 text-left justify-start"
-                                            :title="'Click to view full feedback from ' + record.user_name"
+                                            :title="`Click to view full feedback from ${record.username}`"
                                         >
                                             {{ record.feedback.length > 30 ? record.feedback.substring(0, 30) + '...' : record.feedback }}
                                         </Button>
                                         <span v-else class="text-muted-foreground">—</span>
                                     </div>
                                 </TableCell>
+
+                                <!-- Comment Cell -->
                                 <TableCell class="hidden xl:table-cell">
                                     <div class="max-w-xs">
                                         <Button
                                             v-if="record.comment"
-                                            @click="showComment(record.comment, record.user_name)"
+                                            @click="showComment(record.comment, record.username)"
                                             variant="link"
                                             size="sm"
                                             class="h-auto p-0 text-left justify-start"
-                                            :title="'Click to view full comment from ' + record.user_name"
+                                            :title="`Click to view full comment from ${record.username}`"
                                         >
                                             {{ record.comment.length > 30 ? record.comment.substring(0, 30) + '...' : record.comment }}
                                         </Button>

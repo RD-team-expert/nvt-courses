@@ -52,6 +52,7 @@ interface Module {
     content: ContentItem[]
 }
 
+// ✅ ENHANCED: ContentItem with pdf_page_count
 interface ContentItem {
     title: string
     content_type: 'video' | 'pdf' | ''
@@ -62,6 +63,8 @@ interface ContentItem {
     pdf_source_type: 'upload' | 'google_drive'
     pdf_file: File | null
     google_drive_pdf_url: string
+    pdf_name?: string
+    pdf_page_count: number | null  // ✅ NEW: PDF page count field
 }
 
 const props = defineProps<{
@@ -89,19 +92,28 @@ const form = useForm({
     modules: [] as Module[]
 })
 
-// Computed properties
-const canSubmit = computed(() => {
-    return form.name &&
-        form.difficulty_level &&
-        form.modules.length > 0 &&
-        form.modules.every(module => {
-            return module.name.trim() && (
-                !module.content ||
-                module.content.length === 0 ||
-                module.content.every(content => content.title && content.content_type)
-            )
-        })
-})
+// ✅ ENHANCED: Computed properties with PDF validation
+// const canSubmit = computed(() => {
+//     return form.name &&
+//         form.difficulty_level &&
+//         form.modules.length > 0 &&
+//         form.modules.every(module => {
+//             return module.name.trim() && (
+//                 !module.content ||
+//                 module.content.length === 0 ||
+//                 module.content.every(content => {
+//                     const basicValid = content.title && content.content_type
+//
+//                     // ✅ PDF validation: if PDF type, page count is required
+//                     if (content.content_type === 'pdf') {
+//                         return basicValid && content.pdf_page_count && content.pdf_page_count > 0
+//                     }
+//
+//                     return basicValid
+//                 })
+//             )
+//         })
+// })
 
 const totalContentItems = computed(() => {
     return form.modules.reduce((total, module) => total + (module.content?.length || 0), 0)
@@ -193,14 +205,14 @@ const addContentToModule = (moduleIndex: number) => {
         order_number: form.modules[moduleIndex].content.length + 1,
         is_required: true,
         is_active: true,
-
         // Video fields
         video_id: null,
-
         // PDF fields
         pdf_source_type: 'upload',
         pdf_file: null,
         google_drive_pdf_url: '',
+        pdf_name: '',
+        pdf_page_count: null  // ✅ NEW: Initialize page count
     })
 }
 
@@ -220,6 +232,8 @@ const resetContentFields = (moduleIndex: number, contentIndex: number) => {
     content.pdf_file = null
     content.google_drive_pdf_url = ''
     content.pdf_source_type = 'upload'
+    content.pdf_name = ''
+    content.pdf_page_count = null  // ✅ NEW: Reset page count
 }
 
 const handlePdfUpload = (event: Event, moduleIndex: number, contentIndex: number) => {
@@ -227,6 +241,8 @@ const handlePdfUpload = (event: Event, moduleIndex: number, contentIndex: number
     const file = target.files?.[0]
     if (file && file.type === 'application/pdf') {
         form.modules[moduleIndex].content[contentIndex].pdf_file = file
+        // Set default PDF name from file
+        form.modules[moduleIndex].content[contentIndex].pdf_name = file.name
     }
 }
 
@@ -243,8 +259,81 @@ const getDifficultyBadgeColor = (level: string) => {
     }
 }
 
+// ✅ NEW: PDF validation helper
+// ✅ FIX: Updated validation logic
+const validatePdfContent = (content: ContentItem): string | null => {
+    if (content.content_type === 'pdf') {
+        // Check if page count exists and is a valid number
+        if (!content.pdf_page_count || content.pdf_page_count < 1) {
+            return 'PDF page count is required and must be at least 1'
+        }
+        if (content.pdf_page_count > 1000) {
+            return 'Page count cannot exceed 1000'
+        }
+        // Check source requirements
+        if (content.pdf_source_type === 'upload' && !content.pdf_file) {
+            return 'Please upload a PDF file'
+        }
+        if (content.pdf_source_type === 'google_drive' && !content.google_drive_pdf_url.trim()) {
+            return 'Please provide Google Drive URL'
+        }
+    }
+    return null
+}
+
+// ✅ FIX: Updated canSubmit logic
+// ✅ FIXED: Updated canSubmit logic for video-only courses
+const canSubmit = computed(() => {
+    if (!form.name || !form.difficulty_level || form.modules.length === 0) {
+        return false
+    }
+
+    return form.modules.every(module => {
+        if (!module.name.trim()) return false
+
+        if (module.content && module.content.length > 0) {
+            return module.content.every(content => {
+                if (!content.title || !content.content_type) return false
+
+                // ✅ FIXED: Video validation - only check if video is selected
+                if (content.content_type === 'video') {
+                    return content.video_id && content.video_id > 0
+                }
+
+                // ✅ FIXED: PDF validation - only apply to PDF content
+                if (content.content_type === 'pdf') {
+                    return content.pdf_page_count &&
+                        content.pdf_page_count > 0 &&
+                        content.pdf_page_count <= 1000 &&
+                        ((content.pdf_source_type === 'upload' && content.pdf_file) ||
+                            (content.pdf_source_type === 'google_drive' && content.google_drive_pdf_url.trim()))
+                }
+
+                return true
+            })
+        }
+
+        // ✅ FIXED: Allow modules without content (empty modules are valid)
+        return true
+    })
+})
+
+
 // Form submission
 const submit = () => {
+    // ✅ NEW: Validate PDF content before submission
+    for (let moduleIndex = 0; moduleIndex < form.modules.length; moduleIndex++) {
+        const module = form.modules[moduleIndex]
+        for (let contentIndex = 0; contentIndex < (module.content?.length || 0); contentIndex++) {
+            const content = module.content[contentIndex]
+            const error = validatePdfContent(content)
+            if (error) {
+                alert(`Module ${moduleIndex + 1}, Content ${contentIndex + 1}: ${error}`)
+                return
+            }
+        }
+    }
+
     form.post('/admin/course-online', {
         onSuccess: () => {
             form.reset()
@@ -258,8 +347,7 @@ const submit = () => {
     <Head title="Create Complete Course" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="max-w-6xl mx-auto space-y-6">
-<!--            flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4-->
+        <div class="max-w-4xl mx-auto space-y-">
             <!-- Header -->
             <div class="flex items-center gap-4">
                 <Button asChild variant="ghost">
@@ -747,7 +835,7 @@ const submit = () => {
                                                         </div>
                                                     </div>
 
-                                                    <!-- PDF Content Fields -->
+                                                    <!-- ✅ ENHANCED: PDF Content Fields with Page Count -->
                                                     <div v-if="content.content_type === 'pdf'" class="space-y-4">
                                                         <div class="space-y-3">
                                                             <Label>PDF Source *</Label>
@@ -783,12 +871,42 @@ const submit = () => {
                                                             </div>
 
                                                             <!-- Google Drive URL -->
-                                                            <div v-if="content.pdf_source_type === 'google_drive'">
+                                                            <div v-if="content.pdf_source_type === 'google_drive'" class="space-y-2">
                                                                 <Input
                                                                     v-model="content.google_drive_pdf_url"
                                                                     type="url"
                                                                     placeholder="https://drive.google.com/..."
                                                                 />
+                                                                <div class="space-y-2">
+                                                                    <Label>PDF Name</Label>
+                                                                    <Input
+                                                                        v-model="content.pdf_name"
+                                                                        type="text"
+                                                                        placeholder="Enter PDF name"
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        <!-- ✅ NEW: PDF Page Count Field -->
+                                                        <div class="space-y-2">
+                                                            <Label class="text-red-600">PDF Page Count *</Label>
+                                                            <Input
+                                                                v-model.number="content.pdf_page_count"
+                                                                type="number"
+                                                                min="1"
+                                                                max="1000"
+                                                                placeholder="Enter number of pages (required)"
+                                                                class="w-full"
+                                                                :class="{ 'border-red-500': !content.pdf_page_count }"
+                                                                required
+                                                            />
+                                                            <p class="text-xs text-red-600">
+                                                                * Required: Please count the pages manually and enter the exact number.
+                                                                This helps provide accurate reading time estimates.
+                                                            </p>
+                                                            <div v-if="validatePdfContent(content)" class="text-sm text-destructive">
+                                                                {{ validatePdfContent(content) }}
                                                             </div>
                                                         </div>
 
@@ -798,9 +916,12 @@ const submit = () => {
                                                                 <FileText class="h-8 w-8 text-purple-600" />
                                                                 <div class="flex-1">
                                                                     <p class="font-medium text-sm">
-                                                                        {{ content.pdf_file ? content.pdf_file.name : 'Google Drive PDF' }}
+                                                                        {{ content.pdf_file ? content.pdf_file.name : (content.pdf_name || 'Google Drive PDF') }}
                                                                     </p>
-                                                                    <p class="text-xs text-muted-foreground">PDF Document</p>
+                                                                    <p class="text-xs text-muted-foreground">
+                                                                        PDF Document
+                                                                        <span v-if="content.pdf_page_count"> • {{ content.pdf_page_count }} pages</span>
+                                                                    </p>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -838,6 +959,7 @@ const submit = () => {
                     <AlertTriangle class="h-4 w-4" />
                     <AlertDescription>
                         <strong>Important:</strong> Make sure your videos are accessible and PDFs are properly formatted.
+                        <strong>PDF page count is required</strong> for accurate progress tracking and reading time estimates.
                         Students will access content sequentially based on module order.
                     </AlertDescription>
                 </Alert>

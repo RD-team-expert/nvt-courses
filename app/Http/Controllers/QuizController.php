@@ -214,9 +214,21 @@ class QuizController extends Controller
             // Safe JSON decode function
             $safeJsonDecode = function ($value) {
                 if (is_string($value)) {
-                    return json_decode($value, true) ?? [];
+                    // First decode attempt
+                    $decoded = json_decode($value, true);
+                    if (json_last_error() === JSON_ERROR_NONE) {
+                        // If it's still a string after first decode, try again (double-encoded case)
+                        if (is_string($decoded)) {
+                            $secondDecode = json_decode($decoded, true);
+                            if (json_last_error() === JSON_ERROR_NONE) {
+                                return $secondDecode;
+                            }
+                        }
+                        return $decoded;
+                    }
                 }
-                return is_array($value) ? $value : [];
+
+                return is_array($value) ? $value : $value;
             };
 
             return [

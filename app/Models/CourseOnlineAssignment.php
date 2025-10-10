@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 
 class CourseOnlineAssignment extends Model
 {
@@ -93,6 +94,9 @@ class CourseOnlineAssignment extends Model
         if ($percentage >= 100) {
             $updateData['status'] = 'completed';
             $updateData['completed_at'] = now();
+
+            // ✅ NEW: End all active learning sessions when course is completed
+            $this->endAllActiveSessions();
         } elseif ($this->status === 'assigned') {
             $updateData['status'] = 'in_progress';
             $updateData['started_at'] = now();
@@ -101,11 +105,36 @@ class CourseOnlineAssignment extends Model
         $this->update($updateData);
     }
 
+// ✅ NEW: Add this method to end all active sessions
+    private function endAllActiveSessions(): void
+    {
+        $activeSessions = LearningSession::where('user_id', $this->user_id)
+            ->where('course_online_id', $this->course_online_id)
+            ->whereNull('session_end')
+            ->get();
+
+        foreach ($activeSessions as $session) {
+            $session->endSession(); // Uses the existing endSession() method from LearningSession model
+        }
+
+        Log::info('All active sessions ended for completed course', [
+            'user_id' => $this->user_id,
+            'course_id' => $this->course_online_id,
+            'sessions_ended' => $activeSessions->count(),
+        ]);
+    }
+
     public function getTimeSpentAttribute(): ?int
     {
         if (!$this->started_at) return null;
 
-        $endTime = $this->completed_at ?? now();
+        // ✅ FIX: Use completed_at for completed courses, now() for in-progress
+        if ($this->status === 'completed' && $this->completed_at) {
+            $endTime = $this->completed_at;
+        } else {
+            $endTime = now();
+        }
+
         return $this->started_at->diffInMinutes($endTime);
     }
 }
