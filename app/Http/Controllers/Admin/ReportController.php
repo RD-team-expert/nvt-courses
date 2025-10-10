@@ -428,57 +428,62 @@ class ReportController extends Controller
      */
     public function courseCompletion(Request $request)
     {
-        $filters = $request->only(['course_id', 'date_from', 'date_to']);
+        $filters = $request->only(['courseid', 'datefrom', 'dateto']);
         $page = $request->get('page', 1);
 
-        // ✅ START WITH CourseRegistration and PROPERLY JOIN CourseCompletion
+        // START WITH CourseRegistration and PROPERLY JOIN CourseCompletion
         $query = CourseRegistration::query()
             ->join('users', 'course_registrations.user_id', '=', 'users.id')
-            ->join('courses', 'course_registrations.course_id', '=', 'courses.id');
-
-        // ✅ FIXED: Proper join with course completions for rating and feedback
-        $query->leftJoin('course_completions', function($join) {
-            $join->on('course_registrations.user_id', '=', 'course_completions.user_id')
-                ->on('course_registrations.course_id', '=', 'course_completions.course_id');
-        });
+            ->join('courses', 'course_registrations.course_id', '=', 'courses.id')
+            // FIXED: Use correct column names (snake_case from your model)
+            ->leftJoin('course_availabilities', 'course_registrations.course_availability_id', '=', 'course_availabilities.id')
+            // FIXED: Proper join with course completions for rating and feedback
+            ->leftJoin('course_completions', function($join) {
+                $join->on('course_registrations.user_id', '=', 'course_completions.user_id')
+                    ->on('course_registrations.course_id', '=', 'course_completions.course_id');
+            });
 
         if (Schema::hasTable('clockings')) {
-            $query->leftJoin('clockings as latest_clocking', function ($join) {
-                $join->on('course_registrations.user_id', '=', 'latest_clocking.user_id')
-                    ->on('course_registrations.course_id', '=', 'latest_clocking.course_id')
-                    ->whereRaw('latest_clocking.id = (SELECT MAX(id) FROM clockings WHERE clockings.user_id = course_registrations.user_id AND clockings.course_id = course_registrations.course_id)');
+            $query->leftJoin('clockings as latestclocking', function($join) {
+                $join->on('course_registrations.user_id', '=', 'latestclocking.user_id')
+                    ->on('course_registrations.course_id', '=', 'latestclocking.course_id')
+                    ->whereRaw('latestclocking.id = (SELECT MAX(id) FROM clockings WHERE clockings.user_id = course_registrations.user_id AND clockings.course_id = course_registrations.course_id)');
             });
         }
 
         $selectFields = [
             'course_registrations.id',
-            'users.name as user_name',
-            'users.email as user_email',
-            'courses.name as course_name',
-            'course_registrations.registered_at',
-            'course_registrations.status as course_status',
-
-            // ✅ FIXED: Get completion data, rating, and feedback from course_completions table
-            'course_completions.completed_at',
-            'course_completions.rating',
-            'course_completions.feedback',
-
-            // ✅ Add a computed status field that shows completion status
+            'users.name as username',
+            'users.email as useremail',
+            'courses.name as coursename',
+            'course_registrations.registered_at as registeredat',
+            'course_registrations.status as coursestatus',
+            // FIXED: Get completion data, rating, and feedback from course_registrations table (not separate table)
+            'course_registrations.completed_at as completedat',
+            'course_registrations.rating',
+            'course_registrations.feedback',
+            // FIXED: Course availability information with correct column names
+            'course_availabilities.start_date as availability_startdate',
+            'course_availabilities.end_date as availability_enddate',
+            'course_availabilities.days_of_week as availability_days',
+            'course_availabilities.session_time as availability_sessiontime',
+            'course_availabilities.session_duration_minutes as availability_duration',
+            DB::raw('CONCAT(DATE_FORMAT(course_availabilities.start_date, "%M %d, %Y"), " - ", DATE_FORMAT(course_availabilities.end_date, "%M %d, %Y")) as availability_daterange'),
+            // Add a computed status field that shows completion status
             DB::raw('CASE
-            WHEN course_completions.completed_at IS NOT NULL THEN "completed"
-            WHEN course_registrations.status = "in_progress" THEN "in_progress"
+            WHEN course_registrations.completed_at IS NOT NULL THEN "completed"
+            WHEN course_registrations.status = "inprogress" THEN "inprogress"
             ELSE course_registrations.status
-        END as actual_status'),
-
-            // ✅ Add completion percentage or progress if available
+        END as actualstatus'),
+            // Add completion percentage or progress if available
             DB::raw('CASE
-            WHEN course_completions.completed_at IS NOT NULL THEN 100
+            WHEN course_registrations.completed_at IS NOT NULL THEN 100
             ELSE 0
-        END as completion_percentage')
+        END as completionpercentage')
         ];
 
         if (Schema::hasTable('clockings')) {
-            $selectFields[] = 'latest_clocking.comment';
+            $selectFields[] = 'latestclocking.comment';
         } else {
             $selectFields[] = DB::raw('NULL as comment');
         }
@@ -486,48 +491,48 @@ class ReportController extends Controller
         $query->select($selectFields);
 
         // Apply filters
-        if (!empty($filters['course_id'])) {
-            $query->where('course_registrations.course_id', $filters['course_id']);
+        if (!empty($filters['courseid'])) {
+            $query->where('course_registrations.course_id', $filters['courseid']);
         }
 
-        if (!empty($filters['date_from'])) {
+        if (!empty($filters['datefrom'])) {
             $query->where(function($q) use ($filters) {
-                $q->whereDate('course_registrations.registered_at', '>=', $filters['date_from'])
-                    ->orWhereDate('course_completions.completed_at', '>=', $filters['date_from']);
+                $q->whereDate('course_registrations.registered_at', '>=', $filters['datefrom'])
+                    ->orWhereDate('course_registrations.completed_at', '>=', $filters['datefrom']);
             });
         }
 
-        if (!empty($filters['date_to'])) {
+        if (!empty($filters['dateto'])) {
             $query->where(function($q) use ($filters) {
-                $q->whereDate('course_registrations.registered_at', '<=', $filters['date_to'])
-                    ->orWhereDate('course_completions.completed_at', '<=', $filters['date_to']);
+                $q->whereDate('course_registrations.registered_at', '<=', $filters['dateto'])
+                    ->orWhereDate('course_registrations.completed_at', '<=', $filters['dateto']);
             });
         }
 
-        // ✅ ORDER BY: Show completed courses first, then by registration date
-        $completions = $query->orderByDesc('course_completions.completed_at')
+        // ORDER BY: Show completed courses first, then by registration date
+        $completions = $query->orderByDesc('course_registrations.completed_at')
             ->orderByDesc('course_registrations.created_at')
             ->paginate(15)
             ->withQueryString();
 
         $courses = Course::select('id', 'name')->orderBy('name')->get();
 
-        // ✅ ENHANCED DEBUG: Show completion statistics
+        // ENHANCED DEBUG: Show completion statistics
         $stats = [
-            'total_registrations' => CourseRegistration::count(),
-            'total_completions' => CourseCompletion::count(),
-            'completions_with_rating' => CourseCompletion::whereNotNull('rating')->count(),
-            'completions_with_feedback' => CourseCompletion::whereNotNull('feedback')->count(),
-            'average_rating' => round(CourseCompletion::whereNotNull('rating')->avg('rating'), 2)
+            'totalregistrations' => CourseRegistration::count(),
+            'totalcompletions' => CourseRegistration::whereNotNull('completed_at')->count(),
+            'completionswithrating' => CourseRegistration::whereNotNull('rating')->count(),
+            'completionswithfeedback' => CourseRegistration::whereNotNull('feedback')->count(),
+            'averagerating' => round(CourseRegistration::whereNotNull('rating')->avg('rating'), 2)
         ];
 
         $debug = [
-            'filter_count' => count(array_filter($filters)),
-            'completion_count' => $completions->total(),
-            'has_courses' => $courses->count() > 0,
-            'current_page' => $completions->currentPage(),
-            'per_page' => $completions->perPage(),
-            'total_pages' => $completions->lastPage(),
+            'filtercount' => count(array_filter($filters)),
+            'completioncount' => $completions->total(),
+            'hascourses' => $courses->count() > 0,
+            'currentpage' => $completions->currentPage(),
+            'perpage' => $completions->perPage(),
+            'totalpages' => $completions->lastPage(),
             'stats' => $stats
         ];
 
@@ -548,7 +553,9 @@ class ReportController extends Controller
             ->join('users', 'course_registrations.user_id', '=', 'users.id')
             ->join('courses', 'course_registrations.course_id', '=', 'courses.id')
             ->join('departments', 'users.department_id', '=', 'departments.id', 'left')
-            ->join('user_levels', 'users.user_level_id', '=', 'user_levels.id', 'left');
+            ->join('user_levels', 'users.user_level_id', '=', 'user_levels.id', 'left')
+            // NEW: Add CourseAvailability join
+            ->leftJoin('course_availabilities', 'course_registrations.course_availability_id', '=', 'course_availabilities.id');
 
         // Left join with course completions for additional completion data
         $query->leftJoin('course_completions', function($join) {
@@ -564,7 +571,7 @@ class ReportController extends Controller
             });
         }
 
-        // ✅ ENHANCED SELECT FIELDS with more user data
+        // ✅ ENHANCED SELECT FIELDS with CourseAvailability info (only existing columns)
         $selectFields = [
             'course_registrations.id',
             'users.name as user_name',
@@ -581,6 +588,19 @@ class ReportController extends Controller
             'course_registrations.feedback',
             'course_registrations.status as course_status',
             'course_registrations.created_at as enrollment_date',
+            // NEW: CourseAvailability fields (only existing columns from your model)
+            'course_availabilities.start_date as availability_start_date',
+            'course_availabilities.end_date as availability_end_date',
+            'course_availabilities.days_of_week as availability_days',
+            'course_availabilities.session_time as availability_session_time',
+            'course_availabilities.session_duration_minutes as availability_duration_minutes',
+            'course_availabilities.capacity as availability_capacity',
+            'course_availabilities.sessions as availability_sessions',
+            'course_availabilities.duration_weeks as availability_duration_weeks',
+            'course_availabilities.status as availability_status',
+            'course_availabilities.notes as availability_notes',
+            // Computed availability fields
+            DB::raw('CONCAT(DATE_FORMAT(course_availabilities.start_date, "%M %d, %Y"), " - ", DATE_FORMAT(course_availabilities.end_date, "%M %d, %Y")) as availability_date_range'),
             // Additional completion data if available
             'course_completions.completed_at as completion_completed_at',
             'course_completions.rating as completion_rating',
@@ -620,7 +640,7 @@ class ReportController extends Controller
 
         $completions = $query->orderBy('course_registrations.created_at', 'desc')->get();
 
-        // ✅ ENHANCED HEADERS with more data
+        // ✅ ENHANCED HEADERS with CourseAvailability data (only existing fields)
         $headers = [
             'Registration ID',
             'User Name',
@@ -637,6 +657,19 @@ class ReportController extends Controller
             'Completed At',
             'Rating',
             'Feedback',
+            // NEW: Course Schedule Headers (only existing fields)
+            'Schedule Start Date',
+            'Schedule End Date',
+            'Course Days',
+            'Session Time',
+            'Session Duration (minutes)',
+            'Schedule Duration (weeks)',
+            'Schedule Capacity',
+            'Total Sessions',
+            'Schedule Status',
+            'Schedule Notes',
+            'Schedule Date Range',
+            // Existing fields
             'Comment',
             'Last Activity Date',
             'Days Since Enrollment',
@@ -644,7 +677,7 @@ class ReportController extends Controller
             'Completion Rate'
         ];
 
-        // ✅ ENHANCED DATA MAPPING with calculations
+        // ✅ ENHANCED DATA MAPPING with CourseAvailability calculations
         $data = $completions->map(function($record) {
             // Calculate days since enrollment
             $enrollmentDate = $record->enrollment_date ? Carbon::parse($record->enrollment_date) : null;
@@ -659,6 +692,15 @@ class ReportController extends Controller
                 'enrolled' => '25%',
                 default => '0%'
             };
+
+            // Format availability days
+            $availabilityDays = $this->formatAvailabilityDays($record->availability_days);
+
+            // Format session time
+            $sessionTime = $this->formatSessionTime($record->availability_session_time);
+
+            // Format session duration
+            $sessionDuration = $this->formatSessionDuration($record->availability_duration_minutes);
 
             return [
                 'registration_id' => $record->id,
@@ -676,6 +718,19 @@ class ReportController extends Controller
                 'completed_at' => $this->formatDateTime($record->completed_at),
                 'rating' => $record->rating ? $record->rating . '/5' : 'N/A',
                 'feedback' => $this->cleanText($record->feedback),
+                // NEW: Course Schedule Data (only existing fields)
+                'schedule_start_date' => $this->formatDate($record->availability_start_date),
+                'schedule_end_date' => $this->formatDate($record->availability_end_date),
+                'course_days' => $availabilityDays ?: 'N/A',
+                'session_time' => $sessionTime ?: 'N/A',
+                'session_duration_minutes' => $sessionDuration ?: 'N/A',
+                'schedule_duration_weeks' => $record->availability_duration_weeks ?: 'N/A',
+                'schedule_capacity' => $record->availability_capacity ?: 'N/A',
+                'total_sessions' => $record->availability_sessions ?: 'N/A',
+                'schedule_status' => $record->availability_status ?: 'N/A',
+                'schedule_notes' => $this->cleanText($record->availability_notes),
+                'schedule_date_range' => $record->availability_date_range ?: 'N/A',
+                // Existing fields
                 'comment' => $this->cleanText($record->comment),
                 'last_activity_date' => $this->formatDateTime($record->last_activity_date),
                 'days_since_enrollment' => $daysSinceEnrollment !== null ? $daysSinceEnrollment . ' days' : 'N/A',
@@ -685,7 +740,7 @@ class ReportController extends Controller
         })->toArray();
 
         // ✅ ENHANCED FILENAME with filters info
-        $filename = 'course_registrations_' . date('Y-m-d');
+        $filename = 'course_registrations_with_schedule_' . date('Y-m-d');
 
         if (!empty($filters['course_id'])) {
             $course = Course::find($filters['course_id']);
@@ -707,6 +762,75 @@ class ReportController extends Controller
             $headers,
             $data
         );
+    }
+
+// Helper methods for formatting CourseAvailability data
+    private function formatAvailabilityDays($daysString)
+    {
+        if (!$daysString) return null;
+
+        $dayNames = [
+            'monday' => 'Mon',
+            'tuesday' => 'Tue',
+            'wednesday' => 'Wed',
+            'thursday' => 'Thu',
+            'friday' => 'Fri',
+            'saturday' => 'Sat',
+            'sunday' => 'Sun'
+        ];
+
+        $days = explode(',', $daysString);
+        $formattedDays = array_map(function($day) use ($dayNames) {
+            $day = trim(strtolower($day));
+            return $dayNames[$day] ?? $day;
+        }, $days);
+
+        return implode(', ', $formattedDays);
+    }
+
+    private function formatSessionTime($timeString)
+    {
+        if (!$timeString) return null;
+
+        try {
+            $time = Carbon::createFromFormat('H:i:s', $timeString);
+            return $time->format('g:i A');
+        } catch (Exception $e) {
+            // If it's already in H:i format from your model cast
+            try {
+                $time = Carbon::createFromFormat('H:i', $timeString);
+                return $time->format('g:i A');
+            } catch (Exception $e) {
+                return $timeString;
+            }
+        }
+    }
+
+    private function formatSessionDuration($minutes)
+    {
+        if (!$minutes) return null;
+
+        $hours = floor($minutes / 60);
+        $remainingMinutes = $minutes % 60;
+
+        if ($hours > 0 && $remainingMinutes > 0) {
+            return "{$hours}h {$remainingMinutes}m";
+        } elseif ($hours > 0) {
+            return "{$hours} hour" . ($hours > 1 ? 's' : '');
+        } else {
+            return "{$remainingMinutes} minute" . ($remainingMinutes > 1 ? 's' : '');
+        }
+    }
+
+    private function formatDate($dateString)
+    {
+        if (!$dateString) return 'N/A';
+
+        try {
+            return Carbon::parse($dateString)->format('M d, Y');
+        } catch (Exception $e) {
+            return $dateString;
+        }
     }
 
 // ✅ HELPER METHODS for formatting

@@ -14,7 +14,19 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Progress } from '@/components/ui/progress'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
+// ✅ NEW: Import Alert Dialog components
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
 
 // Icons
 import {
@@ -34,7 +46,9 @@ import {
     CheckCircle,
     AlertCircle,
     RefreshCw,
-    UserCheck
+    UserCheck,
+    Trash2, // ✅ NEW: Delete icon
+    AlertTriangle // ✅ NEW: Warning icon
 } from 'lucide-vue-next'
 
 interface Course {
@@ -86,6 +100,9 @@ const searchQuery = ref('')
 const statusFilter = ref('all')
 const levelFilter = ref('all')
 const isRefreshing = ref(false)
+// ✅ NEW: Delete state
+const isDeleting = ref(false)
+const courseToDelete = ref<Course | null>(null)
 
 // Computed properties for stats
 const activeCourses = computed(() =>
@@ -173,6 +190,50 @@ const toggleCourseStatus = async (courseId: number) => {
     router.patch(route('admin.course-online.toggle-active', courseId))
 }
 
+// ✅ NEW: Delete course functionality
+const confirmDelete = (course: Course) => {
+    courseToDelete.value = course
+}
+
+const deleteCourse = async () => {
+    if (!courseToDelete.value) return
+
+    isDeleting.value = true
+
+    try {
+        router.delete(route('admin.course-online.destroy', courseToDelete.value.id), {
+            onSuccess: () => {
+                // Success feedback will be handled by the backend flash message
+                courseToDelete.value = null
+            },
+            onError: (errors) => {
+                console.error('Delete failed:', errors)
+                // Error feedback will be handled by the backend flash message
+            },
+            onFinish: () => {
+                isDeleting.value = false
+            }
+        })
+    } catch (error) {
+        console.error('Delete error:', error)
+        isDeleting.value = false
+    }
+}
+
+// ✅ NEW: Check if course can be deleted
+const canDeleteCourse = (course: Course): boolean => {
+    // Don't allow deletion if there are active enrollments
+    return course.assignments_count === 0
+}
+
+// ✅ NEW: Get delete warning message
+const getDeleteWarning = (course: Course): string => {
+    if (course.assignments_count > 0) {
+        return `This course has ${course.assignments_count} enrolled students. You cannot delete it while students are enrolled.`
+    }
+    return `Are you sure you want to delete "${course.name}"? This action cannot be undone and will permanently remove all course content, modules, and related data.`
+}
+
 const clearFilters = () => {
     searchQuery.value = ''
     statusFilter.value = 'all'
@@ -191,7 +252,6 @@ const clearFilters = () => {
                     <h1 class="text-3xl font-bold tracking-tight">Online Courses</h1>
                     <p class="text-muted-foreground">Manage your online courses and track student progress</p>
                 </div>
-                <!-- ✅ UPDATED: Added Course Assignments button -->
                 <div class="flex items-center gap-2">
                     <Button variant="outline" size="sm" @click="refreshData" :disabled="isRefreshing">
                         <RefreshCw class="mr-2 h-4 w-4" :class="{ 'animate-spin': isRefreshing }" />
@@ -324,7 +384,6 @@ const clearFilters = () => {
 
             <!-- Courses Content -->
             <Tabs default-value="grid" class="space-y-4">
-                <!-- ✅ UPDATED: Removed Export button section -->
                 <div class="flex items-center justify-between">
                     <TabsList>
                         <TabsTrigger value="grid">Grid View</TabsTrigger>
@@ -377,7 +436,7 @@ const clearFilters = () => {
                                         </div>
                                     </div>
 
-                                    <!-- Actions Dropdown -->
+                                    <!-- ✅ ENHANCED: Actions Dropdown with Delete -->
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
                                             <Button variant="ghost" size="sm">
@@ -403,6 +462,16 @@ const clearFilters = () => {
                                                     Edit Course
                                                 </Link>
                                             </DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            <!-- ✅ NEW: Delete option -->
+                                            <DropdownMenuItem
+                                                @click="confirmDelete(course)"
+                                                :disabled="!canDeleteCourse(course)"
+                                                class="text-red-600 focus:text-red-600 focus:bg-red-50"
+                                            >
+                                                <Trash2 class="mr-2 h-4 w-4" />
+                                                Delete Course
+                                            </DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>
                                 </div>
@@ -416,6 +485,10 @@ const clearFilters = () => {
                                     </Badge>
                                     <Badge :variant="course.is_active ? 'default' : 'secondary'">
                                         {{ course.is_active ? 'Active' : 'Inactive' }}
+                                    </Badge>
+                                    <!-- ✅ NEW: Show if course has enrollments -->
+                                    <Badge v-if="course.assignments_count > 0" variant="outline" class="text-orange-600">
+                                        {{ course.assignments_count }} enrolled
                                     </Badge>
                                 </div>
 
@@ -516,7 +589,12 @@ const clearFilters = () => {
                                         </Badge>
                                     </TableCell>
                                     <TableCell>{{ course.modules_count }}</TableCell>
-                                    <TableCell>{{ course.assignments_count }}</TableCell>
+                                    <TableCell>
+                                        <div class="flex items-center gap-2">
+                                            <span>{{ course.assignments_count }}</span>
+                                            <AlertTriangle v-if="course.assignments_count > 0" class="h-4 w-4 text-orange-500" title="Has enrolled students" />
+                                        </div>
+                                    </TableCell>
                                     <TableCell>
                                         <div class="flex items-center gap-2">
                                             <Progress :value="course.completion_rate" class="w-16" />
@@ -545,6 +623,16 @@ const clearFilters = () => {
                                                     <Edit class="h-4 w-4" />
                                                 </Link>
                                             </Button>
+                                            <!-- ✅ NEW: Delete button in table -->
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                @click="confirmDelete(course)"
+                                                :disabled="!canDeleteCourse(course)"
+                                                class="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                            >
+                                                <Trash2 class="h-4 w-4" />
+                                            </Button>
                                         </div>
                                     </TableCell>
                                 </TableRow>
@@ -567,5 +655,54 @@ const clearFilters = () => {
                 />
             </div>
         </div>
+
+        <!-- ✅ NEW: Delete Confirmation Dialog -->
+        <AlertDialog :open="!!courseToDelete">
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle class="flex items-center gap-2">
+                        <AlertTriangle class="h-5 w-5 text-red-600" />
+                        Delete Course
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                        <div v-if="courseToDelete">
+                            {{ getDeleteWarning(courseToDelete) }}
+
+                            <div v-if="canDeleteCourse(courseToDelete)" class="mt-4 p-3 bg-red-50 rounded-lg border border-red-200">
+                                <h4 class="font-medium text-red-800 mb-2">This will permanently delete:</h4>
+                                <ul class="text-sm text-red-700 space-y-1">
+                                    <li>• Course: {{ courseToDelete.name }}</li>
+                                    <li>• {{ courseToDelete.modules_count }} modules and all their content</li>
+                                    <li>• All associated PDFs, videos, and learning materials</li>
+                                    <li>• All progress tracking data</li>
+                                </ul>
+                            </div>
+
+                            <div v-else class="mt-4 p-3 bg-orange-50 rounded-lg border border-orange-200">
+                                <h4 class="font-medium text-orange-800 mb-2">Cannot Delete</h4>
+                                <p class="text-sm text-orange-700">
+                                    This course has active student enrollments. Please remove all student assignments before deleting the course.
+                                </p>
+                            </div>
+                        </div>
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel @click="courseToDelete = null">
+                        Cancel
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                        v-if="courseToDelete && canDeleteCourse(courseToDelete)"
+                        @click="deleteCourse"
+                        :disabled="isDeleting"
+                        class="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+                    >
+                        <Trash2 v-if="!isDeleting" class="mr-2 h-4 w-4" />
+                        <RefreshCw v-else class="mr-2 h-4 w-4 animate-spin" />
+                        {{ isDeleting ? 'Deleting...' : 'Delete Course' }}
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
     </AppLayout>
 </template>

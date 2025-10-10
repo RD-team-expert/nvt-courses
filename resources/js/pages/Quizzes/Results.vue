@@ -249,11 +249,10 @@
                                     </div>
 
                                     <!-- Your Answer -->
-                                    <div>
-                                        <p class="text-sm font-medium text-muted-foreground mb-2">Your Answer:</p>
-                                        <div class="bg-primary/5 border border-primary/20 rounded-lg p-3">
-                                            <p class="text-primary-foreground/90">{{ formatAnswer(response.answer) || 'Manually Graded' }}</p>
-                                        </div>
+                                    <div class="bg-primary/5 border border-primary/20 rounded-lg p-3">
+                                        <p class="text-primary-foreground/90">
+                                            {{ formatAnswer(response.answer) || 'No answer provided' }}
+                                        </p>
                                     </div>
 
                                     <!-- Correct Answer (safely accessed) -->
@@ -404,11 +403,12 @@ export default {
         };
 
         const formatAnswer = (answer) => {
+            if (!answer) return null; // Return null instead of undefined
             if (Array.isArray(answer)) {
                 return answer.join(', ');
             }
-            return answer;
-        };
+            return String(answer); // Ensure it's a string
+        }
 
         const formatCorrectAnswer = (correctAnswer) => {
             if (Array.isArray(correctAnswer)) {

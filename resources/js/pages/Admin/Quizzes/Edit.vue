@@ -3,7 +3,7 @@
         <div class="mx-auto max-w-7xl py-12 sm:px-6 lg:px-8">
             <!-- Header -->
             <div class="mb-8 flex items-center justify-between">
-                <h1 class="text-3xl font-bold text-gray-900">Edit Quiz</h1>
+                <h1 class="text-3xl font-bold ttext-white0">Edit Quiz</h1>
                 <Button as-child variant="outline">
                     <Link :href="route('admin.quizzes.index')">
                         <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -61,6 +61,40 @@
                 </div>
             </div>
 
+            <!-- Real-time Validation Status -->
+            <div v-if="form.status === 'published' && hasPublishingRequirements" class="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4 shadow-sm">
+                <div class="flex items-start">
+                    <div class="flex-shrink-0">
+                        <svg class="h-5 w-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <h3 class="text-sm font-medium text-blue-800">Publishing Requirements</h3>
+                        <div class="mt-2 text-sm text-blue-700">
+                            <p class="mb-2">To publish this quiz, please ensure:</p>
+                            <ul class="list-disc pl-5 space-y-1">
+                                <li :class="publishingChecklist.hasTitle ? 'text-green-600' : 'text-red-600'">
+                                    {{ publishingChecklist.hasTitle ? '✓' : '✗' }} Quiz has a title
+                                </li>
+                                <li :class="publishingChecklist.hasCourse ? 'text-green-600' : 'text-red-600'">
+                                    {{ publishingChecklist.hasCourse ? '✓' : '✗' }} Course is selected
+                                </li>
+                                <li :class="publishingChecklist.hasValidThreshold ? 'text-green-600' : 'text-red-600'">
+                                    {{ publishingChecklist.hasValidThreshold ? '✓' : '✗' }} Pass threshold is set (0-100%)
+                                </li>
+                                <li :class="publishingChecklist.hasQuestions ? 'text-green-600' : 'text-red-600'">
+                                    {{ publishingChecklist.hasQuestions ? '✓' : '✗' }} At least one valid question
+                                </li>
+                                <li :class="publishingChecklist.allQuestionsValid ? 'text-green-600' : 'text-red-600'">
+                                    {{ publishingChecklist.allQuestionsValid ? '✓' : '✗' }} All questions have correct answers
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Form -->
             <form @submit.prevent="submitQuiz" class="space-y-8">
                 <!-- Quiz Details -->
@@ -77,7 +111,6 @@
                                 <Select
                                     v-model="form.course_id"
                                     :disabled="form.processing"
-                                    :class="getFieldError('course_id') ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''"
                                 >
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select a Course" />
@@ -88,10 +121,7 @@
                                         </SelectItem>
                                     </SelectContent>
                                 </Select>
-                                <div v-if="getFieldError('course_id')" class="mt-1 flex items-center text-sm text-red-600">
-                                    <svg class="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
+                                <div v-if="getFieldError('course_id')" class="mt-1 text-sm text-red-600">
                                     {{ getFieldError('course_id') }}
                                 </div>
                             </div>
@@ -103,7 +133,6 @@
                                 <Select
                                     v-model="form.status"
                                     :disabled="form.processing"
-                                    :class="getFieldError('status') ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''"
                                 >
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select Status" />
@@ -114,10 +143,7 @@
                                         <SelectItem value="archived">Archived</SelectItem>
                                     </SelectContent>
                                 </Select>
-                                <div v-if="getFieldError('status')" class="mt-1 flex items-center text-sm text-red-600">
-                                    <svg class="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
+                                <div v-if="getFieldError('status')" class="mt-1 text-sm text-red-600">
                                     {{ getFieldError('status') }}
                                 </div>
                             </div>
@@ -132,12 +158,8 @@
                                     type="text"
                                     placeholder="Enter quiz title"
                                     :disabled="form.processing"
-                                    :class="getFieldError('title') ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''"
                                 />
-                                <div v-if="getFieldError('title')" class="mt-1 flex items-center text-sm text-red-600">
-                                    <svg class="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
+                                <div v-if="getFieldError('title')" class="mt-1 text-sm text-red-600">
                                     {{ getFieldError('title') }}
                                 </div>
                             </div>
@@ -150,12 +172,8 @@
                                     rows="4"
                                     placeholder="Enter quiz description (optional)"
                                     :disabled="form.processing"
-                                    :class="getFieldError('description') ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''"
                                 />
-                                <div v-if="getFieldError('description')" class="mt-1 flex items-center text-sm text-red-600">
-                                    <svg class="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
+                                <div v-if="getFieldError('description')" class="mt-1 text-sm text-red-600">
                                     {{ getFieldError('description') }}
                                 </div>
                             </div>
@@ -173,12 +191,8 @@
                                     step="0.01"
                                     placeholder="Enter pass threshold (e.g., 80.00)"
                                     :disabled="form.processing"
-                                    :class="getFieldError('pass_threshold') ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''"
                                 />
-                                <div v-if="getFieldError('pass_threshold')" class="mt-1 flex items-center text-sm text-red-600">
-                                    <svg class="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
+                                <div v-if="getFieldError('pass_threshold')" class="mt-1 text-sm text-red-600">
                                     {{ getFieldError('pass_threshold') }}
                                 </div>
                             </div>
@@ -193,15 +207,12 @@
                     </CardHeader>
                     <CardContent>
                         <div v-for="(question, index) in form.questions" :key="`question-${index}`"
-                             class="border border-gray-300 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-800 mb-4"
+                             class="border dark rounded-lg p-4  mb-4"
                              :class="hasQuestionErrors(index) ? 'border-red-300 bg-red-50' : ''">
                             <div class="mb-4 flex items-center justify-between">
-                                <h3 class="text-sm font-medium" :class="hasQuestionErrors(index) ? 'text-red-900' : 'text-gray-900 dark:text-gray-100'">
+                                <h3 class="text-sm font-medium" :class="hasQuestionErrors(index) ? 'text-red-900' : 'text-white'">
                                     Question {{ index + 1 }}
                                     <span v-if="hasQuestionErrors(index)" class="inline-flex items-center ml-2 px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
-                                        <svg class="mr-1 h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
                                         Has errors
                                     </span>
                                 </h3>
@@ -229,12 +240,8 @@
                                         type="text"
                                         placeholder="Enter question text"
                                         :disabled="form.processing"
-                                        :class="getFieldError(`questions.${index}.question_text`) ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''"
                                     />
-                                    <div v-if="getFieldError(`questions.${index}.question_text`)" class="mt-1 flex items-center text-sm text-red-600">
-                                        <svg class="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
+                                    <div v-if="getFieldError(`questions.${index}.question_text`)" class="mt-1 text-sm text-red-600">
                                         {{ getFieldError(`questions.${index}.question_text`) }}
                                     </div>
                                 </div>
@@ -248,7 +255,6 @@
                                         v-model="question.type"
                                         :disabled="form.processing"
                                         @update:model-value="resetQuestionOptions(index)"
-                                        :class="getFieldError(`questions.${index}.type`) ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''"
                                     >
                                         <SelectTrigger>
                                             <SelectValue placeholder="Select question type" />
@@ -259,10 +265,7 @@
                                             <SelectItem value="text">Text (Open-ended)</SelectItem>
                                         </SelectContent>
                                     </Select>
-                                    <div v-if="getFieldError(`questions.${index}.type`)" class="mt-1 flex items-center text-sm text-red-600">
-                                        <svg class="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
+                                    <div v-if="getFieldError(`questions.${index}.type`)" class="mt-1 text-sm text-red-600">
                                         {{ getFieldError(`questions.${index}.type`) }}
                                     </div>
                                 </div>
@@ -278,12 +281,8 @@
                                         min="0"
                                         placeholder="Enter points"
                                         :disabled="form.processing"
-                                        :class="getFieldError(`questions.${index}.points`) ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''"
                                     />
-                                    <div v-if="getFieldError(`questions.${index}.points`)" class="mt-1 flex items-center text-sm text-red-600">
-                                        <svg class="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
+                                    <div v-if="getFieldError(`questions.${index}.points`)" class="mt-1 text-sm text-red-600">
                                         {{ getFieldError(`questions.${index}.points`) }}
                                     </div>
                                 </div>
@@ -291,7 +290,7 @@
 
                             <!-- Options and Correct Answers for non-text questions -->
                             <div v-if="question.type !== 'text'" class="mt-4">
-                                <h4 class="mb-2 text-sm font-medium text-gray-900 dark:text-gray-100">Options</h4>
+                                <h4 class="mb-2 text-sm font-medium text-white">Options</h4>
                                 <div v-for="(option, optIndex) in question.options" :key="`option-${index}-${optIndex}`" class="mb-2 flex items-center">
                                     <Input
                                         v-model="question.options[optIndex]"
@@ -312,10 +311,7 @@
                                         Remove
                                     </Button>
                                 </div>
-                                <div v-if="getFieldError(`questions.${index}.options`)" class="mt-1 flex items-center text-sm text-red-600">
-                                    <svg class="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
+                                <div v-if="getFieldError(`questions.${index}.options`)" class="mt-1 text-sm text-red-600">
                                     {{ getFieldError(`questions.${index}.options`) }}
                                 </div>
                                 <Button
@@ -331,7 +327,7 @@
 
                                 <!-- Correct answers section -->
                                 <div class="mt-4">
-                                    <label class="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                                    <label class="mb-1 block text-sm font-medium ttext-white0">
                                         Correct Answer(s) <span class="text-red-500">*</span>
                                     </label>
                                     <div v-if="question.type === 'radio'" class="space-y-2">
@@ -342,11 +338,11 @@
                                                 :value="option"
                                                 type="radio"
                                                 :name="`correct_answer_${index}`"
-                                                class="h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                                                :disabled="form.processing"
+                                                class="h-4 w-4 dark text-indigo-600 focus:ring-indigo-500"
+                                                :disabled="form.processing || !option.trim()"
                                                 @change="updateCorrectAnswer(index, option)"
                                             />
-                                            <label :for="`correct_answer_${index}_${optIndex}`" class="ml-2 text-sm text-gray-900 dark:text-gray-300">
+                                            <label :for="`correct_answer_${index}_${optIndex}`" class="ml-2 text-sm ttext-white0">
                                                 {{ option || `Option ${optIndex + 1}` }}
                                             </label>
                                         </div>
@@ -359,17 +355,14 @@
                                                 type="checkbox"
                                                 v-model="question.correct_answer"
                                                 class="h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                                                :disabled="form.processing"
+                                                :disabled="form.processing || !option.trim()"
                                             />
-                                            <label :for="`correct_answer_${index}_${optIndex}`" class="ml-2 text-sm text-gray-900 dark:text-gray-300">
+                                            <label :for="`correct_answer_${index}_${optIndex}`" class="ml-2 text-sm ttext-white0">
                                                 {{ option || `Option ${optIndex + 1}` }}
                                             </label>
                                         </div>
                                     </div>
-                                    <div v-if="getFieldError(`questions.${index}.correct_answer`)" class="mt-1 flex items-center text-sm text-red-600">
-                                        <svg class="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
+                                    <div v-if="getFieldError(`questions.${index}.correct_answer`)" class="mt-1 text-sm text-red-600">
                                         {{ getFieldError(`questions.${index}.correct_answer`) }}
                                     </div>
                                 </div>
@@ -384,12 +377,6 @@
                                         placeholder="Explain why this is correct (optional)"
                                         :disabled="form.processing"
                                     />
-                                    <div v-if="getFieldError(`questions.${index}.correct_answer_explanation`)" class="mt-1 flex items-center text-sm text-red-600">
-                                        <svg class="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                        {{ getFieldError(`questions.${index}.correct_answer_explanation`) }}
-                                    </div>
                                 </div>
                             </div>
 
@@ -430,7 +417,7 @@
                     </Button>
                     <Button
                         type="submit"
-                        :disabled="form.processing || hasErrors"
+                        :disabled="form.processing || (form.status === 'published' && !canPublish)"
                     >
                         <span v-if="form.processing" class="flex items-center">
                             <svg class="mr-2 h-5 w-5 animate-spin text-white" fill="none" viewBox="0 0 24 24">
@@ -447,7 +434,7 @@
             <!-- Discard Confirmation Modal -->
             <Modal :show="showDiscardModal" @close="showDiscardModal = false">
                 <div class="p-6 sm:p-8">
-                    <h2 class="mb-3 text-xl font-semibold text-gray-900">Discard Changes</h2>
+                    <h2 class="mb-3 text-xl font-semibold ttext-white0">Discard Changes</h2>
                     <p class="mb-6 text-sm text-gray-600">Are you sure you want to discard your changes? This action cannot be undone.</p>
                     <div class="flex justify-end space-x-3">
                         <Button
@@ -489,8 +476,7 @@
                         </div>
                         <div class="ml-3 text-sm font-normal">{{ toast.message }}</div>
                         <button @click="removeToast(toast.id)" type="button"
-                                class="ml-auto -mx-1.5 -my-1.5 bg-white text-gray-400 hover:text-gray-900 rounded-lg focus:ring-2 focus:ring-gray-300 p-1.5 hover:bg-gray-100 inline-flex h-8 w-8"
-                                aria-label="Close">
+                                class="ml-auto -mx-1.5 -my-1.5 bg-white text-gray-400 hover:ttext-white0 rounded-lg focus:ring-2 focus:ring-gray-300 p-1.5 hover:bg-gray-100 inline-flex h-8 w-8">
                             <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                                 <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
                             </svg>
@@ -582,8 +568,8 @@ export default {
                 ];
             }
 
-            return questions.map((question) => {
-                if (!question) {
+            return questions.map((questionItem) => {
+                if (!questionItem) {
                     return {
                         question_text: '',
                         type: 'radio',
@@ -594,39 +580,41 @@ export default {
                     };
                 }
 
-                if (question.type === 'text') {
+                if (questionItem.type === 'text') {
                     return {
-                        question_text: question.question_text || '',
+                        id: questionItem.id || null,
+                        question_text: questionItem.question_text || '',
                         type: 'text',
                         points: 0,
                         options: [],
                         correct_answer: [],
-                        correct_answer_explanation: question.correct_answer_explanation || '',
+                        correct_answer_explanation: questionItem.correct_answer_explanation || '',
                     };
                 }
 
                 let options = ['', ''];
-                if (question.options && Array.isArray(question.options)) {
-                    options = question.options.map((option) =>
+                if (questionItem.options && Array.isArray(questionItem.options)) {
+                    options = questionItem.options.map((option) =>
                         typeof option === 'string' ? option : option?.option_text || ''
                     );
                     if (options.length < 2) options = [...options, '', ''].slice(0, 2);
                 }
 
                 let correctAnswer = [];
-                if (question.correct_answer && Array.isArray(question.correct_answer)) {
-                    correctAnswer = question.correct_answer.map((answer) =>
+                if (questionItem.correct_answer && Array.isArray(questionItem.correct_answer)) {
+                    correctAnswer = questionItem.correct_answer.map((answer) =>
                         typeof answer === 'string' ? answer : answer?.option_text || ''
                     );
                 }
 
                 return {
-                    question_text: question.question_text || '',
-                    type: question.type || 'radio',
-                    points: question.points || 0,
+                    id: questionItem.id || null,
+                    question_text: questionItem.question_text || '',
+                    type: questionItem.type || 'radio',
+                    points: questionItem.points || 0,
                     options: options,
                     correct_answer: correctAnswer,
-                    correct_answer_explanation: question.correct_answer_explanation || '',
+                    correct_answer_explanation: questionItem.correct_answer_explanation || '',
                 };
             });
         };
@@ -660,6 +648,33 @@ export default {
             return Object.keys(allErrors.value).length > 0;
         });
 
+        // Publishing requirements validation - FIXED: Added back
+        const publishingChecklist = computed(() => {
+            return {
+                hasTitle: !!form.title?.trim(),
+                hasCourse: !!form.course_id,
+                hasValidThreshold: form.pass_threshold >= 0 && form.pass_threshold <= 100,
+                hasQuestions: form.questions.length > 0,
+                allQuestionsValid: form.questions.every(questionItem => {
+                    if (!questionItem.question_text?.trim()) return false;
+                    if (questionItem.type === 'text') return true;
+                    if (!questionItem.points || questionItem.points <= 0) return false;
+                    if (!questionItem.options || questionItem.options.length < 2) return false;
+                    if (!questionItem.options.every(opt => opt?.trim())) return false;
+                    if (!questionItem.correct_answer || questionItem.correct_answer.length === 0) return false;
+                    return true;
+                })
+            };
+        });
+
+        const canPublish = computed(() => {
+            return Object.values(publishingChecklist.value).every(Boolean);
+        });
+
+        const hasPublishingRequirements = computed(() => {
+            return !canPublish.value;
+        });
+
         const errorSummary = computed(() => {
             const errorCount = Object.keys(allErrors.value).length;
             if (errorCount === 0) return { title: '', message: '' };
@@ -676,15 +691,13 @@ export default {
             const toast = { id, message, type, show: false };
             toasts.value.push(toast);
 
-            // Trigger animation
             nextTick(() => {
-                const toastIndex = toasts.value.findIndex(t => t.id === id);
-                if (toastIndex !== -1) {
-                    toasts.value[toastIndex].show = true;
+                const currentToastIndex = toasts.value.findIndex(t => t.id === id);
+                if (currentToastIndex !== -1) {
+                    toasts.value[currentToastIndex].show = true;
                 }
             });
 
-            // Auto remove after duration
             if (duration > 0) {
                 setTimeout(() => removeToast(id), duration);
             }
@@ -693,15 +706,15 @@ export default {
         };
 
         const removeToast = (id) => {
-            const toastIndex = toasts.value.findIndex(toast => toast.id === id);
-            if (toastIndex !== -1) {
-                toasts.value[toastIndex].show = false;
+            const currentToastIndex = toasts.value.findIndex(toast => toast.id === id);
+            if (currentToastIndex !== -1) {
+                toasts.value[currentToastIndex].show = false;
                 setTimeout(() => {
                     const index = toasts.value.findIndex(toast => toast.id === id);
                     if (index !== -1) {
                         toasts.value.splice(index, 1);
                     }
-                }, 300); // Wait for animation
+                }, 300);
             }
         };
 
@@ -722,7 +735,13 @@ export default {
         };
 
         const hasQuestionErrors = (index) => {
-            const questionFields = [`questions.${index}.question_text`, `questions.${index}.type`, `questions.${index}.points`, `questions.${index}.options`, `questions.${index}.correct_answer`];
+            const questionFields = [
+                `questions.${index}.question_text`,
+                `questions.${index}.type`,
+                `questions.${index}.points`,
+                `questions.${index}.options`,
+                `questions.${index}.correct_answer`
+            ];
             return questionFields.some(field => getFieldError(field));
         };
 
@@ -778,14 +797,13 @@ export default {
 
         const removeOption = (questionIndex, optionIndex) => {
             try {
-                const question = form.questions[questionIndex];
-                if (question.options.length > 2) {
-                    const removedOption = question.options[optionIndex];
-                    question.options.splice(optionIndex, 1);
+                const currentQuestion = form.questions[questionIndex];
+                if (currentQuestion.options.length > 2) {
+                    const removedOption = currentQuestion.options[optionIndex];
+                    currentQuestion.options.splice(optionIndex, 1);
 
-                    // Remove from correct answers if present
-                    if (Array.isArray(question.correct_answer)) {
-                        question.correct_answer = question.correct_answer.filter(opt => opt !== removedOption);
+                    if (Array.isArray(currentQuestion.correct_answer)) {
+                        currentQuestion.correct_answer = currentQuestion.correct_answer.filter(opt => opt !== removedOption);
                     }
                 }
             } catch (error) {
@@ -796,19 +814,19 @@ export default {
 
         const resetQuestionOptions = (index) => {
             try {
-                const question = form.questions[index];
+                const currentQuestion = form.questions[index];
 
-                if (question.type === 'text') {
-                    question.options = [];
-                    question.correct_answer = [];
-                    question.points = 0;
+                if (currentQuestion.type === 'text') {
+                    currentQuestion.options = [];
+                    currentQuestion.correct_answer = [];
+                    currentQuestion.points = 0;
                 } else {
-                    if (!question.options || question.options.length < 2) {
-                        question.options = ['', ''];
+                    if (!currentQuestion.options || currentQuestion.options.length < 2) {
+                        currentQuestion.options = ['', ''];
                     }
-                    question.correct_answer = [];
+                    currentQuestion.correct_answer = [];
                 }
-                question.correct_answer_explanation = '';
+                currentQuestion.correct_answer_explanation = '';
             } catch (error) {
                 console.error('Error resetting question options:', error);
                 addToast('Failed to reset question options. Please try again.', 'error');
@@ -817,10 +835,10 @@ export default {
 
         const updateCorrectAnswer = (index, option) => {
             try {
-                const question = form.questions[index];
+                const currentQuestion = form.questions[index];
 
-                if (question.type === 'radio') {
-                    question.correct_answer = [option];
+                if (currentQuestion.type === 'radio') {
+                    currentQuestion.correct_answer = [option];
                 }
             } catch (error) {
                 console.error('Error updating correct answer:', error);
@@ -828,43 +846,48 @@ export default {
             }
         };
 
-        // Form submission with enhanced error handling
+        // FIXED: Enhanced form submission
         const submitQuiz = () => {
             try {
                 // Clear previous server errors and success messages
                 serverErrors.value = {};
                 showSuccessMessage.value = false;
 
-                const formData = {
+                // Client-side validation for publishing
+                if (form.status === 'published' && !canPublish.value) {
+                    addToast('Cannot publish quiz. Please fix all required fields first.', 'error', 8000);
+                    scrollToFirstError();
+                    return;
+                }
+
+                // CRITICAL FIX: Use transform to send processed data
+                form.transform((data) => ({
                     course_id: form.course_id,
                     title: form.title,
                     description: form.description,
                     status: form.status,
                     pass_threshold: form.pass_threshold,
                     questions: form.questions.map((question) => ({
+                        id: question.id || null, // Include ID for existing questions
                         question_text: question.question_text,
                         type: question.type,
                         points: question.type === 'text' ? 0 : question.points,
-                        options: question.options,
+                        options: question.options ? question.options.filter(opt => opt && opt.trim()) : [],
                         correct_answer: Array.isArray(question.correct_answer)
-                            ? question.correct_answer
+                            ? question.correct_answer.filter(ans => ans && ans.trim())
                             : question.correct_answer ? [question.correct_answer] : [],
                         correct_answer_explanation: question.correct_answer_explanation || '',
                     })),
-                };
-
-                form.put(route('admin.quizzes.update', props.quiz.id), {
+                })).put(route('admin.quizzes.update', props.quiz.id), {
                     preserveState: true,
                     preserveScroll: true,
                     onStart: () => {
-                        // Clear any existing toasts
                         toasts.value.forEach(toast => removeToast(toast.id));
                     },
                     onSuccess: (page) => {
                         showSuccessMessage.value = true;
                         addToast('Quiz updated successfully!', 'success', 4000);
 
-                        // Navigate after a short delay to show success message
                         setTimeout(() => {
                             router.visit(route('admin.quizzes.index'), { replace: true });
                         }, 1500);
@@ -879,7 +902,6 @@ export default {
 
                         addToast(errorMessage, 'error', 8000);
 
-                        // Auto scroll to first error after a short delay
                         setTimeout(() => {
                             scrollToFirstError();
                         }, 100);
@@ -911,32 +933,20 @@ export default {
             router.visit(route('admin.quizzes.index'));
         };
 
-        // Watch for prop changes
-        watch(
-            () => props.quiz,
-            (newQuiz) => {
-                if (newQuiz) {
-                    form.course_id = newQuiz.course_id || '';
-                    form.title = newQuiz.title || '';
-                    form.description = newQuiz.description || '';
-                    form.status = newQuiz.status || 'draft';
-                    form.pass_threshold = newQuiz.pass_threshold || 80.00;
-                    form.questions = processQuestions(newQuiz.questions);
-                }
-            },
-            { deep: true }
-        );
-
         const breadcrumbs = [
             { name: 'Quizzes', route: 'admin.quizzes.index' },
             { name: 'Edit', route: null },
         ];
 
+        // CRITICAL FIX: Return all necessary computed properties
         return {
             form,
             hasErrors,
             allErrors,
             errorSummary,
+            publishingChecklist,    // ← FIXED: Added back
+            canPublish,             // ← FIXED: Added back
+            hasPublishingRequirements, // ← FIXED: Added back
             showDiscardModal,
             showSuccessMessage,
             toasts,
@@ -998,7 +1008,7 @@ a {
     @apply transition-colors duration-200;
 }
 
-/* Error styling with enhanced visual feedback */
+/* Error styling */
 .text-red-600 {
     @apply text-red-600 font-medium;
 }
@@ -1016,7 +1026,7 @@ a {
     @apply text-green-600 font-medium;
 }
 
-/* Enhanced focus states for accessibility */
+/* Enhanced focus states */
 input:focus,
 select:focus,
 textarea:focus {
@@ -1026,38 +1036,6 @@ textarea:focus {
 /* Toast animations */
 .transform {
     transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
-}
-
-/* Responsive Adjustments */
-@media (max-width: 640px) {
-    .grid-cols-1 {
-        @apply space-y-4;
-    }
-
-    .sm:col-span-2 {
-        @apply col-span-1;
-    }
-
-    .px-4 {
-        @apply px-2;
-    }
-
-    .py-2 {
-        @apply py-1;
-    }
-
-    .text-sm {
-        @apply text-xs;
-    }
-
-    /* Adjust toast positioning on mobile */
-    .fixed.top-4.right-4 {
-        @apply top-2 right-2 left-2;
-    }
-
-    .max-w-xs {
-        @apply max-w-none;
-    }
 }
 
 /* Loading states */
@@ -1079,13 +1057,22 @@ button:hover:not(:disabled) {
     @apply transform scale-105;
 }
 
-/* Error field highlighting */
-.border-red-300 {
-    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
-}
+/* Responsive Adjustments */
+@media (max-width: 640px) {
+    .grid-cols-1 {
+        @apply space-y-4;
+    }
 
-/* Success field highlighting */
-.border-green-300 {
-    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+    .sm:col-span-2 {
+        @apply col-span-1;
+    }
+
+    .fixed.top-4.right-4 {
+        @apply top-2 right-2 left-2;
+    }
+
+    .max-w-xs {
+        @apply max-w-none;
+    }
 }
 </style>
