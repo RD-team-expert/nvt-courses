@@ -46,7 +46,7 @@ class QuizController extends Controller
                 'questions_count' => $quiz->questions->count(),
                 'attempts_count' => $quiz->attempts_count,
                 'created_at' => $quiz->created_at,
-                'pass_threshold' => $quiz->pass_threshold, // Include new field
+                'pass_threshold' => $quiz->pass_threshold,
             ];
         });
 
@@ -54,7 +54,7 @@ class QuizController extends Controller
         $courses = \App\Models\Course::select('id', 'name')->orderBy('name')->get();
 
         return Inertia::render('Admin/Quizzes/Index', [
-            'quizzes' => $quizzes, // This now includes both data and pagination meta
+            'quizzes' => $quizzes,
             'courses' => $courses,
             'filters' => $request->only(['course_id', 'status']),
         ]);
@@ -83,7 +83,7 @@ class QuizController extends Controller
             'description' => 'nullable|string',
             'status' => 'required|in:draft,published,archived',
             'pass_threshold' => 'required|numeric|min:0|max:100',
-            'questions' => 'required|array|min:1',
+            'questions' => 'required|array|min:1|max:20',
             'questions.*.question_text' => 'required|string',
             'questions.*.type' => 'required|in:radio,checkbox,text',
             'questions.*.points' => 'nullable|integer|min:0',
@@ -94,7 +94,10 @@ class QuizController extends Controller
             'questions.*.correct_answer_explanation' => 'nullable|string',
         ]);
 
-        \DB::beginTransaction();
+        // Validate questions data
+        $this->validateQuestionData($validated['questions']);
+
+        DB::beginTransaction();
         try {
             $quiz = Quiz::create([
                 'course_id' => $validated['course_id'],
@@ -106,16 +109,13 @@ class QuizController extends Controller
             ]);
 
             foreach ($validated['questions'] as $index => $questionData) {
-                // Log the question data being saved
-                \Log::info("Saving question {$index}:", $questionData);
-
                 QuizQuestion::create([
                     'quiz_id' => $quiz->id,
                     'question_text' => $questionData['question_text'],
                     'type' => $questionData['type'],
                     'points' => $questionData['type'] !== 'text' ? ($questionData['points'] ?? 0) : 0,
-                    'options' => $questionData['type'] !== 'text' ? json_encode($questionData['options'] ?? []) : null,
-                    'correct_answer' => $questionData['type'] !== 'text' ? json_encode($questionData['correct_answer'] ?? []) : null,
+                    'options' => $questionData['type'] !== 'text' ? json_encode(array_filter($questionData['options'] ?? [], 'strlen')) : null,
+                    'correct_answer' => $questionData['type'] !== 'text' ? json_encode(array_filter($questionData['correct_answer'] ?? [], 'strlen')) : null,
                     'correct_answer_explanation' => $questionData['correct_answer_explanation'] ?? null,
                     'order' => $index + 1,
                 ]);
@@ -125,12 +125,12 @@ class QuizController extends Controller
             $totalPoints = $quiz->questions()->where('type', '!=', 'text')->sum('points');
             $quiz->update(['total_points' => $totalPoints]);
 
-            \DB::commit();
+            DB::commit();
             return redirect()->route('admin.quizzes.index')
                 ->with('success', 'Quiz created successfully.');
         } catch (\Exception $e) {
-            \DB::rollBack();
-            \Log::error('Failed to create quiz', ['error' => $e->getMessage()]);
+            DB::rollBack();
+            Log::error('Failed to create quiz', ['error' => $e->getMessage()]);
             return back()->withErrors(['error' => 'Failed to create quiz: ' . $e->getMessage()]);
         }
     }
@@ -144,32 +144,32 @@ class QuizController extends Controller
             $type = $question['type'];
 
             if ($type === 'radio' || $type === 'checkbox') {
+                // Filter out empty options
+                $options = array_filter($question['options'] ?? [], function($option) {
+                    return !empty(trim($option));
+                });
+
                 // Validate that options exist and have at least 2 items
-                if (empty($question['options']) || count($question['options']) < 2) {
+                if (count($options) < 2) {
                     throw \Illuminate\Validation\ValidationException::withMessages([
-                        "questions.{$index}.options" => 'Radio and checkbox questions must have at least 2 options.'
+                        "questions.{$index}.options" => 'Radio and checkbox questions must have at least 2 non-empty options.'
                     ]);
                 }
 
-                // Validate that all options are non-empty strings
-                foreach ($question['options'] as $optIndex => $option) {
-                    if (empty(trim($option))) {
-                        throw \Illuminate\Validation\ValidationException::withMessages([
-                            "questions.{$index}.options.{$optIndex}" => 'All options must be non-empty.'
-                        ]);
-                    }
-                }
-
                 // Validate that correct answers exist
-                if (empty($question['correct_answer'])) {
+                $correctAnswers = array_filter($question['correct_answer'] ?? [], function($answer) {
+                    return !empty(trim($answer));
+                });
+
+                if (empty($correctAnswers)) {
                     throw \Illuminate\Validation\ValidationException::withMessages([
                         "questions.{$index}.correct_answer" => 'Radio and checkbox questions must have at least one correct answer.'
                     ]);
                 }
 
                 // Validate that correct answers are in the options
-                foreach ($question['correct_answer'] as $correctAnswer) {
-                    if (!in_array($correctAnswer, $question['options'])) {
+                foreach ($correctAnswers as $correctAnswer) {
+                    if (!in_array($correctAnswer, $options)) {
                         throw \Illuminate\Validation\ValidationException::withMessages([
                             "questions.{$index}.correct_answer" => 'Correct answers must be selected from the available options.'
                         ]);
@@ -177,7 +177,7 @@ class QuizController extends Controller
                 }
 
                 // For radio buttons, ensure only one correct answer
-                if ($type === 'radio' && count($question['correct_answer']) > 1) {
+                if ($type === 'radio' && count($correctAnswers) > 1) {
                     throw \Illuminate\Validation\ValidationException::withMessages([
                         "questions.{$index}.correct_answer" => 'Radio questions can only have one correct answer.'
                     ]);
@@ -198,7 +198,9 @@ class QuizController extends Controller
      */
     public function show(Quiz $quiz)
     {
-        $quiz->load(['course', 'questions']);
+        $quiz->load(['course', 'questions' => function($query) {
+            $query->orderBy('order');
+        }]);
 
         return Inertia::render('Admin/Quizzes/Show', [
             'quiz' => [
@@ -207,7 +209,7 @@ class QuizController extends Controller
                 'description' => $quiz->description,
                 'status' => $quiz->status,
                 'total_points' => $quiz->total_points,
-                'pass_threshold' => $quiz->pass_threshold, // Include new field
+                'pass_threshold' => $quiz->pass_threshold,
                 'created_at' => $quiz->created_at->format('Y-m-d H:i:s'),
                 'course' => $quiz->course ? [
                     'id' => $quiz->course->id,
@@ -220,8 +222,8 @@ class QuizController extends Controller
                         'type' => $question->type,
                         'points' => $question->points ?? 0,
                         'options' => $question->options ?? [],
-                        'correct_answer' => $question->correct_answer ?? [], // Use singular
-                        'correct_answer_explanation' => $question->correct_answer_explanation ?? '', // Include new field
+                        'correct_answer' => $question->correct_answer ?? [],
+                        'correct_answer_explanation' => $question->correct_answer_explanation ?? '',
                         'order' => $question->order,
                     ];
                 }),
@@ -234,7 +236,9 @@ class QuizController extends Controller
      */
     public function edit(Quiz $quiz)
     {
-        $quiz->load(['course', 'questions']);
+        $quiz->load(['course', 'questions' => function($query) {
+            $query->orderBy('order');
+        }]);
         $courses = Course::select('id', 'name')->orderBy('name')->get();
 
         return Inertia::render('Admin/Quizzes/Edit', [
@@ -244,7 +248,7 @@ class QuizController extends Controller
                 'description' => $quiz->description,
                 'status' => $quiz->status,
                 'course_id' => $quiz->course_id,
-                'pass_threshold' => $quiz->pass_threshold, // Include new field
+                'pass_threshold' => $quiz->pass_threshold,
                 'questions' => $quiz->questions->map(function ($question) {
                     return [
                         'id' => $question->id,
@@ -253,7 +257,7 @@ class QuizController extends Controller
                         'points' => $question->points,
                         'options' => $question->options,
                         'correct_answer' => $question->correct_answer,
-                        'correct_answer_explanation' => $question->correct_answer_explanation ?? '', // Include new field
+                        'correct_answer_explanation' => $question->correct_answer_explanation ?? '',
                         'order' => $question->order,
                     ];
                 }),
@@ -264,6 +268,7 @@ class QuizController extends Controller
 
     /**
      * Update the specified quiz.
+     * FIXED: Resolved question duplication issues
      */
     public function update(Request $request, Quiz $quiz)
     {
@@ -273,7 +278,7 @@ class QuizController extends Controller
             'description' => 'nullable|string',
             'status' => 'required|in:draft,published,archived',
             'pass_threshold' => 'required|numeric|min:0|max:100',
-            'questions' => 'required|array|min:1',
+            'questions' => 'required|array|min:1|max:20',
             'questions.*.id' => 'nullable|exists:quiz_questions,id',
             'questions.*.question_text' => 'required|string',
             'questions.*.type' => 'required|in:radio,checkbox,text',
@@ -284,10 +289,10 @@ class QuizController extends Controller
             'questions.*.correct_answer.*' => 'nullable|string',
             'questions.*.correct_answer_explanation' => 'nullable|string',
         ], [
-            // Custom validation messages
             'questions.*.question_text.required' => 'Question text is required.',
             'questions.*.type.required' => 'Question type is required.',
             'questions.*.type.in' => 'Question type must be radio, checkbox, or text.',
+            'questions.max' => 'Maximum 20 questions allowed per quiz.',
         ]);
 
         // Custom validation for complex rules
@@ -295,6 +300,7 @@ class QuizController extends Controller
 
         DB::beginTransaction();
         try {
+            // Update quiz details
             $quiz->update([
                 'course_id' => $validated['course_id'],
                 'title' => $validated['title'],
@@ -303,58 +309,82 @@ class QuizController extends Controller
                 'pass_threshold' => $validated['pass_threshold'],
             ]);
 
-            $existingQuestionIds = [];
+            // CRITICAL FIX: Get existing questions that belong to this quiz only
+            $existingQuestions = $quiz->questions()->pluck('id')->toArray();
+            $processedQuestionIds = [];
+
+            // Process each question
             foreach ($validated['questions'] as $index => $questionData) {
                 if (isset($questionData['id']) && $questionData['id']) {
-                    $question = QuizQuestion::find($questionData['id']);
-                    if ($question && $question->quiz_id === $quiz->id) {
+                    // CRITICAL FIX: Verify the question belongs to this quiz
+                    if (in_array($questionData['id'], $existingQuestions)) {
+                        $question = QuizQuestion::find($questionData['id']);
                         $question->update([
                             'question_text' => $questionData['question_text'],
                             'type' => $questionData['type'],
                             'points' => $questionData['type'] !== 'text' ? ($questionData['points'] ?? 0) : 0,
-                            'options' => $questionData['type'] !== 'text' ? json_encode($questionData['options'] ?? []) : null,
-                            'correct_answer' => $questionData['type'] !== 'text' ? json_encode($questionData['correct_answer'] ?? []) : null,
+                            'options' => $questionData['type'] !== 'text' ?
+                                json_encode(array_values(array_filter($questionData['options'] ?? [], 'strlen'))) : null,
+                            'correct_answer' => $questionData['type'] !== 'text' ?
+                                json_encode(array_values(array_filter($questionData['correct_answer'] ?? [], 'strlen'))) : null,
                             'correct_answer_explanation' => $questionData['correct_answer_explanation'] ?? null,
                             'order' => $index + 1,
                         ]);
-                        $existingQuestionIds[] = $question->id;
+                        $processedQuestionIds[] = $question->id;
                     }
                 } else {
+                    // Create new question
                     $question = QuizQuestion::create([
                         'quiz_id' => $quiz->id,
                         'question_text' => $questionData['question_text'],
                         'type' => $questionData['type'],
                         'points' => $questionData['type'] !== 'text' ? ($questionData['points'] ?? 0) : 0,
-                        'options' => $questionData['type'] !== 'text' ? json_encode($questionData['options'] ?? []) : null,
-                        'correct_answer' => $questionData['type'] !== 'text' ? json_encode($questionData['correct_answer'] ?? []) : null,
+                        'options' => $questionData['type'] !== 'text' ?
+                            json_encode(array_values(array_filter($questionData['options'] ?? [], 'strlen'))) : null,
+                        'correct_answer' => $questionData['type'] !== 'text' ?
+                            json_encode(array_values(array_filter($questionData['correct_answer'] ?? [], 'strlen'))) : null,
                         'correct_answer_explanation' => $questionData['correct_answer_explanation'] ?? null,
                         'order' => $index + 1,
                     ]);
-                    $existingQuestionIds[] = $question->id;
+                    $processedQuestionIds[] = $question->id;
                 }
             }
 
-            // Delete removed questions (only if no answers exist)
-            $quiz->questions()
-                ->whereNotIn('id', $existingQuestionIds)
+            // CRITICAL FIX: Delete questions that are no longer in the form
+            // Only delete questions that belong to this quiz and are not in the processed list
+            $questionsToDelete = QuizQuestion::where('quiz_id', $quiz->id)
+                ->whereNotIn('id', $processedQuestionIds)
                 ->whereDoesntHave('answers')
-                ->delete();
+                ->get();
+
+            foreach ($questionsToDelete as $questionToDelete) {
+                Log::info("Deleting question ID: {$questionToDelete->id} from quiz ID: {$quiz->id}");
+                $questionToDelete->delete();
+            }
 
             // Recalculate total points
-            $totalPoints = $quiz->questions()
+            $totalPoints = $quiz->fresh()->questions()
                 ->where('type', '!=', 'text')
                 ->sum('points');
 
             $quiz->update(['total_points' => $totalPoints]);
 
             DB::commit();
+
+            Log::info("Successfully updated quiz ID: {$quiz->id}", [
+                'questions_processed' => count($processedQuestionIds),
+                'questions_deleted' => $questionsToDelete->count(),
+                'total_points' => $totalPoints
+            ]);
+
             return redirect()->route('admin.quizzes.index')
                 ->with('success', 'Quiz updated successfully.');
 
         } catch (\Exception $e) {
             DB::rollBack();
-            \Log::error('Failed to update quiz', [
+            Log::error('Failed to update quiz', [
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
                 'quiz_id' => $quiz->id,
                 'data' => $validated
             ]);
@@ -371,9 +401,22 @@ class QuizController extends Controller
             return back()->withErrors(['error' => 'Cannot delete quiz with existing attempts.']);
         }
 
-        $quiz->delete();
-        return redirect()->route('admin.quizzes.index')
-            ->with('success', 'Quiz deleted successfully.');
+        DB::beginTransaction();
+        try {
+            // Delete all questions first
+            $quiz->questions()->delete();
+
+            // Delete the quiz
+            $quiz->delete();
+
+            DB::commit();
+            return redirect()->route('admin.quizzes.index')
+                ->with('success', 'Quiz deleted successfully.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Failed to delete quiz', ['error' => $e->getMessage(), 'quiz_id' => $quiz->id]);
+            return back()->withErrors(['error' => 'Failed to delete quiz.']);
+        }
     }
 
     /**
@@ -409,7 +452,7 @@ class QuizController extends Controller
                 'id' => $quiz->id,
                 'title' => $quiz->title,
                 'total_points' => $quiz->total_points,
-                'pass_threshold' => $quiz->pass_threshold, // Include new field
+                'pass_threshold' => $quiz->pass_threshold,
             ],
             'attempts' => $attempts,
             'filters' => request()->only(['user_id']),

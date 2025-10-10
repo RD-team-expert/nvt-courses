@@ -80,6 +80,7 @@ class CourseOnlineController extends Controller
      */
     public function create()
     {
+
         $availableVideos = Video::where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name', 'duration', 'google_drive_url'])
@@ -103,6 +104,7 @@ class CourseOnlineController extends Controller
     /**
      * Store newly created course
      */
+// ✅ SIMPLIFIED: Store function - admin enters page count manually
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -119,26 +121,88 @@ class CourseOnlineController extends Controller
             'modules.*.is_required' => 'boolean',
             'modules.*.is_active' => 'boolean',
             'modules.*.content' => 'nullable|array',
-            'modules.*.content.*.title' => 'required|string|max:255',
-            'modules.*.content.*.content_type' => 'required|in:video,pdf',
+
+            // ✅ FLEXIBLE: Content validation - only applies when content exists
+            'modules.*.content.*.title' => 'nullable|string|max:255',
+            'modules.*.content.*.content_type' => 'nullable|in:video,pdf',
             'modules.*.content.*.is_required' => 'boolean',
             'modules.*.content.*.is_active' => 'boolean',
+
+            // ✅ VIDEO: Only validated when needed
             'modules.*.content.*.video_id' => 'nullable|exists:videos,id',
-            // ✅ FIXED: Add validation for Google Drive PDF URL
+
+            // ✅ PDF: Only validated when needed
             'modules.*.content.*.google_drive_pdf_url' => 'nullable|string|url',
             'modules.*.content.*.pdf_name' => 'nullable|string|max:255',
+            'modules.*.content.*.pdf_page_count' => 'nullable|integer|min:1|max:1000',
         ]);
+
+// ✅ CUSTOM: Smart validation after basic validation
+        foreach ($validated['modules'] as $moduleIndex => $moduleData) {
+            if (isset($moduleData['content']) && is_array($moduleData['content'])) {
+                foreach ($moduleData['content'] as $contentIndex => $contentData) {
+                    // Skip empty content items
+                    if (empty($contentData['title']) && empty($contentData['content_type'])) {
+                        continue;
+                    }
+
+                    // If content has data, validate it properly
+                    if (!empty($contentData['title']) && !empty($contentData['content_type'])) {
+
+                        // ✅ VIDEO VALIDATION: Only when content_type is 'video'
+                        if ($contentData['content_type'] === 'video') {
+                            if (empty($contentData['video_id'])) {
+                                return redirect()->back()
+                                    ->withInput()
+                                    ->withErrors([
+                                        "modules.{$moduleIndex}.content.{$contentIndex}.video_id" =>
+                                            "Please select a video for Module " . ($moduleIndex + 1) . ", Content " . ($contentIndex + 1)
+                                    ]);
+                            }
+                        }
+
+                        // ✅ PDF VALIDATION: Only when content_type is 'pdf'
+                        if ($contentData['content_type'] === 'pdf') {
+                            // Check if page count is provided
+                            if (empty($contentData['pdf_page_count']) || $contentData['pdf_page_count'] < 1) {
+                                return redirect()->back()
+                                    ->withInput()
+                                    ->withErrors([
+                                        "modules.{$moduleIndex}.content.{$contentIndex}.pdf_page_count" =>
+                                            "PDF page count is required for Module " . ($moduleIndex + 1) . ", Content " . ($contentIndex + 1)
+                                    ]);
+                            }
+
+                            // Check if PDF source is provided
+                            $hasUpload = $request->hasFile("modules.{$moduleIndex}.content.{$contentIndex}.pdf_file");
+                            $hasGoogleDrive = !empty($contentData['google_drive_pdf_url']);
+
+                            if (!$hasUpload && !$hasGoogleDrive) {
+                                return redirect()->back()
+                                    ->withInput()
+                                    ->withErrors([
+                                        "modules.{$moduleIndex}.content.{$contentIndex}.pdf_source" =>
+                                            "Please upload a PDF file or provide a Google Drive URL for Module " . ($moduleIndex + 1) . ", Content " . ($contentIndex + 1)
+                                    ]);
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         DB::beginTransaction();
 
         try {
+            // Handle course image upload
             $imagePath = null;
             if ($request->hasFile('image')) {
                 $imageData = $this->fileService->uploadCourseImage($request->file('image'));
                 $imagePath = $imageData['path'];
-                $thumbnails = $this->thumbnailService->generateMultipleThumbnails($imagePath);
+                $this->thumbnailService->generateMultipleThumbnails($imagePath);
             }
 
+            // Create course
             $course = CourseOnline::create([
                 'name' => $validated['name'],
                 'description' => $validated['description'],
@@ -149,6 +213,7 @@ class CourseOnlineController extends Controller
                 'created_by' => auth()->id(),
             ]);
 
+            // Create modules and content
             foreach ($validated['modules'] as $moduleIndex => $moduleData) {
                 $module = $course->modules()->create([
                     'name' => $moduleData['name'],
@@ -170,104 +235,62 @@ class CourseOnlineController extends Controller
                             'is_active' => $contentData['is_active'] ?? true,
                         ];
 
-                        // ✅ FIXED: Handle video content
+                        // Handle video content
                         if ($contentData['content_type'] === 'video' && !empty($contentData['video_id'])) {
                             $video = Video::find($contentData['video_id']);
                             if ($video) {
                                 $contentFields['video_id'] = $video->id;
-
-                                if (!$video->streaming_url) {
-                                    $streamingUrl = $this->googleDriveService->processUrl($video->google_drive_url);
-                                    if ($streamingUrl) {
-                                        $video->update(['streaming_url' => $streamingUrl]);
-                                    }
-                                }
                             }
                         }
 
-                        // ✅ FIXED: Handle PDF content (both file upload and Google Drive)
+                        // ✅ SIMPLIFIED: Handle PDF content - admin provides page count
                         if ($contentData['content_type'] === 'pdf') {
                             $fileKey = "modules.{$moduleIndex}.content.{$contentIndex}.pdf_file";
 
-                            // Priority 1: Check for uploaded file
+                            // Handle uploaded file
                             if ($request->hasFile($fileKey)) {
-                                Log::info('📄 Processing uploaded PDF file', [
-                                    'file_key' => $fileKey,
-                                    'course_id' => $course->id,
-                                ]);
-
                                 $pdfData = $this->fileService->uploadCoursePdf(
                                     $request->file($fileKey),
                                     $course->id
                                 );
+
                                 $contentFields['file_path'] = $pdfData['path'];
                                 $contentFields['pdf_name'] = $contentData['pdf_name'] ?? $pdfData['original_name'] ?? 'PDF Document';
                             }
-                            // Priority 2: Check for Google Drive URL
+                            // Handle Google Drive URL
                             elseif (!empty($contentData['google_drive_pdf_url'])) {
-                                Log::info('📄 Processing Google Drive PDF URL', [
-                                    'url' => $contentData['google_drive_pdf_url'],
-                                    'course_id' => $course->id,
-                                ]);
-
-                                // ✅ FIXED: Process Google Drive URL properly
                                 $processedUrl = $this->processGoogleDrivePdfUrl($contentData['google_drive_pdf_url']);
-
                                 $contentFields['google_drive_pdf_url'] = $processedUrl;
                                 $contentFields['pdf_name'] = $contentData['pdf_name'] ?? 'PDF Document';
+                            }
 
-                                Log::info('📄 Google Drive PDF processed', [
-                                    'original_url' => $contentData['google_drive_pdf_url'],
-                                    'processed_url' => $processedUrl,
-                                    'pdf_name' => $contentFields['pdf_name'],
-                                ]);
-                            }
-                            // No PDF source provided - this might be an error
-                            else {
-                                Log::warning('📄 PDF content with no source', [
-                                    'module_index' => $moduleIndex,
-                                    'content_index' => $contentIndex,
-                                    'title' => $contentData['title'],
-                                ]);
-                            }
+                            // ✅ ALWAYS use admin-provided page count
+                            $contentFields['pdf_page_count'] = $contentData['pdf_page_count'];
+
+                            Log::info('PDF content created with admin-provided page count', [
+                                'title' => $contentData['title'],
+                                'page_count' => $contentData['pdf_page_count'],
+                                'source' => $request->hasFile($fileKey) ? 'uploaded' : 'google_drive'
+                            ]);
                         }
 
-                        // ✅ Create the content record
-                        $createdContent = ModuleContent::create($contentFields);
-
-                        Log::info('📄 Content created successfully', [
-                            'content_id' => $createdContent->id,
-                            'content_type' => $createdContent->content_type,
-                            'title' => $createdContent->title,
-                            'has_file_path' => !empty($createdContent->file_path),
-                            'has_google_drive_url' => !empty($createdContent->google_drive_pdf_url),
-                        ]);
+                        // Create the content record
+                        ModuleContent::create($contentFields);
                     }
                 }
             }
 
             DB::commit();
 
-            Log::info('📄 Course created successfully', [
-                'course_id' => $course->id,
-                'course_name' => $course->name,
-            ]);
-
             return redirect()->route('admin.course-online.index')
-                ->with('success', 'Course created successfully with all modules and content!');
+                ->with('success', 'Course created successfully!');
 
         } catch (\Exception $e) {
             DB::rollBack();
 
-            Log::error('📄 Course creation failed', [
+            Log::error('Course creation failed', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
             ]);
-
-            if ($imagePath) {
-                $this->fileService->deleteFile($imagePath);
-                $this->thumbnailService->deleteThumbnails($imagePath);
-            }
 
             return redirect()->back()
                 ->withInput()
@@ -401,8 +424,20 @@ class CourseOnlineController extends Controller
     /**
      * Show form for editing course
      */
+// ✅ ENHANCED: Edit function with PDF page count data
     public function edit(CourseOnline $courseOnline)
     {
+        // Load course with all related data
+        $courseOnline->load([
+            'modules.content.video',
+            'modules' => function($query) {
+                $query->orderBy('order_number');
+            },
+            'modules.content' => function($query) {
+                $query->orderBy('order_number');
+            }
+        ]);
+
         $thumbnails = [];
         if ($courseOnline->image_path) {
             $thumbnails = [
@@ -411,6 +446,22 @@ class CourseOnlineController extends Controller
                 'large' => $this->thumbnailService->getThumbnailUrl($courseOnline->image_path, 'large'),
             ];
         }
+
+        // Get available videos for content selection
+        $availableVideos = Video::where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'duration', 'google_drive_url'])
+            ->map(function($video) {
+                return [
+                    'id' => $video->id,
+                    'name' => $video->name,
+                    'duration' => $video->duration,
+                    'formatted_duration' => gmdate('H:i:s', $video->duration),
+                    'google_drive_url' => $video->google_drive_url,
+                    'streaming_url' => $this->googleDriveService->processUrl($video->google_drive_url),
+                    'thumbnail_url' => $video->thumbnail_url,
+                ];
+            });
 
         return Inertia::render('Admin/CourseOnline/Edit', [
             'course' => [
@@ -422,13 +473,68 @@ class CourseOnlineController extends Controller
                 'difficulty_level' => $courseOnline->difficulty_level,
                 'estimated_duration' => $courseOnline->estimated_duration,
                 'is_active' => $courseOnline->is_active,
-            ]
+                // ✅ NEW: Include modules with PDF page count data
+                'modules' => $courseOnline->modules->map(function($module) {
+                    return [
+                        'id' => $module->id,
+                        'name' => $module->name,
+                        'description' => $module->description,
+                        'order_number' => $module->order_number,
+                        'estimated_duration' => $module->estimated_duration,
+                        'is_required' => $module->is_required,
+                        'is_active' => $module->is_active,
+                        'content' => $module->content->map(function($content) {
+                            $contentData = [
+                                'id' => $content->id,
+                                'title' => $content->title,
+                                'content_type' => $content->content_type,
+                                'order_number' => $content->order_number,
+                                'is_required' => $content->is_required,
+                                'is_active' => $content->is_active,
+                            ];
+
+                            // Video specific data
+                            if ($content->content_type === 'video') {
+                                $contentData['video_id'] = $content->video_id;
+                                $contentData['video'] = $content->video ? [
+                                    'id' => $content->video->id,
+                                    'name' => $content->video->name,
+                                    'duration' => $content->video->duration,
+                                    'formatted_duration' => gmdate('H:i:s', $content->video->duration),
+                                    'thumbnail_url' => $content->video->thumbnail_url,
+                                ] : null;
+                            }
+
+                            // ✅ PDF specific data with page count
+                            if ($content->content_type === 'pdf') {
+                                $contentData['pdf_name'] = $content->pdf_name;
+                                $contentData['google_drive_pdf_url'] = $content->google_drive_pdf_url;
+                                $contentData['file_path'] = $content->file_path;
+                                // ✅ NEW: Include PDF page count
+                                $contentData['pdf_page_count'] = $content->pdf_page_count;
+                                $contentData['pdf_source_type'] = $content->google_drive_pdf_url ? 'google_drive' : 'upload';
+
+                                // Provide file URL for frontend
+                                if ($content->file_path) {
+                                    $contentData['file_url'] = asset('storage/' . $content->file_path);
+                                } elseif ($content->google_drive_pdf_url) {
+                                    $contentData['file_url'] = $content->google_drive_pdf_url;
+                                }
+                            }
+
+                            return $contentData;
+                        })
+                    ];
+                })
+            ],
+            'availableVideos' => $availableVideos,
         ]);
     }
 
     /**
      * Update specified course
      */
+// ✅ ENHANCED: Update function with PDF page count support
     public function update(Request $request, CourseOnline $courseOnline)
     {
         $validated = $request->validate([
@@ -439,6 +545,25 @@ class CourseOnlineController extends Controller
             'difficulty_level' => 'required|in:beginner,intermediate,advanced',
             'is_active' => 'boolean',
             'remove_image' => 'boolean',
+            // ✅ NEW: Support for updating modules and content
+            'modules' => 'nullable|array',
+            'modules.*.id' => 'nullable|exists:course_modules,id',
+            'modules.*.name' => 'required|string|max:255',
+            'modules.*.description' => 'nullable|string|max:2000',
+            'modules.*.estimated_duration' => 'nullable|integer|min:1|max:1000',
+            'modules.*.is_required' => 'boolean',
+            'modules.*.is_active' => 'boolean',
+            'modules.*.content' => 'nullable|array',
+            'modules.*.content.*.id' => 'nullable|exists:modulecontent,id',
+            'modules.*.content.*.title' => 'required|string|max:255',
+            'modules.*.content.*.content_type' => 'required|in:video,pdf',
+            'modules.*.content.*.is_required' => 'boolean',
+            'modules.*.content.*.is_active' => 'boolean',
+            'modules.*.content.*.video_id' => 'nullable|exists:videos,id',
+            'modules.*.content.*.google_drive_pdf_url' => 'nullable|string|url',
+            'modules.*.content.*.pdf_name' => 'nullable|string|max:255',
+            // ✅ NEW: PDF page count validation for updates
+            'modules.*.content.*.pdf_page_count' => 'nullable|integer|min:1|max:1000',
         ]);
 
         DB::beginTransaction();
@@ -446,6 +571,7 @@ class CourseOnlineController extends Controller
         try {
             $imagePath = $courseOnline->image_path;
 
+            // Handle image removal
             if ($request->boolean('remove_image')) {
                 if ($imagePath) {
                     $this->fileService->deleteFile($imagePath);
@@ -454,6 +580,7 @@ class CourseOnlineController extends Controller
                 $imagePath = null;
             }
 
+            // Handle new image upload
             if ($request->hasFile('image')) {
                 if ($imagePath) {
                     $this->fileService->deleteFile($imagePath);
@@ -468,6 +595,7 @@ class CourseOnlineController extends Controller
                 $this->thumbnailService->generateMultipleThumbnails($imagePath);
             }
 
+            // Update course basic info
             $courseOnline->update([
                 'name' => $validated['name'],
                 'description' => $validated['description'],
@@ -477,6 +605,82 @@ class CourseOnlineController extends Controller
                 'is_active' => $validated['is_active'] ?? $courseOnline->is_active,
             ]);
 
+            // ✅ NEW: Handle modules and content updates if provided
+            if (isset($validated['modules']) && is_array($validated['modules'])) {
+                foreach ($validated['modules'] as $moduleIndex => $moduleData) {
+                    // Update or create module
+                    $module = null;
+                    if (!empty($moduleData['id'])) {
+                        $module = CourseModule::find($moduleData['id']);
+                        if ($module && $module->course_online_id === $courseOnline->id) {
+                            $module->update([
+                                'name' => $moduleData['name'],
+                                'description' => $moduleData['description'],
+                                'order_number' => $moduleIndex + 1,
+                                'estimated_duration' => $moduleData['estimated_duration'],
+                                'is_required' => $moduleData['is_required'] ?? true,
+                                'is_active' => $moduleData['is_active'] ?? true,
+                            ]);
+                        }
+                    } else {
+                        $module = $courseOnline->modules()->create([
+                            'name' => $moduleData['name'],
+                            'description' => $moduleData['description'],
+                            'order_number' => $moduleIndex + 1,
+                            'estimated_duration' => $moduleData['estimated_duration'],
+                            'is_required' => $moduleData['is_required'] ?? true,
+                            'is_active' => $moduleData['is_active'] ?? true,
+                        ]);
+                    }
+
+                    if ($module && isset($moduleData['content']) && is_array($moduleData['content'])) {
+                        foreach ($moduleData['content'] as $contentIndex => $contentData) {
+                            $contentFields = [
+                                'module_id' => $module->id,
+                                'content_type' => $contentData['content_type'],
+                                'title' => $contentData['title'],
+                                'order_number' => $contentIndex + 1,
+                                'is_required' => $contentData['is_required'] ?? true,
+                                'is_active' => $contentData['is_active'] ?? true,
+                            ];
+
+                            // Handle video content
+                            if ($contentData['content_type'] === 'video' && !empty($contentData['video_id'])) {
+                                $contentFields['video_id'] = $contentData['video_id'];
+                            }
+
+                            // ✅ ENHANCED: Handle PDF content updates with page count
+                            if ($contentData['content_type'] === 'pdf') {
+                                if (!empty($contentData['google_drive_pdf_url'])) {
+                                    $processedUrl = $this->processGoogleDrivePdfUrl($contentData['google_drive_pdf_url']);
+                                    $contentFields['google_drive_pdf_url'] = $processedUrl;
+                                    $contentFields['pdf_name'] = $contentData['pdf_name'] ?? 'PDF Document';
+                                }
+
+                                // ✅ NEW: Update PDF page count
+                                if (isset($contentData['pdf_page_count']) && $contentData['pdf_page_count'] > 0) {
+                                    $contentFields['pdf_page_count'] = $contentData['pdf_page_count'];
+                                    Log::info('Updating PDF page count', [
+                                        'content_id' => $contentData['id'] ?? 'new',
+                                        'page_count' => $contentData['pdf_page_count']
+                                    ]);
+                                }
+                            }
+
+                            // Update or create content
+                            if (!empty($contentData['id'])) {
+                                $content = ModuleContent::find($contentData['id']);
+                                if ($content && $content->module_id === $module->id) {
+                                    $content->update($contentFields);
+                                }
+                            } else {
+                                ModuleContent::create($contentFields);
+                            }
+                        }
+                    }
+                }
+            }
+
             DB::commit();
 
             return redirect()->route('admin.course-online.index')
@@ -484,6 +688,11 @@ class CourseOnlineController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
+
+            Log::error('Course update failed', [
+                'course_id' => $courseOnline->id,
+                'error' => $e->getMessage(),
+            ]);
 
             return redirect()->back()
                 ->withInput()

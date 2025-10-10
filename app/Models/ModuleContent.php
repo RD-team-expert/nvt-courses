@@ -22,6 +22,7 @@ class ModuleContent extends Model
         'google_drive_pdf_url', // For PDF Google Drive links
         'duration', // For videos (seconds)
         'file_size', // In bytes
+        'pdf_page_count', // ✅ ADD: Page count for PDFs
         'thumbnail_path',
         'order_number',
         'is_required',
@@ -34,6 +35,8 @@ class ModuleContent extends Model
         'duration' => 'integer',
         'file_size' => 'integer',
         'order_number' => 'integer',
+        'pdf_page_count' => 'integer', // ✅ ADD: Cast to integer
+
     ];
 
     // Relationships
@@ -165,4 +168,28 @@ class ModuleContent extends Model
             ->where('is_suspicious_activity', true)
             ->count();
     }
+    public function getPdfPageCountAttribute()
+    {
+        if ($this->content_type !== 'pdf') {
+            return null;
+        }
+
+        return $this->attributes['pdf_page_count'] ?? null;
+    }
+
+    public function hasPdfPageCount(): bool
+    {
+        return $this->content_type === 'pdf' && !is_null($this->pdf_page_count);
+    }
+
+    public function getEstimatedReadingTimeAttribute(): int
+    {
+        if ($this->content_type !== 'pdf' || !$this->pdf_page_count) {
+            return 0;
+        }
+
+        // Estimate 2 minutes per page
+        return $this->pdf_page_count * 2;
+    }
+
 }
