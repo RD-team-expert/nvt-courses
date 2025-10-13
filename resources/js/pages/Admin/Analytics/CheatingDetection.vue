@@ -678,6 +678,7 @@ const handleClickOutside = () => {
                                                 </div>
 
                                                 <!-- Video Analytics -->
+                                                <!-- Video Analytics -->
                                                 <div class="bg-card border rounded-lg p-3">
                                                     <h4 class="font-medium mb-2">Video Behavior Analysis</h4>
                                                     <div class="grid gap-2 md:grid-cols-3 text-sm">
@@ -686,8 +687,9 @@ const handleClickOutside = () => {
                                                             <span class="ml-2 font-medium">{{ formatTime(session.video_watch_time) }}</span>
                                                         </div>
                                                         <div>
+                                                            <!-- ✅ FIXED: Use session.duration instead of session.video_total_duration -->
                                                             <span class="text-muted-foreground">Total Duration:</span>
-                                                            <span class="ml-2 font-medium">{{ formatTime(session.video_total_duration) }}</span>
+                                                            <span class="ml-2 font-medium">{{ session.duration }}</span>
                                                         </div>
                                                         <div>
                                                             <span class="text-muted-foreground">Completion:</span>

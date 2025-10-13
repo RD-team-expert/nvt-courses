@@ -111,7 +111,8 @@ class CourseController extends Controller
                 }
             }],
             'availabilities.*.duration_weeks' => 'required|integer|min:1|max:52',
-            'availabilities.*.session_time' => 'nullable|date_format:H:i',
+            'availabilities.*.session_time_shift_2' => 'nullable|date_format:H:i',
+            'availabilities.*.session_time_shift_3' => 'nullable|date_format:H:i',
             'availabilities.*.session_duration_minutes' => 'nullable|integer|min:15|max:480',
         ]);
 
@@ -158,7 +159,8 @@ class CourseController extends Controller
                 // NEW SCHEDULING FIELDS - FIXED
                 'days_of_week' => $daysOfWeek, // Now properly converted to string
                 'duration_weeks' => $availability['duration_weeks'],
-                'session_time' => $availability['session_time'] ?? null,
+                'session_time' => $availability['session_time'] ?? null,'session_time_shift_2' => $availability['session_time_shift_2'] ?? null,
+                'session_time_shift_3' => $availability['session_time_shift_3'] ?? null,
                 'session_duration_minutes' => $availability['session_duration_minutes'] ?? 60,
             ]);
 
@@ -211,7 +213,16 @@ class CourseController extends Controller
                 'days_of_week' => $availability->days_of_week,
                 'formatted_days' => $availability->formatted_days ?? 'N/A',
                 'duration_weeks' => $availability->duration_weeks,
-                'session_time' => $availability->formatted_session_time,
+
+                // FIXED: Check if fields exist and are not null before formatting
+                'session_time_shift_2' => $availability->session_time_shift_2 ?
+                    $availability->session_time_shift_2->format('H:i') : null,
+                'session_time_shift_3' => $availability->session_time_shift_3 ?
+                    $availability->session_time_shift_3->format('H:i') : null,
+
+                // Add formatted session times for convenience
+                'formatted_session_times' => $availability->formatted_session_times ?? 'No times set',
+
                 'session_duration' => $availability->formatted_session_duration,
 
                 'enrollments' => $availability->registrations->map(function ($registration) {
@@ -308,7 +319,8 @@ class CourseController extends Controller
                 }
             }],
             'availabilities.*.duration_weeks' => 'required|integer|min:1|max:52',
-            'availabilities.*.session_time' => 'nullable|date_format:H:i',
+            'availabilities.*.session_time_shift_2' => 'nullable|date_format:H:i',
+            'availabilities.*.session_time_shift_3' => 'nullable|date_format:H:i',
             'availabilities.*.session_duration_minutes' => 'nullable|integer|min:15|max:480',
         ]);
 
@@ -397,7 +409,8 @@ class CourseController extends Controller
                         // NEW SCHEDULING FIELDS - FIXED
                         'days_of_week' => $daysOfWeek, // Now properly converted to string
                         'duration_weeks' => $availabilityData['duration_weeks'],
-                        'session_time' => $availabilityData['session_time'] ?? null,
+                        'session_time_shift_2' => $availability['session_time_shift_2'] ?? null,
+                        'session_time_shift_3' => $availability['session_time_shift_3'] ?? null,
                         'session_duration_minutes' => $availabilityData['session_duration_minutes'] ?? 60,
                     ]);
 

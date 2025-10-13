@@ -72,10 +72,13 @@ const form = useForm({
             notes: availability.notes || '',
             status: availability.status || 'active',
 
-            // NEW SCHEDULING FIELDS
+            // NEW SCHEDULING FIELDS - UPDATED
             days_of_week: stringToArray(availability.days_of_week || ''), // Convert string to array for UI
             duration_weeks: availability.duration_weeks || 1,
-            session_time: availability.session_time || '',
+            // REMOVED: session_time: availability.session_time || '',
+            // ADDED: Multiple shift times
+            session_time_shift_2: availability.session_time_shift_2 || '',
+            session_time_shift_3: availability.session_time_shift_3 || '',
             session_duration_minutes: availability.session_duration_minutes || 60
         })) :
         [{
@@ -86,10 +89,13 @@ const form = useForm({
             notes: '',
             status: 'active',
 
-            // NEW SCHEDULING FIELDS
+            // NEW SCHEDULING FIELDS - UPDATED
             days_of_week: [],
             duration_weeks: 1,
-            session_time: '',
+            // REMOVED: session_time: '',
+            // ADDED: Multiple shift times
+            session_time_shift_2: '',
+            session_time_shift_3: '',
             session_duration_minutes: 60
         }]
 })
@@ -142,10 +148,13 @@ function addAvailability() {
             notes: '',
             status: 'active',
 
-            // NEW SCHEDULING FIELDS
+            // NEW SCHEDULING FIELDS - UPDATED
             days_of_week: [],
             duration_weeks: 1,
-            session_time: '',
+            // REMOVED: session_time: '',
+            // ADDED: Multiple shift times
+            session_time_shift_2: '',
+            session_time_shift_3: '',
             session_duration_minutes: 60
         })
     }
@@ -355,7 +364,7 @@ function submit() {
                             </div>
                         </div>
 
-                        <!-- Course Availabilities Section - UPDATED WITH NEW SCHEDULING FIELDS -->
+                        <!-- Course Availabilities Section - UPDATED WITH MULTIPLE SHIFT TIMES -->
                         <div class="mb-6">
                             <div class="flex justify-between items-center mb-4">
                                 <h2 class="text-lg font-semibold">Course Session Schedules</h2>
@@ -390,7 +399,7 @@ function submit() {
                                     </div>
 
                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <!-- Days of Week Selection - NEW -->
+                                        <!-- Days of Week Selection -->
                                         <div class="md:col-span-2">
                                             <label class="block font-medium mb-2">Days of the Week</label>
                                             <div class="grid grid-cols-4 md:grid-cols-7 gap-2">
@@ -420,7 +429,7 @@ function submit() {
                                             </div>
                                         </div>
 
-                                        <!-- Duration in Weeks - NEW -->
+                                        <!-- Duration in Weeks -->
                                         <div>
                                             <label class="block font-medium mb-1">Duration (Weeks)</label>
                                             <Input
@@ -437,21 +446,35 @@ function submit() {
                                             </div>
                                         </div>
 
-                                        <!-- Session Time - NEW -->
+                                        <!-- NEW: Session Time Shift 2 -->
                                         <div>
-                                            <label class="block font-medium mb-1">Session Time</label>
+                                            <label class="block font-medium mb-1">Session Time - Shift 2</label>
                                             <Input
                                                 type="time"
-                                                v-model="availability.session_time"
+                                                v-model="availability.session_time_shift_2"
                                                 :disabled="form.processing"
                                             />
-                                            <p class="text-xs text-muted-foreground mt-1">Start time for each session (optional)</p>
-                                            <div v-if="form.errors[`availabilities.${index}.session_time`]" class="text-destructive text-sm mt-1">
-                                                {{ form.errors[`availabilities.${index}.session_time`] }}
+                                            <p class="text-xs text-muted-foreground mt-1">Start time for Shift 2 sessions (optional)</p>
+                                            <div v-if="form.errors[`availabilities.${index}.session_time_shift_2`]" class="text-destructive text-sm mt-1">
+                                                {{ form.errors[`availabilities.${index}.session_time_shift_2`] }}
                                             </div>
                                         </div>
 
-                                        <!-- Session Duration - NEW -->
+                                        <!-- NEW: Session Time Shift 3 -->
+                                        <div>
+                                            <label class="block font-medium mb-1">Session Time - Shift 3</label>
+                                            <Input
+                                                type="time"
+                                                v-model="availability.session_time_shift_3"
+                                                :disabled="form.processing"
+                                            />
+                                            <p class="text-xs text-muted-foreground mt-1">Start time for Shift 3 sessions (optional)</p>
+                                            <div v-if="form.errors[`availabilities.${index}.session_time_shift_3`]" class="text-destructive text-sm mt-1">
+                                                {{ form.errors[`availabilities.${index}.session_time_shift_3`] }}
+                                            </div>
+                                        </div>
+
+                                        <!-- Session Duration -->
                                         <div>
                                             <label class="block font-medium mb-1">Session Duration (Minutes)</label>
                                             <Input
