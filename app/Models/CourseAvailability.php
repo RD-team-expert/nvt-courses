@@ -24,7 +24,9 @@ class CourseAvailability extends Model
         'days_of_week',
         'duration_weeks',
         'session_time',
-        'session_duration_minutes'
+        'session_duration_minutes',
+        'session_time_shift_2',
+        'session_time_shift_3'
     ];
 
     protected $casts = [
@@ -34,6 +36,8 @@ class CourseAvailability extends Model
         'session_time' => 'datetime:H:i',
         'duration_weeks' => 'integer',
         'session_duration_minutes' => 'integer',
+        'session_time_shift_2' => 'datetime:H:i',
+        'session_time_shift_3' => 'datetime:H:i',
     ];
 
     // EXISTING RELATIONSHIPS - KEEP THESE [attached_file:2]

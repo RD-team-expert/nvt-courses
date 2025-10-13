@@ -254,8 +254,11 @@ console.log('Is admin:', isAdmin.value);
 
             <!-- Admin Navigation (only shown to admins) -->
             <template v-if="isAdmin">
+                <!-- Other Admin Navigation Items -->
+                <NavMain :items="otherAdminNavItems" label="Admin" />
+
+                <!-- Reports & Analytics Collapsible Menu in Admin Section -->
                 <SidebarMenu>
-                    <!-- Reports & Analytics Collapsible Menu -->
                     <Collapsible
                         v-model:open="openSubmenus.reportsAnalytics"
                         class="group/collapsible"
@@ -295,9 +298,6 @@ console.log('Is admin:', isAdmin.value);
                         </SidebarMenuItem>
                     </Collapsible>
                 </SidebarMenu>
-
-                <!-- Other Admin Navigation Items -->
-                <NavMain :items="otherAdminNavItems" label="Admin" />
             </template>
         </SidebarContent>
 

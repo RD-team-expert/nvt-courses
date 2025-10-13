@@ -68,10 +68,13 @@ const form = useForm({
             capacity: 25,
             sessions: 1,
             notes: '',
-            // NEW SCHEDULING FIELDS
+            // NEW SCHEDULING FIELDS - UPDATED
             days_of_week: [], // Array for multiple day selection (UI only)
             duration_weeks: 1,
-            session_time: '',
+            // REMOVED: session_time: '',
+            // ADDED: Multiple shift times
+            session_time_shift_2: '',
+            session_time_shift_3: '',
             session_duration_minutes: 60
         }
     ]
@@ -102,10 +105,13 @@ function addAvailability() {
             capacity: 25,
             sessions: 1,
             notes: '',
-            // NEW SCHEDULING FIELDS
+            // NEW SCHEDULING FIELDS - UPDATED
             days_of_week: [],
             duration_weeks: 1,
-            session_time: '',
+            // REMOVED: session_time: '',
+            // ADDED: Multiple shift times
+            session_time_shift_2: '',
+            session_time_shift_3: '',
             session_duration_minutes: 60
         })
     }
@@ -705,17 +711,31 @@ function getProgressMessage() {
                                             </div>
                                         </div>
 
-                                        <!-- Session Time - NEW -->
+                                        <!-- NEW: Session Time Shift 2 -->
                                         <div>
-                                            <label class="block font-medium mb-1">Session Time</label>
+                                            <label class="block font-medium mb-1">Session Time - Shift 2</label>
                                             <Input
                                                 type="time"
-                                                v-model="availability.session_time"
+                                                v-model="availability.session_time_shift_2"
                                                 :disabled="form.processing"
                                             />
-                                            <p class="text-xs text-muted-foreground mt-1">Start time for each session (optional)</p>
-                                            <div v-if="form.errors[`availabilities.${index}.session_time`]" class="text-destructive text-sm mt-1">
-                                                {{ form.errors[`availabilities.${index}.session_time`] }}
+                                            <p class="text-xs text-muted-foreground mt-1">Start time for Shift 2 sessions (optional)</p>
+                                            <div v-if="form.errors[`availabilities.${index}.session_time_shift_2`]" class="text-destructive text-sm mt-1">
+                                                {{ form.errors[`availabilities.${index}.session_time_shift_2`] }}
+                                            </div>
+                                        </div>
+
+                                        <!-- NEW: Session Time Shift 3 -->
+                                        <div>
+                                            <label class="block font-medium mb-1">Session Time - Shift 3</label>
+                                            <Input
+                                                type="time"
+                                                v-model="availability.session_time_shift_3"
+                                                :disabled="form.processing"
+                                            />
+                                            <p class="text-xs text-muted-foreground mt-1">Start time for Shift 3 sessions (optional)</p>
+                                            <div v-if="form.errors[`availabilities.${index}.session_time_shift_3`]" class="text-destructive text-sm mt-1">
+                                                {{ form.errors[`availabilities.${index}.session_time_shift_3`] }}
                                             </div>
                                         </div>
 

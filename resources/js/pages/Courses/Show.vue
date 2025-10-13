@@ -306,6 +306,25 @@ const isAvailabilityDisabled = (availability) => {
     return sessions <= 0 || !availability?.is_available || (props.userAssignment && props.userAssignment.status === 'pending');
 }
 
+// NEW: Format multiple session times for display
+const formatSessionTimes = (availability) => {
+    const times = [];
+
+    if (availability.session_time_shift_2) {
+        times.push(`Shift 2: ${availability.session_time_shift_2}`);
+    }
+
+    if (availability.session_time_shift_3) {
+        times.push(`Shift 3: ${availability.session_time_shift_3}`);
+    }
+
+    if (times.length === 0) {
+        return 'No session times set';
+    }
+
+    return times.join(', ');
+}
+
 // Define breadcrumbs with proper typing
 const breadcrumbs: BreadcrumbItemType[] = [
     { name: 'Dashboard', href: route('dashboard') },
@@ -504,7 +523,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                                 </p>
                             </div>
 
-                            <!-- ✅ Available Session Schedules with NEW SCHEDULING DATA -->
+                            <!-- ✅ Available Session Schedules with UPDATED SCHEDULING DATA -->
                             <div v-if="availabilities && availabilities.length > 0" class="space-y-4" :class="{ 'opacity-50': userAssignment && userAssignment.status === 'pending' }">
                                 <Label class="text-base font-semibold">Available Session Schedules:</Label>
 
@@ -543,7 +562,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                                                     </Badge>
                                                 </div>
 
-                                                <!-- NEW: Scheduling Information -->
+                                                <!-- UPDATED: Scheduling Information with Multiple Shift Times -->
                                                 <div class="border-t pt-3 space-y-2">
                                                     <h4 class="text-xs font-semibold text-foreground uppercase tracking-wide">Schedule Details</h4>
 
@@ -563,11 +582,20 @@ const breadcrumbs: BreadcrumbItemType[] = [
                                                         <span class="text-sm font-medium text-foreground">{{ availability.duration_weeks }} weeks</span>
                                                     </div>
 
-                                                    <!-- Session Time -->
-                                                    <div v-if="availability.formatted_session_time" class="flex items-center space-x-2">
-                                                        <Timer class="h-4 w-4 text-muted-foreground" />
-                                                        <span class="text-sm text-muted-foreground">Time:</span>
-                                                        <span class="text-sm font-medium text-foreground">{{ availability.formatted_session_time }}</span>
+                                                    <!-- UPDATED: Multiple Session Times -->
+                                                    <div v-if="availability.session_time_shift_2 || availability.session_time_shift_3" class="flex items-start space-x-2">
+                                                        <Timer class="h-4 w-4 text-muted-foreground mt-0.5" />
+                                                        <div class="flex-1">
+                                                            <span class="text-sm text-muted-foreground">Session Times:</span>
+                                                            <div class="mt-1 space-y-1">
+                                                                <div v-if="availability.session_time_shift_2" class="text-sm font-medium text-foreground">
+                                                                    Shift 2: {{ availability.session_time_shift_2 }}
+                                                                </div>
+                                                                <div v-if="availability.session_time_shift_3" class="text-sm font-medium text-foreground">
+                                                                    Shift 3: {{ availability.session_time_shift_3 }}
+                                                                </div>
+                                                            </div>
+                                                        </div>
                                                     </div>
 
                                                     <!-- Session Duration -->
@@ -749,7 +777,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                                     </Button>
                                 </Alert>
 
-                                <!-- ✅ Show selected session schedule with NEW SCHEDULING DATA -->
+                                <!-- ✅ Show selected session schedule with UPDATED SCHEDULING DATA -->
                                 <Card v-if="selectedAvailability" class="bg-primary/5 border-primary/20">
                                     <CardContent class="p-4">
                                         <div class="flex items-center space-x-2 mb-3">
@@ -766,7 +794,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                                                 </p>
                                             </div>
 
-                                            <!-- NEW: Scheduling Information -->
+                                            <!-- UPDATED: Scheduling Information with Multiple Shift Times -->
                                             <div class="border-t pt-3 space-y-2 text-sm">
                                                 <h4 class="text-xs font-semibold text-foreground uppercase tracking-wide">Schedule Details</h4>
 
@@ -786,11 +814,20 @@ const breadcrumbs: BreadcrumbItemType[] = [
                                                     <span class="font-medium text-foreground">{{ selectedAvailability.duration_weeks }} weeks</span>
                                                 </div>
 
-                                                <!-- Session Time -->
-                                                <div v-if="selectedAvailability.formatted_session_time" class="flex items-center space-x-2">
-                                                    <Timer class="h-4 w-4 text-muted-foreground" />
-                                                    <span class="text-muted-foreground">Time:</span>
-                                                    <span class="font-medium text-foreground">{{ selectedAvailability.formatted_session_time }}</span>
+                                                <!-- UPDATED: Multiple Session Times -->
+                                                <div v-if="selectedAvailability.session_time_shift_2 || selectedAvailability.session_time_shift_3" class="flex items-start space-x-2">
+                                                    <Timer class="h-4 w-4 text-muted-foreground mt-0.5" />
+                                                    <div class="flex-1">
+                                                        <span class="text-muted-foreground">Session Times:</span>
+                                                        <div class="mt-1 space-y-1">
+                                                            <div v-if="selectedAvailability.session_time_shift_2" class="font-medium text-foreground">
+                                                                Shift 2: {{ selectedAvailability.session_time_shift_2 }}
+                                                            </div>
+                                                            <div v-if="selectedAvailability.session_time_shift_3" class="font-medium text-foreground">
+                                                                Shift 3: {{ selectedAvailability.session_time_shift_3 }}
+                                                            </div>
+                                                        </div>
+                                                    </div>
                                                 </div>
 
                                                 <!-- Session Duration -->

@@ -256,7 +256,7 @@ class CourseController extends Controller
             if ($enrollment && $enrollment->courseAvailability) {
                 $availability = $enrollment->courseAvailability;
 
-                // ✅ UPDATED: Include NEW scheduling fields in selected availability
+                // ✅ UPDATED: Include NEW scheduling fields with multiple shift times
                 $selectedAvailability = [
                     'id' => $availability->id,
                     'start_date' => $availability->start_date,
@@ -266,20 +266,30 @@ class CourseController extends Controller
                     'sessions' => $availability->sessions ?? 0,
                     'notes' => $availability->notes,
 
-                    // ✅ NEW SCHEDULING FIELDS
+                    // ✅ NEW SCHEDULING FIELDS WITH MULTIPLE SHIFT TIMES
                     'days_of_week' => $availability->days_of_week,
                     'selected_days' => $availability->selected_days ?? [], // Array format
                     'formatted_days' => $availability->formatted_days ?? 'N/A',
                     'duration_weeks' => $availability->duration_weeks,
-                    'session_time' => $availability->session_time,
-                    'formatted_session_time' => $availability->formatted_session_time,
+
+                    // REMOVED: single session_time fields
+                    // 'session_time' => $availability->session_time,
+                    // 'formatted_session_time' => $availability->formatted_session_time,
+
+                    // ADDED: Multiple shift times
+                    'session_time_shift_2' => $availability->session_time_shift_2 ?
+                        $availability->session_time_shift_2->format('H:i') : null,
+                    'session_time_shift_3' => $availability->session_time_shift_3 ?
+                        $availability->session_time_shift_3->format('H:i') : null,
+                    'formatted_session_times' => $availability->formatted_session_times ?? 'No times set',
+
                     'session_duration_minutes' => $availability->session_duration_minutes,
                     'formatted_session_duration' => $availability->formatted_session_duration ?? '1 hour',
                 ];
             }
         }
 
-        // ✅ UPDATED: Format availabilities with NEW scheduling data
+        // ✅ UPDATED: Format availabilities with NEW scheduling data and multiple shift times
         $availabilities = $course->availabilities->map(function ($availability) {
             return [
                 'id' => $availability->id,
@@ -295,25 +305,41 @@ class CourseController extends Controller
                 'is_expired' => false,
                 'notes' => $availability->notes,
 
-                // ✅ NEW SCHEDULING FIELDS FOR USER DISPLAY
+                // ✅ NEW SCHEDULING FIELDS FOR USER DISPLAY WITH MULTIPLE SHIFT TIMES
                 'days_of_week' => $availability->days_of_week, // Raw SET data
                 'selected_days' => $availability->selected_days ?? [], // Array format from model accessor
                 'formatted_days' => $availability->formatted_days ?? 'N/A', // "Mon, Wed, Fri"
                 'duration_weeks' => $availability->duration_weeks ?? 1,
-                'session_time' => $availability->session_time,
-                'formatted_session_time' => $availability->formatted_session_time ?? null, // "09:00"
+
+                // REMOVED: single session_time fields
+                // 'session_time' => $availability->session_time,
+                // 'formatted_session_time' => $availability->formatted_session_time ?? null,
+
+                // ADDED: Multiple shift times with safe formatting
+                'session_time_shift_2' => $availability->session_time_shift_2 ?
+                    $availability->session_time_shift_2->format('H:i') : null,
+                'session_time_shift_3' => $availability->session_time_shift_3 ?
+                    $availability->session_time_shift_3->format('H:i') : null,
+                'formatted_session_times' => $availability->formatted_session_times ?? 'No times set',
+
                 'session_duration_minutes' => $availability->session_duration_minutes ?? 60,
                 'formatted_session_duration' => $availability->formatted_session_duration ?? '1 hour', // "2h 30m"
             ];
         });
 
-        Log::info('Returning data with NEW scheduling fields', [
+        Log::info('Returning data with NEW multiple shift scheduling fields', [
             'isEnrolled' => $isEnrolled,
             'userStatus' => $userStatus,
             'completion_exists' => !!$completion,
             'selectedAvailability_has_scheduling' => $selectedAvailability ? isset($selectedAvailability['formatted_days']) : false,
+            'selectedAvailability_has_shifts' => $selectedAvailability ?
+                (isset($selectedAvailability['session_time_shift_2']) || isset($selectedAvailability['session_time_shift_3'])) : false,
             'availabilities_count' => $availabilities->count(),
-            'first_availability_days' => $availabilities->first()['formatted_days'] ?? 'none'
+            'first_availability_days' => $availabilities->first()['formatted_days'] ?? 'none',
+            'first_availability_shift_times' => $availabilities->first() ? [
+                'shift_2' => $availabilities->first()['session_time_shift_2'],
+                'shift_3' => $availabilities->first()['session_time_shift_3']
+            ] : 'none'
         ]);
 
         return Inertia::render('Courses/Show', [
@@ -321,8 +347,8 @@ class CourseController extends Controller
             'isEnrolled' => $isEnrolled,
             'userStatus' => $userStatus,
             'completion' => $completion,
-            'selectedAvailability' => $selectedAvailability, // ✅ Now includes scheduling data
-            'availabilities' => $availabilities, // ✅ Now includes scheduling data
+            'selectedAvailability' => $selectedAvailability, // ✅ Now includes multiple shift scheduling data
+            'availabilities' => $availabilities, // ✅ Now includes multiple shift scheduling data
             'userAssignment' => $userAssignment,
         ]);
     }
