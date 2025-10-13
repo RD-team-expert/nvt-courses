@@ -270,6 +270,12 @@ class ContentViewController extends Controller
     /**
      * ✅ ENHANCED: Session management with PDF support
      */
+    /**
+     * ✅ FIXED: Enhanced session management with REAL data collection
+     */
+    /**
+     * ✅ FIXED: Enhanced session management with CUMULATIVE data collection
+     */
     public function manageSession(Request $request, ModuleContent $content)
     {
         $user = auth()->user();
@@ -284,40 +290,48 @@ class ContentViewController extends Controller
         $action = $request->input('action');
         $currentPosition = $request->input('current_position', 0);
 
-        // ✅ ENHANCED: Log session data including PDF info
-        Log::info('📹 Enhanced session management', [
+        // ✅ NEW: Get INCREMENTAL tracking data from frontend
+        $skipCountIncrement = $request->input('skip_count', 0);  // New skips since last heartbeat
+        $seekCountIncrement = $request->input('seek_count', 0);  // New seeks since last heartbeat
+        $pauseCountIncrement = $request->input('pause_count', 0); // New pauses since last heartbeat
+        $watchTimeIncrement = $request->input('watch_time', 0);   // New watch time since last heartbeat
+
+        Log::info('📹 FIXED session management with CUMULATIVE data', [
             'user_id' => $user->id,
             'content_id' => $content->id,
             'action' => $action,
             'position' => $currentPosition,
+            'new_skip_count' => $skipCountIncrement,
+            'new_seek_count' => $seekCountIncrement,
+            'new_pause_count' => $pauseCountIncrement,
+            'new_watch_time' => $watchTimeIncrement,
             'content_type' => $content->content_type,
-            'pdf_page_count' => $content->content_type === 'pdf' ? $content->pdf_page_count : null,
-            'has_pdf_page_count' => $content->content_type === 'pdf' ? !is_null($content->pdf_page_count) : false,
         ]);
 
         try {
             switch ($action) {
                 case 'start':
-                    // End any existing active sessions for this content
+                    // ✅ FIXED: End existing sessions properly
                     $existingSessions = LearningSession::where('user_id', $user->id)
                         ->where('content_id', $content->id)
                         ->whereNull('session_end')
                         ->get();
 
                     foreach ($existingSessions as $existingSession) {
-                        $duration = max(0, now()->diffInMinutes($existingSession->session_start));
+                        $realDuration = max(0, now()->diffInMinutes($existingSession->session_start));
+
                         $existingSession->update([
                             'session_end' => now(),
-                            'total_duration_minutes' => $duration,
+                            'total_duration_minutes' => $realDuration,
                         ]);
 
                         Log::info('🔄 Ended existing session', [
                             'session_id' => $existingSession->id,
-                            'duration_minutes' => $duration,
+                            'real_duration_minutes' => $realDuration,
                         ]);
                     }
 
-                    // Create new session
+                    // Create new session with zero counters
                     $session = LearningSession::create([
                         'user_id' => $user->id,
                         'course_online_id' => $content->module->course_online_id,
@@ -325,31 +339,17 @@ class ContentViewController extends Controller
                         'session_start' => now(),
                         'current_position' => $currentPosition,
                         'total_duration_minutes' => 0,
+                        'video_watch_time' => 0,
+                        'video_skip_count' => 0,
+                        'seek_count' => 0,
+                        'pause_count' => 0,
                     ]);
 
-                    // ✅ ENHANCED: Return PDF metadata with session
-                    $responseData = [
+                    return response()->json([
                         'success' => true,
                         'session_id' => $session->id,
-                        'message' => 'Session started'
-                    ];
-
-                    if ($content->content_type === 'pdf') {
-                        $responseData['pdf_data'] = [
-                            'pdf_page_count' => $content->pdf_page_count,
-                            'has_page_count' => !is_null($content->pdf_page_count),
-                            'estimated_reading_time' => $content->pdf_page_count ? ($content->pdf_page_count * 2) : null,
-                        ];
-                    }
-
-                    Log::info('✅ Enhanced session started', [
-                        'session_id' => $session->id,
-                        'content_type' => $content->content_type,
-                        'pdf_page_count' => $content->pdf_page_count ?? 'N/A',
-                        'has_pdf_data' => isset($responseData['pdf_data']),
+                        'message' => 'Session started with cumulative tracking'
                     ]);
-
-                    return response()->json($responseData);
 
                 case 'heartbeat':
                     $session = LearningSession::where('user_id', $user->id)
@@ -361,28 +361,33 @@ class ContentViewController extends Controller
                     if ($session) {
                         $currentDuration = max(0, now()->diffInMinutes($session->session_start));
 
-                        // ✅ ENHANCED: Validate position for PDF content
-                        if ($content->content_type === 'pdf' && $content->pdf_page_count) {
-                            $currentPosition = max(1, min($content->pdf_page_count, $currentPosition));
-                        }
-
+                        // ✅ FIXED: ACCUMULATE data, don't overwrite
                         $session->update([
                             'current_position' => $currentPosition,
                             'last_heartbeat' => now(),
                             'total_duration_minutes' => $currentDuration,
+
+                            // ✅ ACCUMULATE: Add increments to existing values
+                            'video_watch_time' => ($session->video_watch_time ?? 0) + $watchTimeIncrement,
+                            'video_skip_count' => ($session->video_skip_count ?? 0) + $skipCountIncrement,
+                            'seek_count' => ($session->seek_count ?? 0) + $seekCountIncrement,
+                            'pause_count' => ($session->pause_count ?? 0) + $pauseCountIncrement,
                         ]);
 
-                        Log::info('💓 Enhanced session heartbeat', [
+                        Log::info('💓 FIXED session heartbeat with CUMULATIVE data', [
                             'session_id' => $session->id,
                             'duration_minutes' => $currentDuration,
+                            'total_watch_time' => $session->video_watch_time,
+                            'total_skip_count' => $session->video_skip_count,
+                            'total_seek_count' => $session->seek_count,
                             'position' => $currentPosition,
-                            'content_type' => $content->content_type,
-                            'pdf_page_validation' => $content->content_type === 'pdf' ? "max_{$content->pdf_page_count}" : 'N/A',
                         ]);
 
                         return response()->json([
                             'success' => true,
                             'duration_minutes' => $currentDuration,
+                            'total_watch_time' => $session->video_watch_time,
+                            'total_skip_count' => $session->video_skip_count,
                         ]);
                     }
 
@@ -398,44 +403,68 @@ class ContentViewController extends Controller
                     if ($session) {
                         $totalDuration = max(0, now()->diffInMinutes($session->session_start));
 
-                        // ✅ ENHANCED: Validate final position for PDF
+                        // ✅ FIXED: Calculate completion percentage
+                        $completionPercentage = 0;
                         if ($content->content_type === 'pdf' && $content->pdf_page_count) {
-                            $currentPosition = max(1, min($content->pdf_page_count, $currentPosition));
+                            $completionPercentage = ($currentPosition / $content->pdf_page_count) * 100;
+                        } elseif ($content->content_type === 'video' && $content->video) {
+                            $completionPercentage = ($currentPosition / $content->video->duration) * 100;
                         }
 
+                        // ✅ FIXED: Add final increments to cumulative totals
                         $session->update([
                             'session_end' => now(),
                             'current_position' => $currentPosition,
                             'total_duration_minutes' => $totalDuration,
+
+                            // ✅ ADD final increments to existing totals
+                            'video_watch_time' => ($session->video_watch_time ?? 0) + $watchTimeIncrement,
+                            'video_skip_count' => ($session->video_skip_count ?? 0) + $skipCountIncrement,
+                            'seek_count' => ($session->seek_count ?? 0) + $seekCountIncrement,
+                            'pause_count' => ($session->pause_count ?? 0) + $pauseCountIncrement,
+
+                            'video_completion_percentage' => min(100, max(0, $completionPercentage)),
+
+                            // ✅ Calculate final scores
+                            'attention_score' => $this->calculateAttentionScore($totalDuration, $content, $completionPercentage),
+                            'cheating_score' => $this->calculateCheatingScore($totalDuration, $content, $session->video_skip_count + $skipCountIncrement, $completionPercentage),
+                            'is_suspicious_activity' => $this->isSuspiciousSession($totalDuration, $content, $session->video_skip_count + $skipCountIncrement, $completionPercentage),
                         ]);
 
-                        Log::info('✅ Enhanced session ended', [
+                        // ✅ DEBUGGING: Log final session data
+                        Log::info('✅ FIXED session ended with COMPLETE CUMULATIVE DATA', [
                             'session_id' => $session->id,
                             'total_duration_minutes' => $totalDuration,
-                            'final_position' => $currentPosition,
-                            'content_type' => $content->content_type,
-                            'pdf_page_count' => $content->pdf_page_count ?? 'N/A',
+                            'final_watch_time' => $session->video_watch_time,
+                            'final_completion_percentage' => $completionPercentage,
+                            'final_skip_count' => $session->video_skip_count,
+                            'final_seek_count' => $session->seek_count,
+                            'final_pause_count' => $session->pause_count,
+                            'attention_score' => $session->attention_score,
+                            'cheating_score' => $session->cheating_score,
+                            'is_suspicious' => $session->is_suspicious_activity,
                         ]);
 
                         return response()->json([
                             'success' => true,
                             'total_duration_minutes' => $totalDuration,
+                            'total_watch_time' => $session->video_watch_time,
+                            'total_skip_count' => $session->video_skip_count,
+                            'completion_percentage' => $completionPercentage,
+                            'attention_score' => $session->attention_score,
+                            'cheating_score' => $session->cheating_score,
                         ]);
                     }
 
                     return response()->json(['success' => false, 'message' => 'No active session'], 404);
-
-                default:
-                    return response()->json(['success' => false, 'message' => 'Invalid action'], 400);
             }
 
         } catch (\Exception $e) {
-            Log::error('❌ Enhanced session management error', [
+            Log::error('❌ FIXED session management error', [
                 'user_id' => $user->id,
                 'content_id' => $content->id,
                 'action' => $action,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
@@ -446,172 +475,262 @@ class ContentViewController extends Controller
     }
 
     /**
+     * ✅ NEW: Calculate attention score based on real data
+     */
+    private function calculateAttentionScore($duration, $content, $completion): int
+    {
+        $score = 50; // Base score
+
+        // Get expected duration
+        $expectedDuration = 0;
+        if ($content->content_type === 'pdf' && $content->pdf_page_count) {
+            $expectedDuration = $content->pdf_page_count * 2; // 2 minutes per page
+        } elseif ($content->content_type === 'video' && $content->video) {
+            $expectedDuration = $content->video->duration / 60; // Convert to minutes
+        }
+
+        // Time efficiency scoring
+        if ($expectedDuration > 0) {
+            $timeRatio = $duration / $expectedDuration;
+            if ($timeRatio >= 0.8 && $timeRatio <= 1.5) {
+                $score += 25; // Good pace
+            } elseif ($timeRatio < 0.3) {
+                $score -= 30; // Too fast
+            }
+        }
+
+        // Completion scoring
+        if ($completion >= 90) {
+            $score += 20;
+        } elseif ($completion < 20) {
+            $score -= 25;
+        }
+
+        return max(0, min(100, $score));
+    }
+
+    /**
+     * ✅ NEW: Calculate cheating score based on real data
+     */
+    private function calculateCheatingScore($duration, $content, $skipCount, $completion): int
+    {
+        $score = 0;
+
+        // Duration analysis
+        if ($duration < 2 && $duration > 0) {
+            $score += 60; // Extremely short
+        } elseif ($duration < 5) {
+            $score += 30; // Very short
+        }
+
+        // Skip analysis
+        if ($skipCount > 15) {
+            $score += 40; // Excessive skipping
+        } elseif ($skipCount > 8) {
+            $score += 20; // High skipping
+        }
+
+        // Time vs completion analysis
+        $expectedDuration = 0;
+        if ($content->content_type === 'pdf' && $content->pdf_page_count) {
+            $expectedDuration = $content->pdf_page_count * 2;
+        } elseif ($content->content_type === 'video' && $content->video) {
+            $expectedDuration = $content->video->duration / 60;
+        }
+
+        if ($expectedDuration > 0 && $duration > 0) {
+            $efficiency = $duration / $expectedDuration;
+            if ($efficiency < 0.2 && $completion > 70) {
+                $score += 50; // Impossibly fast completion
+            }
+        }
+
+        return max(0, min(100, $score));
+    }
+
+    /**
+     * ✅ NEW: Determine if session is suspicious
+     */
+    private function isSuspiciousSession($duration, $content, $skipCount, $completion): bool
+    {
+        // Very short session with high completion
+        if ($duration < 2 && $completion > 50) {
+            return true;
+        }
+
+        // Excessive skipping
+        if ($skipCount > 20) {
+            return true;
+        }
+
+        // Impossibly fast completion
+        $expectedDuration = 0;
+        if ($content->content_type === 'pdf' && $content->pdf_page_count) {
+            $expectedDuration = $content->pdf_page_count * 2;
+        } elseif ($content->content_type === 'video' && $content->video) {
+            $expectedDuration = $content->video->duration / 60;
+        }
+
+        if ($expectedDuration > 0 && $duration > 0) {
+            $efficiency = $duration / $expectedDuration;
+            if ($efficiency < 0.15 && $completion > 80) {
+                return true; // Completed 80%+ in less than 15% of expected time
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * ✅ ENHANCED: Update progress with comprehensive PDF support
+     */
+    /**
+     * ✅ FIXED: Create separate progress records for each session
+     */
+    /**
+     * ✅ SIMPLE: Auto-detect skips from position changes
      */
     public function updateProgress(Request $request, ModuleContent $content)
     {
         $user = auth()->user();
 
-        Log::info('🔍 === ENHANCED UPDATE PROGRESS START ===', [
+        Log::info('🔍 === SMART SKIP DETECTION UPDATE PROGRESS ===', [
             'user_id' => $user->id,
             'content_id' => $content->id,
-            'content_type' => $content->content_type,
-            'pdf_page_count' => $content->pdf_page_count,
-            'has_pdf_page_count' => !is_null($content->pdf_page_count),
             'request_data' => $request->all(),
         ]);
 
         try {
-            // ✅ ENHANCED VALIDATION with PDF page validation
-            $rules = [
+            $validated = $request->validate([
                 'current_position' => 'required|numeric|min:0',
                 'completion_percentage' => 'required|numeric|min:0|max:100',
-            ];
-
-            // Enhanced validation based on content type
-            if ($content->content_type === 'video') {
-                $rules['watch_time'] = 'nullable|integer|min:0';
-            } elseif ($content->content_type === 'pdf') {
-                // For PDF, validate current position against page count if available
-                if ($content->pdf_page_count) {
-                    $rules['current_position'] = "required|numeric|min:1|max:{$content->pdf_page_count}";
-                }
-            }
-
-            $validated = $request->validate($rules);
-
-            Log::info('✅ Enhanced validation passed', [
-                'user_id' => $user->id,
-                'content_id' => $content->id,
-                'validated_data' => $validated,
-                'pdf_page_validation' => $content->content_type === 'pdf' && $content->pdf_page_count ?
-                    "range_1_to_{$content->pdf_page_count}" : 'N/A',
+                'watch_time' => 'nullable|integer|min:0',
             ]);
 
-            $completionPercentage = max(0, min(100, $validated['completion_percentage']));
-            $currentPosition = max(0, $validated['current_position']);
+            // ✅ SMART: Get PREVIOUS position to detect skips
+            $previousProgress = UserContentProgress::where('user_id', $user->id)
+                ->where('content_id', $content->id)
+                ->first();
 
-            // ✅ ENHANCED: PDF-specific position validation and completion calculation
-            if ($content->content_type === 'pdf' && $content->pdf_page_count) {
-                $currentPosition = max(1, min($content->pdf_page_count, $currentPosition));
+            $previousPosition = $previousProgress?->playback_position ?? 0;
+            $currentPosition = $validated['current_position'];
 
-                // Recalculate completion based on page count from database
-                $pageBasedCompletion = ($currentPosition / $content->pdf_page_count) * 100;
-                $completionPercentage = max($completionPercentage, $pageBasedCompletion);
+            // ✅ AUTO-DETECT: Calculate skips from position jump
+            $skipCount = 0;
+            $positionJump = $currentPosition - $previousPosition;
 
-                Log::info('📄 Enhanced PDF progress calculated', [
-                    'current_page' => $currentPosition,
-                    'total_pages' => $content->pdf_page_count,
-                    'page_based_completion' => $pageBasedCompletion,
-                    'final_completion' => $completionPercentage,
-                    'original_completion' => $validated['completion_percentage'],
-                ]);
-            }
-
-            // ✅ Enhanced watch_time calculation
-            $watchTime = 0;
             if ($content->content_type === 'video') {
-                $watchTime = max(0, $validated['watch_time'] ?? 0);
-            } elseif ($content->content_type === 'pdf') {
-                // For PDF, calculate reading time based on pages read and database count
-                if ($content->pdf_page_count && $currentPosition > 0) {
-                    $pagesRead = $currentPosition;
-                    $watchTime = $pagesRead * 2; // 2 minutes per page average
-                    Log::info('📖 PDF reading time calculated', [
-                        'pages_read' => $pagesRead,
-                        'total_pages' => $content->pdf_page_count,
-                        'calculated_time' => $watchTime,
+                // For video: if user jumps forward more than 30 seconds = skip
+                if ($positionJump > 30) {
+                    $skipCount = 1; // Detected a skip!
+                    Log::info("🎥 VIDEO SKIP DETECTED!", [
+                        'previous_position' => $previousPosition,
+                        'current_position' => $currentPosition,
+                        'position_jump' => $positionJump,
+                        'skip_detected' => true,
                     ]);
-                } else {
-                    $watchTime = max(0, intval($request->input('reading_time', 0)));
+                }
+            } elseif ($content->content_type === 'pdf') {
+                // For PDF: if user jumps forward more than 2 pages = skip
+                if ($positionJump > 2) {
+                    $skipCount = 1; // Detected a skip!
+                    Log::info("📄 PDF SKIP DETECTED!", [
+                        'previous_page' => $previousPosition,
+                        'current_page' => $currentPosition,
+                        'page_jump' => $positionJump,
+                        'skip_detected' => true,
+                    ]);
                 }
             }
 
-            Log::info('📊 Enhanced progress values calculated', [
-                'user_id' => $user->id,
-                'content_id' => $content->id,
-                'content_type' => $content->content_type,
-                'current_position' => $currentPosition,
-                'completion_percentage' => $completionPercentage,
-                'watch_time' => $watchTime,
-                'pdf_page_count' => $content->pdf_page_count,
-                'calculation_method' => $content->content_type === 'pdf' ? 'page_based' : 'time_based',
-            ]);
+            // ✅ SMART: Calculate REAL watch time based on position change
+            $realWatchTime = $validated['watch_time'] ?? 0;
 
-            // ✅ DISABLE EVENTS to prevent calculateProgress errors
-            $progress = null;
-            \App\Models\UserContentProgress::withoutEvents(function () use ($user, $content, $currentPosition, $completionPercentage, $watchTime, &$progress) {
-                $progress = UserContentProgress::updateOrCreate([
-                    'user_id' => $user->id,
-                    'content_id' => $content->id,
-                ], [
-                    'course_online_id' => $content->module->course_online_id,
-                    'module_id' => $content->module_id,
-                    'content_type' => $content->content_type,
-                    'video_id' => $content->video_id,
-                    'playback_position' => $currentPosition,
-                    'completion_percentage' => $completionPercentage,
-                    'watch_time' => $watchTime,
-                    'is_completed' => $completionPercentage >= 95,
-                    'last_accessed_at' => now(),
-                    'completed_at' => $completionPercentage >= 95 ? now() : null,
-                ]);
-            });
-
-            Log::info('✅ Enhanced progress updated successfully', [
-                'user_id' => $user->id,
-                'content_id' => $content->id,
-                'progress_id' => $progress->id,
-                'completion_percentage' => $progress->completion_percentage,
-                'is_completed' => $progress->is_completed,
-                'playback_position' => $progress->playback_position,
-                'watch_time' => $progress->watch_time,
-            ]);
-
-            // ✅ Manual assignment progress update (without events)
-            try {
-                $this->updateAssignmentProgressManually($content->module->course_online_id, $user->id);
-            } catch (\Exception $e) {
-                Log::warning('Assignment progress update failed (non-critical)', [
-                    'error' => $e->getMessage()
+            if ($skipCount > 0) {
+                // If skip detected, don't count the skipped time as "watched"
+                if ($content->content_type === 'video') {
+                    $skippedSeconds = max(0, $positionJump - 5); // Subtract skipped time
+                    $realWatchTime = max(0, $realWatchTime - $skippedSeconds);
+                }
+                Log::info("⚠️ Adjusted watch time due to skip", [
+                    'original_watch_time' => $validated['watch_time'],
+                    'adjusted_watch_time' => $realWatchTime,
+                    'skipped_amount' => $positionJump,
                 ]);
             }
+
+            // ✅ UPDATE: UserContentProgress (keep your existing logic)
+            $progress = UserContentProgress::updateOrCreate([
+                'user_id' => $user->id,
+                'content_id' => $content->id,
+            ], [
+                'course_online_id' => $content->module->course_online_id,
+                'module_id' => $content->module_id,
+                'content_type' => $content->content_type,
+                'video_id' => $content->video_id,
+                'playback_position' => $currentPosition,
+                'completion_percentage' => $validated['completion_percentage'],
+                'watch_time' => $realWatchTime, // ✅ Adjusted for skips
+                'is_completed' => $validated['completion_percentage'] >= 95,
+                'last_accessed_at' => now(),
+                'completed_at' => $validated['completion_percentage'] >= 95 ? now() : null,
+            ]);
+
+            // ✅ SMART: Update current session with detected skip data
+            $currentSession = LearningSession::where('user_id', $user->id)
+                ->where('content_id', $content->id)
+                ->whereNull('session_end')
+                ->orderBy('created_at', 'desc')
+                ->first();
+
+            if ($currentSession) {
+                $sessionDuration = max(0, now()->diffInMinutes($currentSession->session_start));
+
+                // ✅ INCREMENT: Add detected skip to session total
+                $currentSkipCount = $currentSession->video_skip_count ?? 0;
+                $newSkipCount = $currentSkipCount + $skipCount;
+
+                $currentSession->update([
+                    'current_position' => $currentPosition,
+                    'total_duration_minutes' => $sessionDuration,
+                    'video_watch_time' => $realWatchTime,
+                    'video_skip_count' => $newSkipCount, // ✅ Cumulative skip count
+                    'video_completion_percentage' => $validated['completion_percentage'],
+                    'last_heartbeat' => now(),
+                ]);
+
+                Log::info('✅ SMART: Updated session with auto-detected skip data', [
+                    'session_id' => $currentSession->id,
+                    'session_duration' => $sessionDuration,
+                    'real_watch_time' => $realWatchTime,
+                    'new_skip_detected' => $skipCount,
+                    'total_skip_count' => $newSkipCount,
+                    'completion_percentage' => $validated['completion_percentage'],
+                ]);
+            }
+
+            Log::info('✅ SMART: Progress updated with auto-skip detection', [
+                'progress_id' => $progress->id,
+                'skip_detected_this_update' => $skipCount,
+                'position_jump' => $positionJump,
+                'completion_percentage' => $progress->completion_percentage,
+            ]);
 
             return response()->json([
                 'success' => true,
                 'is_completed' => $progress->is_completed,
                 'completion_percentage' => $progress->completion_percentage,
-                'total_watch_time' => $watchTime,
-                // ✅ ENHANCED: Return comprehensive PDF info
-                'pdf_page_count' => $content->pdf_page_count,
-                'current_page' => $content->content_type === 'pdf' ? $currentPosition : null,
-                'has_pdf_page_count' => !is_null($content->pdf_page_count),
-                'estimated_reading_time' => $content->pdf_page_count ? ($content->pdf_page_count * 2) : null,
-                'message' => 'Progress updated successfully'
+                'total_watch_time' => $realWatchTime,
+                'skip_detected' => $skipCount > 0,
+                'position_jump' => $positionJump,
+                'message' => 'Progress updated with smart skip detection'
             ]);
-
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            Log::error('❌ Enhanced validation error in updateProgress', [
-                'user_id' => $user->id,
-                'content_id' => $content->id,
-                'errors' => $e->errors(),
-                'request_data' => $request->all(),
-                'pdf_page_count' => $content->pdf_page_count,
-                'validation_rules' => 'enhanced_pdf_aware',
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $e->errors()
-            ], 422);
 
         } catch (\Exception $e) {
-            Log::error('❌ Enhanced progress update error', [
+            Log::error('❌ Smart skip detection error', [
                 'user_id' => $user->id,
                 'content_id' => $content->id,
-                'error_message' => $e->getMessage(),
-                'error_trace' => $e->getTraceAsString(),
+                'error' => $e->getMessage(),
             ]);
 
             return response()->json([

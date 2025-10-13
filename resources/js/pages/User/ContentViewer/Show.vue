@@ -64,9 +64,9 @@ interface Content {
     } | null
     pdf_name?: string | null
     file_url?: string | null
-    pdf_page_count?: number | null  // ✅ NEW: PDF page count from database
-    has_pdf_page_count?: boolean    // ✅ NEW: Helper property
-    estimated_reading_time?: number | null  // ✅ NEW: Estimated reading time
+    pdf_page_count?: number | null
+    has_pdf_page_count?: boolean
+    estimated_reading_time?: number | null
 }
 
 interface Module {
@@ -155,8 +155,6 @@ const pdfScrollPercentage = ref(0)
 const estimatedReadingTime = ref(0)
 const averageReadingSpeed = ref(200) // words per minute
 const pdfLoadingError = ref(false)
-
-// ✅ SIMPLIFIED: Removed complex loading strategies
 const loadingStrategy = ref('vue-pdf-embed')
 const errorMessage = ref('')
 
@@ -168,6 +166,19 @@ const sessionStartTime = ref<number | null>(null)
 const completionPercentage = ref(safeUserProgress.value.completion_percentage || 0)
 const isCompleted = ref(safeUserProgress.value.is_completed || false)
 const timeSpent = ref(safeUserProgress.value.time_spent || 0)
+
+// ✅ NEW: Skip/Seek Tracking Variables
+const totalSkipCount = ref(0)
+const totalSeekCount = ref(0)
+const totalPauseCount = ref(0)
+const totalWatchTime = ref(0)
+
+// ✅ NEW: Incremental counters (since last heartbeat)
+const skipCountSinceLastHeartbeat = ref(0)
+const seekCountSinceLastHeartbeat = ref(0)
+const pauseCountSinceLastHeartbeat = ref(0)
+const watchTimeSinceLastHeartbeat = ref(0)
+const lastCurrentTime = ref(0)
 
 // ========== COMPUTED PROPERTIES ==========
 const formattedCurrentTime = computed(() => formatTime(currentTime.value))
@@ -205,7 +216,6 @@ const detectPdfSource = (url: string) => {
 }
 
 // ✅ ENHANCED: Get PDF source for vue-pdf-embed
-// ✅ ENHANCED: Google Drive PDF source handler with embed support
 const pdfSource = computed(() => {
     if (!props.content.file_url) return ''
 
@@ -216,21 +226,17 @@ const pdfSource = computed(() => {
 
     switch (source) {
         case 'google_drive':
-            // ✅ FIX: For Google Drive, we'll use the iframe embed method
-            // Don't return direct download URL as it causes CORS issues
             const fileIdMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) ||
                 url.match(/id=([a-zA-Z0-9_-]+)/) ||
                 url.match(/open\?id=([a-zA-Z0-9_-]+)/)
 
             if (fileIdMatch && fileIdMatch[1]) {
                 const fileId = fileIdMatch[1]
-                // Return embed URL instead of download URL
                 return `https://drive.google.com/file/d/${fileId}/preview`
             }
             return url
 
         case 'storage':
-            // Handle Laravel storage URLs (these work fine)
             let storageUrl = url
 
             if (!storageUrl.startsWith('http://') && !storageUrl.startsWith('https://')) {
@@ -252,15 +258,6 @@ const pdfSource = computed(() => {
     }
 })
 
-// ✅ Extract Google Drive file ID
-const extractGoogleDriveId = (url) => {
-    if (!url) return ''
-    const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) ||
-        url.match(/id=([a-zA-Z0-9_-]+)/) ||
-        url.match(/open\?id=([a-zA-Z0-9_-]+)/)
-    return match ? match[1] : ''
-}
-
 // ========== UTILITY METHODS ==========
 const formatTime = (seconds: number): string => {
     const hours = Math.floor(seconds / 3600)
@@ -271,6 +268,14 @@ const formatTime = (seconds: number): string => {
         return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
     }
     return `${minutes}:${secs.toString().padStart(2, '0')}`
+}
+
+// ✅ NEW: Reset incremental counters
+const resetIncrementalCounters = () => {
+    skipCountSinceLastHeartbeat.value = 0
+    seekCountSinceLastHeartbeat.value = 0
+    pauseCountSinceLastHeartbeat.value = 0
+    watchTimeSinceLastHeartbeat.value = 0
 }
 
 // ========== SESSION MANAGEMENT ==========
@@ -292,6 +297,15 @@ const startSession = async () => {
         if (response.data.success) {
             sessionId.value = response.data.session_id
             sessionStartTime.value = Date.now()
+
+            // ✅ Reset all tracking counters
+            resetIncrementalCounters()
+            totalSkipCount.value = 0
+            totalSeekCount.value = 0
+            totalPauseCount.value = 0
+            totalWatchTime.value = 0
+            lastCurrentTime.value = currentTime.value
+
             console.log('✅ Session started:', sessionId.value)
         }
     } catch (error) {
@@ -340,15 +354,57 @@ const updateProgress = async () => {
             console.log('✅ Progress updated:', completionPercentage.value + '%')
         }
 
-        await axios.post(`/content/${props.content.id}/session`, {
-            action: 'heartbeat',
-            current_position: currentPosition,
-        }, {
-            headers: { 'X-CSRF-TOKEN': csrfToken }
-        })
+        // ✅ Send heartbeat with skip/seek data
+        await sendHeartbeat()
 
     } catch (error) {
         console.error('❌ Failed to update progress:', error)
+    }
+}
+
+// ✅ NEW: Heartbeat function with skip/seek tracking
+const sendHeartbeat = async () => {
+    if (!sessionId.value) return
+
+    try {
+        const currentPosition = props.content.content_type === 'video'
+            ? currentTime.value
+            : currentPage.value
+
+        // Calculate actual watch time increment
+        if (props.content.content_type === 'video' && isPlaying.value) {
+            const timeDiff = currentTime.value - lastCurrentTime.value
+            if (timeDiff > 0 && timeDiff < 10) { // Reasonable time diff (not seeking)
+                watchTimeSinceLastHeartbeat.value += timeDiff
+                totalWatchTime.value += timeDiff
+            }
+            lastCurrentTime.value = currentTime.value
+        }
+
+        const payload = {
+            action: 'heartbeat',
+            current_position: currentPosition,
+            // Send incremental data since last heartbeat
+            skip_count: skipCountSinceLastHeartbeat.value,
+            seek_count: seekCountSinceLastHeartbeat.value,
+            pause_count: pauseCountSinceLastHeartbeat.value,
+            watch_time: Math.floor(watchTimeSinceLastHeartbeat.value),
+        }
+
+        console.log('💓 Sending heartbeat with skip/seek data:', payload)
+
+        const response = await axios.post(`/content/${props.content.id}/session`, payload, {
+            headers: { 'X-CSRF-TOKEN': csrfToken }
+        })
+
+        if (response.data.success) {
+            console.log('✅ Heartbeat sent successfully')
+            // Reset incremental counters after successful heartbeat
+            resetIncrementalCounters()
+        }
+
+    } catch (error) {
+        console.error('❌ Failed to send heartbeat:', error)
     }
 }
 
@@ -358,10 +414,17 @@ const endSession = async () => {
     console.log('🛑 Ending session:', sessionId.value)
 
     try {
-        await axios.post(`/content/${props.content.id}/session`, {
+        const payload = {
             action: 'end',
             current_position: props.content.content_type === 'video' ? currentTime.value : currentPage.value,
-        }, {
+            // Send any remaining incremental data
+            skip_count: skipCountSinceLastHeartbeat.value,
+            seek_count: seekCountSinceLastHeartbeat.value,
+            pause_count: pauseCountSinceLastHeartbeat.value,
+            watch_time: Math.floor(watchTimeSinceLastHeartbeat.value),
+        }
+
+        await axios.post(`/content/${props.content.id}/session`, payload, {
             headers: { 'X-CSRF-TOKEN': csrfToken }
         })
 
@@ -435,12 +498,43 @@ const togglePlay = async () => {
     }
 }
 
+// ✅ Enhanced with skip/seek tracking
 const seek = (seconds: number) => {
     if (!videoElement.value) return
-    videoElement.value.currentTime = Math.max(0, Math.min(duration.value, seconds))
+
+    const oldTime = currentTime.value
+    const newTime = Math.max(0, Math.min(duration.value, seconds))
+
+    videoElement.value.currentTime = newTime
+
+    // ✅ Track seeking behavior
+    const timeDiff = Math.abs(newTime - oldTime)
+    if (timeDiff > 5) { // Only count significant seeks (>5 seconds)
+        seekCountSinceLastHeartbeat.value++
+        totalSeekCount.value++
+
+        console.log('🔍 Seek detected:', {
+            from: oldTime,
+            to: newTime,
+            diff: timeDiff,
+            totalSeeks: totalSeekCount.value
+        })
+    }
 }
 
+// ✅ Enhanced with skip tracking
 const seekRelative = (seconds: number) => {
+    // Track skip behavior
+    if (Math.abs(seconds) >= 10) { // Skip if seeking by 10+ seconds
+        skipCountSinceLastHeartbeat.value++
+        totalSkipCount.value++
+
+        console.log('⏭️ Skip detected:', {
+            seconds: seconds,
+            totalSkips: totalSkipCount.value
+        })
+    }
+
     seek(currentTime.value + seconds)
 }
 
@@ -496,45 +590,27 @@ const tryIframeLoad = () => {
     console.log('📄 Trying iframe loading strategy')
 }
 
-// ✅ SIMPLIFIED: PDF loaded handler - DATABASE ONLY
 const onPdfLoaded = async (pdf: any) => {
     console.log('✅ PDF loaded successfully via vue-pdf-embed:', pdf)
 
-    // ✅ PRIORITY 1: Always use database page count (admin-provided)
     if (props.content.pdf_page_count && props.content.pdf_page_count > 0) {
         totalPages.value = props.content.pdf_page_count
         console.log('🎯 Using database page count:', props.content.pdf_page_count)
-    }
-    // ✅ FALLBACK: For local storage PDFs, use vue-pdf-embed if no database count
-    else if (detectPdfSource(props.content.file_url || '') === 'storage' && pdf.numPages > 0) {
+    } else if (detectPdfSource(props.content.file_url || '') === 'storage' && pdf.numPages > 0) {
         totalPages.value = pdf.numPages
         console.log('📄 Using vue-pdf-embed page count for local PDF:', pdf.numPages)
-    }
-    // ✅ FINAL FALLBACK: Default value
-    else {
+    } else {
         totalPages.value = 10
         console.warn('⚠️ No database page count found, using default: 10')
     }
 
-    // Calculate reading time based on database page count
-    estimatedReadingTime.value = Math.ceil((totalPages.value * 2)) // 2 minutes per page
+    estimatedReadingTime.value = Math.ceil((totalPages.value * 2))
     isPdfLoaded.value = true
     pdfLoadingError.value = false
     isLoading.value = false
 
-    // Set current page from user progress
     currentPage.value = Math.max(1, Math.min(totalPages.value, safeUserProgress.value.current_position || 1))
 
-    console.log('📊 Final PDF Data:', {
-        totalPages: totalPages.value,
-        currentPage: currentPage.value,
-        estimatedReadingTime: estimatedReadingTime.value,
-        source: 'database_priority',
-        database_count: props.content.pdf_page_count,
-        vue_pdf_count: pdf.numPages
-    })
-
-    // Start session
     if (!sessionId.value) {
         startSession()
     }
@@ -548,11 +624,10 @@ const onPdfLoadingFailed = (error: any) => {
     isPdfLoaded.value = false
     isLoading.value = false
 
-    // ✅ EVEN WITH ERROR: Use database page count if available
     if (props.content.pdf_page_count && props.content.pdf_page_count > 0) {
         totalPages.value = props.content.pdf_page_count
         estimatedReadingTime.value = Math.ceil((totalPages.value * 2))
-        isPdfLoaded.value = true // Allow progress tracking even if PDF doesn't display
+        isPdfLoaded.value = true
         pdfLoadingError.value = false
 
         console.log('✅ Using database page count despite loading failure:', totalPages.value)
@@ -561,7 +636,6 @@ const onPdfLoadingFailed = (error: any) => {
             startSession()
         }
     } else {
-        // Auto-try alternative method after a short delay
         setTimeout(() => {
             console.log('🔄 Auto-trying alternative loading method...')
             tryAlternativeLoad()
@@ -577,12 +651,11 @@ const onPdfRendered = () => {
 const onIframeLoad = () => {
     console.log('✅ Iframe PDF loaded successfully')
 
-    // ✅ EVEN WITH IFRAME: Use database page count if available
     if (props.content.pdf_page_count && props.content.pdf_page_count > 0) {
         totalPages.value = props.content.pdf_page_count
         console.log('🎯 Using database page count for iframe:', totalPages.value)
     } else {
-        totalPages.value = 10 // Default for iframe
+        totalPages.value = 10
     }
 
     estimatedReadingTime.value = Math.ceil((totalPages.value * 2))
@@ -608,16 +681,14 @@ const onIframeError = () => {
     }
 }
 
-// ✅ SIMPLIFIED: Google Drive embed handler with database priority
 const onGoogleEmbedLoad = async () => {
     console.log('✅ Google Drive embed loaded')
 
-    // ✅ ALWAYS USE DATABASE PAGE COUNT FIRST
     if (props.content.pdf_page_count && props.content.pdf_page_count > 0) {
         totalPages.value = props.content.pdf_page_count
         console.log('🎯 Using database page count for Google Drive:', totalPages.value)
     } else {
-        totalPages.value = 15 // Default for Google Drive embed
+        totalPages.value = 15
         console.log('📊 Using default page count for Google Drive embed:', totalPages.value)
     }
 
@@ -745,13 +816,23 @@ const onTimeUpdate = () => {
 
 const onPlay = () => {
     isPlaying.value = true
+    lastCurrentTime.value = currentTime.value
+
     if (!sessionId.value) {
         startSession()
     }
 }
 
+// ✅ Enhanced with pause tracking
 const onPause = () => {
     isPlaying.value = false
+
+    // Track pause count
+    pauseCountSinceLastHeartbeat.value++
+    totalPauseCount.value++
+
+    console.log('⏸️ Pause detected, total pauses:', totalPauseCount.value)
+
     updateProgress()
 }
 
@@ -774,6 +855,13 @@ const onFullscreenChange = () => {
     isPdfFullscreen.value = !!document.fullscreenElement
 }
 
+// ✅ Video seek event handler (will be added in onMounted)
+const onVideoSeeked = () => {
+    console.log('🔍 Manual seek detected via timeline')
+    seekCountSinceLastHeartbeat.value++
+    totalSeekCount.value++
+}
+
 // ========== LIFECYCLE ==========
 onMounted(async () => {
     document.addEventListener('fullscreenchange', onFullscreenChange)
@@ -782,7 +870,6 @@ onMounted(async () => {
     if (props.content.content_type === 'pdf') {
         console.log('📄 Initializing PDF viewer with database page count priority')
 
-        // ✅ IMMEDIATELY SET DATABASE PAGE COUNT IF AVAILABLE
         if (props.content.pdf_page_count && props.content.pdf_page_count > 0) {
             totalPages.value = props.content.pdf_page_count
             estimatedReadingTime.value = Math.ceil((totalPages.value * 2))
@@ -801,9 +888,14 @@ onMounted(async () => {
         onUnmounted(() => {
             clearInterval(readingTimer)
         })
-    } else if (props.content.content_type === 'video' && videoElement.value) {
+    } else if (props.content.content_type === 'video') {
         await nextTick()
-        videoElement.value.currentTime = safeUserProgress.value.current_position || 0
+        if (videoElement.value) {
+            videoElement.value.currentTime = safeUserProgress.value.current_position || 0
+
+            // ✅ Add video seek event listener
+            videoElement.value.addEventListener('seeked', onVideoSeeked)
+        }
     }
 
     // Progress tracking interval
@@ -827,6 +919,11 @@ onMounted(async () => {
         endSession()
         document.removeEventListener('fullscreenchange', onFullscreenChange)
         window.removeEventListener('beforeunload', handleBeforeUnload)
+
+        // ✅ Cleanup video event listener
+        if (videoElement.value) {
+            videoElement.value.removeEventListener('seeked', onVideoSeeked)
+        }
     })
 })
 
@@ -859,7 +956,6 @@ watch(currentPage, (newPage) => {
                             <Badge v-if="content.is_required" variant="destructive" class="text-xs">
                                 Required
                             </Badge>
-                            <!-- Smart source indicator -->
                             <Badge v-if="content.content_type === 'pdf' && content.file_url"
                                    variant="outline"
                                    class="text-xs"
@@ -874,7 +970,6 @@ watch(currentPage, (newPage) => {
                                             'External PDF'
                                 }}
                             </Badge>
-                            <!-- ✅ NEW: Show database page count status -->
                             <Badge v-if="content.content_type === 'pdf' && content.pdf_page_count"
                                    variant="outline"
                                    class="text-xs bg-green-50 text-green-700">
@@ -899,6 +994,26 @@ watch(currentPage, (newPage) => {
                     </Link>
                 </Button>
             </div>
+
+            <!-- ✅ OPTIONAL: Debug Panel to show tracking data -->
+            <Card v-if="sessionId" class="mb-4 border-blue-200 bg-blue-50/30">
+                <CardContent class="p-4">
+                    <div class="text-xs text-muted-foreground grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div>
+                            <strong>Session ID:</strong> {{ sessionId }}
+                        </div>
+                        <div>
+                            <strong>Total Skips:</strong> {{ totalSkipCount }}
+                        </div>
+                        <div>
+                            <strong>Total Seeks:</strong> {{ totalSeekCount }}
+                        </div>
+                        <div>
+                            <strong>Total Pauses:</strong> {{ totalPauseCount }}
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
 
             <!-- Split Layout - 3/4 for content, 1/4 for sidebar -->
             <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -997,7 +1112,7 @@ watch(currentPage, (newPage) => {
                         </CardContent>
                     </Card>
 
-                    <!-- ✅ SIMPLIFIED: Database-Priority PDF Viewer -->
+                    <!-- PDF Viewer -->
                     <Card v-if="content.content_type === 'pdf'" class="overflow-hidden">
                         <CardHeader>
                             <div class="flex items-center justify-between">
@@ -1011,7 +1126,6 @@ watch(currentPage, (newPage) => {
                                     </Button>
                                 </div>
                             </div>
-                            <!-- ✅ ENHANCED: Show database page count status -->
                             <div class="text-xs text-muted-foreground">
                                 <span v-if="content.pdf_page_count" class="text-green-700 font-medium">
                                     ✅ Page count from database: {{ content.pdf_page_count }} pages
@@ -1104,7 +1218,7 @@ watch(currentPage, (newPage) => {
                             </div>
                         </div>
 
-                        <!-- ✅ FIXED: Google Drive Compatible PDF Viewer -->
+                        <!-- PDF Content -->
                         <CardContent class="p-0">
                             <div
                                 ref="pdfContainer"
@@ -1315,19 +1429,23 @@ watch(currentPage, (newPage) => {
                         :variant="safeNavigation.next.is_unlocked ? 'default' : 'outline'"
                         :disabled="!safeNavigation.next.is_unlocked"
                         :class="[
-                'flex items-center gap-3 max-w-xs ml-auto transition-colors',
-                safeNavigation.next.is_unlocked
-                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                    : 'opacity-50 cursor-not-allowed'
-            ]"
+            'flex items-center justify-between w-50',
+            'px-4 py-3 rounded-lg font-medium text-white',
+            'flex items-center gap-6 max-w-md ml-auto transition-colors w',
+            'px-8 py-5 rounded-xl font-medium',
+            safeNavigation.next.is_unlocked
+                ? 'bg-blue-600 text-white'
+                : 'opacity-50 cursor-not-allowed'
+        ]"
                     >
                         <div class="text-right">
-                            <div class="font-medium text-sm">{{ safeNavigation.next.title }}</div>
-                            <div class="text-xs opacity-75">{{ safeNavigation.next.content_type.toUpperCase() }}</div>
+                            <div class="font-semibold text-lg">{{ safeNavigation.next.title }}</div>
+                            <div class="text-sm opacity-75 tracking-wide uppercase">{{ safeNavigation.next.content_type }}</div>
                         </div>
-                        <SkipForward class="h-4 w-4" />
+                        <SkipForward class="h-6 w-6" />
                     </Button>
                 </div>
+
             </div>
 
             <!-- Enhanced Completion Alert -->
@@ -1342,7 +1460,7 @@ watch(currentPage, (newPage) => {
                 </AlertDescription>
             </Alert>
 
-            <!-- ✅ ENHANCED: PDF Reading Tips with Database Status -->
+            <!-- PDF Reading Tips -->
             <Alert v-if="content.content_type === 'pdf' && !isCompleted && totalPages > 0" class="border-blue-200 bg-blue-50 dark:bg-blue-950">
                 <Eye class="h-4 w-4 text-blue-600" />
                 <AlertDescription>
