@@ -42,6 +42,16 @@ use Illuminate\Support\Facades\Route;
 // ROOT & AUTHENTICATION ROUTES
 // ==========================================
 
+
+
+Route::get('/docs/{path?}', function ($path = 'index') {
+    $filePath = public_path('docs/' . str_replace('/', DIRECTORY_SEPARATOR, $path) . '.html');
+    if (file_exists($filePath)) {
+        return response()->file($filePath);
+    }
+    abort(404);
+})->where('path', '.*');
+
 Route::get('/', function () {
     return redirect()->route('dashboard');
 })->name('home');
