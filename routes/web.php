@@ -50,7 +50,7 @@ Route::get('/docs/{path?}', function ($path = 'index') {
         return response()->file($filePath);
     }
     abort(404);
-})->where('path', '.*');
+})->where('path', '.*')->name('docs');
 
 Route::get('/', function () {
     return redirect()->route('dashboard');

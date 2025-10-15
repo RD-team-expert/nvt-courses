@@ -1,1 +1,0 @@
-import{_ as e,c as o,o as t,a as r}from"./app.4844cc51.js";const f=JSON.parse('{"title":"Managing Your Profile","description":"","frontmatter":{},"headers":[],"relativePath":"user/profile.md"}'),n={name:"user/profile.md"},i=r("",3),s=[i];function a(l,g,c,u,p,m){return t(),o("div",null,s)}const d=e(n,[["render",a]]);export{f as __pageData,d as default};
