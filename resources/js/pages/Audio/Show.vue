@@ -386,7 +386,7 @@ onMounted(() => {
         if (isPlaying.value) {
             saveProgress()
         }
-    }, 10000)
+    }, 180000)
 
     // Save progress on page unload
     const handleBeforeUnload = () => {
