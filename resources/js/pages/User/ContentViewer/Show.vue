@@ -904,7 +904,7 @@ onMounted(async () => {
             (props.content.content_type === 'pdf' && (isPdfLoaded.value || totalPages.value > 0))) {
             updateProgress()
         }
-    }, 15000)
+    }, 180000)
 
     // Save progress on page unload
     const handleBeforeUnload = () => {
