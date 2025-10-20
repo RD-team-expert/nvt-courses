@@ -126,7 +126,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
             </div>
 
             <!-- Stats Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <Card>
                     <CardContent class="p-6">
                         <div class="flex items-center">
@@ -175,21 +175,6 @@ const breadcrumbs: BreadcrumbItemType[] = [
                     </CardContent>
                 </Card>
 
-                <Card>
-                    <CardContent class="p-6">
-                        <div class="flex items-center">
-                            <div class="shrink-0">
-                                <div class="w-8 h-8 bg-red-500 rounded-md flex items-center justify-center">
-                                    <Building class="h-5 w-5 text-white" />
-                                </div>
-                            </div>
-                            <div class="ml-5 w-0 flex-1">
-                                <div class="text-sm font-medium text-muted-foreground">Department Heads</div>
-                                <div class="text-lg font-medium text-foreground">{{ stats.department_heads || 0 }}</div>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
             </div>
 
             <!-- Roles Table -->
