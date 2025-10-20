@@ -117,19 +117,7 @@ class EvaluationNotificationController extends Controller
         \Log::info('Validation passed', $validated);
 
         try {
-            // Validate that selected users are L1 employees
-            $validation = $this->hierarchyService->validateL1Employees($validated['employee_ids']);
-            \Log::info('L1 validation result', $validation);
-
-            if (!empty($validation['invalid'])) {
-                \Log::warning('Invalid employees found', $validation['invalid']);
-                return back()->withErrors([
-                    'employee_selection' => 'Some selected employees are not L1 level: ' .
-                        collect($validation['invalid'])->pluck('name')->implode(', ')
-                ]);
-            }
-
-            // Get preview data
+            // Get preview data (no L1 validation)
             $preview = $this->hierarchyService->previewNotification(
                 $validated['employee_ids'],
                 $validated['target_manager_levels']
@@ -143,7 +131,6 @@ class EvaluationNotificationController extends Controller
 
             \Log::info('Returning preview data to frontend');
 
-            // FIXED: Use same data as index() method but add preview data
             // Get the same data as index method
             $departments = Department::select(['id', 'name'])->orderBy('name')->get();
             $courses = Course::select(['id', 'name'])->orderBy('name')->get();
@@ -171,15 +158,14 @@ class EvaluationNotificationController extends Controller
                     ];
                 });
 
-            // Return complete page data WITH preview
             return Inertia::render('Admin/Evaluations/Notifications', [
                 'employees' => $employees,
                 'departments' => $departments,
                 'courses' => $courses,
                 'filters' => $filters,
                 'recentNotifications' => $recentNotifications,
-                'preview' => $preview,           // ADD THIS
-                'showPreview' => true,          // ADD THIS
+                'preview' => $preview,
+                'showPreview' => true,
             ]);
 
         } catch (\Exception $e) {
@@ -195,7 +181,6 @@ class EvaluationNotificationController extends Controller
             ]);
         }
     }
-
     /**
      * Send notifications to managers
      */

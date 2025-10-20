@@ -268,6 +268,9 @@ class ManagerHierarchyService
     /**
      * Validate that employees are L1 level
      */
+    /**
+     * Validate that employees are L1 or L2 level
+     */
     public function validateL1Employees(array $employeeIds): array
     {
         $employees = User::with('userLevel')
@@ -278,7 +281,7 @@ class ManagerHierarchyService
         $invalid = [];
 
         foreach ($employees as $employee) {
-            if ($employee->user_level_id == 1) {
+            if (in_array($employee->user_level_id, [1, 2])) { // Allow L1 and L2
                 $valid[] = $employee->id;
             } else {
                 $invalid[] = [
@@ -294,7 +297,6 @@ class ManagerHierarchyService
             'invalid' => $invalid
         ];
     }
-
     /**
      * Get L1 employees with completed evaluations for filtering
      */
