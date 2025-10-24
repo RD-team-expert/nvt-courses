@@ -232,6 +232,8 @@ if (isReportsSubmenuActive.value) {
 // For debugging - log user data to console
 console.log('User data:', user.value);
 console.log('Is admin:', isAdmin.value);
+
+
 </script>
 
 <template>
@@ -307,3 +309,5 @@ console.log('Is admin:', isAdmin.value);
     </Sidebar>
     <slot />
 </template>
+
+

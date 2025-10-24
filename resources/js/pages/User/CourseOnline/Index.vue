@@ -23,9 +23,15 @@ import {
     Calendar,
     Award,
     Eye,
-    BarChart3
+    BarChart3,
+    // ✅ NEW: Deadline icons
+    AlarmClock,
+    CalendarDays,
+    Timer,
+    AlertTriangle
 } from 'lucide-vue-next'
 
+// ✅ ENHANCED: Assignment interface with deadline fields
 interface Assignment {
     id: number
     course: {
@@ -36,12 +42,28 @@ interface Assignment {
         difficulty_level: string
         estimated_duration: number
         modules_count: number
+        // ✅ NEW: Course deadline fields
+        has_deadline: boolean
+        deadline: string | null
+        deadline_type: 'flexible' | 'strict'
     }
     status: 'assigned' | 'in_progress' | 'completed'
     progress_percentage: number
     assigned_at: string
     started_at: string | null
     completed_at: string | null
+    // ✅ NEW: Assignment deadline fields
+    deadline: string | null
+    is_overdue: boolean
+    deadline_info: {
+        status: 'no_deadline' | 'overdue' | 'due_today' | 'due_tomorrow' | 'due_soon' | 'due_this_week' | 'upcoming'
+        message: string
+        days_remaining: number | null
+        urgency_level: 'none' | 'low' | 'medium' | 'high' | 'critical'
+        formatted_deadline: string | null
+        is_overdue: boolean
+        time_remaining: string
+    }
     current_module: {
         id: number
         name: string
@@ -56,6 +78,7 @@ interface Assignment {
     } | null
 }
 
+// ✅ ENHANCED: Stats interface with deadline stats
 interface Stats {
     total_assignments: number
     completed_courses: number
@@ -63,6 +86,9 @@ interface Stats {
     total_hours_spent: number
     average_completion_rate: number
     certificates_earned: number
+    // ✅ NEW: Deadline stats
+    overdue_courses: number
+    due_soon_courses: number
 }
 
 // ✅ FIX: Add default values and make stats optional
@@ -85,6 +111,9 @@ const stats = computed(() => ({
     total_hours_spent: props.stats?.total_hours_spent || 0,
     average_completion_rate: props.stats?.average_completion_rate || 0,
     certificates_earned: props.stats?.certificates_earned || 0,
+    // ✅ NEW: Deadline stats
+    overdue_courses: props.stats?.overdue_courses || 0,
+    due_soon_courses: props.stats?.due_soon_courses || 0,
 }))
 
 const activeAssignments = computed(() =>
@@ -97,6 +126,19 @@ const completedAssignments = computed(() =>
 
 const notStartedAssignments = computed(() =>
     assignments.value.filter(a => a.status === 'assigned')
+)
+
+// ✅ NEW: Deadline-specific computed properties
+const overdueAssignments = computed(() =>
+    assignments.value.filter(a => a.deadline_info.status === 'overdue')
+)
+
+const dueSoonAssignments = computed(() =>
+    assignments.value.filter(a => ['due_today', 'due_tomorrow', 'due_soon'].includes(a.deadline_info.status))
+)
+
+const hasUrgentDeadlines = computed(() =>
+    assignments.value.some(a => ['overdue', 'due_today', 'due_tomorrow'].includes(a.deadline_info.status))
 )
 
 // Methods
@@ -127,6 +169,32 @@ const getDifficultyColor = (level: string) => {
     }
 }
 
+// ✅ NEW: Deadline status colors
+const getDeadlineColor = (status: string) => {
+    switch (status) {
+        case 'overdue': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300 border-red-200 dark:border-red-800'
+        case 'due_today': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300 border-red-200 dark:border-red-800'
+        case 'due_tomorrow': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300 border-orange-200 dark:border-orange-800'
+        case 'due_soon': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300 border-orange-200 dark:border-orange-800'
+        case 'due_this_week': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800'
+        case 'upcoming': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 border-blue-200 dark:border-blue-800'
+        default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300 border-gray-200 dark:border-gray-800'
+    }
+}
+
+// ✅ NEW: Deadline icon based on status
+const getDeadlineIcon = (status: string) => {
+    switch (status) {
+        case 'overdue': return AlertTriangle
+        case 'due_today':
+        case 'due_tomorrow': return AlarmClock
+        case 'due_soon':
+        case 'due_this_week': return Timer
+        case 'upcoming': return CalendarDays
+        default: return Calendar
+    }
+}
+
 const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
         month: 'short',
@@ -154,6 +222,14 @@ const getActionButton = (assignment: Assignment) => {
             return { text: 'View Course', variant: 'outline', icon: Eye }
     }
 }
+
+// ✅ NEW: Sort assignments by deadline urgency
+const getSortedByDeadline = (assignments: Assignment[]) => {
+    return [...assignments].sort((a, b) => {
+        const urgencyOrder = { critical: 0, high: 1, medium: 2, low: 3, none: 4 }
+        return urgencyOrder[a.deadline_info.urgency_level] - urgencyOrder[b.deadline_info.urgency_level]
+    })
+}
 </script>
 
 <template>
@@ -167,8 +243,23 @@ const getActionButton = (assignment: Assignment) => {
                 <p class="text-muted-foreground">Track your progress and continue your learning journey</p>
             </div>
 
-            <!-- ✅ FIX: Safe stats access -->
-            <div class="grid gap-4 md:grid-cols-4 lg:grid-cols-5">
+            <!-- ✅ ENHANCED: Urgent Deadline Alert -->
+            <div v-if="hasUrgentDeadlines" class="p-4 border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20 rounded-lg">
+                <div class="flex items-start gap-3">
+                    <AlertTriangle class="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5" />
+                    <div class="flex-1">
+                        <h3 class="font-medium text-red-800 dark:text-red-300">Urgent Deadline Alert</h3>
+                        <p class="text-sm text-red-700 dark:text-red-400 mt-1">
+                            You have {{ overdueAssignments.length }} overdue course{{ overdueAssignments.length !== 1 ? 's' : '' }}
+                            and {{ dueSoonAssignments.length }} course{{ dueSoonAssignments.length !== 1 ? 's' : '' }} due soon.
+                            Please prioritize completing these courses.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ✅ ENHANCED: Stats with deadline information -->
+            <div class="grid gap-4 md:grid-cols-4 lg:grid-cols-7">
                 <Card>
                     <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle class="text-sm font-medium">Total Courses</CardTitle>
@@ -199,6 +290,34 @@ const getActionButton = (assignment: Assignment) => {
                     <CardContent>
                         <div class="text-2xl font-bold">{{ stats.completed_courses }}</div>
                         <p class="text-xs text-muted-foreground">Successfully finished</p>
+                    </CardContent>
+                </Card>
+
+                <!-- ✅ NEW: Overdue stat card -->
+                <Card :class="stats.overdue_courses > 0 ? 'border-red-200 dark:border-red-800' : ''">
+                    <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle class="text-sm font-medium">Overdue</CardTitle>
+                        <AlertTriangle class="h-4 w-4" :class="stats.overdue_courses > 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'" />
+                    </CardHeader>
+                    <CardContent>
+                        <div class="text-2xl font-bold" :class="stats.overdue_courses > 0 ? 'text-red-600 dark:text-red-400' : ''">
+                            {{ stats.overdue_courses }}
+                        </div>
+                        <p class="text-xs text-muted-foreground">Past deadline</p>
+                    </CardContent>
+                </Card>
+
+                <!-- ✅ NEW: Due soon stat card -->
+                <Card :class="stats.due_soon_courses > 0 ? 'border-orange-200 dark:border-orange-800' : ''">
+                    <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle class="text-sm font-medium">Due Soon</CardTitle>
+                        <Timer class="h-4 w-4" :class="stats.due_soon_courses > 0 ? 'text-orange-600 dark:text-orange-400' : 'text-muted-foreground'" />
+                    </CardHeader>
+                    <CardContent>
+                        <div class="text-2xl font-bold" :class="stats.due_soon_courses > 0 ? 'text-orange-600 dark:text-orange-400' : ''">
+                            {{ stats.due_soon_courses }}
+                        </div>
+                        <p class="text-xs text-muted-foreground">Within 3 days</p>
                     </CardContent>
                 </Card>
 
@@ -256,9 +375,13 @@ const getActionButton = (assignment: Assignment) => {
 
                     <div v-else class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                         <Card
-                            v-for="assignment in activeAssignments"
+                            v-for="assignment in getSortedByDeadline(activeAssignments)"
                             :key="assignment.id"
                             class="hover:shadow-lg transition-shadow"
+                            :class="{
+                                'border-red-200 dark:border-red-800': assignment.deadline_info.status === 'overdue',
+                                'border-orange-200 dark:border-orange-800': ['due_today', 'due_tomorrow', 'due_soon'].includes(assignment.deadline_info.status)
+                            }"
                         >
                             <CardHeader class="pb-3">
                                 <div class="flex items-start justify-between">
@@ -280,6 +403,22 @@ const getActionButton = (assignment: Assignment) => {
                                         :alt="assignment.course.name"
                                         class="w-full h-full object-cover"
                                     />
+                                </div>
+
+                                <!-- ✅ NEW: Deadline Alert -->
+                                <div v-if="assignment.course.has_deadline && assignment.deadline_info.status !== 'no_deadline'"
+                                     class="p-3 rounded-lg border" :class="getDeadlineColor(assignment.deadline_info.status)">
+                                    <div class="flex items-center gap-2">
+                                        <component :is="getDeadlineIcon(assignment.deadline_info.status)" class="h-4 w-4" />
+                                        <div class="flex-1">
+                                            <div class="font-medium text-sm">
+                                                {{ assignment.deadline_info.message }}
+                                            </div>
+                                            <div v-if="assignment.deadline_info.formatted_deadline" class="text-xs opacity-75 mt-1">
+                                                Due: {{ assignment.deadline_info.formatted_deadline }}
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <!-- Progress -->
@@ -333,9 +472,13 @@ const getActionButton = (assignment: Assignment) => {
 
                     <div v-else class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                         <Card
-                            v-for="assignment in notStartedAssignments"
+                            v-for="assignment in getSortedByDeadline(notStartedAssignments)"
                             :key="assignment.id"
                             class="hover:shadow-lg transition-shadow"
+                            :class="{
+                                'border-red-200 dark:border-red-800': assignment.deadline_info.status === 'overdue',
+                                'border-orange-200 dark:border-orange-800': ['due_today', 'due_tomorrow', 'due_soon'].includes(assignment.deadline_info.status)
+                            }"
                         >
                             <CardHeader class="pb-3">
                                 <div class="flex items-start justify-between">
@@ -350,6 +493,22 @@ const getActionButton = (assignment: Assignment) => {
                             </CardHeader>
 
                             <CardContent class="space-y-4">
+                                <!-- ✅ NEW: Deadline Alert for not started -->
+                                <div v-if="assignment.course.has_deadline && assignment.deadline_info.status !== 'no_deadline'"
+                                     class="p-3 rounded-lg border" :class="getDeadlineColor(assignment.deadline_info.status)">
+                                    <div class="flex items-center gap-2">
+                                        <component :is="getDeadlineIcon(assignment.deadline_info.status)" class="h-4 w-4" />
+                                        <div class="flex-1">
+                                            <div class="font-medium text-sm">
+                                                {{ assignment.deadline_info.message }}
+                                            </div>
+                                            <div v-if="assignment.deadline_info.formatted_deadline" class="text-xs opacity-75 mt-1">
+                                                Due: {{ assignment.deadline_info.formatted_deadline }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <!-- Course Details -->
                                 <div class="flex items-center justify-between text-sm">
                                     <div class="flex items-center gap-4">
@@ -409,6 +568,22 @@ const getActionButton = (assignment: Assignment) => {
                                         <CheckCircle class="h-3 w-3 mr-1" />
                                         Completed
                                     </Badge>
+                                </div>
+
+                                <!-- ✅ NEW: Show completion vs deadline info -->
+                                <div v-if="assignment.course.has_deadline && assignment.deadline_info.formatted_deadline"
+                                     class="p-2 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800">
+                                    <div class="flex items-center gap-2 text-sm">
+                                        <CheckCircle class="h-4 w-4 text-green-600 dark:text-green-400" />
+                                        <div class="flex-1">
+                                            <div class="font-medium text-green-800 dark:text-green-300">
+                                                Completed on time
+                                            </div>
+                                            <div class="text-xs text-green-700 dark:text-green-400">
+                                                Deadline was {{ assignment.deadline_info.formatted_deadline }}
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <!-- Completion Details -->

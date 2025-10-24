@@ -20,11 +20,14 @@ class CourseOnline extends Model
         'difficulty_level',
         'is_active',
         'created_by',
+        'deadline', 'has_deadline', 'deadline_type'  // NEW
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
         'estimated_duration' => 'integer',
+        'deadline' => 'datetime',           // NEW
+        'has_deadline' => 'boolean',        // NEW
     ];
 
     // Relationships
@@ -96,5 +99,46 @@ class CourseOnline extends Model
         }
 
         return $analytics;
+    }
+
+    // NEW: Deadline-related methods
+    public function hasDeadline(): bool
+    {
+        return $this->has_deadline && !is_null($this->deadline);
+    }
+
+    public function isDeadlinePassed(): bool
+    {
+        if (!$this->hasDeadline()) {
+            return false;
+        }
+        return $this->deadline->isPast();
+    }
+
+    public function daysUntilDeadline(): ?int
+    {
+        if (!$this->hasDeadline()) {
+            return null;
+        }
+        return now()->diffInDays($this->deadline, false);
+    }
+
+    public function getDeadlineStatusAttribute(): string
+    {
+        if (!$this->hasDeadline()) {
+            return 'none';
+        }
+
+        $days = $this->daysUntilDeadline();
+
+        if ($days < 0) {
+            return 'overdue';
+        } elseif ($days <= 3) {
+            return 'urgent';
+        } elseif ($days <= 7) {
+            return 'warning';
+        }
+
+        return 'normal';
     }
 }

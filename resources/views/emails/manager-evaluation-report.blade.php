@@ -57,6 +57,40 @@
             border-bottom: 2px solid #eee;
             padding-bottom: 10px;
         }
+        .employee-section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        .employee-header {
+            background: #667eea;
+            color: white;
+            padding: 15px;
+            margin: -20px -20px 20px -20px;
+            border-radius: 8px 8px 0 0;
+        }
+        .employee-header h3 {
+            margin: 0;
+            font-size: 18px;
+        }
+        .employee-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        .employee-info div {
+            margin: 5px 0;
+        }
+        .evaluation-details {
+            margin: 20px 0;
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #667eea;
+        }
         table {
             width: 100%;
             border-collapse: collapse;
@@ -66,16 +100,32 @@
         th {
             background: #667eea;
             color: white;
-            padding: 15px 10px;
+            padding: 12px 8px;
             text-align: left;
             font-weight: 500;
+            font-size: 14px;
         }
         td {
-            padding: 12px 10px;
+            padding: 10px 8px;
             border-bottom: 1px solid #eee;
+            font-size: 13px;
         }
         tr:hover {
             background-color: #f9f9f9;
+        }
+        .summary-table {
+            background: #f8f9ff;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .summary-table h4 {
+            margin: 0 0 10px 0;
+            color: #667eea;
+        }
+        .score-highlight {
+            font-weight: bold;
+            color: #667eea;
         }
         .signature {
             margin-top: 30px;
@@ -114,7 +164,7 @@
         <p>I hope this message finds you well.</p>
 
         <div class="intro-text">
-            As part of our ongoing commitment to supporting employee growth, I am sharing with you the evaluation results for your team members' Personal Development section. This information is intended to provide insight into each individual's progress, strengths, and areas for further improvement.
+            As part of our ongoing commitment to supporting employee growth, I am sharing with you the detailed evaluation results for your team members' Personal Development section. This comprehensive report includes both overall scores and detailed breakdowns by evaluation category and type.
         </div>
 
         @if($customMessage)
@@ -145,7 +195,7 @@
                             <td><strong>{{ $employee->name }}</strong></td>
                             <td>{{ $employee->department?->name ?? 'N/A' }}</td>
                             <td>{{ $evaluation->course?->name ?? 'N/A' }}</td>
-                            <td>{{ $evaluation->total_score }}</td>
+                            <td class="score-highlight">{{ $evaluation->total_score }}</td>
                             <td>${{ number_format($evaluation->incentive_amount, 2) }}</td>
                             <td>{{ $evaluation->created_at->format('M d, Y') }}</td>
                         </tr>
@@ -155,9 +205,66 @@
             </table>
         </div>
 
+        @if(isset($detailedEvaluations) && !empty($detailedEvaluations))
+            <div class="data-section">
+                <h2>Detailed Evaluation Breakdown</h2>
+
+                @foreach($detailedEvaluations as $employeeData)
+                    <div class="employee-section">
+                        <div class="employee-header">
+                            <h3>{{ $employeeData['employee']['name'] }}</h3>
+                        </div>
+
+                        <div class="employee-info">
+                            <div><strong>Department:</strong> {{ $employeeData['employee']['department'] }}</div>
+                            <div><strong>Level:</strong> {{ $employeeData['employee']['level'] }}</div>
+                            <div><strong>Email:</strong> {{ $employeeData['employee']['email'] }}</div>
+                        </div>
+
+                        @foreach($employeeData['evaluations'] as $evaluation)
+                            <div class="evaluation-details">
+                                <div class="summary-table">
+                                    <h4>{{ $evaluation['course'] }} - Evaluation Summary</h4>
+                                    <div style="display: flex; justify-content: space-between; flex-wrap: wrap;">
+                                        <div><strong>Total Score:</strong> <span class="score-highlight">{{ $evaluation['total_score'] }}</span></div>
+                                        <div><strong>Incentive:</strong> ${{ $evaluation['incentive_amount'] }}</div>
+                                        <div><strong>Date:</strong> {{ $evaluation['created_at'] }}</div>
+                                    </div>
+                                </div>
+
+                                @if(!empty($evaluation['detailed_scores']))
+                                    <h4 style="color: #667eea; margin: 15px 0 10px 0;">Detailed Score Breakdown:</h4>
+                                    <table>
+                                        <thead>
+                                        <tr>
+                                            <th>Category</th>
+                                            <th>Evaluation Type</th>
+                                            <th>Score</th>
+                                            <th>Comments</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody>
+                                        @foreach($evaluation['detailed_scores'] as $detail)
+                                            <tr>
+                                                <td><strong>{{ $detail['category_name'] }}</strong></td>
+                                                <td>{{ $detail['type_name'] }}</td>
+                                                <td class="score-highlight">{{ $detail['score'] }}</td>
+                                                <td>{{ $detail['comments'] }}</td>
+                                            </tr>
+                                        @endforeach
+                                        </tbody>
+                                    </table>
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
+                @endforeach
+            </div>
+        @endif
+
         <div style="background: #f8f9ff; padding: 20px; border-radius: 5px; margin: 25px 0;">
             <p style="margin: 0;"><strong>Your Role in Development:</strong></p>
-            <p style="margin: 10px 0 0 0;">We greatly appreciate your dedication to fostering the professional development of your team. Your role as a direct manager is essential in creating an environment where employees feel supported, motivated, and empowered to grow.</p>
+            <p style="margin: 10px 0 0 0;">We greatly appreciate your dedication to fostering the professional development of your team. Your role as a direct manager is essential in creating an environment where employees feel supported, motivated, and empowered to grow. Use this detailed breakdown to have meaningful conversations with your team members about their strengths and areas for improvement.</p>
         </div>
 
         <p>If you have any questions about the results, or would like guidance on how best to use this information during your discussions, please don't hesitate to reach out.</p>

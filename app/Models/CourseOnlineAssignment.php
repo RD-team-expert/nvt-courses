@@ -23,6 +23,7 @@ class CourseOnlineAssignment extends Model
         'progress_percentage',
         'current_module_id',
         'notification_sent',
+        'deadline', 'is_overdue', 'deadline_notification_sent_at'  // NEW
     ];
 
     protected $casts = [
@@ -31,6 +32,9 @@ class CourseOnlineAssignment extends Model
         'completed_at' => 'datetime',
         'progress_percentage' => 'decimal:2',
         'notification_sent' => 'boolean',
+        'deadline' => 'datetime',                    // NEW
+        'is_overdue' => 'boolean',                   // NEW
+        'deadline_notification_sent_at' => 'datetime', // NEW
     ];
 
     // Relationships
@@ -136,5 +140,34 @@ class CourseOnlineAssignment extends Model
         }
 
         return $this->started_at->diffInMinutes($endTime);
+    }
+
+    // NEW: Deadline methods
+    public function hasDeadline(): bool
+    {
+        return !is_null($this->deadline);
+    }
+
+    public function isOverdue(): bool
+    {
+        if (!$this->hasDeadline() || $this->status === 'completed') {
+            return false;
+        }
+        return $this->deadline->isPast();
+    }
+
+    public function daysUntilDeadline(): ?int
+    {
+        if (!$this->hasDeadline()) {
+            return null;
+        }
+        return now()->diffInDays($this->deadline, false);
+    }
+
+    public function updateOverdueStatus(): void
+    {
+        if ($this->hasDeadline() && $this->status !== 'completed') {
+            $this->update(['is_overdue' => $this->isOverdue()]);
+        }
     }
 }

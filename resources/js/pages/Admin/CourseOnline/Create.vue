@@ -2,7 +2,7 @@
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import { ref, computed } from 'vue'
 import AppLayout from '@/layouts/AppLayout.vue'
-import { type BreadcrumbItem } from '@/types'
+import type { BreadcrumbItem } from '@/types'
 
 // shadcn-vue components
 import { Button } from '@/components/ui/button'
@@ -15,25 +15,9 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 
 // Icons
-import {
-    ArrowLeft,
-    Save,
-    BookOpen,
-    Plus,
-    Trash2,
-    ChevronUp,
-    ChevronDown,
-    Video,
-    FileText,
-    Upload,
-    X,
-    AlertTriangle,
-    Clock,
-    Users,
-    Settings,
-    Eye
-} from 'lucide-vue-next'
+import { ArrowLeft, Save, BookOpen, Plus, Trash2, ChevronUp, ChevronDown, Video, FileText, Upload, X, AlertTriangle, Clock, Users, Settings, Eye, Calendar, CalendarClock } from 'lucide-vue-next' // ✅ NEW: Added Calendar icons
 
+// Interfaces
 interface Video {
     id: number
     name: string
@@ -55,16 +39,18 @@ interface Module {
 // ✅ ENHANCED: ContentItem with pdf_page_count
 interface ContentItem {
     title: string
-    content_type: 'video' | 'pdf' | ''
+    content_type: 'video' | 'pdf'
     order_number: number
     is_required: boolean
     is_active: boolean
+    // Video fields
     video_id: number | null
+    // PDF fields
     pdf_source_type: 'upload' | 'google_drive'
     pdf_file: File | null
     google_drive_pdf_url: string
     pdf_name?: string
-    pdf_page_count: number | null  // ✅ NEW: PDF page count field
+    pdf_page_count: number | null // ✅ NEW: PDF page count field
 }
 
 const props = defineProps<{
@@ -72,13 +58,15 @@ const props = defineProps<{
 }>()
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Course Online', href: '/admin/course-online' },
-    { title: 'Create Course', href: '#' }
+    { title: "Course Online", href: "/admin/course-online" },
+    { title: "Create Course", href: "/admin/course-online/create" },
 ]
 
+// Reactive references
 const imageInput = ref<HTMLInputElement | null>(null)
 const imagePreview = ref<string | null>(null)
 
+// ✅ NEW: Form with deadline fields
 const form = useForm({
     // Course fields
     name: '',
@@ -87,36 +75,78 @@ const form = useForm({
     difficulty_level: '',
     estimated_duration: null as number | null,
     is_active: true,
-
+    // ✅ NEW: Deadline fields
+    deadline: null as string | null,
+    deadline_type: 'flexible',
     // Modules with content array
     modules: [] as Module[]
 })
 
 // ✅ ENHANCED: Computed properties with PDF validation
-// const canSubmit = computed(() => {
-//     return form.name &&
-//         form.difficulty_level &&
-//         form.modules.length > 0 &&
-//         form.modules.every(module => {
-//             return module.name.trim() && (
-//                 !module.content ||
-//                 module.content.length === 0 ||
-//                 module.content.every(content => {
-//                     const basicValid = content.title && content.content_type
-//
-//                     // ✅ PDF validation: if PDF type, page count is required
-//                     if (content.content_type === 'pdf') {
-//                         return basicValid && content.pdf_page_count && content.pdf_page_count > 0
-//                     }
-//
-//                     return basicValid
-//                 })
-//             )
-//         })
-// })
+const canSubmit = computed(() => {
+    // Basic course info validation
+    if (!form.name || !form.difficulty_level || form.modules.length === 0) {
+        return false
+    }
+
+    // ✅ FIXED: Always check deadline (no conditional)
+    if (!form.deadline) {
+        return false
+    }
+
+    return form.modules.every(module => {
+        if (!module.name.trim()) {
+            return false
+        }
+
+        if (!module.content || module.content.length === 0) {
+            // Allow modules without content (empty modules are valid)
+            return true
+        }
+
+        return module.content.every(content => {
+            const basicValid = content.title && content.content_type
+
+            // PDF validation
+            if (content.content_type === 'pdf') {
+                return basicValid &&
+                    content.pdf_page_count &&
+                    content.pdf_page_count > 0 &&
+                    content.pdf_page_count <= 1000 &&
+                    ((content.pdf_source_type === 'upload' && content.pdf_file) ||
+                        (content.pdf_source_type === 'google_drive' && content.google_drive_pdf_url.trim()))
+            }
+
+            return basicValid
+        })
+    })
+})
 
 const totalContentItems = computed(() => {
     return form.modules.reduce((total, module) => total + (module.content?.length || 0), 0)
+})
+
+// ✅ NEW: Deadline computed properties
+const deadlineMinDate = computed(() => {
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    return tomorrow.toISOString().slice(0, 16)
+})
+
+const deadlinePreview = computed(() => {
+    if (!form.deadline) return null
+    const date = new Date(form.deadline)
+    return {
+        formatted: date.toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        }),
+        relative: Math.ceil((date.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+    }
 })
 
 // Image handling
@@ -180,17 +210,17 @@ const removeModule = (index: number) => {
 
 const moveModule = (index: number, direction: 'up' | 'down') => {
     const newIndex = direction === 'up' ? index - 1 : index + 1
-    if (newIndex >= 0 && newIndex < form.modules.length) {
-        // Swap modules
-        const temp = form.modules[index]
-        form.modules[index] = form.modules[newIndex]
-        form.modules[newIndex] = temp
+    if (newIndex < 0 || newIndex >= form.modules.length) return
 
-        // Update order numbers
-        form.modules.forEach((module, idx) => {
-            module.order_number = idx + 1
-        })
-    }
+    // Swap modules
+    const temp = form.modules[index]
+    form.modules[index] = form.modules[newIndex]
+    form.modules[newIndex] = temp
+
+    // Update order numbers
+    form.modules.forEach((module, idx) => {
+        module.order_number = idx + 1
+    })
 }
 
 // Content management
@@ -201,7 +231,7 @@ const addContentToModule = (moduleIndex: number) => {
 
     form.modules[moduleIndex].content.push({
         title: '',
-        content_type: '' as any,
+        content_type: 'video' as any,
         order_number: form.modules[moduleIndex].content.length + 1,
         is_required: true,
         is_active: true,
@@ -212,7 +242,7 @@ const addContentToModule = (moduleIndex: number) => {
         pdf_file: null,
         google_drive_pdf_url: '',
         pdf_name: '',
-        pdf_page_count: null  // ✅ NEW: Initialize page count
+        pdf_page_count: null // ✅ NEW: Initialize page count
     })
 }
 
@@ -233,12 +263,13 @@ const resetContentFields = (moduleIndex: number, contentIndex: number) => {
     content.google_drive_pdf_url = ''
     content.pdf_source_type = 'upload'
     content.pdf_name = ''
-    content.pdf_page_count = null  // ✅ NEW: Reset page count
+    content.pdf_page_count = null // ✅ NEW: Reset page count
 }
 
 const handlePdfUpload = (event: Event, moduleIndex: number, contentIndex: number) => {
     const target = event.target as HTMLInputElement
     const file = target.files?.[0]
+
     if (file && file.type === 'application/pdf') {
         form.modules[moduleIndex].content[contentIndex].pdf_file = file
         // Set default PDF name from file
@@ -247,20 +278,23 @@ const handlePdfUpload = (event: Event, moduleIndex: number, contentIndex: number
 }
 
 const getSelectedVideo = (videoId: number): Video | undefined => {
-    return props.availableVideos?.find(video => video.id == videoId)
+    return props.availableVideos?.find(video => video.id === videoId)
 }
 
 const getDifficultyBadgeColor = (level: string) => {
     switch (level) {
-        case 'beginner': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-        case 'intermediate': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
-        case 'advanced': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
-        default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
+        case 'beginner':
+            return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+        case 'intermediate':
+            return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
+        case 'advanced':
+            return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
+        default:
+            return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
     }
 }
 
 // ✅ NEW: PDF validation helper
-// ✅ FIX: Updated validation logic
 const validatePdfContent = (content: ContentItem): string | null => {
     if (content.content_type === 'pdf') {
         // Check if page count exists and is a valid number
@@ -270,6 +304,7 @@ const validatePdfContent = (content: ContentItem): string | null => {
         if (content.pdf_page_count > 1000) {
             return 'Page count cannot exceed 1000'
         }
+
         // Check source requirements
         if (content.pdf_source_type === 'upload' && !content.pdf_file) {
             return 'Please upload a PDF file'
@@ -281,47 +316,10 @@ const validatePdfContent = (content: ContentItem): string | null => {
     return null
 }
 
-// ✅ FIX: Updated canSubmit logic
-// ✅ FIXED: Updated canSubmit logic for video-only courses
-const canSubmit = computed(() => {
-    if (!form.name || !form.difficulty_level || form.modules.length === 0) {
-        return false
-    }
-
-    return form.modules.every(module => {
-        if (!module.name.trim()) return false
-
-        if (module.content && module.content.length > 0) {
-            return module.content.every(content => {
-                if (!content.title || !content.content_type) return false
-
-                // ✅ FIXED: Video validation - only check if video is selected
-                if (content.content_type === 'video') {
-                    return content.video_id && content.video_id > 0
-                }
-
-                // ✅ FIXED: PDF validation - only apply to PDF content
-                if (content.content_type === 'pdf') {
-                    return content.pdf_page_count &&
-                        content.pdf_page_count > 0 &&
-                        content.pdf_page_count <= 1000 &&
-                        ((content.pdf_source_type === 'upload' && content.pdf_file) ||
-                            (content.pdf_source_type === 'google_drive' && content.google_drive_pdf_url.trim()))
-                }
-
-                return true
-            })
-        }
-
-        // ✅ FIXED: Allow modules without content (empty modules are valid)
-        return true
-    })
-})
-
-
 // Form submission
+// ✅ SIMPLIFIED: No conditional deadline logic needed
 const submit = () => {
-    // ✅ NEW: Validate PDF content before submission
+    // PDF validation (unchanged)
     for (let moduleIndex = 0; moduleIndex < form.modules.length; moduleIndex++) {
         const module = form.modules[moduleIndex]
         for (let contentIndex = 0; contentIndex < (module.content?.length || 0); contentIndex++) {
@@ -334,6 +332,7 @@ const submit = () => {
         }
     }
 
+    // ✅ ALWAYS SET: has_deadline is always true now
     form.post('/admin/course-online', {
         onSuccess: () => {
             form.reset()
@@ -347,19 +346,21 @@ const submit = () => {
     <Head title="Create Complete Course" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="max-w-4xl mx-auto space-y-">
+        <div class="max-w-4xl mx-auto space-y-6">
             <!-- Header -->
             <div class="flex items-center gap-4">
-                <Button asChild variant="ghost">
+                <Button as-child variant="ghost">
                     <Link href="/admin/course-online">
                         <ArrowLeft class="h-4 w-4 mr-2" />
                         Back to Courses
                     </Link>
                 </Button>
+
                 <div class="flex-1">
                     <h1 class="text-3xl font-bold">Create Complete Course</h1>
                     <p class="text-muted-foreground">Build course, modules, and content all in one place</p>
                 </div>
+
                 <div class="hidden sm:flex items-center gap-4 text-sm text-muted-foreground">
                     <div class="flex items-center gap-2">
                         <BookOpen class="h-4 w-4" />
@@ -387,7 +388,7 @@ const submit = () => {
                     <CardContent class="space-y-6">
                         <!-- Course Name -->
                         <div class="space-y-2">
-                            <Label for="name">Course Name *</Label>
+                            <Label for="name">Course Name</Label>
                             <Input
                                 id="name"
                                 v-model="form.name"
@@ -420,7 +421,7 @@ const submit = () => {
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <!-- Difficulty Level -->
                             <div class="space-y-2">
-                                <Label for="difficulty_level">Difficulty Level *</Label>
+                                <Label for="difficulty_level">Difficulty Level</Label>
                                 <select
                                     id="difficulty_level"
                                     v-model="form.difficulty_level"
@@ -471,6 +472,82 @@ const submit = () => {
                     </CardContent>
                 </Card>
 
+                <!-- ✅ NEW: Course Deadline Section -->
+                <!-- ✅ FIXED: Course Deadline Section - Always visible -->
+                <Card>
+                    <CardHeader>
+                        <CardTitle class="flex items-center gap-2">
+                            <Calendar class="h-5 w-5 text-primary" />
+                            Course Deadline
+                            <Badge variant="destructive" class="ml-2">Required</Badge>
+                        </CardTitle>
+                        <CardDescription>
+                            Set a completion deadline for this course - all courses must have a deadline
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent class="space-y-6">
+                        <!-- ✅ ALWAYS VISIBLE: Deadline Date & Time -->
+                        <div class="space-y-2">
+                            <Label for="deadline">📅 Deadline Date & Time *</Label>
+                            <Input
+                                id="deadline"
+                                v-model="form.deadline"
+                                type="datetime-local"
+                                :min="deadlineMinDate"
+                                :class="{ 'border-destructive': form.errors.deadline || !form.deadline }"
+                                required
+                                class="w-full"
+                            />
+                            <div v-if="form.errors.deadline" class="text-sm text-destructive">
+                                {{ form.errors.deadline }}
+                            </div>
+                            <div v-if="!form.deadline" class="text-sm text-destructive">
+                                Course deadline is required for all courses
+                            </div>
+                        </div>
+
+                        <!-- ✅ ALWAYS VISIBLE: Deadline Type -->
+                        <div class="space-y-2">
+                            <Label for="deadline_type">⚙️ Deadline Type</Label>
+                            <select
+                                id="deadline_type"
+                                v-model="form.deadline_type"
+                                class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                <option value="flexible">Flexible - Allow completion after deadline</option>
+                                <option value="strict">Strict - Block access after deadline</option>
+                            </select>
+                        </div>
+
+                        <!-- ✅ ALWAYS VISIBLE: Deadline Preview (when deadline is set) -->
+                        <div v-if="form.deadline && deadlinePreview" class="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg border">
+                            <div class="flex items-start gap-3">
+                                <CalendarClock class="h-5 w-5 text-blue-600 mt-0.5" />
+                                <div class="flex-1">
+                                    <div class="font-medium text-blue-900 dark:text-blue-100">
+                                        📅 {{ deadlinePreview.formatted }}
+                                    </div>
+                                    <div class="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                                        ⏰ {{ deadlinePreview.relative }} days from now
+                                    </div>
+                                    <div class="text-xs text-muted-foreground mt-2">
+                                        Type: {{ form.deadline_type === 'flexible' ? 'Flexible (late completion allowed)' : 'Strict (access blocked after deadline)' }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ✅ MANDATORY NOTICE -->
+                        <Alert>
+                            <AlertTriangle class="h-4 w-4" />
+                            <AlertDescription>
+                                <strong>Required:</strong> All courses must have a deadline. This ensures proper progress tracking and evaluation reporting.
+                                Students and managers will be notified about the deadline automatically.
+                            </AlertDescription>
+                        </Alert>
+                    </CardContent>
+                </Card>
+
                 <!-- Course Image -->
                 <Card>
                     <CardHeader>
@@ -501,9 +578,7 @@ const submit = () => {
                         >
                             <Upload class="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                             <div class="text-sm font-medium mb-2">Click to upload course image</div>
-                            <div class="text-xs text-muted-foreground">
-                                PNG, JPG, GIF up to 2MB
-                            </div>
+                            <div class="text-xs text-muted-foreground">PNG, JPG, GIF up to 2MB</div>
                         </div>
 
                         <!-- Image Preview -->
@@ -525,7 +600,12 @@ const submit = () => {
                                 </Button>
                             </div>
                             <div class="text-center">
-                                <Button @click="triggerImageInput" variant="outline" size="sm" type="button">
+                                <Button
+                                    @click="triggerImageInput"
+                                    variant="outline"
+                                    size="sm"
+                                    type="button"
+                                >
                                     <Upload class="h-4 w-4 mr-2" />
                                     Change Image
                                 </Button>
@@ -552,7 +632,11 @@ const submit = () => {
                                     Build your course structure with modules and content
                                 </CardDescription>
                             </div>
-                            <Button type="button" @click="addModule" class="shrink-0">
+                            <Button
+                                type="button"
+                                @click="addModule"
+                                class="shrink-0"
+                            >
                                 <Plus class="h-4 w-4 mr-2" />
                                 Add Module
                             </Button>
@@ -621,14 +705,13 @@ const submit = () => {
                                         </div>
                                     </div>
                                 </CardHeader>
-
                                 <CardContent class="space-y-6">
                                     <!-- Module Basic Info -->
                                     <div class="space-y-4">
                                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <!-- Module Name -->
                                             <div class="space-y-2">
-                                                <Label :for="`module-name-${moduleIndex}`">Module Name *</Label>
+                                                <Label :for="`module-name-${moduleIndex}`">Module Name</Label>
                                                 <Input
                                                     :id="`module-name-${moduleIndex}`"
                                                     v-model="module.name"
@@ -699,9 +782,7 @@ const submit = () => {
                                             <div class="flex items-center gap-2">
                                                 <Video class="h-5 w-5 text-primary" />
                                                 <h4 class="font-medium">Module Content</h4>
-                                                <Badge variant="outline">
-                                                    {{ module.content?.length || 0 }} items
-                                                </Badge>
+                                                <Badge variant="outline">{{ module.content?.length || 0 }} items</Badge>
                                             </div>
                                             <Button
                                                 type="button"
@@ -727,7 +808,6 @@ const submit = () => {
                                                 Add first content item
                                             </Button>
                                         </div>
-
                                         <div v-else class="space-y-4">
                                             <Card
                                                 v-for="(content, contentIndex) in module.content"
@@ -765,12 +845,11 @@ const submit = () => {
                                                         </Button>
                                                     </div>
                                                 </CardHeader>
-
                                                 <CardContent class="space-y-4">
                                                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                                                         <!-- Content Type -->
                                                         <div class="space-y-2">
-                                                            <Label>Content Type *</Label>
+                                                            <Label>Content Type</Label>
                                                             <select
                                                                 v-model="content.content_type"
                                                                 required
@@ -785,7 +864,7 @@ const submit = () => {
 
                                                         <!-- Content Title -->
                                                         <div class="space-y-2">
-                                                            <Label>Content Title *</Label>
+                                                            <Label>Content Title</Label>
                                                             <Input
                                                                 v-model="content.title"
                                                                 type="text"
@@ -798,7 +877,7 @@ const submit = () => {
                                                     <!-- Video Content Fields -->
                                                     <div v-if="content.content_type === 'video'" class="space-y-4">
                                                         <div class="space-y-2">
-                                                            <Label>Select Video *</Label>
+                                                            <Label>Select Video</Label>
                                                             <select
                                                                 v-model="content.video_id"
                                                                 required
@@ -826,10 +905,10 @@ const submit = () => {
                                                                 />
                                                                 <div class="flex-1">
                                                                     <p class="font-medium text-sm">{{ getSelectedVideo(content.video_id)!.name }}</p>
-                                                                    <div class="flex items-center gap-2 text-xs text-muted-foreground">
-                                                                        <Clock class="h-3 w-3" />
-                                                                        {{ getSelectedVideo(content.video_id)!.formatted_duration }}
-                                                                    </div>
+                                                                </div>
+                                                                <div class="flex items-center gap-2 text-xs text-muted-foreground">
+                                                                    <Clock class="h-3 w-3" />
+                                                                    {{ getSelectedVideo(content.video_id)!.formatted_duration }}
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -838,7 +917,7 @@ const submit = () => {
                                                     <!-- ✅ ENHANCED: PDF Content Fields with Page Count -->
                                                     <div v-if="content.content_type === 'pdf'" class="space-y-4">
                                                         <div class="space-y-3">
-                                                            <Label>PDF Source *</Label>
+                                                            <Label>PDF Source</Label>
                                                             <div class="flex gap-6">
                                                                 <label class="flex items-center space-x-2">
                                                                     <input
@@ -896,18 +975,20 @@ const submit = () => {
                                                                 type="number"
                                                                 min="1"
                                                                 max="1000"
-                                                                placeholder="Enter number of pages (required)"
+                                                                placeholder="Enter number of pages"
+                                                                required
                                                                 class="w-full"
                                                                 :class="{ 'border-red-500': !content.pdf_page_count }"
-                                                                required
+
                                                             />
                                                             <p class="text-xs text-red-600">
-                                                                * Required: Please count the pages manually and enter the exact number.
+                                                                <strong>Required:</strong> Please count the pages manually and enter the exact number.
                                                                 This helps provide accurate reading time estimates.
                                                             </p>
-                                                            <div v-if="validatePdfContent(content)" class="text-sm text-destructive">
-                                                                {{ validatePdfContent(content) }}
-                                                            </div>
+                                                        </div>
+
+                                                        <div v-if="validatePdfContent(content)" class="text-sm text-destructive">
+                                                            {{ validatePdfContent(content) }}
                                                         </div>
 
                                                         <!-- PDF Preview -->
@@ -966,7 +1047,7 @@ const submit = () => {
 
                 <!-- Submit Actions -->
                 <div class="flex justify-between items-center py-6">
-                    <Button asChild variant="outline">
+                    <Button as-child variant="outline">
                         <Link href="/admin/course-online">
                             Cancel
                         </Link>

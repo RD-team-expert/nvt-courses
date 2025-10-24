@@ -10,6 +10,7 @@ class EvaluationEmailService
     /**
      * Send evaluation report to managers
      */
+
     public function sendEvaluationReport(array $managers, $employees, string $subject, string $customMessage = ''): array
     {
         $results = [
@@ -45,6 +46,36 @@ class EvaluationEmailService
             return $results;
         }
 
+        // Prepare detailed evaluation data with history/detailed points
+        $detailedEvaluations = $employees->map(function ($employee) {
+            return [
+                'employee' => [
+                    'id' => $employee->id,
+                    'name' => $employee->name,
+                    'email' => $employee->email,
+                    'department' => $employee->department ? $employee->department->name : 'No Department',
+                    'level' => $employee->userLevel ? $employee->userLevel->name : 'Unknown'
+                ],
+                'evaluations' => $employee->evaluations->map(function ($evaluation) {
+                    return [
+                        'id' => $evaluation->id,
+                        'course' => $evaluation->course ? $evaluation->course->name : 'Unknown Course',
+                        'total_score' => $evaluation->total_score,
+                        'incentive_amount' => $evaluation->incentive_amount,
+                        'created_at' => $evaluation->created_at->format('M d, Y'),
+                        'detailed_scores' => $evaluation->history->map(function ($history) {
+                            return [
+                                'category_name' => $history->category_name,
+                                'type_name' => $history->type_name,
+                                'score' => $history->score,
+                                'comments' => $history->comments ?? 'No comments'
+                            ];
+                        })->toArray()
+                    ];
+                })->toArray()
+            ];
+        })->toArray();
+
         // Send emails to each manager
         foreach ($allManagers as $manager) {
             try {
@@ -53,9 +84,10 @@ class EvaluationEmailService
                 Mail::send('emails.manager-evaluation-report', [
                     'manager' => $manager,
                     'employees' => $employees,
-                    'subject' => $subject,              // ✅ FIXED: Added this line
+                    'subject' => $subject,
                     'customMessage' => $customMessage,
-                    'evaluations' => $employees->flatMap->evaluations
+                    'evaluations' => $employees->flatMap->evaluations,
+                    'detailedEvaluations' => $detailedEvaluations  // ✅ ADDED: Detailed evaluation data
                 ], function ($message) use ($manager, $subject) {
                     $message->to($manager['email'], $manager['name'])
                         ->subject($subject);
