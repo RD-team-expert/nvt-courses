@@ -159,6 +159,7 @@ class UserContentProgress extends Model
     }
 
     // ✅ ADD: Course progress calculation
+    // ✅ FIXED: Course progress calculation
     private function updateCourseProgress(): void
     {
         $assignment = CourseOnlineAssignment::where('course_online_id', $this->course_online_id)
@@ -166,9 +167,26 @@ class UserContentProgress extends Model
             ->first();
 
         if ($assignment) {
-            $assignment->calculateProgress();
+            // ❌ WRONG: $assignment->calculateProgress();
+
+            // ✅ CORRECT - Use your existing updateProgress method:
+            $assignment->updateProgress($assignment->progress_percentage);
+
+            // OR simply recalculate and update:
+            // $totalContent = ModuleContent::whereHas('module', function($query) {
+            //     $query->where('course_online_id', $this->course_online_id);
+            // })->count();
+
+            // $completedContent = UserContentProgress::where('user_id', $this->user_id)
+            //     ->where('course_online_id', $this->course_online_id)
+            //     ->where('is_completed', true)
+            //     ->count();
+
+            // $newProgress = $totalContent > 0 ? round(($completedContent / $totalContent) * 100, 2) : 0;
+            // $assignment->update(['progress_percentage' => $newProgress]);
         }
     }
+
 
     // ✅ ADD: Analytics methods
     public function getEngagementLevel(): string

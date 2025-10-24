@@ -200,4 +200,8 @@ class CourseModule extends Model
     {
         return $query->where('course_online_id', $courseId);
     }
+    public function contents()
+{
+    return $this->hasMany(ModuleContent::class, 'module_id');
+}
 }

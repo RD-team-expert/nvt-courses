@@ -29,7 +29,12 @@ import {
     Award,
     TrendingUp,
     User,
-    Calendar
+    Calendar,
+    // ✅ NEW: Deadline icons
+    AlarmClock,
+    CalendarDays,
+    Timer,
+    AlertTriangle
 } from 'lucide-vue-next'
 
 interface Course {
@@ -40,6 +45,10 @@ interface Course {
     difficulty_level: string
     estimated_duration: number
     is_active: boolean
+    // ✅ NEW: Course deadline fields
+    has_deadline: boolean
+    deadline: string | null
+    deadline_type: 'flexible' | 'strict'
 }
 
 interface Assignment {
@@ -50,6 +59,18 @@ interface Assignment {
     started_at: string | null
     current_module_id: number | null
     time_spent: string
+    // ✅ NEW: Assignment deadline fields
+    deadline: string | null
+    is_overdue: boolean
+    deadline_info: {
+        status: 'no_deadline' | 'overdue' | 'due_today' | 'due_tomorrow' | 'due_soon' | 'due_this_week' | 'upcoming'
+        message: string
+        days_remaining: number | null
+        urgency_level: 'none' | 'low' | 'medium' | 'high' | 'critical'
+        formatted_deadline: string | null
+        is_overdue: boolean
+        time_remaining: string
+    }
 }
 
 interface ContentProgress {
@@ -113,6 +134,51 @@ const breadcrumbs: BreadcrumbItem[] = [
 const openModules = ref<Set<number>>(new Set())
 const currentContent = ref<Content | null>(null)
 const isStarting = ref(false)
+
+// ✅ NEW: Deadline computed properties
+const hasDeadline = computed(() => props.course.has_deadline && props.assignment.deadline)
+
+const deadlineStatus = computed(() => props.assignment.deadline_info.status)
+
+const isUrgentDeadline = computed(() =>
+    ['overdue', 'due_today', 'due_tomorrow'].includes(deadlineStatus.value)
+)
+
+const deadlineColor = computed(() => {
+    switch (deadlineStatus.value) {
+        case 'overdue': return 'border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-800'
+        case 'due_today': return 'border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-800'
+        case 'due_tomorrow': return 'border-orange-200 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-800'
+        case 'due_soon': return 'border-orange-200 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-800'
+        case 'due_this_week': return 'border-yellow-200 bg-yellow-50 dark:bg-yellow-950/20 dark:border-yellow-800'
+        case 'upcoming': return 'border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800'
+        default: return 'border-gray-200 bg-gray-50 dark:bg-gray-950/20 dark:border-gray-800'
+    }
+})
+
+const deadlineIcon = computed(() => {
+    switch (deadlineStatus.value) {
+        case 'overdue': return AlertTriangle
+        case 'due_today':
+        case 'due_tomorrow': return AlarmClock
+        case 'due_soon':
+        case 'due_this_week': return Timer
+        case 'upcoming': return CalendarDays
+        default: return Calendar
+    }
+})
+
+const deadlineTextColor = computed(() => {
+    switch (deadlineStatus.value) {
+        case 'overdue': return 'text-red-700 dark:text-red-300'
+        case 'due_today':
+        case 'due_tomorrow': return 'text-red-700 dark:text-red-300'
+        case 'due_soon': return 'text-orange-700 dark:text-orange-300'
+        case 'due_this_week': return 'text-yellow-700 dark:text-yellow-300'
+        case 'upcoming': return 'text-blue-700 dark:text-blue-300'
+        default: return 'text-gray-700 dark:text-gray-300'
+    }
+})
 
 // Computed
 const completedModules = computed(() =>
@@ -281,6 +347,34 @@ onMounted(() => {
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="max-w-7xl mx-auto space-y-6">
+            <!-- ✅ NEW: Urgent Deadline Alert -->
+            <Alert v-if="isUrgentDeadline" class="border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-800">
+                <component :is="deadlineIcon" class="h-4 w-4" />
+                <AlertDescription>
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <strong class="text-red-800 dark:text-red-300">
+                                {{ deadlineStatus === 'overdue' ? '🚨 OVERDUE:' : '⚠️ URGENT:' }}
+                            </strong>
+                            <span class="ml-2 text-red-700 dark:text-red-300">
+                                {{ assignment.deadline_info.message }}
+                            </span>
+                            <span v-if="assignment.deadline_info.formatted_deadline" class="block text-sm text-red-600 dark:text-red-400 mt-1">
+                                Deadline was {{ assignment.deadline_info.formatted_deadline }}
+                            </span>
+                        </div>
+                        <Button
+                            v-if="assignment.status === 'in_progress' && nextContent"
+                            @click="continueWhere"
+                            size="sm"
+                            variant="destructive"
+                        >
+                            Continue Now
+                        </Button>
+                    </div>
+                </AlertDescription>
+            </Alert>
+
             <!-- Course Header -->
             <div class="flex items-start gap-6">
                 <!-- Course Image -->
@@ -311,6 +405,10 @@ onMounted(() => {
                                     <BookOpen class="h-4 w-4" />
                                     {{ totalModules }} modules
                                 </div>
+                                <!-- ✅ NEW: Deadline type badge -->
+                                <Badge v-if="course.has_deadline" variant="outline" :class="course.deadline_type === 'strict' ? 'border-red-300 text-red-600 dark:border-red-700 dark:text-red-400' : 'border-blue-300 text-blue-600 dark:border-blue-700 dark:text-blue-400'">
+                                    {{ course.deadline_type === 'strict' ? 'Strict Deadline' : 'Flexible Deadline' }}
+                                </Badge>
                             </div>
                         </div>
 
@@ -325,8 +423,8 @@ onMounted(() => {
                 </div>
             </div>
 
-            <!-- Progress Overview -->
-            <div class="grid gap-4 md:grid-cols-4">
+            <!-- ✅ ENHANCED: Progress Overview with deadline information -->
+            <div class="grid gap-4 md:grid-cols-5">
                 <Card>
                     <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle class="text-sm font-medium">Status</CardTitle>
@@ -367,6 +465,25 @@ onMounted(() => {
                     </CardContent>
                 </Card>
 
+                <!-- ✅ NEW: Deadline Status Card -->
+                <Card v-if="hasDeadline" :class="deadlineColor.split(' ').slice(0, 2).join(' ')">
+                    <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle class="text-sm font-medium">Deadline</CardTitle>
+                        <component :is="deadlineIcon" class="h-4 w-4" :class="deadlineTextColor" />
+                    </CardHeader>
+                    <CardContent>
+                        <div class="text-lg font-bold mb-2" :class="deadlineTextColor">
+                            {{ assignment.deadline_info.time_remaining }}
+                        </div>
+                        <p class="text-xs" :class="deadlineTextColor">
+                            {{ assignment.deadline_info.formatted_deadline }}
+                        </p>
+                        <p class="text-xs text-muted-foreground mt-1">
+                            {{ course.deadline_type === 'strict' ? 'Access blocked after' : 'Late completion tracked' }}
+                        </p>
+                    </CardContent>
+                </Card>
+
                 <Card>
                     <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle class="text-sm font-medium">Actions</CardTitle>
@@ -389,9 +506,10 @@ onMounted(() => {
                             v-else-if="assignment.status === 'in_progress' && nextContent"
                             @click="continueWhere"
                             class="w-full mb-2"
+                            :variant="isUrgentDeadline ? 'destructive' : 'default'"
                         >
                             <Play class="h-4 w-4 mr-2" />
-                            Continue Learning
+                            {{ isUrgentDeadline ? 'Continue Urgently' : 'Continue Learning' }}
                         </Button>
 
                         <!-- Complete Course -->
@@ -409,10 +527,45 @@ onMounted(() => {
                         <div v-if="assignment.status === 'completed'" class="text-center">
                             <CheckCircle class="h-8 w-8 mx-auto text-green-600 mb-2" />
                             <p class="text-sm font-medium text-green-600">Course Completed!</p>
+                            <p v-if="hasDeadline" class="text-xs text-muted-foreground mt-1">
+                                {{ assignment.deadline_info.is_overdue ? 'Completed after deadline' : 'Completed on time' }}
+                            </p>
                         </div>
                     </CardContent>
                 </Card>
             </div>
+
+            <!-- ✅ ENHANCED: Deadline Information Card -->
+            <Card v-if="hasDeadline && !isUrgentDeadline" :class="deadlineColor">
+                <CardHeader>
+                    <CardTitle class="flex items-center gap-2" :class="deadlineTextColor">
+                        <component :is="deadlineIcon" class="h-5 w-5" />
+                        Course Deadline Information
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div class="grid gap-4 md:grid-cols-3">
+                        <div>
+                            <div class="text-sm font-medium text-muted-foreground mb-1">Status</div>
+                            <div class="font-medium" :class="deadlineTextColor">
+                                {{ assignment.deadline_info.message }}
+                            </div>
+                        </div>
+                        <div>
+                            <div class="text-sm font-medium text-muted-foreground mb-1">Due Date</div>
+                            <div class="font-medium">
+                                {{ assignment.deadline_info.formatted_deadline }}
+                            </div>
+                        </div>
+                        <div>
+                            <div class="text-sm font-medium text-muted-foreground mb-1">Type</div>
+                            <div class="font-medium">
+                                {{ course.deadline_type === 'strict' ? 'Strict (Access blocked after deadline)' : 'Flexible (Late completion allowed)' }}
+                            </div>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
 
             <!-- Next Content Alert -->
             <Alert v-if="nextContent && assignment.status === 'in_progress'" class="border-blue-200 bg-blue-50 dark:bg-blue-950">
@@ -424,7 +577,7 @@ onMounted(() => {
                             <span class="ml-2">{{ nextContent.content.title }}</span>
                             <span class="text-muted-foreground ml-2">in {{ nextContent.module.name }}</span>
                         </div>
-                        <Button @click="continueWhere" size="sm">
+                        <Button @click="continueWhere" size="sm" :variant="isUrgentDeadline ? 'destructive' : 'default'">
                             Continue
                         </Button>
                     </div>
@@ -437,9 +590,16 @@ onMounted(() => {
                     <CardTitle class="flex items-center gap-2">
                         <BookOpen class="h-5 w-5 text-primary" />
                         Course Modules
+                        <!-- ✅ NEW: Show deadline urgency in modules header -->
+                        <Badge v-if="isUrgentDeadline" variant="destructive" class="ml-2">
+                            {{ deadlineStatus === 'overdue' ? 'Overdue!' : 'Due Soon!' }}
+                        </Badge>
                     </CardTitle>
                     <CardDescription>
                         Complete modules in order to progress through the course
+                        <span v-if="hasDeadline" :class="deadlineTextColor">
+                            · {{ assignment.deadline_info.time_remaining }}
+                        </span>
                     </CardDescription>
                 </CardHeader>
                 <CardContent class="space-y-4">

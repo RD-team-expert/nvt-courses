@@ -1,0 +1,61 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: courses_backend
+    ports:
+      - "2654:80"
+    volumes:
+      # Mount source code as read-only (for development)
+      - ./app:/var/www/html/app:ro
+      - ./config:/var/www/html/config:ro
+      - ./database:/var/www/html/database:ro
+      - ./public:/var/www/html/public:ro
+      - ./resources:/var/www/html/resources:ro
+      - ./routes:/var/www/html/routes:ro
+      - ./artisan:/var/www/html/artisan:ro
+      - ./composer.json:/var/www/html/composer.json:ro
+      - ./.env:/var/www/html/.env:ro
+      
+      # Use Docker volumes for writable directories (fixes Windows permissions)
+      - laravel_storage:/var/www/html/storage
+      - laravel_cache:/var/www/html/bootstrap/cache
+      - laravel_vendor:/var/www/html/vendor
+    restart: unless-stopped
+
+  reverb:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: courses_reverb
+    command: ["php", "artisan", "reverb:start", "--host=0.0.0.0", "--port=9586"]
+    ports:
+      - "9586:9586"
+    volumes:
+      # Same read-only source mounts
+      - ./app:/var/www/html/app:ro
+      - ./config:/var/www/html/config:ro
+      - ./database:/var/www/html/database:ro
+      - ./routes:/var/www/html/routes:ro
+      - ./artisan:/var/www/html/artisan:ro
+      - ./composer.json:/var/www/html/composer.json:ro
+      - ./.env:/var/www/html/.env:ro
+      
+      # Same Docker volumes
+      - laravel_storage:/var/www/html/storage
+      - laravel_cache:/var/www/html/bootstrap/cache
+      - laravel_vendor:/var/www/html/vendor
+    restart: unless-stopped
+    depends_on:
+      - backend
+
+volumes:
+  laravel_storage:
+  laravel_cache:
+  laravel_vendor:
+
+networks:
+  default:
+    name: nvt-courses_default
+    external: true

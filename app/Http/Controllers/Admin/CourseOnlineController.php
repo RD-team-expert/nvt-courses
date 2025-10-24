@@ -48,6 +48,12 @@ class CourseOnlineController extends Controller
                 'difficulty_level' => $course->difficulty_level,
                 'estimated_duration' => $course->estimated_duration,
                 'is_active' => $course->is_active,
+                // ✅ NEW: Include deadline information
+                'has_deadline' => $course->has_deadline,
+                'deadline' => $course->deadline?->toDateTimeString(),
+                'deadline_type' => $course->deadline_type,
+                'deadline_status' => $course->deadline_status,
+                'days_until_deadline' => $course->daysUntilDeadline(),
                 'creator' => $course->creator ? [
                     'id' => $course->creator->id,
                     'name' => $course->creator->name,
@@ -80,7 +86,6 @@ class CourseOnlineController extends Controller
      */
     public function create()
     {
-
         $availableVideos = Video::where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name', 'duration', 'google_drive_url'])
@@ -104,7 +109,6 @@ class CourseOnlineController extends Controller
     /**
      * Store newly created course
      */
-// ✅ SIMPLIFIED: Store function - admin enters page count manually
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -114,6 +118,9 @@ class CourseOnlineController extends Controller
             'estimated_duration' => 'nullable|integer|min:1|max:10000',
             'difficulty_level' => 'required|in:beginner,intermediate,advanced',
             'is_active' => 'boolean',
+            // ✅ FIXED: Always required deadline validation
+            'deadline' => 'required|date|after:now',
+            'deadline_type' => 'required|in:flexible,strict',
             'modules' => 'required|array|min:1',
             'modules.*.name' => 'required|string|max:255',
             'modules.*.description' => 'nullable|string|max:2000',
@@ -121,23 +128,17 @@ class CourseOnlineController extends Controller
             'modules.*.is_required' => 'boolean',
             'modules.*.is_active' => 'boolean',
             'modules.*.content' => 'nullable|array',
-
-            // ✅ FLEXIBLE: Content validation - only applies when content exists
             'modules.*.content.*.title' => 'nullable|string|max:255',
             'modules.*.content.*.content_type' => 'nullable|in:video,pdf',
             'modules.*.content.*.is_required' => 'boolean',
             'modules.*.content.*.is_active' => 'boolean',
-
-            // ✅ VIDEO: Only validated when needed
             'modules.*.content.*.video_id' => 'nullable|exists:videos,id',
-
-            // ✅ PDF: Only validated when needed
             'modules.*.content.*.google_drive_pdf_url' => 'nullable|string|url',
             'modules.*.content.*.pdf_name' => 'nullable|string|max:255',
             'modules.*.content.*.pdf_page_count' => 'nullable|integer|min:1|max:1000',
         ]);
 
-// ✅ CUSTOM: Smart validation after basic validation
+        // ✅ CUSTOM: Smart validation after basic validation
         foreach ($validated['modules'] as $moduleIndex => $moduleData) {
             if (isset($moduleData['content']) && is_array($moduleData['content'])) {
                 foreach ($moduleData['content'] as $contentIndex => $contentData) {
@@ -202,7 +203,7 @@ class CourseOnlineController extends Controller
                 $this->thumbnailService->generateMultipleThumbnails($imagePath);
             }
 
-            // Create course
+            // ✅ FIXED: Create course with always-set deadline
             $course = CourseOnline::create([
                 'name' => $validated['name'],
                 'description' => $validated['description'],
@@ -211,6 +212,10 @@ class CourseOnlineController extends Controller
                 'difficulty_level' => $validated['difficulty_level'],
                 'is_active' => $validated['is_active'] ?? true,
                 'created_by' => auth()->id(),
+                // ✅ FIXED: Always set deadline fields
+                'has_deadline' => true,  // ALWAYS TRUE
+                'deadline' => $validated['deadline'],  // ALWAYS SET (required in validation)
+                'deadline_type' => $validated['deadline_type'],  // ALWAYS SET (required in validation)
             ]);
 
             // Create modules and content
@@ -339,6 +344,7 @@ class CourseOnlineController extends Controller
 
         return $viewUrl;
     }
+
     /**
      * Display the specified course
      */
@@ -371,6 +377,13 @@ class CourseOnlineController extends Controller
                 'difficulty_level' => $courseOnline->difficulty_level,
                 'estimated_duration' => $courseOnline->estimated_duration,
                 'is_active' => $courseOnline->is_active,
+                // ✅ NEW: Include deadline information in show view
+                'has_deadline' => $courseOnline->has_deadline,
+                'deadline' => $courseOnline->deadline?->toDateTimeString(),
+                'deadline_type' => $courseOnline->deadline_type,
+                'deadline_status' => $courseOnline->deadline_status,
+                'days_until_deadline' => $courseOnline->daysUntilDeadline(),
+                'is_deadline_passed' => $courseOnline->isDeadlinePassed(),
                 'creator' => $courseOnline->creator ? [
                     'id' => $courseOnline->creator->id,
                     'name' => $courseOnline->creator->name,
@@ -409,6 +422,10 @@ class CourseOnlineController extends Controller
                     'assigned_at' => $assignment->assigned_at->toDateTimeString(),
                     'started_at' => $assignment->started_at?->toDateTimeString(),
                     'completed_at' => $assignment->completed_at?->toDateTimeString(),
+                    // ✅ NEW: Include assignment deadline info
+                    'deadline' => $assignment->deadline?->toDateTimeString(),
+                    'is_overdue' => $assignment->is_overdue,
+                    'days_until_deadline' => $assignment->daysUntilDeadline(),
                 ]),
                 'analytics' => [
                     'total_enrollments' => $analytics->total_enrollments,
@@ -424,7 +441,6 @@ class CourseOnlineController extends Controller
     /**
      * Show form for editing course
      */
-// ✅ ENHANCED: Edit function with PDF page count data
     public function edit(CourseOnline $courseOnline)
     {
         // Load course with all related data
@@ -473,6 +489,10 @@ class CourseOnlineController extends Controller
                 'difficulty_level' => $courseOnline->difficulty_level,
                 'estimated_duration' => $courseOnline->estimated_duration,
                 'is_active' => $courseOnline->is_active,
+                // ✅ NEW: Include deadline fields for editing
+                'has_deadline' => $courseOnline->has_deadline,
+                'deadline' => $courseOnline->deadline?->format('Y-m-d\TH:i'),
+                'deadline_type' => $courseOnline->deadline_type,
                 // ✅ NEW: Include modules with PDF page count data
                 'modules' => $courseOnline->modules->map(function($module) {
                     return [
@@ -534,7 +554,6 @@ class CourseOnlineController extends Controller
     /**
      * Update specified course
      */
-// ✅ ENHANCED: Update function with PDF page count support
     public function update(Request $request, CourseOnline $courseOnline)
     {
         $validated = $request->validate([
@@ -545,7 +564,10 @@ class CourseOnlineController extends Controller
             'difficulty_level' => 'required|in:beginner,intermediate,advanced',
             'is_active' => 'boolean',
             'remove_image' => 'boolean',
-            // ✅ NEW: Support for updating modules and content
+            // ✅ FIXED: Always required deadline validation
+            'deadline' => 'required|date|after:now',  // ALWAYS REQUIRED
+            'deadline_type' => 'required|in:flexible,strict',  // ALWAYS REQUIRED
+            // ✅ Support for updating modules and content
             'modules' => 'nullable|array',
             'modules.*.id' => 'nullable|exists:course_modules,id',
             'modules.*.name' => 'required|string|max:255',
@@ -562,7 +584,6 @@ class CourseOnlineController extends Controller
             'modules.*.content.*.video_id' => 'nullable|exists:videos,id',
             'modules.*.content.*.google_drive_pdf_url' => 'nullable|string|url',
             'modules.*.content.*.pdf_name' => 'nullable|string|max:255',
-            // ✅ NEW: PDF page count validation for updates
             'modules.*.content.*.pdf_page_count' => 'nullable|integer|min:1|max:1000',
         ]);
 
@@ -595,7 +616,7 @@ class CourseOnlineController extends Controller
                 $this->thumbnailService->generateMultipleThumbnails($imagePath);
             }
 
-            // Update course basic info
+            // ✅ FIXED: Update course basic info with always-set deadline
             $courseOnline->update([
                 'name' => $validated['name'],
                 'description' => $validated['description'],
@@ -603,9 +624,26 @@ class CourseOnlineController extends Controller
                 'estimated_duration' => $validated['estimated_duration'],
                 'difficulty_level' => $validated['difficulty_level'],
                 'is_active' => $validated['is_active'] ?? $courseOnline->is_active,
+                // ✅ FIXED: Always set deadline fields
+                'has_deadline' => true,  // ALWAYS TRUE
+                'deadline' => $validated['deadline'],  // ALWAYS SET (required in validation)
+                'deadline_type' => $validated['deadline_type'],  // ALWAYS SET (required in validation)
             ]);
 
-            // ✅ NEW: Handle modules and content updates if provided
+            // ✅ FIXED: Always update assignment deadlines (no conditional check)
+            $courseOnline->assignments()->update([
+                'deadline' => $validated['deadline']
+            ]);
+
+            Log::info('Updated assignment deadlines for course', [
+                'course_id' => $courseOnline->id,
+                'new_deadline' => $validated['deadline'],
+                'assignments_updated' => $courseOnline->assignments()->count()
+            ]);
+
+            // ✅ REMOVED: dd() debug statement
+
+            // ✅ Handle modules and content updates if provided
             if (isset($validated['modules']) && is_array($validated['modules'])) {
                 foreach ($validated['modules'] as $moduleIndex => $moduleData) {
                     // Update or create module
@@ -649,7 +687,7 @@ class CourseOnlineController extends Controller
                                 $contentFields['video_id'] = $contentData['video_id'];
                             }
 
-                            // ✅ ENHANCED: Handle PDF content updates with page count
+                            // ✅ Handle PDF content updates with page count
                             if ($contentData['content_type'] === 'pdf') {
                                 if (!empty($contentData['google_drive_pdf_url'])) {
                                     $processedUrl = $this->processGoogleDrivePdfUrl($contentData['google_drive_pdf_url']);
@@ -657,7 +695,7 @@ class CourseOnlineController extends Controller
                                     $contentFields['pdf_name'] = $contentData['pdf_name'] ?? 'PDF Document';
                                 }
 
-                                // ✅ NEW: Update PDF page count
+                                // ✅ Update PDF page count
                                 if (isset($contentData['pdf_page_count']) && $contentData['pdf_page_count'] > 0) {
                                     $contentFields['pdf_page_count'] = $contentData['pdf_page_count'];
                                     Log::info('Updating PDF page count', [
@@ -809,6 +847,14 @@ class CourseOnlineController extends Controller
                 'engagement_score' => $analytics->engagement_score,
                 'cheating_incidents' => $analytics->cheating_incidents_count,
                 'last_updated' => $analytics->last_calculated_at?->toDateTimeString(),
+                // ✅ NEW: Include deadline statistics
+                'deadline_info' => [
+                    'has_deadline' => $courseOnline->has_deadline,
+                    'deadline' => $courseOnline->deadline?->toDateTimeString(),
+                    'days_until_deadline' => $courseOnline->daysUntilDeadline(),
+                    'is_deadline_passed' => $courseOnline->isDeadlinePassed(),
+                    'overdue_assignments' => $courseOnline->assignments()->where('is_overdue', true)->count(),
+                ]
             ]
         ]);
     }
