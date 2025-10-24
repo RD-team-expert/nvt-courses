@@ -35,7 +35,10 @@ import {
     Settings,
     Zap,
     Target,
-    Brain
+    Brain,
+    Timer,
+    CalendarDays,
+    AlarmClock
 } from 'lucide-vue-next'
 
 interface Assignment {
@@ -47,6 +50,10 @@ interface Assignment {
     status: string
     progress_percentage: number
     created_at: string
+    deadline: string | null
+    completed_at: string | null
+    is_overdue: boolean
+
 }
 
 interface Module {
@@ -79,11 +86,48 @@ interface Course {
     avg_engagement?: number
     avg_study_time?: number
     success_prediction?: number
+    upcoming_deadlines_count: number
+    overdue_assignments_count: number
+    default_deadline_days: number | null
 }
 
 const props = defineProps<{
     course: Course
 }>()
+
+const currentTime = ref<Date>(new Date())
+const countdownInterval = ref<NodeJS.Timeout | null>(null)
+
+const upcomingDeadlines = computed(() => {
+    if (!props.course.assignments) return []
+
+    return props.course.assignments
+        .filter(assignment =>
+            assignment.deadline &&
+            !assignment.completed_at &&
+            new Date(assignment.deadline) > currentTime.value
+        )
+        .sort((a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime())
+        .slice(0, 5)
+})
+
+const overdueAssignments = computed(() => {
+    if (!props.course.assignments) return []
+
+    return props.course.assignments
+        .filter(assignment =>
+            assignment.deadline &&
+            !assignment.completed_at &&
+            new Date(assignment.deadline) < currentTime.value
+        )
+        .sort((a, b) => new Date(b.deadline!).getTime() - new Date(a.deadline!).getTime())
+})
+
+const deadlineStats = computed(() => ({
+    upcoming: upcomingDeadlines.value.length,
+    overdue: overdueAssignments.value.length,
+    total: props.course.assignments?.filter(a => a.deadline).length || 0
+}))
 
 // Breadcrumbs
 const breadcrumbs: BreadcrumbItemType[] = [
@@ -131,6 +175,59 @@ const formatDate = (dateString: string) => {
     })
 }
 
+const formatDeadline = (dateString: string): string => {
+    try {
+        return new Date(dateString).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        })
+    } catch {
+        return 'Invalid date'
+    }
+}
+
+const getTimeUntilDeadline = (deadline: string): string => {
+    const now = currentTime.value.getTime()
+    const deadlineTime = new Date(deadline).getTime()
+    const difference = deadlineTime - now
+
+    if (difference <= 0) return 'Overdue'
+
+    const days = Math.floor(difference / (1000 * 60 * 60 * 24))
+    const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+    const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60))
+
+    if (days > 0) return `${days}d ${hours}h`
+    if (hours > 0) return `${hours}h ${minutes}m`
+    return `${minutes}m`
+}
+
+const getDeadlineUrgency = (deadline: string): 'safe' | 'warning' | 'danger' | 'overdue' => {
+    const now = currentTime.value.getTime()
+    const deadlineTime = new Date(deadline).getTime()
+    const difference = deadlineTime - now
+    const hoursUntil = difference / (1000 * 60 * 60)
+
+    if (difference <= 0) return 'overdue'
+    if (hoursUntil <= 24) return 'danger'
+    if (hoursUntil <= 72) return 'warning'
+    return 'safe'
+}
+
+const getUrgencyBadgeVariant = (urgency: string): 'default' | 'secondary' | 'destructive' | 'outline' => {
+    switch (urgency) {
+        case 'overdue': return 'destructive'
+        case 'danger': return 'destructive'
+        case 'warning': return 'secondary'
+        case 'safe': return 'default'
+        default: return 'outline'
+    }
+}
+
+
 const toggleActiveStatus = () => {
     toggleLoading.value = true
     router.patch(route('admin.course-online.toggle-active', props.course.id), {}, {
@@ -139,6 +236,24 @@ const toggleActiveStatus = () => {
         }
     })
 }
+
+// Add imports at the top
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+
+// Add lifecycle hooks
+onMounted(() => {
+    // Update current time every minute for deadline countdowns
+    countdownInterval.value = setInterval(() => {
+        currentTime.value = new Date()
+    }, 60000) // Update every minute
+})
+
+onUnmounted(() => {
+    if (countdownInterval.value) {
+        clearInterval(countdownInterval.value)
+    }
+})
+
 
 const showAnalytics = () => {
     showAnalyticsModal.value = true
@@ -515,6 +630,161 @@ const showAnalytics = () => {
                 </div>
             </div>
         </div>
+        <!-- Quick Stats -->
+        <div class="px-8 py-6 bg-muted/30">
+            <div class="grid grid-cols-2 md:grid-cols-6 gap-6">
+                <!-- Existing stats -->
+                <div class="flex items-center space-x-3">
+                    <div class="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+                        <Layers class="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div>
+                        <div class="text-2xl font-bold text-foreground">{{ course.modules?.length || 0 }}</div>
+                        <div class="text-sm text-muted-foreground">Modules</div>
+                    </div>
+                </div>
+
+                <div class="flex items-center space-x-3">
+                    <div class="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
+                        <Users class="w-6 h-6 text-green-600 dark:text-green-400" />
+                    </div>
+                    <div>
+                        <div class="text-2xl font-bold text-foreground">{{ course.enrollment_count || 0 }}</div>
+                        <div class="text-sm text-muted-foreground">Enrolled</div>
+                    </div>
+                </div>
+
+                <div class="flex items-center space-x-3">
+                    <div class="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
+                        <BarChart3 class="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                    </div>
+                    <div>
+                        <div class="text-2xl font-bold text-foreground">{{ course.completion_rate || 0 }}%</div>
+                        <div class="text-sm text-muted-foreground">Completion</div>
+                    </div>
+                </div>
+
+                <div class="flex items-center space-x-3">
+                    <div class="w-12 h-12 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg flex items-center justify-center">
+                        <Clock class="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
+                    </div>
+                    <div>
+                        <div class="text-2xl font-bold text-foreground">{{ course.estimated_duration || 0 }}</div>
+                        <div class="text-sm text-muted-foreground">Minutes</div>
+                    </div>
+                </div>
+
+                <!-- New Deadline Stats -->
+                <div class="flex items-center space-x-3">
+                    <div class="w-12 h-12 bg-orange-100 dark:bg-orange-900/30 rounded-lg flex items-center justify-center">
+                        <Timer class="w-6 h-6 text-orange-600 dark:text-orange-400" />
+                    </div>
+                    <div>
+                        <div class="text-2xl font-bold text-foreground">{{ deadlineStats.upcoming }}</div>
+                        <div class="text-sm text-muted-foreground">Due Soon</div>
+                    </div>
+                </div>
+
+                <div class="flex items-center space-x-3">
+                    <div class="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center">
+                        <AlarmClock class="w-6 h-6 text-red-600 dark:text-red-400" />
+                    </div>
+                    <div>
+                        <div class="text-2xl font-bold text-foreground">{{ deadlineStats.overdue }}</div>
+                        <div class="text-sm text-muted-foreground">Overdue</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Deadline Alert Banner -->
+        <div v-if="deadlineStats.overdue > 0" class="mb-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-4">
+            <div class="flex items-center">
+                <AlarmClock class="h-5 w-5 text-red-400" />
+                <div class="ml-3">
+                    <h3 class="text-sm font-medium text-red-800 dark:text-red-200">
+                        Overdue Assignments Alert
+                    </h3>
+                    <p class="text-sm text-red-700 dark:text-red-300 mt-1">
+                        {{ deadlineStats.overdue }} assignment{{ deadlineStats.overdue === 1 ? '' : 's' }} are past their deadline and need attention.
+                    </p>
+                </div>
+            </div>
+        </div>
+        <!-- Deadline Management Card -->
+        <Card v-if="deadlineStats.upcoming > 0 || deadlineStats.overdue > 0">
+            <CardHeader>
+                <CardTitle class="flex items-center">
+                    <CalendarDays class="w-5 h-5 mr-2 text-orange-600" />
+                    Assignment Deadlines
+                </CardTitle>
+                <CardDescription>
+                    Upcoming and overdue assignment deadlines
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <!-- Overdue Assignments -->
+                <div v-if="overdueAssignments.length > 0" class="mb-6">
+                    <h4 class="text-sm font-semibold text-red-600 dark:text-red-400 mb-3 flex items-center">
+                        <AlertCircle class="w-4 h-4 mr-2" />
+                        Overdue Assignments ({{ overdueAssignments.length }})
+                    </h4>
+                    <div class="space-y-3">
+                        <div
+                            v-for="assignment in overdueAssignments.slice(0, 3)"
+                            :key="assignment.id"
+                            class="flex items-center justify-between p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800"
+                        >
+                            <div class="flex items-center space-x-3">
+                                <div class="w-8 h-8 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
+                                    <span class="text-red-600 dark:text-red-400 font-semibold text-xs">{{ assignment.user.name.charAt(0).toUpperCase() }}</span>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-medium text-foreground">{{ assignment.user.name }}</p>
+                                    <p class="text-xs text-muted-foreground">Due: {{ formatDeadline(assignment.deadline!) }}</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <Badge variant="destructive">
+                                    {{ getTimeUntilDeadline(assignment.deadline!) }}
+                                </Badge>
+                                <Progress :value="assignment.progress_percentage || 0" class="w-16 h-2" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Upcoming Deadlines -->
+                <div v-if="upcomingDeadlines.length > 0">
+                    <h4 class="text-sm font-semibold text-orange-600 dark:text-orange-400 mb-3 flex items-center">
+                        <Timer class="w-4 h-4 mr-2" />
+                        Upcoming Deadlines ({{ upcomingDeadlines.length }})
+                    </h4>
+                    <div class="space-y-3">
+                        <div
+                            v-for="assignment in upcomingDeadlines"
+                            :key="assignment.id"
+                            class="flex items-center justify-between p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800"
+                        >
+                            <div class="flex items-center space-x-3">
+                                <div class="w-8 h-8 bg-orange-100 dark:bg-orange-900/30 rounded-full flex items-center justify-center">
+                                    <span class="text-orange-600 dark:text-orange-400 font-semibold text-xs">{{ assignment.user.name.charAt(0).toUpperCase() }}</span>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-medium text-foreground">{{ assignment.user.name }}</p>
+                                    <p class="text-xs text-muted-foreground">Due: {{ formatDeadline(assignment.deadline!) }}</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <Badge :variant="getUrgencyBadgeVariant(getDeadlineUrgency(assignment.deadline!))">
+                                    {{ getTimeUntilDeadline(assignment.deadline!) }}
+                                </Badge>
+                                <Progress :value="assignment.progress_percentage || 0" class="w-16 h-2" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
 
         <!-- Analytics Modal -->
         <Dialog v-model:open="showAnalyticsModal">

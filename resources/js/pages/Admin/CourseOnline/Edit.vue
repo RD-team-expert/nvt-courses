@@ -54,6 +54,96 @@
                         <div v-if="form.errors.description" class="mt-2 text-sm text-red-600 dark:text-red-400">{{ form.errors.description }}</div>
                     </div>
 
+                    <!-- ✅ NEW: Course Deadline Section -->
+                    <div class="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
+                        <div class="flex items-center gap-2 mb-4">
+                            <svg class="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            <h3 class="text-lg font-semibold text-blue-900 dark:text-blue-200">Course Deadline</h3>
+                            <span class="bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300 text-xs font-medium px-2.5 py-0.5 rounded-full">Required</span>
+                        </div>
+                        <p class="text-sm text-blue-700 dark:text-blue-300 mb-4">
+                            Set a completion deadline for this course - all courses must have a deadline
+                        </p>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <!-- Deadline Date -->
+                            <div>
+                                <label for="deadline" class="block text-sm font-medium text-gray-700 dark:text-foreground mb-2">
+                                    Deadline Date & Time *
+                                </label>
+                                <input
+                                    id="deadline"
+                                    v-model="form.deadline"
+                                    type="datetime-local"
+                                    :min="deadlineMinDate"
+                                    required
+                                    class="w-full border border-gray-300 dark:border-border rounded-md px-4 py-3 bg-white dark:bg-background text-gray-900 dark:text-foreground focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
+                                    :class="{ 'border-red-500 dark:border-red-400': form.errors.deadline }"
+                                />
+                                <div v-if="form.errors.deadline" class="mt-2 text-sm text-red-600 dark:text-red-400">{{ form.errors.deadline }}</div>
+                                <div v-if="!form.deadline" class="mt-2 text-sm text-red-600 dark:text-red-400">
+                                    Course deadline is required for all courses
+                                </div>
+                            </div>
+
+                            <!-- Deadline Type -->
+                            <div>
+                                <label for="deadline_type" class="block text-sm font-medium text-gray-700 dark:text-foreground mb-2">
+                                    Deadline Type *
+                                </label>
+                                <select
+                                    id="deadline_type"
+                                    v-model="form.deadline_type"
+                                    required
+                                    class="w-full border border-gray-300 dark:border-border rounded-md px-4 py-3 bg-white dark:bg-background text-gray-900 dark:text-foreground focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
+                                    :class="{ 'border-red-500 dark:border-red-400': form.errors.deadline_type }"
+                                >
+                                    <option value="flexible">Flexible - Allow completion after deadline</option>
+                                    <option value="strict">Strict - Block access after deadline</option>
+                                </select>
+                                <div v-if="form.errors.deadline_type" class="mt-2 text-sm text-red-600 dark:text-red-400">{{ form.errors.deadline_type }}</div>
+                            </div>
+                        </div>
+
+                        <!-- ✅ NEW: Deadline Preview -->
+                        <div v-if="form.deadline && deadlinePreview" class="mt-4 p-4 bg-white dark:bg-background border border-blue-200 dark:border-blue-700 rounded-lg">
+                            <div class="flex items-start gap-3">
+                                <svg class="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <div class="flex-1">
+                                    <div class="font-medium text-blue-900 dark:text-blue-200">
+                                        📅 {{ deadlinePreview.formatted }}
+                                    </div>
+                                    <div class="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                                        ⏰ {{ deadlinePreview.relative }} days from now
+                                    </div>
+                                    <div class="text-xs text-gray-600 dark:text-muted-foreground mt-2">
+                                        Type: {{ form.deadline_type === 'flexible' ? 'Flexible (late completion allowed)' : 'Strict (access blocked after deadline)' }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ✅ NEW: Deadline Impact Notice -->
+                        <div class="mt-4 p-4 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                            <div class="flex items-start gap-2">
+                                <svg class="w-5 h-5 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                                </svg>
+                                <div class="text-sm">
+                                    <p class="font-medium text-yellow-800 dark:text-yellow-200">Important:</p>
+                                    <p class="text-yellow-700 dark:text-yellow-300 mt-1">
+                                        Course deadlines will be automatically applied to all existing course assignments.
+                                        Students will receive deadline notifications, and managers will be informed of deadline status in their reports.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Course Image -->
                     <div>
                         <label for="image" class="block text-sm font-medium text-gray-700 dark:text-foreground mb-2">
@@ -159,7 +249,7 @@
                         </Link>
                         <button
                             type="submit"
-                            :disabled="form.processing"
+                            :disabled="form.processing || !canSubmit"
                             class="px-6 py-3 border border-transparent rounded-md shadow-sm text-white bg-blue-600 dark:bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-offset-white dark:focus:ring-offset-background transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                         >
                             <svg v-if="form.processing" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -176,7 +266,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
 
 // Props from controller
@@ -191,23 +281,72 @@ const imageInput = ref(null)
 const imagePreview = ref(null)
 const imageChanged = ref(false)
 
-// Initialize form with existing course data
+// ✅ NEW: Initialize form with deadline fields
 const form = useForm({
     name: '',
     description: '',
     image: null,
     difficulty_level: '',
     estimated_duration: null,
-    is_active: true
+    is_active: true,
+    // ✅ NEW: Deadline fields
+    deadline: '',
+    deadline_type: 'flexible'
 })
 
-// Populate form with existing course data
+// ✅ NEW: Deadline computed properties
+const deadlineMinDate = computed(() => {
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    return tomorrow.toISOString().slice(0, 16)
+})
+
+const deadlinePreview = computed(() => {
+    if (!form.deadline) return null
+    const date = new Date(form.deadline)
+    return {
+        formatted: date.toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        }),
+        relative: Math.ceil((date.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+    }
+})
+
+// ✅ NEW: Form validation with deadline
+const canSubmit = computed(() => {
+    return form.name &&
+        form.difficulty_level &&
+        form.deadline &&           // ✅ NEW: Always require deadline
+        form.deadline_type
+})
+
+// ✅ ENHANCED: Populate form with existing course data including deadline
 onMounted(() => {
     form.name = props.course.name || ''
     form.description = props.course.description || ''
     form.difficulty_level = props.course.difficulty_level || ''
     form.estimated_duration = props.course.estimated_duration || null
     form.is_active = props.course.is_active ?? true
+
+    // ✅ NEW: Populate deadline fields
+    form.deadline_type = props.course.deadline_type || 'flexible'
+
+    // ✅ NEW: Format existing deadline for datetime-local input
+    if (props.course.deadline) {
+        const date = new Date(props.course.deadline)
+        // Convert to local datetime format (YYYY-MM-DDTHH:MM)
+        const year = date.getFullYear()
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const day = String(date.getDate()).padStart(2, '0')
+        const hours = String(date.getHours()).padStart(2, '0')
+        const minutes = String(date.getMinutes()).padStart(2, '0')
+        form.deadline = `${year}-${month}-${day}T${hours}:${minutes}`
+    }
 })
 
 const handleImageUpload = (event) => {

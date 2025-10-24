@@ -99,6 +99,9 @@ class CourseOnlineController extends Controller
                     ]);
                 }
 
+                // ✅ NEW: Calculate deadline information
+                $deadlineInfo = $this->calculateDeadlineInfo($assignment);
+
                 $assignmentData = [
                     'id' => $assignment->id,
                     'course' => [
@@ -111,12 +114,20 @@ class CourseOnlineController extends Controller
                         'difficulty_level' => $assignment->courseOnline->difficulty_level,
                         'estimated_duration' => $assignment->courseOnline->estimated_duration,
                         'modules_count' => $assignment->courseOnline->modules()->count(),
+                        // ✅ NEW: Add course deadline info
+                        'has_deadline' => $assignment->courseOnline->has_deadline,
+                        'deadline' => $assignment->courseOnline->deadline?->toDateTimeString(),
+                        'deadline_type' => $assignment->courseOnline->deadline_type,
                     ],
                     'status' => $assignment->status,
                     'progress_percentage' => $assignment->progress_percentage,
                     'assigned_at' => $assignment->created_at->toDateTimeString(),
                     'started_at' => $assignment->started_at?->toDateTimeString(),
                     'completed_at' => $assignment->completed_at?->toDateTimeString(),
+                    // ✅ NEW: Add assignment deadline info
+                    'deadline' => $assignment->deadline?->toDateTimeString(),
+                    'is_overdue' => $assignment->is_overdue ?? false,
+                    'deadline_info' => $deadlineInfo,
                     'current_module' => $assignment->currentModule ? [
                         'id' => $assignment->currentModule->id,
                         'name' => $assignment->currentModule->name,
@@ -137,6 +148,9 @@ class CourseOnlineController extends Controller
                     'final_progress' => $assignmentData['progress_percentage'],
                     'final_time_spent' => $assignmentData['time_spent'],
                     'status' => $assignmentData['status'],
+                    // ✅ NEW: Log deadline info
+                    'deadline_status' => $deadlineInfo['status'],
+                    'days_remaining' => $deadlineInfo['days_remaining'],
                 ]);
 
                 return $assignmentData;
@@ -158,6 +172,9 @@ class CourseOnlineController extends Controller
             'total_hours_spent' => $totalHours,
             'average_completion_rate' => $assignments->avg('progress_percentage') ?? 0,
             'certificates_earned' => $assignments->where('status', 'completed')->count(),
+            // ✅ NEW: Add deadline-related stats
+            'overdue_courses' => $assignments->where('deadline_info.status', 'overdue')->count(),
+            'due_soon_courses' => $assignments->where('deadline_info.status', 'due_soon')->count(),
         ];
 
         // ✅ DEBUG: Final dashboard stats
@@ -298,6 +315,9 @@ class CourseOnlineController extends Controller
             'formatted_time' => $this->formatTimeSpent($assignmentTimeSpent),
         ]);
 
+        // ✅ NEW: Calculate deadline info for course show
+        $deadlineInfo = $this->calculateDeadlineInfo($assignment);
+
         Log::info('=== USER COURSE SHOW DEBUG END ===');
 
         return Inertia::render('User/CourseOnline/Show', [
@@ -311,6 +331,10 @@ class CourseOnlineController extends Controller
                 'difficulty_level' => $courseOnline->difficulty_level,
                 'estimated_duration' => $courseOnline->estimated_duration,
                 'is_active' => $courseOnline->is_active,
+                // ✅ NEW: Add course deadline info
+                'has_deadline' => $courseOnline->has_deadline,
+                'deadline' => $courseOnline->deadline?->toDateTimeString(),
+                'deadline_type' => $courseOnline->deadline_type,
             ],
             'assignment' => [
                 'id' => $assignment->id,
@@ -321,12 +345,96 @@ class CourseOnlineController extends Controller
                 'current_module_id' => $assignment->current_module_id,
                 // ✅ DEBUG: Use calculated time
                 'time_spent' => $this->formatTimeSpent($assignmentTimeSpent),
+                // ✅ NEW: Add assignment deadline info
+                'deadline' => $assignment->deadline?->toDateTimeString(),
+                'is_overdue' => $assignment->is_overdue ?? false,
+                'deadline_info' => $deadlineInfo,
             ],
             'modules' => $modulesWithProgress,
         ]);
     }
 
     // ===== 🔍 HELPER METHODS WITH ENHANCED DEBUGGING =====
+
+    // ✅ NEW: Calculate deadline information for assignments
+    // ✅ FIXED: Calculate deadline information for assignments
+    private function calculateDeadlineInfo($assignment): array
+    {
+        if (!$assignment->deadline) {
+            return [
+                'status' => 'no_deadline',
+                'message' => 'No deadline set',
+                'days_remaining' => null,
+                'urgency_level' => 'none',
+                'formatted_deadline' => null,
+            ];
+        }
+
+        $now = now();
+        $deadline = $assignment->deadline;
+
+        // ✅ FIXED: Use floor() to get whole days only
+        $daysDiff = floor($now->diffInDays($deadline, false));
+
+        // Status determination
+        $status = 'upcoming';
+        $urgencyLevel = 'low';
+        $message = '';
+
+        if ($daysDiff < 0) {
+            $status = 'overdue';
+            $urgencyLevel = 'critical';
+            $message = 'Overdue by ' . abs($daysDiff) . ' day' . (abs($daysDiff) !== 1 ? 's' : '');
+        } elseif ($daysDiff == 0) {
+            $status = 'due_today';
+            $urgencyLevel = 'critical';
+            $message = 'Due today';
+        } elseif ($daysDiff == 1) {
+            $status = 'due_tomorrow';
+            $urgencyLevel = 'high';
+            $message = 'Due tomorrow';
+        } elseif ($daysDiff <= 3) {
+            $status = 'due_soon';
+            $urgencyLevel = 'high';
+            $message = 'Due in ' . $daysDiff . ' days';
+        } elseif ($daysDiff <= 7) {
+            $status = 'due_this_week';
+            $urgencyLevel = 'medium';
+            $message = 'Due in ' . $daysDiff . ' days';
+        } else {
+            $status = 'upcoming';
+            $urgencyLevel = 'low';
+            $message = 'Due in ' . $daysDiff . ' days';
+        }
+
+        return [
+            'status' => $status,
+            'message' => $message,
+            'days_remaining' => $daysDiff >= 0 ? $daysDiff : null,
+            'urgency_level' => $urgencyLevel,
+            'formatted_deadline' => $deadline->format('M d, Y H:i'),
+            'is_overdue' => $daysDiff < 0,
+            'time_remaining' => $this->formatTimeRemaining($daysDiff),
+        ];
+    }
+
+// ✅ FIXED: Format time remaining text with whole days
+    private function formatTimeRemaining($daysDiff): string
+    {
+        // ✅ FIXED: Convert to integer to avoid decimals
+        $days = intval($daysDiff);
+
+        if ($days < 0) {
+            return 'Overdue by ' . abs($days) . ' day' . (abs($days) !== 1 ? 's' : '');
+        } elseif ($days == 0) {
+            return 'Due today';
+        } elseif ($days == 1) {
+            return 'Due tomorrow';
+        } else {
+            return $days . ' day' . ($days !== 1 ? 's' : '') . ' remaining';
+        }
+    }
+
 
     /**
      * ✅ NEW: Calculate time spent for specific assignment/course
@@ -784,7 +892,9 @@ class CourseOnlineController extends Controller
             return redirect()->back()
                 ->with('error', 'Failed to complete course. Please try again.');
         }
-    }    private function getRecommendedCourses(int $userId, int $completedCourseId): array
+    }
+
+    private function getRecommendedCourses(int $userId, int $completedCourseId): array
     {
         try {
             // Get courses at similar or next difficulty level

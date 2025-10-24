@@ -48,7 +48,11 @@ import {
     RefreshCw,
     UserCheck,
     Trash2, // ✅ NEW: Delete icon
-    AlertTriangle // ✅ NEW: Warning icon
+    AlertTriangle, // ✅ NEW: Warning icon
+    Timer,
+    CalendarDays,
+    AlarmClock,
+    Calendar
 } from 'lucide-vue-next'
 
 interface Course {
@@ -72,7 +76,13 @@ interface Course {
     assignments_count: number
     completion_rate: number
     created_at: string
+    upcoming_deadlines_count?: number
+    overdue_assignments_count?: number
+    default_deadline_days?: number | null
+    next_deadline?: string | null
+    has_active_deadlines?: boolean
 }
+
 
 interface CoursesData {
     data: Course[]
@@ -94,6 +104,19 @@ const props = defineProps<{
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Online Courses', href: '#' }
 ]
+
+// ✅ ADD THESE DEADLINE COMPUTATIONS
+const totalUpcomingDeadlines = computed(() =>
+    props.courses.data.reduce((sum, course) => sum + (course.upcoming_deadlines_count || 0), 0)
+)
+
+const totalOverdueAssignments = computed(() =>
+    props.courses.data.reduce((sum, course) => sum + (course.overdue_assignments_count || 0), 0)
+)
+
+const coursesWithDeadlines = computed(() =>
+    props.courses.data.filter(course => course.has_active_deadlines).length
+)
 
 // State
 const searchQuery = ref('')
@@ -149,6 +172,43 @@ const filteredCourses = computed(() => {
 const truncateText = (text: string | null, maxLength: number): string => {
     if (!text) return ''
     return text.length > maxLength ? text.substring(0, maxLength) + '...' : text
+}
+
+// ✅ ADD THESE DEADLINE FUNCTIONS
+const formatDeadline = (dateString: string): string => {
+    try {
+        return new Date(dateString).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        })
+    } catch {
+        return 'Invalid date'
+    }
+}
+
+const getDeadlineUrgency = (deadline: string): 'safe' | 'warning' | 'danger' => {
+    const now = new Date().getTime()
+    const deadlineTime = new Date(deadline).getTime()
+    const hoursUntil = (deadlineTime - now) / (1000 * 60 * 60)
+
+    if (hoursUntil <= 24) return 'danger'
+    if (hoursUntil <= 72) return 'warning'
+    return 'safe'
+}
+
+const getUrgencyColor = (urgency: string): string => {
+    switch (urgency) {
+        case 'danger': return 'text-red-600 bg-red-50'
+        case 'warning': return 'text-orange-600 bg-orange-50'
+        case 'safe': return 'text-green-600 bg-green-50'
+        default: return 'text-gray-600 bg-gray-50'
+    }
+}
+
+const navigateToDeadlines = () => {
+    router.get('/admin/course-assignments/deadlines')
 }
 
 const getDifficultyColor = (level: string): string => {
@@ -257,9 +317,11 @@ const clearFilters = () => {
                         <RefreshCw class="mr-2 h-4 w-4" :class="{ 'animate-spin': isRefreshing }" />
                         Refresh
                     </Button>
+                    <!-- ✅ NEW: Deadline Management Button -->
+
                     <Button asChild variant="outline">
                         <Link href="/admin/course-assignments">
-                            <UserCheck class="mr-2 h-4 w-4" />
+                            <UserCheck class="mr-3 h-4 w-4" />
                             Course Assignments
                         </Link>
                     </Button>
@@ -272,58 +334,98 @@ const clearFilters = () => {
                 </div>
             </div>
 
-            <!-- Stats Cards -->
-            <div class="grid gap-4 md:grid-cols-4">
-                <Card>
-                    <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle class="text-sm font-medium">Total Courses</CardTitle>
-                        <BookOpen class="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div class="text-2xl font-bold">{{ courses.meta?.total || courses.data.length }}</div>
-                        <p class="text-xs text-muted-foreground">
-                            +{{ courses.data.filter(c => new Date(c.created_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).length }} this month
-                        </p>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle class="text-sm font-medium">Active Courses</CardTitle>
-                        <CheckCircle class="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div class="text-2xl font-bold">{{ activeCourses }}</div>
-                        <p class="text-xs text-muted-foreground">
-                            {{ Math.round((activeCourses / courses.data.length) * 100) || 0 }}% of total
-                        </p>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle class="text-sm font-medium">Total Enrollments</CardTitle>
-                        <Users class="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div class="text-2xl font-bold">{{ totalEnrollments }}</div>
-                        <p class="text-xs text-muted-foreground">
-                            Avg {{ Math.round(totalEnrollments / (courses.data.length || 1)) }} per course
-                        </p>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle class="text-sm font-medium">Avg. Completion</CardTitle>
-                        <TrendingUp class="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div class="text-2xl font-bold">{{ averageCompletion }}%</div>
-                        <Progress :value="averageCompletion" class="mt-2" />
-                    </CardContent>
-                </Card>
+            <!-- ✅ NEW: Deadline Alert Banner -->
+            <div v-if="totalOverdueAssignments > 0" class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <AlarmClock class="h-5 w-5 text-red-500 mr-3" />
+                        <div>
+                            <h3 class="text-sm font-medium text-red-800 dark:text-red-200">
+                                Overdue Assignments Alert
+                            </h3>
+                            <p class="text-sm text-red-600 dark:text-red-300">
+                                {{ totalOverdueAssignments }} assignment{{ totalOverdueAssignments === 1 ? '' : 's' }} are past deadline
+                            </p>
+                        </div>
+                    </div>
+                    <Button @click="navigateToDeadlines" variant="outline" size="sm" class="border-red-200 text-red-700 hover:bg-red-100">
+                        <CalendarDays class="h-4 w-4 mr-2" />
+                        Manage Deadlines
+                    </Button>
+                </div>
             </div>
+
+
+            <!-- Stats Cards -->
+            <!-- Stats Cards -->
+<!--            <div class="grid gap-4 md:grid-cols-5">-->
+<!--                <Card>-->
+<!--                    <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">-->
+<!--                        <CardTitle class="text-sm font-medium">Total Courses</CardTitle>-->
+<!--                        <BookOpen class="h-4 w-4 text-muted-foreground" />-->
+<!--                    </CardHeader>-->
+<!--                    <CardContent>-->
+<!--                        <div class="text-2xl font-bold">{{ courses.meta?.total || courses.data.length }}</div>-->
+<!--                        <p class="text-xs text-muted-foreground">-->
+<!--                            +{{ courses.data.filter(c => new Date(c.created_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).length }} this month-->
+<!--                        </p>-->
+<!--                    </CardContent>-->
+<!--                </Card>-->
+
+<!--                <Card>-->
+<!--                    <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">-->
+<!--                        <CardTitle class="text-sm font-medium">Active Courses</CardTitle>-->
+<!--                        <CheckCircle class="h-4 w-4 text-muted-foreground" />-->
+<!--                    </CardHeader>-->
+<!--                    <CardContent>-->
+<!--                        <div class="text-2xl font-bold">{{ activeCourses }}</div>-->
+<!--                        <p class="text-xs text-muted-foreground">-->
+<!--                            {{ Math.round((activeCourses / courses.data.length) * 100) || 0 }}% of total-->
+<!--                        </p>-->
+<!--                    </CardContent>-->
+<!--                </Card>-->
+
+<!--                <Card>-->
+<!--                    <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">-->
+<!--                        <CardTitle class="text-sm font-medium">Total Enrollments</CardTitle>-->
+<!--                        <Users class="h-4 w-4 text-muted-foreground" />-->
+<!--                    </CardHeader>-->
+<!--                    <CardContent>-->
+<!--                        <div class="text-2xl font-bold">{{ totalEnrollments }}</div>-->
+<!--                        <p class="text-xs text-muted-foreground">-->
+<!--                            Avg {{ Math.round(totalEnrollments / (courses.data.length || 1)) }} per course-->
+<!--                        </p>-->
+<!--                    </CardContent>-->
+<!--                </Card>-->
+
+<!--                &lt;!&ndash; ✅ NEW: Upcoming Deadlines Card &ndash;&gt;-->
+<!--                <Card>-->
+<!--                    <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">-->
+<!--                        <CardTitle class="text-sm font-medium">Due Soon</CardTitle>-->
+<!--                        <Timer class="h-4 w-4 text-orange-500" />-->
+<!--                    </CardHeader>-->
+<!--                    <CardContent>-->
+<!--                        <div class="text-2xl font-bold text-orange-600">{{ totalUpcomingDeadlines }}</div>-->
+<!--                        <p class="text-xs text-muted-foreground">-->
+<!--                            {{ coursesWithDeadlines }} courses with deadlines-->
+<!--                        </p>-->
+<!--                    </CardContent>-->
+<!--                </Card>-->
+
+<!--                &lt;!&ndash; ✅ NEW: Overdue Assignments Card &ndash;&gt;-->
+<!--                <Card>-->
+<!--                    <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">-->
+<!--                        <CardTitle class="text-sm font-medium">Overdue</CardTitle>-->
+<!--                        <AlarmClock class="h-4 w-4 text-red-500" />-->
+<!--                    </CardHeader>-->
+<!--                    <CardContent>-->
+<!--                        <div class="text-2xl font-bold text-red-600">{{ totalOverdueAssignments }}</div>-->
+<!--                        <p class="text-xs text-muted-foreground">-->
+<!--                            Need immediate attention-->
+<!--                        </p>-->
+<!--                    </CardContent>-->
+<!--                </Card>-->
+<!--            </div>-->
 
             <!-- Filters -->
             <Card>
@@ -401,7 +503,7 @@ const clearFilters = () => {
                             ? 'Try adjusting your filters'
                             : 'Get started by creating your first online course' }}
                         </p>
-                        <Button asChild v-if="!searchQuery && statusFilter === 'all' && levelFilter === 'all'">
+                        <Button as-child v-if="!searchQuery && statusFilter === 'all' && levelFilter === 'all'">
                             <Link :href="route('admin.course-online.create')">
                                 <Plus class="mr-2 h-4 w-4" />
                                 Create Course
@@ -436,38 +538,37 @@ const clearFilters = () => {
                                         </div>
                                     </div>
 
-                                    <!-- ✅ ENHANCED: Actions Dropdown with Delete -->
+                                    <!-- Actions Dropdown -->
                                     <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
+                                        <DropdownMenuTrigger as-child>
                                             <Button variant="ghost" size="sm">
                                                 <MoreHorizontal class="h-4 w-4" />
                                             </Button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end">
-                                            <DropdownMenuItem asChild>
+                                            <DropdownMenuItem as-child>
                                                 <Link :href="route('admin.course-online.show', course.id)">
                                                     <Eye class="mr-2 h-4 w-4" />
                                                     View Details
                                                 </Link>
                                             </DropdownMenuItem>
-                                            <DropdownMenuItem asChild>
+                                            <DropdownMenuItem as-child>
                                                 <Link :href="route('admin.course-modules.index', course.id)">
                                                     <Settings class="mr-2 h-4 w-4" />
                                                     Manage Modules
                                                 </Link>
                                             </DropdownMenuItem>
-                                            <DropdownMenuItem asChild>
+                                            <DropdownMenuItem as-child>
                                                 <Link :href="route('admin.course-online.edit', course.id)">
                                                     <Edit class="mr-2 h-4 w-4" />
                                                     Edit Course
                                                 </Link>
                                             </DropdownMenuItem>
                                             <DropdownMenuSeparator />
-                                            <!-- ✅ NEW: Delete option -->
                                             <DropdownMenuItem
                                                 @click="confirmDelete(course)"
                                                 :disabled="!canDeleteCourse(course)"
-                                                class="text-red-600 focus:text-red-600 focus:bg-red-50"
+                                                class="text-red-600 focus:text-red-600 focus:bg-red-50 dark:text-red-400 dark:focus:text-red-300 dark:focus:bg-red-950/20"
                                             >
                                                 <Trash2 class="mr-2 h-4 w-4" />
                                                 Delete Course
@@ -479,16 +580,20 @@ const clearFilters = () => {
 
                             <CardContent class="space-y-4">
                                 <!-- Course Badges -->
-                                <div class="flex items-center gap-2">
+                                <div class="flex items-center gap-2 flex-wrap">
                                     <Badge :class="getDifficultyColor(course.difficulty_level)">
                                         {{ course.difficulty_level }}
                                     </Badge>
                                     <Badge :variant="course.is_active ? 'default' : 'secondary'">
                                         {{ course.is_active ? 'Active' : 'Inactive' }}
                                     </Badge>
-                                    <!-- ✅ NEW: Show if course has enrollments -->
-                                    <Badge v-if="course.assignments_count > 0" variant="outline" class="text-orange-600">
+                                    <Badge v-if="course.assignments_count > 0" variant="outline" class="text-orange-600 border-orange-600/50 dark:text-orange-400 dark:border-orange-400/50">
                                         {{ course.assignments_count }} enrolled
+                                    </Badge>
+                                    <!-- ✅ FIXED: Deadline Badge with dark mode -->
+                                    <Badge v-if="course.has_deadline" variant="outline" class="text-blue-600 border-blue-600/50 dark:text-blue-400 dark:border-blue-400/50 bg-blue-50/50 dark:bg-blue-950/20">
+                                        <Calendar class="mr-1 h-3 w-3" />
+                                        Deadline Set
                                     </Badge>
                                 </div>
 
@@ -505,6 +610,66 @@ const clearFilters = () => {
                                     <div>
                                         <div class="text-lg font-bold">{{ Math.round(course.completion_rate) }}%</div>
                                         <div class="text-xs text-muted-foreground">Completion</div>
+                                    </div>
+                                </div>
+
+                                <!-- ✅ FIXED: Course Deadline Information with proper dark mode -->
+                                <div v-if="course.has_deadline" class="mt-4 p-3 rounded-lg border"
+                                     :class="{
+                             'bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-800': course.overdue_assignments_count > 0,
+                             'bg-orange-50 border-orange-200 dark:bg-orange-950/30 dark:border-orange-800': course.upcoming_deadlines_count > 0 && !course.overdue_assignments_count,
+                             'bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800': !course.overdue_assignments_count && !course.upcoming_deadlines_count
+                         }">
+                                    <div class="flex items-center justify-between text-sm mb-2">
+                                        <div class="flex items-center gap-2">
+                                            <Calendar class="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                            <span class="font-medium text-foreground">Course Deadline:</span>
+                                        </div>
+                                        <span class="text-xs px-2 py-1 rounded-full border font-medium" :class="{
+                                'text-red-700 bg-red-100 border-red-300 dark:text-red-300 dark:bg-red-900/50 dark:border-red-700': course.overdue_assignments_count > 0,
+                                'text-orange-700 bg-orange-100 border-orange-300 dark:text-orange-300 dark:bg-orange-900/50 dark:border-orange-700': course.upcoming_deadlines_count > 0 && !course.overdue_assignments_count,
+                                'text-blue-700 bg-blue-100 border-blue-300 dark:text-blue-300 dark:bg-blue-900/50 dark:border-blue-700': !course.overdue_assignments_count && !course.upcoming_deadlines_count
+                            }">
+                                {{ course.deadline_type === 'strict' ? 'Strict' : 'Flexible' }}
+                            </span>
+                                    </div>
+
+                                    <!-- Course Default Deadline -->
+                                    <div v-if="course.deadline" class="text-sm mb-2 text-muted-foreground">
+                                        📅 {{ formatDeadline(course.deadline) }}
+                                    </div>
+
+                                    <!-- Assignment Status Summary -->
+                                    <div v-if="course.assignments_count > 0" class="space-y-1">
+                                        <div v-if="course.overdue_assignments_count > 0" class="flex items-center gap-2 p-2 rounded-md bg-red-100/70 border border-red-200 dark:bg-red-900/30 dark:border-red-700">
+                                            <AlarmClock class="h-3 w-3 text-red-600 dark:text-red-400" />
+                                            <span class="text-xs text-red-700 dark:text-red-300 font-medium">
+                                    {{ course.overdue_assignments_count }} overdue assignment{{ course.overdue_assignments_count !== 1 ? 's' : '' }}
+                                </span>
+                                        </div>
+                                        <div v-if="course.upcoming_deadlines_count > 0" class="flex items-center gap-2 p-2 rounded-md bg-orange-100/70 border border-orange-200 dark:bg-orange-900/30 dark:border-orange-700">
+                                            <Timer class="h-3 w-3 text-orange-600 dark:text-orange-400" />
+                                            <span class="text-xs text-orange-700 dark:text-orange-300 font-medium">
+                                    {{ course.upcoming_deadlines_count }} due soon
+                                </span>
+                                        </div>
+                                        <div v-if="!course.overdue_assignments_count && !course.upcoming_deadlines_count" class="flex items-center gap-2 p-2 rounded-md bg-green-100/70 border border-green-200 dark:bg-green-900/30 dark:border-green-700">
+                                            <CheckCircle class="h-3 w-3 text-green-600 dark:text-green-400" />
+                                            <span class="text-xs text-green-700 dark:text-green-300">✅ All assignments on track</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- No Assignments Message -->
+                                    <div v-else class="text-xs text-muted-foreground p-2 rounded-md bg-muted/30 border border-muted-foreground/20">
+                                        No active assignments
+                                    </div>
+                                </div>
+
+                                <!-- ✅ FIXED: No Deadline Information with dark mode -->
+                                <div v-else class="mt-4 p-3 rounded-lg bg-gray-50 border border-gray-200 dark:bg-muted/20 dark:border-muted-foreground/20">
+                                    <div class="flex items-center gap-2 text-sm text-gray-600 dark:text-muted-foreground">
+                                        <CalendarDays class="h-4 w-4" />
+                                        <span>No deadline set for this course</span>
                                     </div>
                                 </div>
 
@@ -528,13 +693,13 @@ const clearFilters = () => {
 
                                 <!-- Action Buttons -->
                                 <div class="flex gap-2 pt-2">
-                                    <Button asChild size="sm" class="flex-1">
+                                    <Button as-child size="sm" class="flex-1">
                                         <Link :href="route('admin.course-online.show', course.id)">
                                             <Eye class="mr-2 h-4 w-4" />
                                             View
                                         </Link>
                                     </Button>
-                                    <Button asChild variant="outline" size="sm" class="flex-1">
+                                    <Button as-child variant="outline" size="sm" class="flex-1">
                                         <Link :href="route('admin.course-modules.index', course.id)">
                                             <Settings class="mr-2 h-4 w-4" />
                                             Modules
@@ -557,83 +722,153 @@ const clearFilters = () => {
                                     <TableHead>Modules</TableHead>
                                     <TableHead>Enrolled</TableHead>
                                     <TableHead>Completion</TableHead>
+                                    <!-- ✅ Deadline Column -->
+                                    <TableHead>Deadline Status</TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead>Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 <TableRow v-for="course in filteredCourses" :key="course.id">
+                                    <!-- Course Name & Image -->
                                     <TableCell>
                                         <div class="flex items-center gap-3">
-                                            <Avatar class="h-10 w-10">
+                                            <Avatar class="h-8 w-8">
                                                 <AvatarImage
                                                     v-if="course.image_path"
                                                     :src="course.thumbnails?.small || course.image_path"
                                                     :alt="course.name"
                                                 />
                                                 <AvatarFallback>
-                                                    <BookOpen class="h-5 w-5" />
+                                                    <BookOpen class="h-4 w-4" />
                                                 </AvatarFallback>
                                             </Avatar>
                                             <div>
                                                 <div class="font-medium">{{ course.name }}</div>
                                                 <div class="text-sm text-muted-foreground">
-                                                    {{ truncateText(course.description, 40) }}
+                                                    {{ truncateText(course.description, 50) }}
                                                 </div>
                                             </div>
                                         </div>
                                     </TableCell>
+
+                                    <!-- Difficulty Level -->
                                     <TableCell>
                                         <Badge :class="getDifficultyColor(course.difficulty_level)">
                                             {{ course.difficulty_level }}
                                         </Badge>
                                     </TableCell>
+
+                                    <!-- Modules Count -->
                                     <TableCell>{{ course.modules_count }}</TableCell>
-                                    <TableCell>
-                                        <div class="flex items-center gap-2">
-                                            <span>{{ course.assignments_count }}</span>
-                                            <AlertTriangle v-if="course.assignments_count > 0" class="h-4 w-4 text-orange-500" title="Has enrolled students" />
-                                        </div>
-                                    </TableCell>
+
+                                    <!-- Enrolled Count -->
+                                    <TableCell>{{ course.assignments_count }}</TableCell>
+
+                                    <!-- Completion Progress -->
                                     <TableCell>
                                         <div class="flex items-center gap-2">
                                             <Progress :value="course.completion_rate" class="w-16" />
                                             <span class="text-sm">{{ Math.round(course.completion_rate) }}%</span>
                                         </div>
                                     </TableCell>
+
+                                    <!-- ✅ FIXED: Deadline Status Cell with proper dark mode -->
+                                    <TableCell>
+                                        <div class="space-y-1">
+                                            <!-- Course has deadline -->
+                                            <div v-if="course.has_deadline">
+                                                <!-- Course deadline info -->
+                                                <div class="flex items-center gap-1 text-xs">
+                                                    <Calendar class="h-3 w-3 text-blue-600 dark:text-blue-400" />
+                                                    <span class="text-blue-700 dark:text-blue-300 font-medium">
+                                            {{ course.deadline ? formatDeadline(course.deadline) : 'Set' }}
+                                        </span>
+                                                    <span class="text-xs px-1.5 py-0.5 rounded-full text-muted-foreground bg-muted/40 border border-muted-foreground/20">
+                                            {{ course.deadline_type === 'strict' ? 'Strict' : 'Flexible' }}
+                                        </span>
+                                                </div>
+
+                                                <!-- Assignment status if any exist -->
+                                                <div v-if="course.assignments_count > 0" class="space-y-1">
+                                                    <!-- Overdue assignments -->
+                                                    <div v-if="course.overdue_assignments_count > 0" class="flex items-center gap-1">
+                                                        <AlarmClock class="h-3 w-3 text-red-600 dark:text-red-400" />
+                                                        <span class="text-xs text-red-700 dark:text-red-300 font-medium">
+                                                {{ course.overdue_assignments_count }} overdue
+                                            </span>
+                                                    </div>
+
+                                                    <!-- Due soon assignments -->
+                                                    <div v-if="course.upcoming_deadlines_count > 0" class="flex items-center gap-1">
+                                                        <Timer class="h-3 w-3 text-orange-600 dark:text-orange-400" />
+                                                        <span class="text-xs text-orange-700 dark:text-orange-300 font-medium">
+                                                {{ course.upcoming_deadlines_count }} due soon
+                                            </span>
+                                                    </div>
+
+                                                    <!-- All on track -->
+                                                    <div v-if="!course.overdue_assignments_count && !course.upcoming_deadlines_count"
+                                                         class="flex items-center gap-1">
+                                                        <CheckCircle class="h-3 w-3 text-green-600 dark:text-green-400" />
+                                                        <span class="text-xs text-green-700 dark:text-green-300">On track</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <!-- No deadline set -->
+                                            <div v-else class="flex items-center gap-1">
+                                                <CalendarDays class="h-3 w-3 text-gray-500 dark:text-muted-foreground" />
+                                                <span class="text-xs text-gray-600 dark:text-muted-foreground">No deadline</span>
+                                            </div>
+                                        </div>
+                                    </TableCell>
+
+                                    <!-- Course Active Status -->
                                     <TableCell>
                                         <Badge :variant="course.is_active ? 'default' : 'secondary'">
                                             {{ course.is_active ? 'Active' : 'Inactive' }}
                                         </Badge>
                                     </TableCell>
+
+                                    <!-- Actions -->
                                     <TableCell>
-                                        <div class="flex items-center gap-2">
-                                            <Button asChild size="sm" variant="outline">
-                                                <Link :href="route('admin.course-online.show', course.id)">
-                                                    <Eye class="h-4 w-4" />
-                                                </Link>
-                                            </Button>
-                                            <Button asChild size="sm" variant="outline">
-                                                <Link :href="route('admin.course-modules.index', course.id)">
-                                                    <Settings class="h-4 w-4" />
-                                                </Link>
-                                            </Button>
-                                            <Button asChild size="sm" variant="outline">
-                                                <Link :href="route('admin.course-online.edit', course.id)">
-                                                    <Edit class="h-4 w-4" />
-                                                </Link>
-                                            </Button>
-                                            <!-- ✅ NEW: Delete button in table -->
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                @click="confirmDelete(course)"
-                                                :disabled="!canDeleteCourse(course)"
-                                                class="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                            >
-                                                <Trash2 class="h-4 w-4" />
-                                            </Button>
-                                        </div>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger as-child>
+                                                <Button variant="ghost" size="sm">
+                                                    <MoreHorizontal class="h-4 w-4" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end">
+                                                <DropdownMenuItem as-child>
+                                                    <Link :href="route('admin.course-online.show', course.id)">
+                                                        <Eye class="mr-2 h-4 w-4" />
+                                                        View Details
+                                                    </Link>
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem as-child>
+                                                    <Link :href="route('admin.course-modules.index', course.id)">
+                                                        <Settings class="mr-2 h-4 w-4" />
+                                                        Manage Modules
+                                                    </Link>
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem as-child>
+                                                    <Link :href="route('admin.course-online.edit', course.id)">
+                                                        <Edit class="mr-2 h-4 w-4" />
+                                                        Edit Course
+                                                    </Link>
+                                                </DropdownMenuItem>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem
+                                                    @click="confirmDelete(course)"
+                                                    :disabled="!canDeleteCourse(course)"
+                                                    class="text-red-600 focus:text-red-600 focus:bg-red-50 dark:text-red-400 dark:focus:text-red-300 dark:focus:bg-red-950/20"
+                                                >
+                                                    <Trash2 class="mr-2 h-4 w-4" />
+                                                    Delete Course
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
                                     </TableCell>
                                 </TableRow>
                             </TableBody>
