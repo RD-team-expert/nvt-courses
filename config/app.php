@@ -65,8 +65,7 @@ return [
     |
     */
 
-    'timezone' => 'UTC',
-
+    'timezone' => 'America/New_York',  // This handles EDT (-4) in summer and EST (-5) in winter
     /*
     |--------------------------------------------------------------------------
     | Application Locale Configuration

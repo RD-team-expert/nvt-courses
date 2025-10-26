@@ -3,8 +3,9 @@
   Interface for listing, managing, and paginating users with CRUD operations
 -->
 <script setup lang="ts">
-import { defineProps } from 'vue'
-import { Link, router } from '@inertiajs/vue3'
+import { defineProps, ref, watch } from 'vue'
+import { Link, router, usePage } from '@inertiajs/vue3'
+import { debounce } from 'lodash'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import { type BreadcrumbItemType } from '@/types'
 import Pagination from '@/components/Pagination.vue'
@@ -20,6 +21,7 @@ import {
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Input } from '@/components/ui/input'
 import {
     AlertDialog,
     AlertDialogAction,
@@ -37,18 +39,46 @@ import {
     Edit,
     Trash2,
     ChevronLeft,
-    ChevronRight
+    ChevronRight,
+    Search,
+    X
 } from 'lucide-vue-next'
 
 const props = defineProps({
     users: Object, // Changed from Array to Object to support pagination
+    search: String, // Add search prop
 })
+
+// Get search value from props or page props
+const page = usePage()
+const searchTerm = ref(props.search || page.props.search || '')
 
 // Define breadcrumbs
 const breadcrumbs: BreadcrumbItemType[] = [
     { name: 'Dashboard', href: route('dashboard') },
     { name: 'User Management', href: route('admin.users.index') }
 ]
+
+// Debounced search function
+const performSearch = debounce((searchValue: string) => {
+    router.get(route('admin.users.index'), {
+        search: searchValue || undefined, // Don't send empty search params
+    }, {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+    })
+}, 500)
+
+// Watch for search term changes
+watch(searchTerm, (newValue) => {
+    performSearch(newValue)
+})
+
+// Clear search function
+const clearSearch = () => {
+    searchTerm.value = ''
+}
 
 function confirmDelete(e) {
     if (!confirm('Are you sure you want to delete this user?')) {
@@ -73,7 +103,8 @@ const deleteUser = (userId: number) => {
 // Handle pagination
 const handlePageChange = (page) => {
     router.get(route('admin.users.index'), {
-        page
+        page,
+        search: searchTerm.value || undefined, // Preserve search when paginating
     }, {
         preserveState: true,
         replace: true,
@@ -111,6 +142,34 @@ const getUserInitials = (name: string) => {
                     Create New User
                 </Button>
             </div>
+
+            <!-- Search Bar -->
+            <Card>
+                <CardContent class="pt-6">
+                    <div class="relative max-w-md">
+                        <Search class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            v-model="searchTerm"
+                            type="text"
+                            placeholder="Search users by name, email, or role..."
+                            class="pl-10 pr-10"
+                        />
+                        <Button
+                            v-if="searchTerm"
+                            @click="clearSearch"
+                            variant="ghost"
+                            size="sm"
+                            class="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 hover:bg-muted"
+                        >
+                            <X class="h-4 w-4" />
+                        </Button>
+                    </div>
+                    <div v-if="searchTerm" class="text-sm text-muted-foreground mt-2">
+                        Searching for: "{{ searchTerm }}"
+                        <span v-if="users?.total !== undefined"> - {{ users.total }} result(s) found</span>
+                    </div>
+                </CardContent>
+            </Card>
 
             <!-- Users Table -->
             <Card>
@@ -205,12 +264,21 @@ const getUserInitials = (name: string) => {
                         <!-- Empty state -->
                         <div v-if="!users.data || users.data.length === 0" class="text-center py-12">
                             <Users class="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                            <h3 class="text-lg font-medium text-foreground mb-2">No users found</h3>
-                            <p class="text-sm text-muted-foreground mb-6">Get started by creating your first user</p>
-                            <Button :as="Link" href="/admin/users/create">
-                                <UserPlus class="mr-2 h-4 w-4" />
-                                Create New User
-                            </Button>
+                            <h3 class="text-lg font-medium text-foreground mb-2">
+                                {{ searchTerm ? 'No users found matching your search' : 'No users found' }}
+                            </h3>
+                            <p class="text-sm text-muted-foreground mb-6">
+                                {{ searchTerm ? 'Try adjusting your search terms' : 'Get started by creating your first user' }}
+                            </p>
+                            <div class="space-x-2">
+                                <Button v-if="searchTerm" @click="clearSearch" variant="outline">
+                                    Clear Search
+                                </Button>
+                                <Button :as="Link" href="/admin/users/create">
+                                    <UserPlus class="mr-2 h-4 w-4" />
+                                    Create New User
+                                </Button>
+                            </div>
                         </div>
                     </div>
 
@@ -218,11 +286,9 @@ const getUserInitials = (name: string) => {
                     <div v-if="users.data && users.data.length > 0" class="flex justify-between items-center pt-4 border-t">
                         <Button
                             v-if="users.prev_page_url"
-                            :as="Link"
-                            :href="users.prev_page_url"
+                            @click="handlePageChange(users.current_page - 1)"
                             variant="outline"
                             size="sm"
-                            preserve-scroll
                         >
                             <ChevronLeft class="mr-2 h-4 w-4" />
                             Previous
@@ -239,21 +305,20 @@ const getUserInitials = (name: string) => {
 
                         <!-- Pagination info -->
                         <div class="text-sm text-muted-foreground hidden sm:block">
-              <span v-if="users.from && users.to && users.total">
-                Showing {{ users.from }} to {{ users.to }} of {{ users.total }} users
-              </span>
+                            <span v-if="users.from && users.to && users.total">
+                                Showing {{ users.from }} to {{ users.to }} of {{ users.total }} users
+                                <span v-if="searchTerm">(filtered)</span>
+                            </span>
                             <span v-else-if="users.data">
-                {{ users.data.length }} users
-              </span>
+                                {{ users.data.length }} users
+                            </span>
                         </div>
 
                         <Button
                             v-if="users.next_page_url"
-                            :as="Link"
-                            :href="users.next_page_url"
+                            @click="handlePageChange(users.current_page + 1)"
                             variant="outline"
                             size="sm"
-                            preserve-scroll
                         >
                             Next
                             <ChevronRight class="ml-2 h-4 w-4" />
@@ -268,17 +333,6 @@ const getUserInitials = (name: string) => {
                             <ChevronRight class="ml-2 h-4 w-4" />
                         </Button>
                     </div>
-
-                    <!-- Original pagination component (optional - you can remove if not needed) -->
-                    <Pagination
-                        v-if="false && users.data && users.data.length > 0"
-                        :links="users.links"
-                        @page-changed="handlePageChange"
-                        class="mt-4"
-                    />
-
-                    <!-- Debug pagination data -->
-                    <pre v-if="false" class="text-xs mt-2">{{ JSON.stringify(users, null, 2) }}</pre>
                 </CardContent>
             </Card>
         </div>

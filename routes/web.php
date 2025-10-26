@@ -26,9 +26,11 @@ use App\Http\Controllers\Admin\VideoCategoryController;
 use App\Http\Controllers\Api\ProgressController;
 use App\Http\Controllers\AudioController;
 use App\Http\Controllers\AuthVaiEmailController;
+use App\Http\Controllers\BugReportController;
 use App\Http\Controllers\ClockingController;
 use App\Http\Controllers\CourseController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\EmployeeFeedbackController;
 use App\Http\Controllers\GeminiController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\User\ContentViewController;
@@ -49,7 +51,7 @@ use Illuminate\Support\Facades\Route;
 Route::get('/test-websocket-admin/{assignmentId}', function($assignmentId) {
     $assignment = \App\Models\CourseOnlineAssignment::with(['user', 'courseOnline'])
         ->find($assignmentId);
-        
+
     if (!$assignment) {
         return response()->json(['error' => 'Assignment not found']);
     }
@@ -58,7 +60,7 @@ Route::get('/test-websocket-admin/{assignmentId}', function($assignmentId) {
     $content = \App\Models\ModuleContent::whereHas('module', function($query) use ($assignment) {
         $query->where('course_online_id', $assignment->course_online_id);
     })->first();
-    
+
     if (!$content) {
         return response()->json(['error' => 'No content found for this assignment']);
     }
@@ -185,6 +187,9 @@ Route::middleware('auth')->group(function () {
 
 Route::middleware(['auth'])->group(function () {
 
+    Route::get('/feedback', [EmployeeFeedbackController::class, 'create'])->name('feedback.create');
+    Route::post('/feedback', [EmployeeFeedbackController::class, 'store'])->name('feedback.store');
+    Route::get('/my-feedback', [EmployeeFeedbackController::class, 'myFeedback'])->name('feedback.my');
 
     // Content session management
     Route::post('/content/{content}/session', [ContentViewController::class, 'manageSession'])->name('content.session');
@@ -355,6 +360,18 @@ Route::middleware(['auth'])->prefix('manager')->name('manager.')->group(function
 // ==========================================
 
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
+
+
+    // Employee Feedback Management
+    Route::get('/feedback', [EmployeeFeedbackController::class, 'index'])->name('feedback.index');
+    Route::get('/feedback/{feedback}', [EmployeeFeedbackController::class, 'show'])->name('feedback.show');
+    Route::patch('/feedback/{feedback}/respond', [EmployeeFeedbackController::class, 'respond'])->name('feedback.respond');
+    Route::patch('/feedback/{feedback}/status', [EmployeeFeedbackController::class, 'updateStatus'])->name('feedback.status');
+
+    // Bug Reports Management
+    Route::resource('bug-reports', BugReportController::class);
+    Route::patch('/bug-reports/{bugReport}/assign', [BugReportController::class, 'assign'])->name('bug-reports.assign');
+    Route::patch('/bug-reports/{bugReport}/resolve', [BugReportController::class, 'resolve'])->name('bug-reports.resolve');
 
 
 
