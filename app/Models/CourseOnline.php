@@ -141,4 +141,8 @@ class CourseOnline extends Model
 
         return 'normal';
     }
+    public function quizzes()
+    {
+        return $this->hasMany(Quiz::class, 'course_online_id');
+    }
 }

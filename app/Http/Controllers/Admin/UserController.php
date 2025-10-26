@@ -83,17 +83,29 @@ class UserController extends Controller
         ]);
     }
 
-    public function index()
+    public function index(Request $request)
     {
-        // Enhanced to include tier information
+        $search = $request->get('search', '');
+
+        // Enhanced to include tier information and search functionality
         $users = User::with(['userLevel', 'userLevelTier', 'department'])
+            ->when($search, function ($query) use ($search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'LIKE', '%' . $search . '%')
+                        ->orWhere('email', 'LIKE', '%' . $search . '%')
+                        ->orWhere('role', 'LIKE', '%' . $search . '%');
+                });
+            })
             ->orderBy('created_at', 'desc')
             ->paginate(10);
 
         return Inertia::render('Admin/Users/Index', [
             'users' => $users,
+            'search' => $search, // Pass the search term back to the frontend
         ]);
     }
+
+
 
     public function create()
     {
