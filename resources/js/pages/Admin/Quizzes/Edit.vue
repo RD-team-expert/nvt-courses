@@ -3,7 +3,7 @@
         <div class="mx-auto max-w-7xl py-12 sm:px-6 lg:px-8">
             <!-- Header -->
             <div class="mb-8 flex items-center justify-between">
-                <h1 class="text-3xl font-bold ttext-white0">Edit Quiz</h1>
+                <h1 class="text-3xl font-bold text-white">Edit Quiz</h1>
                 <Button as-child variant="outline">
                     <Link :href="route('admin.quizzes.index')">
                         <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -97,6 +97,59 @@
 
             <!-- Form -->
             <form @submit.prevent="submitQuiz" class="space-y-8">
+                <!-- NEW: Course Assignment -->
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Course Assignment</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                            <!-- Course Type Selection -->
+                            <div>
+                                <Label for="course_type" :class="getFieldError('course_type') ? 'text-red-700' : ''">
+                                    Course Type <span class="text-red-500">*</span>
+                                </Label>
+                                <Select v-model="form.course_type" @update:model-value="resetCourseSelection" :disabled="form.processing">
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select course type" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="regular">Regular Course</SelectItem>
+                                        <SelectItem value="online">Online Course</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <div v-if="getFieldError('course_type')" class="mt-1 text-sm text-red-600">
+                                    {{ getFieldError('course_type') }}
+                                </div>
+                            </div>
+
+                            <!-- Course Selection -->
+                            <div v-if="form.course_type">
+                                <Label for="course_id" :class="getFieldError('course_id') || getFieldError('course_online_id') ? 'text-red-700' : ''">
+                                    Select {{ form.course_type === 'regular' ? 'Regular' : 'Online' }} Course <span class="text-red-500">*</span>
+                                </Label>
+                                <Select v-model="selectedCourseId" :disabled="form.processing">
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select Course" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem
+                                            v-for="course in (form.course_type === 'regular' ? courses : onlineCourses)"
+                                            :key="course.id"
+                                            :value="course.id.toString()"
+                                        >
+                                            {{ course.name }}
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <div v-if="getFieldError('course_id') || getFieldError('course_online_id')" class="mt-1 text-sm text-red-600">
+                                    {{ getFieldError('course_id') || getFieldError('course_online_id') }}
+                                </div>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
                 <!-- Quiz Details -->
                 <Card>
                     <CardHeader>
@@ -104,28 +157,6 @@
                     </CardHeader>
                     <CardContent class="space-y-6">
                         <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                            <div>
-                                <Label for="course_id" :class="getFieldError('course_id') ? 'text-red-700' : ''">
-                                    Course <span class="text-red-500">*</span>
-                                </Label>
-                                <Select
-                                    v-model="form.course_id"
-                                    :disabled="form.processing"
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select a Course" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem v-for="course in courses" :key="course.id" :value="course.id">
-                                            {{ course.name }}
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <div v-if="getFieldError('course_id')" class="mt-1 text-sm text-red-600">
-                                    {{ getFieldError('course_id') }}
-                                </div>
-                            </div>
-
                             <div>
                                 <Label for="status" :class="getFieldError('status') ? 'text-red-700' : ''">
                                     Status <span class="text-red-500">*</span>
@@ -145,6 +176,25 @@
                                 </Select>
                                 <div v-if="getFieldError('status')" class="mt-1 text-sm text-red-600">
                                     {{ getFieldError('status') }}
+                                </div>
+                            </div>
+
+                            <div>
+                                <Label for="pass_threshold" :class="getFieldError('pass_threshold') ? 'text-red-700' : ''">
+                                    Pass Threshold (%) <span class="text-red-500">*</span>
+                                </Label>
+                                <Input
+                                    id="pass_threshold"
+                                    v-model.number="form.pass_threshold"
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    step="0.01"
+                                    placeholder="Enter pass threshold (e.g., 80.00)"
+                                    :disabled="form.processing"
+                                />
+                                <div v-if="getFieldError('pass_threshold')" class="mt-1 text-sm text-red-600">
+                                    {{ getFieldError('pass_threshold') }}
                                 </div>
                             </div>
 
@@ -177,37 +227,109 @@
                                     {{ getFieldError('description') }}
                                 </div>
                             </div>
+                        </div>
+                    </CardContent>
+                </Card>
 
-                            <div>
-                                <Label for="pass_threshold" :class="getFieldError('pass_threshold') ? 'text-red-700' : ''">
-                                    Pass Threshold (%) <span class="text-red-500">*</span>
-                                </Label>
-                                <Input
-                                    id="pass_threshold"
-                                    v-model.number="form.pass_threshold"
-                                    type="number"
-                                    min="0"
-                                    max="100"
-                                    step="0.01"
-                                    placeholder="Enter pass threshold (e.g., 80.00)"
+                <!-- NEW: Deadline Settings -->
+                <Card>
+                    <CardHeader>
+                        <CardTitle>⏰ Deadline Settings</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div class="space-y-4">
+                            <!-- Enable Deadline -->
+                            <div class="flex items-center space-x-2">
+                                <input
+                                    type="checkbox"
+                                    v-model="form.has_deadline"
+                                    id="has_deadline"
                                     :disabled="form.processing"
+                                    class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                                 />
-                                <div v-if="getFieldError('pass_threshold')" class="mt-1 text-sm text-red-600">
-                                    {{ getFieldError('pass_threshold') }}
+                                <Label for="has_deadline">Set a deadline for this quiz</Label>
+                            </div>
+
+                            <!-- Deadline Configuration -->
+                            <div v-if="form.has_deadline" class="space-y-4 p-4 border rounded-lg bg-muted/20">
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <Label for="deadline_date">Deadline Date</Label>
+                                        <Input
+                                            id="deadline_date"
+                                            type="date"
+                                            v-model="form.deadline_date"
+                                            :disabled="form.processing"
+                                        />
+                                        <div v-if="getFieldError('deadline_date')" class="mt-1 text-sm text-red-600">
+                                            {{ getFieldError('deadline_date') }}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <Label for="deadline_time">Deadline Time</Label>
+                                        <Input
+                                            id="deadline_time"
+                                            type="time"
+                                            v-model="form.deadline_time"
+                                            :disabled="form.processing"
+                                        />
+                                        <div v-if="getFieldError('deadline_time')" class="mt-1 text-sm text-red-600">
+                                            {{ getFieldError('deadline_time') }}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center space-x-2">
+                                    <input
+                                        type="checkbox"
+                                        v-model="form.enforce_deadline"
+                                        id="enforce_deadline"
+                                        :disabled="form.processing"
+                                        class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                                    />
+                                    <Label for="enforce_deadline">Strictly enforce deadline (no late submissions)</Label>
+                                </div>
+
+                                <div>
+                                    <Label for="time_limit_minutes">Quiz time limit (minutes per attempt)</Label>
+                                    <Input
+                                        id="time_limit_minutes"
+                                        type="number"
+                                        v-model.number="form.time_limit_minutes"
+                                        :disabled="form.processing"
+                                        placeholder="Leave empty for no time limit"
+                                        min="1"
+                                        max="1440"
+                                    />
+                                    <p class="text-xs text-muted-foreground mt-1">Optional: Set how many minutes students have to complete the quiz</p>
+                                    <div v-if="getFieldError('time_limit_minutes')" class="mt-1 text-sm text-red-600">
+                                        {{ getFieldError('time_limit_minutes') }}
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center space-x-2">
+                                    <input
+                                        type="checkbox"
+                                        v-model="form.allows_extensions"
+                                        id="allows_extensions"
+                                        :disabled="form.processing"
+                                        class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                                    />
+                                    <Label for="allows_extensions">Allow deadline extensions upon request</Label>
                                 </div>
                             </div>
                         </div>
                     </CardContent>
                 </Card>
 
-                <!-- Questions -->
+                <!-- Questions (EXISTING CODE UNCHANGED) -->
                 <Card>
                     <CardHeader>
                         <CardTitle>Questions ({{ form.questions.length }}/20)</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div v-for="(question, index) in form.questions" :key="`question-${index}`"
-                             class="border dark rounded-lg p-4  mb-4"
+                             class="border dark rounded-lg p-4 mb-4"
                              :class="hasQuestionErrors(index) ? 'border-red-300 bg-red-50' : ''">
                             <div class="mb-4 flex items-center justify-between">
                                 <h3 class="text-sm font-medium" :class="hasQuestionErrors(index) ? 'text-red-900' : 'text-white'">
@@ -327,7 +449,7 @@
 
                                 <!-- Correct answers section -->
                                 <div class="mt-4">
-                                    <label class="mb-1 block text-sm font-medium ttext-white0">
+                                    <label class="mb-1 block text-sm font-medium text-white">
                                         Correct Answer(s) <span class="text-red-500">*</span>
                                     </label>
                                     <div v-if="question.type === 'radio'" class="space-y-2">
@@ -342,7 +464,7 @@
                                                 :disabled="form.processing || !option.trim()"
                                                 @change="updateCorrectAnswer(index, option)"
                                             />
-                                            <label :for="`correct_answer_${index}_${optIndex}`" class="ml-2 text-sm ttext-white0">
+                                            <label :for="`correct_answer_${index}_${optIndex}`" class="ml-2 text-sm text-white">
                                                 {{ option || `Option ${optIndex + 1}` }}
                                             </label>
                                         </div>
@@ -357,7 +479,7 @@
                                                 class="h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
                                                 :disabled="form.processing || !option.trim()"
                                             />
-                                            <label :for="`correct_answer_${index}_${optIndex}`" class="ml-2 text-sm ttext-white0">
+                                            <label :for="`correct_answer_${index}_${optIndex}`" class="ml-2 text-sm text-white">
                                                 {{ option || `Option ${optIndex + 1}` }}
                                             </label>
                                         </div>
@@ -434,7 +556,7 @@
             <!-- Discard Confirmation Modal -->
             <Modal :show="showDiscardModal" @close="showDiscardModal = false">
                 <div class="p-6 sm:p-8">
-                    <h2 class="mb-3 text-xl font-semibold ttext-white0">Discard Changes</h2>
+                    <h2 class="mb-3 text-xl font-semibold text-white">Discard Changes</h2>
                     <p class="mb-6 text-sm text-gray-600">Are you sure you want to discard your changes? This action cannot be undone.</p>
                     <div class="flex justify-end space-x-3">
                         <Button
@@ -455,7 +577,7 @@
                 </div>
             </Modal>
 
-            <!-- Toast Container -->
+            <!-- Toast Container (EXISTING CODE UNCHANGED) -->
             <div v-if="toasts.length > 0" class="fixed top-4 right-4 z-50 space-y-2">
                 <div v-for="toast in toasts" :key="toast.id"
                      class="transform transition-all duration-300 ease-in-out"
@@ -476,7 +598,7 @@
                         </div>
                         <div class="ml-3 text-sm font-normal">{{ toast.message }}</div>
                         <button @click="removeToast(toast.id)" type="button"
-                                class="ml-auto -mx-1.5 -my-1.5 bg-white text-gray-400 hover:ttext-white0 rounded-lg focus:ring-2 focus:ring-gray-300 p-1.5 hover:bg-gray-100 inline-flex h-8 w-8">
+                                class="ml-auto -mx-1.5 -my-1.5 bg-white text-gray-400 hover:text-white rounded-lg focus:ring-2 focus:ring-gray-300 p-1.5 hover:bg-gray-100 inline-flex h-8 w-8">
                             <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                                 <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
                             </svg>
@@ -526,6 +648,11 @@ export default {
             required: true,
         },
         courses: {
+            type: Array,
+            default: () => [],
+        },
+        // NEW: Add online courses prop
+        onlineCourses: {
             type: Array,
             default: () => [],
         },
@@ -619,15 +746,51 @@ export default {
             });
         };
 
-        // Initialize form
+        // Initialize form with NEW fields
         const form = useForm({
+            // NEW: Course type fields
+            course_type: props.quiz?.course_type || (props.quiz?.course_online_id ? 'online' : 'regular'),
             course_id: props.quiz?.course_id || '',
+            course_online_id: props.quiz?.course_online_id || '',
+
+            // Existing fields
             title: props.quiz?.title || '',
             description: props.quiz?.description || '',
             status: props.quiz?.status || 'draft',
             pass_threshold: props.quiz?.pass_threshold || 80.00,
+
+            // NEW: Deadline fields
+            has_deadline: props.quiz?.has_deadline || false,
+            deadline_date: props.quiz?.deadline_date || '',
+            deadline_time: props.quiz?.deadline_time || '',
+            enforce_deadline: props.quiz?.enforce_deadline ?? true,
+            time_limit_minutes: props.quiz?.time_limit_minutes || null,
+            allows_extensions: props.quiz?.allows_extensions || false,
+
             questions: processQuestions(props.quiz?.questions),
         });
+
+        // NEW: Computed property for selected course ID
+        const selectedCourseId = computed({
+            get() {
+                return form.course_type === 'regular' ? form.course_id : form.course_online_id;
+            },
+            set(value) {
+                if (form.course_type === 'regular') {
+                    form.course_id = value;
+                    form.course_online_id = '';
+                } else {
+                    form.course_online_id = value;
+                    form.course_id = '';
+                }
+            }
+        });
+
+        // NEW: Reset course selection when type changes
+        const resetCourseSelection = () => {
+            form.course_id = '';
+            form.course_online_id = '';
+        };
 
         // Watch for server errors from Inertia page props
         watch(
@@ -648,11 +811,11 @@ export default {
             return Object.keys(allErrors.value).length > 0;
         });
 
-        // Publishing requirements validation - FIXED: Added back
+        // Publishing requirements validation
         const publishingChecklist = computed(() => {
             return {
                 hasTitle: !!form.title?.trim(),
-                hasCourse: !!form.course_id,
+                hasCourse: !!(form.course_id || form.course_online_id), // UPDATED: Check both course types
                 hasValidThreshold: form.pass_threshold >= 0 && form.pass_threshold <= 100,
                 hasQuestions: form.questions.length > 0,
                 allQuestionsValid: form.questions.every(questionItem => {
@@ -685,7 +848,7 @@ export default {
             };
         });
 
-        // Toast management
+        // Toast management (EXISTING CODE UNCHANGED)
         const addToast = (message, type = 'info', duration = 5000) => {
             const id = ++toastIdCounter.value;
             const toast = { id, message, type, show: false };
@@ -718,7 +881,7 @@ export default {
             }
         };
 
-        // Helper functions
+        // Helper functions (EXISTING CODE UNCHANGED)
         const formatFieldName = (field) => {
             return field
                 .replace(/_/g, ' ')
@@ -754,7 +917,7 @@ export default {
             });
         };
 
-        // Question management functions
+        // Question management functions (EXISTING CODE UNCHANGED)
         const addQuestion = () => {
             try {
                 if (form.questions.length < 20) {
@@ -846,7 +1009,7 @@ export default {
             }
         };
 
-        // FIXED: Enhanced form submission
+        // UPDATED: Enhanced form submission with new fields
         const submitQuiz = () => {
             try {
                 // Clear previous server errors and success messages
@@ -860,15 +1023,30 @@ export default {
                     return;
                 }
 
-                // CRITICAL FIX: Use transform to send processed data
+                // UPDATED: Enhanced form data with new fields
                 form.transform((data) => ({
-                    course_id: form.course_id,
+                    // Course assignment fields
+                    course_type: form.course_type,
+                    course_id: form.course_type === 'regular' ? form.course_id : null,
+                    course_online_id: form.course_type === 'online' ? form.course_online_id : null,
+
+                    // Basic quiz fields
                     title: form.title,
                     description: form.description,
                     status: form.status,
                     pass_threshold: form.pass_threshold,
+
+                    // Deadline fields
+                    has_deadline: form.has_deadline,
+                    deadline_date: form.has_deadline ? form.deadline_date : null,
+                    deadline_time: form.has_deadline ? form.deadline_time : null,
+                    enforce_deadline: form.has_deadline ? form.enforce_deadline : true,
+                    time_limit_minutes: form.time_limit_minutes || null,
+                    allows_extensions: form.has_deadline ? form.allows_extensions : false,
+
+                    // Questions
                     questions: form.questions.map((question) => ({
-                        id: question.id || null, // Include ID for existing questions
+                        id: question.id || null,
                         question_text: question.question_text,
                         type: question.type,
                         points: question.type === 'text' ? 0 : question.points,
@@ -916,7 +1094,7 @@ export default {
             }
         };
 
-        // Discard functionality
+        // Discard functionality (EXISTING CODE UNCHANGED)
         const confirmDiscard = () => {
             if (form.isDirty) {
                 showDiscardModal.value = true;
@@ -938,20 +1116,24 @@ export default {
             { name: 'Edit', route: null },
         ];
 
-        // CRITICAL FIX: Return all necessary computed properties
         return {
             form,
             hasErrors,
             allErrors,
             errorSummary,
-            publishingChecklist,    // ← FIXED: Added back
-            canPublish,             // ← FIXED: Added back
-            hasPublishingRequirements, // ← FIXED: Added back
+            publishingChecklist,
+            canPublish,
+            hasPublishingRequirements,
             showDiscardModal,
             showSuccessMessage,
             toasts,
             toastClasses,
             toastIconClasses,
+
+            // NEW: Course type functionality
+            selectedCourseId,
+            resetCourseSelection,
+
             formatFieldName,
             getFieldError,
             hasQuestionErrors,
@@ -974,12 +1156,11 @@ export default {
 </script>
 
 <style scoped>
-/* General Layout */
+/* EXISTING STYLES UNCHANGED */
 .max-w-7xl {
     @apply px-4 sm:px-6 lg:px-8;
 }
 
-/* Form Styling */
 form {
     @apply space-y-6;
 }
@@ -997,18 +1178,15 @@ button:disabled {
     @apply cursor-not-allowed opacity-50;
 }
 
-/* Question Sections */
 .bg-gray-50 {
     @apply transition-all duration-200;
 }
 
-/* Buttons */
 button,
 a {
     @apply transition-colors duration-200;
 }
 
-/* Error styling */
 .text-red-600 {
     @apply text-red-600 font-medium;
 }
@@ -1021,24 +1199,20 @@ a {
     @apply border-red-500 ring-2 ring-red-200;
 }
 
-/* Success styling */
 .text-green-600 {
     @apply text-green-600 font-medium;
 }
 
-/* Enhanced focus states */
 input:focus,
 select:focus,
 textarea:focus {
     @apply ring-2 ring-offset-2;
 }
 
-/* Toast animations */
 .transform {
     transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
 }
 
-/* Loading states */
 .animate-spin {
     animation: spin 1s linear infinite;
 }
@@ -1052,12 +1226,10 @@ textarea:focus {
     }
 }
 
-/* Enhanced hover states */
 button:hover:not(:disabled) {
     @apply transform scale-105;
 }
 
-/* Responsive Adjustments */
 @media (max-width: 640px) {
     .grid-cols-1 {
         @apply space-y-4;

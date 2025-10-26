@@ -537,15 +537,23 @@ const breadcrumbs: BreadcrumbItemType[] = [
                                         :key="availability.id"
                                         class="flex items-start space-x-3"
                                     >
+                                        <!-- ENHANCED: More visible radio button with custom styling -->
                                         <RadioGroupItem
                                             :value="availability.id.toString()"
                                             :disabled="isAvailabilityDisabled(availability)"
-                                            class="mt-1"
-                                        />
+                                            class="mt-1 w-6 h-6 rounded-full border-2 border-gray-400 bg-white hover:border-primary focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 data-[state=checked]:border-primary data-[state=checked]:bg-primary transition-all duration-200"
+                                        >
+                                            <!-- ENHANCED: Visible inner dot with better contrast -->
+                                            <div class="w-full h-full rounded-full flex items-center justify-center">
+                                                <div class="w-2.5 h-2.5 rounded-full bg-white opacity-0 data-[state=checked]:opacity-100 transition-opacity duration-200"></div>
+                                            </div>
+                                        </RadioGroupItem>
+
                                         <Card class="flex-1 p-4" :class="{
-                                            'border-primary': enrollForm.course_availability_id === availability.id.toString(),
-                                            'opacity-50': isAvailabilityDisabled(availability)
-                                        }">
+                'border-primary ring-2 ring-primary ring-opacity-20': enrollForm.course_availability_id === availability.id.toString(),
+                'opacity-50': isAvailabilityDisabled(availability)
+            }">
+                                            <!-- Your existing card content remains the same -->
                                             <div class="space-y-3">
                                                 <!-- Date Range -->
                                                 <div class="flex justify-between items-start">
@@ -562,11 +570,10 @@ const breadcrumbs: BreadcrumbItemType[] = [
                                                     </Badge>
                                                 </div>
 
-                                                <!-- UPDATED: Scheduling Information with Multiple Shift Times -->
+                                                <!-- Rest of your existing content... -->
                                                 <div class="border-t pt-3 space-y-2">
                                                     <h4 class="text-xs font-semibold text-foreground uppercase tracking-wide">Schedule Details</h4>
 
-                                                    <!-- Days of Week -->
                                                     <div v-if="availability.formatted_days && availability.formatted_days !== 'N/A'" class="flex items-center space-x-2">
                                                         <CalendarDays class="h-4 w-4 text-muted-foreground" />
                                                         <span class="text-sm text-muted-foreground">Days:</span>
@@ -575,14 +582,12 @@ const breadcrumbs: BreadcrumbItemType[] = [
                                                         </Badge>
                                                     </div>
 
-                                                    <!-- Duration in Weeks -->
                                                     <div v-if="availability.duration_weeks" class="flex items-center space-x-2">
                                                         <Calendar class="h-4 w-4 text-muted-foreground" />
                                                         <span class="text-sm text-muted-foreground">Duration:</span>
                                                         <span class="text-sm font-medium text-foreground">{{ availability.duration_weeks }} weeks</span>
                                                     </div>
 
-                                                    <!-- UPDATED: Multiple Session Times -->
                                                     <div v-if="availability.session_time_shift_2 || availability.session_time_shift_3" class="flex items-start space-x-2">
                                                         <Timer class="h-4 w-4 text-muted-foreground mt-0.5" />
                                                         <div class="flex-1">
@@ -598,7 +603,6 @@ const breadcrumbs: BreadcrumbItemType[] = [
                                                         </div>
                                                     </div>
 
-                                                    <!-- Session Duration -->
                                                     <div v-if="availability.formatted_session_duration" class="flex items-center space-x-2">
                                                         <Clock class="h-4 w-4 text-muted-foreground" />
                                                         <span class="text-sm text-muted-foreground">Length:</span>
@@ -606,7 +610,6 @@ const breadcrumbs: BreadcrumbItemType[] = [
                                                     </div>
                                                 </div>
 
-                                                <!-- Availability Numbers -->
                                                 <div class="border-t pt-3 space-y-1">
                                                     <p class="text-sm text-primary font-medium">
                                                         {{ formatCapacity(availability.capacity) }}
@@ -619,7 +622,6 @@ const breadcrumbs: BreadcrumbItemType[] = [
                                                     </p>
                                                 </div>
 
-                                                <!-- Notes -->
                                                 <div v-if="availability.notes" class="border-t pt-3">
                                                     <p class="text-sm text-muted-foreground">
                                                         <span class="font-medium">Notes:</span> {{ availability.notes }}

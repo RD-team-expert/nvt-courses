@@ -718,6 +718,7 @@ function getProgressMessage() {
                                                 type="time"
                                                 v-model="availability.session_time_shift_2"
                                                 :disabled="form.processing"
+                                                class="time-input"
                                             />
                                             <p class="text-xs text-muted-foreground mt-1">Start time for Shift 2 sessions (optional)</p>
                                             <div v-if="form.errors[`availabilities.${index}.session_time_shift_2`]" class="text-destructive text-sm mt-1">
@@ -732,6 +733,7 @@ function getProgressMessage() {
                                                 type="time"
                                                 v-model="availability.session_time_shift_3"
                                                 :disabled="form.processing"
+                                                class="time-input"
                                             />
                                             <p class="text-xs text-muted-foreground mt-1">Start time for Shift 3 sessions (optional)</p>
                                             <div v-if="form.errors[`availabilities.${index}.session_time_shift_3`]" class="text-destructive text-sm mt-1">
@@ -878,3 +880,22 @@ function getProgressMessage() {
         </div>
     </AdminLayout>
 </template>
+
+<style scoped>
+/* Dark mode time input clock icon fix */
+@media (prefers-color-scheme: dark) {
+    .time-input[type="time"]::-webkit-calendar-picker-indicator {
+        filter: invert(1) brightness(0.8);
+    }
+}
+
+/* If using manual dark mode toggle */
+.dark .time-input[type="time"]::-webkit-calendar-picker-indicator {
+    filter: invert(1) brightness(0.8);
+}
+
+/* Alternative: Make it completely white */
+.dark .time-input[type="time"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+}
+</style>

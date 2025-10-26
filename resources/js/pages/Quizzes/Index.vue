@@ -1,7 +1,3 @@
-<!--
-  Quizzes Index Page
-  Display available quizzes with filtering, search, and progress tracking
--->
 <script setup>
 import { Link } from '@inertiajs/vue3'
 import { ref, computed } from 'vue'
@@ -26,7 +22,9 @@ import {
     List,
     Grid3X3,
     Brain,
-    BarChart3
+    BarChart3,
+    AlertTriangle,
+    Calendar
 } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -37,14 +35,14 @@ const props = defineProps({
 })
 
 const searchQuery = ref('')
-const selectedCourse = ref('all') // Default to 'all' instead of empty string
+const selectedCourse = ref('all')
 const viewMode = ref('grid')
 
 const breadcrumbs = [
     { name: 'Quizzes', route: null },
 ]
 
-// Computed properties
+// EXISTING: Computed properties
 const uniqueCourses = computed(() => {
     if (!props.quizzes.data || !props.quizzes.data.length) return []
     const courses = props.quizzes.data.map(quiz => quiz.course)
@@ -66,7 +64,6 @@ const filteredQuizzes = computed(() => {
         )
     }
 
-    // Updated to handle 'all' value properly
     if (selectedCourse.value && selectedCourse.value !== 'all') {
         filtered = filtered.filter(quiz => quiz.course.id.toString() === selectedCourse.value)
     }
@@ -76,7 +73,6 @@ const filteredQuizzes = computed(() => {
 
 const completedQuizzes = computed(() => {
     if (!props.quizzes.data || !props.quizzes.data.length) return 0
-    // ✅ Count quizzes that are passed OR reached max attempts
     return props.quizzes.data.filter(quiz =>
         quiz.has_passed || quiz.attempts >= 3
     ).length
@@ -84,38 +80,37 @@ const completedQuizzes = computed(() => {
 
 const pendingQuizzes = computed(() => {
     if (!props.quizzes.data || !props.quizzes.data.length) return 0
-    // ✅ Count quizzes that are not passed AND under max attempts
     return props.quizzes.data.filter(quiz =>
         !quiz.has_passed && quiz.attempts < 3
     ).length
 })
 
-// Methods
+// EXISTING: Methods
 const toggleView = () => {
     viewMode.value = viewMode.value === 'grid' ? 'list' : 'grid'
 }
 
 const clearFilters = () => {
     searchQuery.value = ''
-    selectedCourse.value = 'all' // Reset to 'all' instead of empty string
+    selectedCourse.value = 'all'
 }
 
 const canTakeQuiz = (quiz) => {
-    // ✅ Cannot retake if already passed
     if (quiz.has_passed) {
         return false
     }
-    // Can take if under 3 attempts and hasn't passed
+    // NEW: Check if quiz is still available (deadline check)
+    if (quiz.has_deadline && !quiz.is_available) {
+        return false
+    }
     return quiz.attempts < 3
 }
 
 const isQuizCompleted = (quiz) => {
-    // ✅ Quiz is completed if passed or reached max attempts
     return quiz.has_passed || quiz.attempts >= 3
 }
 
 const getQuizStatus = (quiz) => {
-    // ✅ Show "Passed" if user has passed
     if (quiz.has_passed) return 'Passed'
     if (quiz.attempts >= 3) return 'Failed'
     if (quiz.attempts > 0) return 'In Progress'
@@ -123,7 +118,6 @@ const getQuizStatus = (quiz) => {
 }
 
 const getQuizStatusColorClass = (quiz) => {
-    // ✅ Green for passed, red for failed after max attempts
     if (quiz.has_passed) return 'bg-green-500'
     if (quiz.attempts >= 3) return 'bg-red-500'
     if (quiz.attempts > 0) return 'bg-yellow-500'
@@ -131,7 +125,6 @@ const getQuizStatusColorClass = (quiz) => {
 }
 
 const getQuizStatusVariant = (quiz) => {
-    // ✅ Badge variants for different statuses
     if (quiz.has_passed) return 'default'
     if (quiz.attempts >= 3) return 'destructive'
     if (quiz.attempts > 0) return 'secondary'
@@ -139,9 +132,58 @@ const getQuizStatusVariant = (quiz) => {
 }
 
 const getActiveButtonText = (quiz) => {
-    // ✅ Show appropriate button text for active quizzes
     if (quiz.attempts > 0) return 'Continue Quiz'
     return 'Start Quiz'
+}
+
+// NEW: Deadline related methods
+const getDeadlineStatus = (quiz) => {
+    if (!quiz.has_deadline) return null
+
+    if (quiz.deadline_status?.status === 'urgent') return 'urgent'
+    if (quiz.deadline_status?.status === 'soon') return 'warning'
+    if (quiz.deadline_status?.status === 'expired') return 'expired'
+    return 'normal'
+}
+
+const getDeadlineIcon = (quiz) => {
+    if (!quiz.has_deadline) return null
+
+    const status = getDeadlineStatus(quiz)
+    switch (status) {
+        case 'urgent':
+            return '🚨'
+        case 'warning':
+            return '⚠️'
+        case 'expired':
+            return '❌'
+        default:
+            return '📅'
+    }
+}
+
+const getDeadlineClass = (quiz) => {
+    const status = getDeadlineStatus(quiz)
+    switch (status) {
+        case 'urgent':
+            return 'text-red-600 bg-red-50 border-red-200'
+        case 'warning':
+            return 'text-orange-600 bg-orange-50 border-orange-200'
+        case 'expired':
+            return 'text-gray-600 bg-gray-50 border-gray-200'
+        default:
+            return 'text-blue-600 bg-blue-50 border-blue-200'
+    }
+}
+
+const getCourseTypeBadge = (quiz) => {
+    return quiz.course_type === 'online' ? 'Online' : 'Regular'
+}
+
+const getCourseTypeClass = (quiz) => {
+    return quiz.course_type === 'online'
+        ? 'bg-green-100 text-green-800 border-green-200'
+        : 'bg-blue-100 text-blue-800 border-blue-200'
 }
 </script>
 
@@ -206,7 +248,8 @@ const getActiveButtonText = (quiz) => {
                         <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                             <div class="flex flex-col sm:flex-row gap-4">
                                 <div class="relative">
-                                    <Search class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Search
+                                        class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                     <Input
                                         v-model="searchQuery"
                                         type="text"
@@ -221,7 +264,8 @@ const getActiveButtonText = (quiz) => {
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="all">All Courses</SelectItem>
-                                        <SelectItem v-for="course in uniqueCourses" :key="course.id" :value="course.id.toString()">
+                                        <SelectItem v-for="course in uniqueCourses" :key="course.id"
+                                                    :value="course.id.toString()">
                                             {{ course.name }}
                                         </SelectItem>
                                     </SelectContent>
@@ -245,7 +289,8 @@ const getActiveButtonText = (quiz) => {
 
                 <!-- Quiz Cards -->
                 <div v-if="filteredQuizzes.length" class="space-y-6">
-                    <div :class="viewMode === 'grid' ? 'grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6' : 'space-y-4'">
+                    <div
+                        :class="viewMode === 'grid' ? 'grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6' : 'space-y-4'">
                         <Card
                             v-for="quiz in filteredQuizzes"
                             :key="quiz.id"
@@ -262,9 +307,18 @@ const getActiveButtonText = (quiz) => {
                                     <!-- Quiz Header -->
                                     <div class="flex items-start justify-between mb-4">
                                         <div class="flex-1 pr-4">
-                                            <h2 class="text-xl font-semibold text-foreground mb-2">
-                                                {{ quiz.title }}
-                                            </h2>
+                                            <div class="flex items-center gap-2 mb-2">
+                                                <h2 class="text-xl font-semibold text-foreground">
+                                                    {{ quiz.title }}
+                                                </h2>
+                                                <!-- NEW: Course Type Badge -->
+                                                <Badge
+                                                    :class="getCourseTypeClass(quiz)"
+                                                    class="text-xs px-2 py-1"
+                                                >
+                                                    {{ getCourseTypeBadge(quiz) }}
+                                                </Badge>
+                                            </div>
                                             <p class="text-sm text-muted-foreground mb-3 line-clamp-3">
                                                 {{ quiz.description || 'No description available' }}
                                             </p>
@@ -274,18 +328,41 @@ const getActiveButtonText = (quiz) => {
                                         </Badge>
                                     </div>
 
+                                    <!-- NEW: Deadline Alert (if applicable) -->
+                                    <div
+                                        v-if="quiz.has_deadline"
+                                        :class="[
+                                            'mb-4 p-3 rounded-lg border text-sm',
+                                            getDeadlineClass(quiz)
+                                        ]"
+                                    >
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-lg">{{ getDeadlineIcon(quiz) }}</span>
+                                            <div class="flex-1">
+                                                <div class="font-medium">
+                                                    {{ quiz.deadline_status?.message || 'Deadline Information' }}
+                                                </div>
+                                                <div class="text-xs opacity-80 mt-1">
+                                                    Due: {{ quiz.deadline_formatted }}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <!-- Quiz Metrics -->
                                     <div class="grid grid-cols-2 gap-4 mb-4">
                                         <Card class="bg-muted/50">
                                             <CardContent class="p-3">
                                                 <p class="text-xs text-muted-foreground mb-1">Course</p>
-                                                <p class="text-sm font-medium text-foreground">{{ quiz.course.name }}</p>
+                                                <p class="text-sm font-medium text-foreground">{{ quiz.course.name
+                                                    }}</p>
                                             </CardContent>
                                         </Card>
                                         <Card class="bg-muted/50">
                                             <CardContent class="p-3">
                                                 <p class="text-xs text-muted-foreground mb-1">Total Points</p>
-                                                <p class="text-sm font-medium text-foreground">{{ quiz.total_points }}</p>
+                                                <p class="text-sm font-medium text-foreground">{{ quiz.total_points
+                                                    }}</p>
                                             </CardContent>
                                         </Card>
                                     </div>
@@ -310,13 +387,14 @@ const getActiveButtonText = (quiz) => {
                                     <!-- Quiz Details -->
                                     <div class="flex items-center justify-between text-xs text-muted-foreground mb-4">
                                         <span>Pass: {{ quiz.pass_threshold }}%</span>
-                                        <span v-if="quiz.time_limit" class="flex items-center">
+                                        <!-- NEW: Show time limit if available -->
+                                        <span v-if="quiz.time_limit_minutes" class="flex items-center">
                                             <Clock class="w-3 h-3 mr-1" />
-                                            {{ quiz.time_limit }} min
+                                            {{ quiz.time_limit_minutes }} min
                                         </span>
                                     </div>
 
-                                    <!-- Action Buttons - UPDATED VERSION -->
+                                    <!-- Action Buttons -->
                                     <div class="space-y-2">
                                         <!-- Active Quiz Button (Start/Continue) -->
                                         <Button
@@ -328,6 +406,17 @@ const getActiveButtonText = (quiz) => {
                                                 <Brain class="w-4 h-4 mr-2" />
                                                 {{ getActiveButtonText(quiz) }}
                                             </Link>
+                                        </Button>
+
+                                        <!-- Deadline Expired Button -->
+                                        <Button
+                                            v-else-if="quiz.has_deadline && !quiz.is_available"
+                                            disabled
+                                            variant="ghost"
+                                            class="w-full"
+                                        >
+                                            <AlertTriangle class="w-4 h-4 mr-2" />
+                                            Deadline Passed
                                         </Button>
 
                                         <!-- View Results Button (For completed/failed quizzes) -->
@@ -343,7 +432,7 @@ const getActiveButtonText = (quiz) => {
                                             </Link>
                                         </Button>
 
-                                        <!-- Fallback disabled button (should not normally show) -->
+                                        <!-- Fallback disabled button -->
                                         <Button
                                             v-else
                                             variant="ghost"
@@ -366,7 +455,8 @@ const getActiveButtonText = (quiz) => {
                         <FileText class="w-12 h-12 text-muted-foreground" />
                     </div>
                     <h3 class="text-lg font-medium text-foreground mb-2">No quizzes available</h3>
-                    <p class="text-muted-foreground mb-4">There are no quizzes available for your enrolled courses at the moment.</p>
+                    <p class="text-muted-foreground mb-4">There are no quizzes available for your enrolled courses at
+                        the moment.</p>
                 </div>
 
                 <!-- No Results State -->

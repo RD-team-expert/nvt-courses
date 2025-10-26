@@ -165,15 +165,7 @@ class CourseController extends Controller
             ]);
 
             // Auto-calculate end_date and sessions if needed
-            if ($courseAvailability->duration_weeks) {
-                $calculatedEndDate = $courseAvailability->calculateEndDate();
-                $calculatedSessions = $courseAvailability->calculateTotalSessions();
 
-                $courseAvailability->update([
-                    'end_date' => $calculatedEndDate,
-                    'sessions' => $calculatedSessions
-                ]);
-            }
         }
 
         if ($course->privacy === 'public') {
@@ -415,15 +407,7 @@ class CourseController extends Controller
                     ]);
 
                     // Auto-calculate end_date and sessions if needed
-                    if ($availability->duration_weeks) {
-                        $calculatedEndDate = $availability->calculateEndDate();
-                        $calculatedSessions = $availability->calculateTotalSessions();
 
-                        $availability->update([
-                            'end_date' => $calculatedEndDate,
-                            'sessions' => $calculatedSessions
-                        ]);
-                    }
 
                     $existingAvailabilityIds[] = $availability->id;
                 }
@@ -446,15 +430,7 @@ class CourseController extends Controller
                 ]);
 
                 // Auto-calculate end_date and sessions if needed
-                if ($availability->duration_weeks) {
-                    $calculatedEndDate = $availability->calculateEndDate();
-                    $calculatedSessions = $availability->calculateTotalSessions();
 
-                    $availability->update([
-                        'end_date' => $calculatedEndDate,
-                        'sessions' => $calculatedSessions
-                    ]);
-                }
 
                 $existingAvailabilityIds[] = $availability->id;
             }

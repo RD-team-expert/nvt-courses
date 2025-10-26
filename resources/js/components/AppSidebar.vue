@@ -85,6 +85,12 @@ const mainNavItems: NavItem[] = [
         href: '/courses-online',
         icon: BookOpenCheck,
     },
+    {
+        title: 'My feedback',
+        href: '/my-feedback',
+        icon: BookOpenCheck,
+    },
+
 ];
 
 // Reports & Analytics submenu items
@@ -143,7 +149,19 @@ const reportsSubItems = [
         title: 'Audio Categories',
         href: '/admin/audio-categories',
         icon: Volume2,
+    },
+    {
+        title: 'Bug Reports',
+        href: '/admin/bug-reports',
+        icon: BarChart,
+    },
+    {
+        title: 'Feedback',
+        href: '/admin/feedback',
+        icon: UserCheck,
+
     }
+
 ];
 
 // Other Admin-only navigation items (non-Reports)
