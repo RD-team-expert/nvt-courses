@@ -17,7 +17,7 @@ class ResendLoginController extends Controller
     {
         // Get users with expired or missing login tokens
         $query = User::query()
-            ->whereNotNull('email_verified_at')
+            ->whereNotNull('login_token')
             ->where(function($q) {
                 $q->whereNull('login_token_expires_at')
                     ->orWhere('login_token_expires_at', '<', now());

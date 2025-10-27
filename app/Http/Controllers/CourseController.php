@@ -150,16 +150,16 @@ class CourseController extends Controller
                 }
 
                 // ✅ FIXED: Allow enrollment on the same day as course start
-                if ($today < $courseStartDate) {
-                    Log::warning('❌ Enrollment too early', [
-                        'user_id' => $user->id,
-                        'course_id' => $course->id,
-                        'availability_id' => $availability->id,
-                        'today' => $today->format('Y-m-d'),
-                        'course_start' => $courseStartDate->format('Y-m-d')
-                    ]);
-                    return back()->withErrors(['message' => 'Enrollment for this course has not opened yet.']);
-                }
+//                if ($today < $courseStartDate) {
+//                    Log::warning('❌ Enrollment too early', [
+//                        'user_id' => $user->id,
+//                        'course_id' => $course->id,
+//                        'availability_id' => $availability->id,
+//                        'today' => $today->format('Y-m-d'),
+//                        'course_start' => $courseStartDate->format('Y-m-d')
+//                    ]);
+//                    return back()->withErrors(['message' => 'Enrollment for this course has not opened yet.']);
+//                }
 
                 // Check if course has ended
                 if ($today > $courseEndDate) {
