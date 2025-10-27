@@ -133,15 +133,46 @@ class CourseController extends Controller
                     return back()->withErrors(['message' => 'Invalid availability selection.']);
                 }
 
-                // ✅ Check if availability is still available
-                if (!$availability->is_available) {
-                    Log::warning('❌ Availability no longer available', [
+                // ✅ UPDATED: Better date checking for same-day enrollment
+                $today = now()->startOfDay();
+                $courseStartDate = $availability->start_date->startOfDay();
+                $courseEndDate = $availability->end_date->endOfDay();
+
+                // Check if course is active
+                if ($availability->status !== 'active') {
+                    Log::warning('❌ Course availability not active', [
                         'user_id' => $user->id,
                         'course_id' => $course->id,
-                        'availability_id' => $availability->id
+                        'availability_id' => $availability->id,
+                        'status' => $availability->status
                     ]);
-                    return back()->withErrors(['message' => 'This date range is no longer available.']);
+                    return back()->withErrors(['message' => 'This course schedule is not active.']);
                 }
+
+                // ✅ FIXED: Allow enrollment on the same day as course start
+                if ($today < $courseStartDate) {
+                    Log::warning('❌ Enrollment too early', [
+                        'user_id' => $user->id,
+                        'course_id' => $course->id,
+                        'availability_id' => $availability->id,
+                        'today' => $today->format('Y-m-d'),
+                        'course_start' => $courseStartDate->format('Y-m-d')
+                    ]);
+                    return back()->withErrors(['message' => 'Enrollment for this course has not opened yet.']);
+                }
+
+                // Check if course has ended
+                if ($today > $courseEndDate) {
+                    Log::warning('❌ Course has ended', [
+                        'user_id' => $user->id,
+                        'course_id' => $course->id,
+                        'availability_id' => $availability->id,
+                        'today' => $today->format('Y-m-d'),
+                        'course_end' => $courseEndDate->format('Y-m-d')
+                    ]);
+                    return back()->withErrors(['message' => 'This course has already ended.']);
+                }
+
 
                 // ✅ Check if there are available sessions (capacity)
                 if ($availability->sessions <= 0) {
@@ -291,6 +322,15 @@ class CourseController extends Controller
 
         // ✅ UPDATED: Format availabilities with NEW scheduling data and multiple shift times
         $availabilities = $course->availabilities->map(function ($availability) {
+            $today = now()->startOfDay();
+            $courseStartDate = $availability->start_date->startOfDay();
+            $courseEndDate = $availability->end_date->endOfDay();
+
+            // ✅ FIXED: Allow enrollment on same day as course start
+            $isAvailableForEnrollment = $availability->status === 'active'
+                && $availability->sessions > 0
+                && $today >= $courseStartDate  // CHANGED: >= instead of >
+                && $today <= $courseEndDate;
             return [
                 'id' => $availability->id,
                 'start_date' => $availability->start_date,
@@ -302,7 +342,7 @@ class CourseController extends Controller
                 'available_spots' => $availability->sessions ?? 0,
                 'is_available' => ($availability->sessions ?? 0) > 0,
                 'is_full' => ($availability->sessions ?? 0) <= 0,
-                'is_expired' => false,
+                'is_expired' => $today > $courseEndDate, // ✅ UPDATED: Use endOfDay comparison
                 'notes' => $availability->notes,
 
                 // ✅ NEW SCHEDULING FIELDS FOR USER DISPLAY WITH MULTIPLE SHIFT TIMES
