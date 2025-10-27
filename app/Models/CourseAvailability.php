@@ -69,7 +69,7 @@ class CourseAvailability extends Model
 
     public function getIsExpiredAttribute()
     {
-        return $this->end_date < now();
+        return $this->end_date < now()->startOfDay(); // ✅ Also needs startOfDay()
     }
 
     public function getIsAvailableAttribute()
@@ -85,7 +85,7 @@ class CourseAvailability extends Model
     public function scopeAvailable($query)
     {
         return $query->active()
-            ->where('end_date', '>', now())
+            ->where('end_date', '>=', now()->startOfDay()) // CHANGED: >= instead of > and use startOfDay()
             ->whereRaw('capacity > (SELECT COUNT(*) FROM course_registrations WHERE course_availability_id = course_availabilities.id)');
     }
 
