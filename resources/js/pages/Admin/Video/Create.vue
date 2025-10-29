@@ -60,27 +60,7 @@
                             </div>
                         </div>
 
-                        <!-- Category -->
-                        <div class="space-y-2">
-                            <Label for="video_category_id">Category</Label>
-                            <Select v-model="form.video_category_id">
-                                <SelectTrigger :class="{ 'border-destructive': form.errors.video_category_id }">
-                                    <SelectValue placeholder="Select a category..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem
-                                        v-for="category in categories"
-                                        :key="category.id"
-                                        :value="category.id.toString()"
-                                    >
-                                        {{ category.name }}
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <div v-if="form.errors.video_category_id" class="text-sm text-destructive">
-                                {{ form.errors.video_category_id }}
-                            </div>
-                        </div>
+
                     </CardContent>
                 </Card>
 
