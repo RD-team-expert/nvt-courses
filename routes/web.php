@@ -48,63 +48,6 @@ use Illuminate\Support\Facades\Route;
 
 
 // Replace the previous test route with this corrected one
-Route::get('/test-websocket-admin/{assignmentId}', function($assignmentId) {
-    $assignment = \App\Models\CourseOnlineAssignment::with(['user', 'courseOnline'])
-        ->find($assignmentId);
-
-    if (!$assignment) {
-        return response()->json(['error' => 'Assignment not found']);
-    }
-
-    // Get any content from the course using ModuleContent directly
-    $content = \App\Models\ModuleContent::whereHas('module', function($query) use ($assignment) {
-        $query->where('course_online_id', $assignment->course_online_id);
-    })->first();
-
-    if (!$content) {
-        return response()->json(['error' => 'No content found for this assignment']);
-    }
-
-    try {
-        $testProgress = 85.5; // Test progress value
-
-        // Fire the ContentCompletionTracked event
-        event(new \App\Events\ContentCompletionTracked(
-            $assignment->user,
-            $content,
-            $assignment,
-            150.0,  // final position
-            45.0,   // watch time
-            $testProgress    // course progress - this should show up in admin
-        ));
-
-        \Log::info('🧪 Test WebSocket event fired', [
-            'assignment_id' => $assignment->id,
-            'test_progress' => $testProgress,
-            'user_id' => $assignment->user->id,
-            'content_id' => $content->id
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Test event fired successfully',
-            'assignment_id' => $assignment->id,
-            'user_name' => $assignment->user->name,
-            'course_name' => $assignment->courseOnline->name,
-            'content_title' => $content->title,
-            'test_progress' => $testProgress,
-            'current_progress' => $assignment->progress_percentage,
-            'expected_result' => 'Admin page should show progress updated to ' . $testProgress . '%'
-        ]);
-    } catch (\Exception $e) {
-        return response()->json([
-            'error' => $e->getMessage(),
-            'line' => $e->getLine(),
-            'file' => $e->getFile(),
-            'trace' => $e->getTraceAsString()
-        ]);
-    }
-});
 
 
 
