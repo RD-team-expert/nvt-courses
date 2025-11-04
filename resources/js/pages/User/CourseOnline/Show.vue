@@ -382,7 +382,7 @@ onMounted(() => {
                     <img
                         :src="course.image_path"
                         :alt="course.name"
-                        class="w-32 h-24 rounded-lg object-cover border"
+                        class="w-32 h-24 rounded-lg object-full border"
                     />
                 </div>
 
