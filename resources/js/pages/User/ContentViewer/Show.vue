@@ -1429,24 +1429,42 @@ watch(currentPage, (newPage) => {
                         :variant="safeNavigation.next.is_unlocked ? 'default' : 'outline'"
                         :disabled="!safeNavigation.next.is_unlocked"
                         :class="[
-            'flex items-center justify-between w-50',
-            'px-4 py-3 rounded-lg font-medium text-white',
-            'flex items-center gap-6 max-w-md ml-auto transition-colors w',
-            'px-8 py-5 rounded-xl font-medium',
+            'group relative flex items-center justify-between',
+            'px-6 py-4 rounded-xl font-medium transition-all duration-200',
+            'min-h-[80px] max-w-md ml-auto shadow-lg',
             safeNavigation.next.is_unlocked
-                ? 'bg-blue-600 text-white'
-                : 'opacity-50 cursor-not-allowed'
+                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 hover:shadow-xl'
+                : 'bg-gray-100 border-2 border-dashed border-gray-300 text-gray-500 cursor-not-allowed'
         ]"
                     >
-                        <div class="text-right">
-                            <div class="font-semibold text-lg">{{ safeNavigation.next.title }}</div>
-                            <div class="text-sm opacity-75 tracking-wide uppercase">{{ safeNavigation.next.content_type }}</div>
+                        <!-- Progress indicator for locked content -->
+                        <div v-if="!safeNavigation.next.is_unlocked"
+                             class="absolute -top-2 -right-2 bg-amber-500 text-white text-xs px-2 py-1 rounded-full shadow-md">
+                            Locked
                         </div>
-                        <SkipForward class="h-6 w-6" />
-                    </Button>
-                </div>
 
-            </div>
+                        <div class="text-right flex-1 mr-4">
+                            <div class="font-semibold text-lg mb-1 leading-tight">
+                                {{ safeNavigation.next.title }}
+                            </div>
+                            <div class="text-sm opacity-90 tracking-wide uppercase flex items-center justify-end gap-2">
+                <span class="inline-flex items-center">
+                    {{ safeNavigation.next.content_type }}
+                </span>
+                                <span v-if="safeNavigation.next.duration" class="text-xs bg-black/20 px-2 py-1 rounded">
+                    {{ safeNavigation.next.duration }}
+                </span>
+                            </div>
+                        </div>
+
+                        <div :class="[
+            'flex-shrink-0 transition-transform duration-200',
+            safeNavigation.next.is_unlocked ? 'group-hover:translate-x-1' : ''
+        ]">
+                            <SkipForward class="h-6 w-6" />
+                        </div>
+                    </Button>
+                </div>            </div>
 
             <!-- Enhanced Completion Alert -->
             <Alert v-if="isCompleted" class="border-green-200 bg-green-50 dark:bg-green-950">
