@@ -559,7 +559,7 @@ class CourseOnlineController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255|unique:course_online,name,' . $courseOnline->id,
             'description' => 'nullable|string|max:2000',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif',
             'estimated_duration' => 'nullable|integer|min:1|max:10000',
             'difficulty_level' => 'required|in:beginner,intermediate,advanced',
             'is_active' => 'boolean',
