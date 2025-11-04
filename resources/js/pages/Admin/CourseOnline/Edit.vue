@@ -365,9 +365,12 @@ const handleImageUpload = (event) => {
 }
 
 const submit = () => {
-    form.put(route('admin.course-online.update', props.course.id), {
+    // Use POST with method spoofing instead of PUT
+    form.transform((data) => ({
+        ...data,
+        _method: 'PUT'  // ✅ CORRECT
+    })).post(route('admin.course-online.update', props.course.id), {
         onSuccess: () => {
-            // Reset image-related states
             imagePreview.value = null
             imageChanged.value = false
             if (imageInput.value) {
