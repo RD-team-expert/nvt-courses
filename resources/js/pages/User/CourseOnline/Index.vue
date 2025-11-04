@@ -30,7 +30,6 @@ import {
     Timer,
     AlertTriangle
 } from 'lucide-vue-next'
-
 // ✅ ENHANCED: Assignment interface with deadline fields
 interface Assignment {
     id: number
@@ -401,7 +400,7 @@ const getSortedByDeadline = (assignments: Assignment[]) => {
                                     <img
                                         :src="assignment.course.image_path"
                                         :alt="assignment.course.name"
-                                        class="w-full h-full object-cover"
+                                        class="w-full h-full object-full"
                                     />
                                 </div>
 

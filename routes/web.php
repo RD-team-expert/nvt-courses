@@ -390,6 +390,8 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     // ===== COURSE ONLINE MANAGEMENT (NEW SYSTEM) =====
     Route::resource('course-online', App\Http\Controllers\Admin\CourseOnlineController::class);
+    Route::post('course-online/{courseOnline}/update', [App\Http\Controllers\Admin\CourseOnlineController::class, 'update'])->name('course-online.update-file');
+
     Route::patch('course-online/{courseOnline}/toggle-active', [App\Http\Controllers\Admin\CourseOnlineController::class, 'toggleActive'])->name('course-online.toggle-active');
     Route::post('course-online/{courseOnline}/refresh-video-urls', [App\Http\Controllers\Admin\CourseOnlineController::class, 'refreshVideoUrls'])->name('course-online.refresh-video-urls');
     Route::get('course-online/{courseOnline}/statistics', [App\Http\Controllers\Admin\CourseOnlineController::class, 'statistics'])->name('course-online.statistics');
