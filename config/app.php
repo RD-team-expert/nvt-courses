@@ -124,6 +124,13 @@ return [
 
     'google_drive' => [
         'api_key' => env('GOOGLE_DRIVE_API_KEY'),
+        'api_key_1' => env('DRIVE_API_KEY_1'),
+        'api_key_2' => env('DRIVE_API_KEY_2'),
+        'api_key_3' => env('DRIVE_API_KEY_3'),
+        'api_key_4' => env('DRIVE_API_KEY_4'),
+        'api_key_5' => env('DRIVE_API_KEY_5'),
+        'api_key_6' => env('DRIVE_API_KEY_6'),
+        'api_key_7' => env('DRIVE_API_KEY_7'),
         'api_base_url' => 'https://www.googleapis.com/drive/v3',
     ],
 

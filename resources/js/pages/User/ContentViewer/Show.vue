@@ -102,13 +102,36 @@ interface Navigation {
     } | null
 }
 
+interface Video {
+    id: number
+    name: string
+    description: string | null
+    duration: number | null
+    thumbnail_url: string | null
+    streaming_url: string
+    key_id: number
+    key_name: string
+}
+
+
 const props = defineProps<{
     content: Content
     module?: Module
     course?: Course
     userProgress?: UserProgress
     navigation?: Navigation
+    video?: Video  // ✅ ADD THIS!
+
+
+
 }>()
+
+console.log('📦 Props received:', {
+    content: props.content,
+    video: props.video,  // ✅ Use props.video directly!
+    has_streaming_url: !!props.video?.streaming_url,
+    streaming_url: props.video?.streaming_url
+});
 
 // ✅ GET CSRF TOKEN
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
@@ -1026,8 +1049,8 @@ watch(currentPage, (newPage) => {
                                 <!-- Video Element -->
                                 <video
                                     ref="videoElement"
-                                    :src="content.video?.streaming_url || ''"
-                                    :poster="content.video?.thumbnail_url || ''"
+    :src="video?.streaming_url"  
+                                    :poster="video?.thumbnail_url || ''"
                                     class="w-full h-full"
                                     preload="metadata"
                                     @loadstart="onLoadStart"
