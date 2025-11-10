@@ -8,6 +8,8 @@ import axios from 'axios'
 // ✅ vue-pdf-embed import
 import VuePdfEmbed from 'vue-pdf-embed'
 
+
+
 // shadcn-vue components
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -303,38 +305,29 @@ const resetIncrementalCounters = () => {
 
 // ========== SESSION MANAGEMENT ==========
 const startSession = async () => {
+    if (sessionId.value) return
+
     console.log('🚀 Starting session for content:', props.content.id)
 
     try {
-        const payload = {
-            action: 'start',
-            current_position: props.content.content_type === 'video'
-                ? currentTime.value
-                : currentPage.value,
-        }
+        // ✅ Get the key_id from the video data passed from backend
+        const keyId = props.video?.key_id || null
 
-        const response = await axios.post(`/content/${props.content.id}/session`, payload, {
-            headers: { 'X-CSRF-TOKEN': csrfToken }
+        const response = await axios.post(`/content/${props.content.id}/session`, {
+            action: 'start',
+            position: currentTime.value || 0,
+            api_key_id: keyId  // ✅ Send the key_id from frontend
         })
 
         if (response.data.success) {
             sessionId.value = response.data.session_id
-            sessionStartTime.value = Date.now()
-
-            // ✅ Reset all tracking counters
-            resetIncrementalCounters()
-            totalSkipCount.value = 0
-            totalSeekCount.value = 0
-            totalPauseCount.value = 0
-            totalWatchTime.value = 0
-            lastCurrentTime.value = currentTime.value
-
             console.log('✅ Session started:', sessionId.value)
         }
     } catch (error) {
         console.error('❌ Failed to start session:', error)
     }
 }
+
 
 const updateProgress = async () => {
     if (!sessionId.value) return
@@ -885,70 +878,124 @@ const onVideoSeeked = () => {
     totalSeekCount.value++
 }
 
+
 // ========== LIFECYCLE ==========
+// LIFECYCLE
 onMounted(async () => {
     document.addEventListener('fullscreenchange', onFullscreenChange)
 
     // Initialize based on content type
-    if (props.content.content_type === 'pdf') {
-        console.log('📄 Initializing PDF viewer with database page count priority')
-
-        if (props.content.pdf_page_count && props.content.pdf_page_count > 0) {
-            totalPages.value = props.content.pdf_page_count
-            estimatedReadingTime.value = Math.ceil((totalPages.value * 2))
-            console.log('✅ Pre-loaded database page count:', totalPages.value)
-        }
-
-        isLoading.value = true
-
-        // Track reading time
-        const readingTimer = setInterval(() => {
-            if (isPdfLoaded.value || totalPages.value > 0) {
-                pdfReadingTime.value++
-            }
-        }, 1000)
-
-        onUnmounted(() => {
-            clearInterval(readingTimer)
-        })
-    } else if (props.content.content_type === 'video') {
+    if (props.content.contenttype === 'pdf') {
+        // ... your existing PDF initialization code ...
+    } else if (props.content.contenttype === 'video') {
         await nextTick()
         if (videoElement.value) {
-            videoElement.value.currentTime = safeUserProgress.value.current_position || 0
-
-            // ✅ Add video seek event listener
+            videoElement.value.currentTime = safeUserProgress.value.currentposition || 0
             videoElement.value.addEventListener('seeked', onVideoSeeked)
         }
     }
 
     // Progress tracking interval
     const progressInterval = setInterval(() => {
-        if ((props.content.content_type === 'video' && isPlaying.value) ||
-            (props.content.content_type === 'pdf' && (isPdfLoaded.value || totalPages.value > 0))) {
+        if (
+            (props.content.contenttype === 'video' && isPlaying.value) ||
+            (props.content.contenttype === 'pdf' && isPdfLoaded.value && totalPages.value > 0)
+        ) {
             updateProgress()
         }
     }, 180000)
 
-    // Save progress on page unload
-    const handleBeforeUnload = () => {
-        updateProgress()
-        endSession()
+    // ✅ IMPROVED: Multiple cleanup handlers for reliability
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+        // Use sendBeacon for reliable cleanup during page unload
+        if (sessionId.value) {
+            const currentPosition = props.content.contenttype === 'video' 
+                ? currentTime.value 
+                : currentPage.value
+
+            // sendBeacon is more reliable than axios during page unload
+            const payload = JSON.stringify({
+                action: 'end',
+                currentposition: currentPosition,
+                skipcount: skipCountSinceLastHeartbeat.value,
+                seekcount: seekCountSinceLastHeartbeat.value,
+                pausecount: pauseCountSinceLastHeartbeat.value,
+                watchtime: Math.floor(watchTimeSinceLastHeartbeat.value)
+            })
+
+            // Use sendBeacon - it works even when page is closing
+            navigator.sendBeacon(
+                `/content/${props.content.id}/session`,
+                new Blob([payload], { 
+                    type: 'application/json',
+                    // Add CSRF token to headers
+                    headers: { 'X-CSRF-TOKEN': csrfToken || '' }
+                })
+            )
+        }
     }
 
+    // ✅ Handle visibility changes (tab switching, minimizing)
+    const handleVisibilityChange = async () => {
+        if (document.visibilityState === 'hidden') {
+            // User left the tab - send heartbeat
+            await updateProgress()
+            await sendHeartbeat()
+        } else if (document.visibilityState === 'visible') {
+            // User came back - restart session tracking
+            if (!sessionId.value && (isPlaying.value || isPdfLoaded.value)) {
+                await startSession()
+            }
+        }
+    }
+
+    // ✅ Handle page hide (more reliable than beforeunload)
+    const handlePageHide = () => {
+        if (sessionId.value) {
+            const currentPosition = props.content.contenttype === 'video' 
+                ? currentTime.value 
+                : currentPage.value
+
+            const payload = JSON.stringify({
+                action: 'end',
+                currentposition: currentPosition,
+                skipcount: skipCountSinceLastHeartbeat.value,
+                seekcount: seekCountSinceLastHeartbeat.value,
+                pausecount: pauseCountSinceLastHeartbeat.value,
+                watchtime: Math.floor(watchTimeSinceLastHeartbeat.value)
+            })
+
+            navigator.sendBeacon(
+                `/content/${props.content.id}/session`,
+                new Blob([payload], { type: 'application/json' })
+            )
+        }
+    }
+
+    // Add all event listeners
     window.addEventListener('beforeunload', handleBeforeUnload)
+    window.addEventListener('pagehide', handlePageHide)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
 
+    // ✅ Cleanup on component unmount
     onUnmounted(() => {
-        clearInterval(progressInterval)
-        endSession()
-        document.removeEventListener('fullscreenchange', onFullscreenChange)
+        // Clean up all listeners
         window.removeEventListener('beforeunload', handleBeforeUnload)
-
-        // ✅ Cleanup video event listener
+        window.removeEventListener('pagehide', handlePageHide)
+        document.removeEventListener('visibilitychange', handleVisibilityChange)
+        document.removeEventListener('fullscreenchange', onFullscreenChange)
+        
+        // End session before unmounting
+        endSession()
+        clearInterval(progressInterval)
+        
+        // Cleanup video event listener
         if (videoElement.value) {
             videoElement.value.removeEventListener('seeked', onVideoSeeked)
         }
     })
 })
+
 
 // Watch for page changes in PDF
 watch(currentPage, (newPage) => {

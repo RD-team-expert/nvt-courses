@@ -13,6 +13,8 @@ use App\Services\ContentView\LearningSessionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
+use App\Models\LearningSession;
+use Illuminate\Support\Facades\Auth;
 
 class ContentViewController extends Controller
 {
@@ -140,21 +142,33 @@ class ContentViewController extends Controller
 
             switch ($action) {
                 case 'start':
-                    $session = $this->sessionService->startSession(
-                        $user,
-                        $content,
-                        $request->input('position', 0)
-                    );
+    // ✅ Get key_id from request (sent by frontend) OR session storage as fallback
+    $keyId = $request->input('api_key_id') ?? session("content_{$content->id}_key_id");
+    
+    Log::info('🔍 Retrieved key_id for session start', [
+        'content_id' => $content->id,
+        'key_id_from_request' => $request->input('api_key_id'),
+        'key_id_from_session' => session("content_{$content->id}_key_id"),
+        'final_key_id' => $keyId
+    ]);
+    
+    $session = $this->sessionService->startSession(
+        $user,
+        $content,
+        $request->input('position', 0),
+        $keyId  // ✅ Pass the key_id
+    );
 
-                    Log::info('▶️ Session started via service', [
-                        'session_id' => $session->id,
-                    ]);
+    Log::info('▶️ Session started via service', [
+        'session_id' => $session->id,
+        'api_key_id' => $session->api_key_id  // ✅ Verify it was saved
+    ]);
 
-                    return response()->json([
-                        'success' => true,
-                        'session_id' => $session->id,
-                        'message' => 'Session started successfully',
-                    ]);
+    return response()->json([
+        'success' => true,
+        'session_id' => $session->id,
+        'message' => 'Session started successfully',
+    ]);
 
                 case 'heartbeat':
                     $session = $this->sessionService->getActiveSession($user->id, $content->id);
@@ -346,4 +360,7 @@ class ContentViewController extends Controller
             ], 500);
         }
     }
+
+
+    
 }
