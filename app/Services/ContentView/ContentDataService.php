@@ -23,10 +23,20 @@ class ContentDataService
             'is_required' => $content->is_required,
             'duration' => $content->duration,
             'pdf_page_count' => $content->pdf_page_count,
+            
+            // ✅ FIXED: Complete module data
             'module' => [
                 'id' => $content->module->id,
+                'title' => $content->module->title,  // ✅ Added title
                 'name' => $content->module->name,
                 'course_id' => $content->module->course_online_id,
+                
+                // ✅ FIXED: Add complete course data
+                'course' => [
+                    'id' => $content->module->courseOnline->id ?? 0,
+                    'title' => $content->module->courseOnline->title ?? 'Unknown Course',
+                    'name' => $content->module->courseOnline->name ?? 'Unknown Course',
+                ],
             ],
         ];
     }
@@ -121,46 +131,50 @@ class ContentDataService
     /**
      * Build complete Inertia response
      */
-    public function buildInertiaResponse(
+   public function buildInertiaResponse(
     ModuleContent $content,
     ?Video $video,
     ?array $streamingData,
     UserContentProgress $progress,
     array $navigation
 ): array {
+    $contentData = $this->prepareContentData($content);
+    $progressData = $this->prepareProgressData($progress);
+    $navigationData = $navigation;
+
     $response = [
-        'content' => $this->prepareContentData($content),
-        'progress' => $this->prepareProgressData($progress),
-        'navigation' => $this->prepareNavigationData($navigation),
+        'content' => $contentData,
+        'progress' => $progressData,
+        'navigation' => $navigationData,
+        
+        // ✅ ADD THIS: Send course data separately for easier access
+        'course' => [
+            'id' => $content->module->courseOnline->id ?? 0,
+            'name' => $content->module->courseOnline->name ?? 'Unknown Course',
+            'title' => $content->module->courseOnline->title ?? 'Unknown Course',
+        ],
+        
+        // ✅ ADD THIS: Send module data separately
+        'module' => [
+            'id' => $content->module->id ?? 0,
+            'name' => $content->module->name ?? 'Unknown Module',
+            'title' => $content->module->title ?? 'Unknown Module',
+        ],
     ];
 
-    // Add video data if content is video
-    if ($content->content_type === 'video') {
-        // ✅ ALWAYS add video key, even if null
+    // Add video data if it's a video content
+    if ($content->content_type === 'video' && $video) {
         $response['video'] = $this->prepareVideoData($video, $streamingData);
-        
-        Log::info('📦 Video data included in response', [
-            'has_video_model' => !is_null($video),
-            'has_streaming_data' => !is_null($streamingData),
-            'video_data' => $response['video'],
-        ]);
     }
 
-    // Add PDF data if content is PDF
+    // Add PDF data if it's a PDF content
     if ($content->content_type === 'pdf') {
         $response['pdf'] = $this->preparePdfData($content);
     }
 
-    Log::info('📦 Inertia response built successfully', [
-        'content_id' => $content->id,
-        'content_type' => $content->content_type,
-        'has_video' => isset($response['video']),
-        'has_pdf' => isset($response['pdf']),
-        'response_keys' => array_keys($response),
-    ]);
-
     return $response;
 }
+
 
 
     /**
