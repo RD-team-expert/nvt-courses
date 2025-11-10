@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Models\LearningSession;
+
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -14,6 +16,7 @@ class DriveKeyManager
     public function getAvailableKey(): ?array
     {
         try {
+            
             // 🔒 Lock the database while we find and assign a key
             // This prevents two users from getting the same key at the exact same time
             $key = DB::transaction(function () {
@@ -241,4 +244,26 @@ class DriveKeyManager
             return false;
         }
     }
+
+    public function cleanupExpiredSessions(): void
+{
+    $timeout = now()->subSeconds(30);
+
+    $expiredSessions = LearningSession::whereNull('session_end')
+        ->where('last_heartbeat', '<', $timeout)
+        ->get();
+
+    foreach ($expiredSessions as $session) {
+        if ($session->api_key_id) {
+            $this->releaseKey($session->api_key_id);
+        }
+
+        $session->session_end = now();
+        $session->save();
+
+        Log::info('Cleaned up expired session', ['session_id' => $session->id]);
+    }
+}
+
+
 }

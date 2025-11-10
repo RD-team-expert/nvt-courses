@@ -115,6 +115,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/courses/{id}/completion', [CourseController::class, 'showCompletionPage'])->name('courses.completion');
     Route::post('/courses/{id}/rating', [CourseController::class, 'submitRating'])->name('courses.rating.submit');
 
+
+
+
     // Debug route (can be removed in production)
     Route::get('/debug/course/{course}', function (Course $course) {
         return [

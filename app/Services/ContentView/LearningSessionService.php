@@ -24,18 +24,39 @@ class LearningSessionService
   public function startSession(
     User $user,
     ModuleContent $content,
-    float $position = 0
+    float $position = 0,
+    ?int $apiKeyId = null  // ✅ Accept the parameter
 ): LearningSession {
-    // End any existing active sessions
-    $this->endExistingSessions($user->id, $content->id);
+    // End existing sessions
+    $existingSessions = LearningSession::where('user_id', $user->id)
+        ->where('content_id', $content->id)
+        ->whereNull('session_end')
+        ->get();
+
+    foreach ($existingSessions as $existingSession) {
+        if ($existingSession->api_key_id) {
+            app(\App\Services\GoogleDriveService::class)->releaseKey($existingSession->api_key_id);
+        }
+        $existingSession->session_end = now();
+        $existingSession->save();
+    }
+
+    Log::info('🔍 Creating new session with key', [
+        'user_id' => $user->id,
+        'content_id' => $content->id,
+        'api_key_id' => $apiKeyId,  // ✅ Log the parameter value
+        'session_key_name' => "content_{$content->id}_key_id"
+    ]);
 
     // Create new session
     $session = LearningSession::create([
         'user_id' => $user->id,
         'course_online_id' => $content->module->course_online_id,
         'content_id' => $content->id,
+        'api_key_id' => $apiKeyId,  // ✅ Use the parameter!
         'session_start' => now(),
-        // ❌ REMOVED: current_position doesn't exist in your model
+        'last_heartbeat' => now(),
+        'current_position' => $position,
         'total_duration_minutes' => 0,
         'video_watch_time' => 0,
         'video_skip_count' => 0,
@@ -49,10 +70,14 @@ class LearningSessionService
         'session_id' => $session->id,
         'user_id' => $user->id,
         'content_id' => $content->id,
+        'api_key_id' => $session->api_key_id  // ✅ Verify it was saved
     ]);
 
     return $session;
 }
+
+
+
 
     /**
      * Update session with heartbeat data (called every ~10 seconds)
@@ -118,6 +143,39 @@ class LearningSessionService
         return $session;
     }
 
+    // ✅ IMPORTANT: Release the API key BEFORE ending the session
+    if ($session->api_key_id) {
+        Log::info('🔓 Releasing API key from session service', [
+            'session_id' => $sessionId,
+            'api_key_id' => $session->api_key_id,
+            'user_id' => $session->user_id,
+            'content_id' => $session->content_id
+        ]);
+        
+        try {
+            // Get the GoogleDriveService and release the key
+            $driveService = app(\App\Services\GoogleDriveService::class);
+            $driveService->releaseKey($session->api_key_id);
+            
+            Log::info('✅ API key successfully released', [
+                'session_id' => $sessionId,
+                'api_key_id' => $session->api_key_id
+            ]);
+        } catch (\Exception $e) {
+            Log::error('❌ Failed to release API key', [
+                'session_id' => $sessionId,
+                'api_key_id' => $session->api_key_id,
+                'error' => $e->getMessage()
+            ]);
+        }
+    } else {
+        Log::warning('⚠️ Session has no api_key_id to release', [
+            'session_id' => $sessionId,
+            'user_id' => $session->user_id,
+            'content_id' => $session->content_id
+        ]);
+    }
+
     // Calculate total duration
     $totalDuration = max(0, now()->diffInMinutes($session->session_start));
 
@@ -176,6 +234,7 @@ class LearningSessionService
 
     return $session->fresh();
 }
+
 
 
     /**

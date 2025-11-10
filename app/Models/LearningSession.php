@@ -18,6 +18,8 @@ class LearningSession extends Model
         'session_start',
         'session_end',
         'total_duration_minutes',
+        'api_key_id',  // ✅ This MUST be here!
+
 
         // Video-specific tracking
         'video_watch_time',
