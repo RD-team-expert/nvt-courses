@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CourseOnline;
 use App\Models\CourseModule;
 use App\Models\ModuleContent;
+use App\Models\VideoCategory;
 use App\Models\Video;
 use App\Services\FileUploadService;
 use App\Services\ThumbnailService;
@@ -85,26 +86,43 @@ class CourseOnlineController extends Controller
      * Show form for creating new course
      */
     public function create()
-    {
-        $availableVideos = Video::where('is_active', true)
-            ->orderBy('name')
-            ->get(['id', 'name', 'duration', 'google_drive_url'])
-            ->map(function($video) {
-                return [
-                    'id' => $video->id,
-                    'name' => $video->name,
-                    'duration' => $video->duration,
-                    'formatted_duration' => gmdate('H:i:s', $video->duration),
-                    'google_drive_url' => $video->google_drive_url,
-                    'streaming_url' => $this->googleDriveService->processUrl($video->google_drive_url),
-                    'thumbnail_url' => $video->thumbnail_url,
-                ];
-            });
+{
+    // Get videos with categories
+    $availableVideos = Video::with('category')
+        ->where('is_active', true)
+        ->orderBy('name')
+        ->get()
+        ->map(function ($video) {
+            return [
+                'id' => $video->id,
+                'name' => $video->name,
+                'formatted_duration' => $video->formatted_duration,
+                'thumbnail_url' => $video->thumbnail_url,
+                'google_drive_url' => $video->google_drive_url,
+                'content_category_id' => $video->content_category_id,
+                'category_name' => $video->category?->name,
+            ];
+        });
 
-        return Inertia::render('Admin/CourseOnline/Create', [
-            'availableVideos' => $availableVideos,
-        ]);
-    }
+    // ✅ NEW: Get video categories with video counts
+    $videoCategories = VideoCategory::withCount('videos')
+        ->where('is_active', true)
+        ->orderBy('sort_order')
+        ->get()
+        ->map(function ($category) {
+            return [
+                'id' => $category->id,
+                'name' => $category->name,
+                'videos_count' => $category->videos_count,
+            ];
+        });
+
+    return Inertia::render('Admin/CourseOnline/Create', [
+        'availableVideos' => $availableVideos,
+        'videoCategories' => $videoCategories,  // ✅ NEW
+    ]);
+}
+
 
     /**
      * Store newly created course
@@ -114,7 +132,7 @@ class CourseOnlineController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255|unique:course_online,name',
             'description' => 'nullable|string|max:2000',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif',
             'estimated_duration' => 'nullable|integer|min:1|max:10000',
             'difficulty_level' => 'required|in:beginner,intermediate,advanced',
             'is_active' => 'boolean',

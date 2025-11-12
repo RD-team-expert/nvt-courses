@@ -185,8 +185,8 @@ function submit() {
     if (processedData.end_date) {
         processedData.end_date = formatDate(processedData.end_date);
     }
-
-    form.post(`/admin/courses/${props.course.id}?_method=PUT`, {
+// ✅ CHANGED: Remove ?_method=PUT and use the new POST route
+    form.post(`/admin/courses/${props.course.id}/update`, {
         data: processedData,
         forceFormData: true,
     })

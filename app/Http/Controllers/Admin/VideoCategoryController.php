@@ -51,7 +51,7 @@ class VideoCategoryController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255|unique:video_categories,name',
+'name' => 'required|string|max:255|unique:content_categories,name',
             'description' => 'nullable|string|max:1000',
             'is_active' => 'boolean',
             'sort_order' => 'nullable|integer|min:0|max:999',

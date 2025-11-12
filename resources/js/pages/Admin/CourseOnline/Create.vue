@@ -14,16 +14,25 @@ import { Switch } from '@/components/ui/switch'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 
-// Icons
-import { ArrowLeft, Save, BookOpen, Plus, Trash2, ChevronUp, ChevronDown, Video, FileText, Upload, X, AlertTriangle, Clock, Users, Settings, Eye, Calendar, CalendarClock } from 'lucide-vue-next' // ✅ NEW: Added Calendar icons
+// Icons - UPDATED: Added FolderOpen
+import { ArrowLeft, Save, BookOpen, Plus, Trash2, ChevronUp, ChevronDown, Video, FileText, Upload, X, AlertTriangle, Clock, Users, Settings, Eye, Calendar, CalendarClock, FolderOpen } from 'lucide-vue-next'
 
-// Interfaces
+// UPDATED: Added VideoCategory interface
+interface VideoCategory {
+    id: number
+    name: string
+    videos_count: number
+}
+
+// UPDATED: Enhanced Video interface
 interface Video {
     id: number
     name: string
     formatted_duration: string
     thumbnail_url?: string
     google_drive_url: string
+    content_category_id: number | null
+    category_name: string | null
 }
 
 interface Module {
@@ -36,25 +45,24 @@ interface Module {
     content: ContentItem[]
 }
 
-// ✅ ENHANCED: ContentItem with pdf_page_count
 interface ContentItem {
     title: string
     content_type: 'video' | 'pdf'
     order_number: number
     is_required: boolean
     is_active: boolean
-    // Video fields
     video_id: number | null
-    // PDF fields
     pdf_source_type: 'upload' | 'google_drive'
     pdf_file: File | null
     google_drive_pdf_url: string
     pdf_name?: string
-    pdf_page_count: number | null // ✅ NEW: PDF page count field
+    pdf_page_count: number | null
 }
 
+// UPDATED: Enhanced props
 const props = defineProps<{
     availableVideos?: Video[]
+    videoCategories?: VideoCategory[]
 }>()
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -66,30 +74,58 @@ const breadcrumbs: BreadcrumbItem[] = [
 const imageInput = ref<HTMLInputElement | null>(null)
 const imagePreview = ref<string | null>(null)
 
-// ✅ NEW: Form with deadline fields
+// NEW: Video category filter state
+const videoCategoryFilters = ref<Record<string, number | null>>({})
+
 const form = useForm({
-    // Course fields
     name: '',
     description: '',
     image: null as File | null,
     difficulty_level: '',
     estimated_duration: null as number | null,
     is_active: true,
-    // ✅ NEW: Deadline fields
     deadline: null as string | null,
     deadline_type: 'flexible',
-    // Modules with content array
     modules: [] as Module[]
 })
 
-// ✅ ENHANCED: Computed properties with PDF validation
+// NEW: Get filtered videos for specific content item
+const getFilteredVideos = (moduleIndex: number, contentIndex: number) => {
+    if (!props.availableVideos) return []
+    
+    const filterKey = `${moduleIndex}-${contentIndex}`
+    const selectedCategoryId = videoCategoryFilters.value[filterKey]
+    
+    // ✅ FIX: Return all videos if no category selected
+    if (selectedCategoryId === null || selectedCategoryId === undefined || selectedCategoryId === '') {
+        return props.availableVideos
+    }
+    
+    // ✅ FIX: Convert to number for comparison
+    const categoryIdNumber = parseInt(selectedCategoryId.toString())
+    
+    return props.availableVideos.filter(
+        video => video.content_category_id === categoryIdNumber
+    )
+}
+
+// NEW: Set category filter
+const setVideoCategoryFilter = (moduleIndex: number, contentIndex: number, categoryId: number | null) => {
+    const filterKey = `${moduleIndex}-${contentIndex}`
+    
+    // ✅ FIX: Convert empty string to null
+    if (categoryId === '' || categoryId === null || categoryId === undefined) {
+        videoCategoryFilters.value[filterKey] = null
+    } else {
+        videoCategoryFilters.value[filterKey] = parseInt(categoryId.toString())
+    }
+}
+
 const canSubmit = computed(() => {
-    // Basic course info validation
     if (!form.name || !form.difficulty_level || form.modules.length === 0) {
         return false
     }
 
-    // ✅ FIXED: Always check deadline (no conditional)
     if (!form.deadline) {
         return false
     }
@@ -100,14 +136,12 @@ const canSubmit = computed(() => {
         }
 
         if (!module.content || module.content.length === 0) {
-            // Allow modules without content (empty modules are valid)
             return true
         }
 
         return module.content.every(content => {
             const basicValid = content.title && content.content_type
 
-            // PDF validation
             if (content.content_type === 'pdf') {
                 return basicValid &&
                     content.pdf_page_count &&
@@ -126,7 +160,6 @@ const totalContentItems = computed(() => {
     return form.modules.reduce((total, module) => total + (module.content?.length || 0), 0)
 })
 
-// ✅ NEW: Deadline computed properties
 const deadlineMinDate = computed(() => {
     const tomorrow = new Date()
     tomorrow.setDate(tomorrow.getDate() + 1)
@@ -149,13 +182,11 @@ const deadlinePreview = computed(() => {
     }
 })
 
-// Image handling
 const handleImageUpload = (event: Event) => {
     const target = event.target as HTMLInputElement
     const file = target.files?.[0]
 
     if (file) {
-        // Validate file size (2MB)
         if (file.size > 2 * 1024 * 1024) {
             alert('File size must be less than 2MB')
             target.value = ''
@@ -164,7 +195,6 @@ const handleImageUpload = (event: Event) => {
 
         form.image = file
 
-        // Create preview
         const reader = new FileReader()
         reader.onload = (e) => {
             imagePreview.value = e.target?.result as string
@@ -185,7 +215,6 @@ const triggerImageInput = () => {
     imageInput.value?.click()
 }
 
-// Module management
 const addModule = () => {
     form.modules.push({
         name: '',
@@ -201,7 +230,6 @@ const addModule = () => {
 const removeModule = (index: number) => {
     if (confirm('Are you sure you want to remove this module and all its content?')) {
         form.modules.splice(index, 1)
-        // Update order numbers
         form.modules.forEach((module, idx) => {
             module.order_number = idx + 1
         })
@@ -212,18 +240,15 @@ const moveModule = (index: number, direction: 'up' | 'down') => {
     const newIndex = direction === 'up' ? index - 1 : index + 1
     if (newIndex < 0 || newIndex >= form.modules.length) return
 
-    // Swap modules
     const temp = form.modules[index]
     form.modules[index] = form.modules[newIndex]
     form.modules[newIndex] = temp
 
-    // Update order numbers
     form.modules.forEach((module, idx) => {
         module.order_number = idx + 1
     })
 }
 
-// Content management
 const addContentToModule = (moduleIndex: number) => {
     if (!form.modules[moduleIndex].content) {
         form.modules[moduleIndex].content = []
@@ -235,21 +260,18 @@ const addContentToModule = (moduleIndex: number) => {
         order_number: form.modules[moduleIndex].content.length + 1,
         is_required: true,
         is_active: true,
-        // Video fields
         video_id: null,
-        // PDF fields
         pdf_source_type: 'upload',
         pdf_file: null,
         google_drive_pdf_url: '',
         pdf_name: '',
-        pdf_page_count: null // ✅ NEW: Initialize page count
+        pdf_page_count: null
     })
 }
 
 const removeContentFromModule = (moduleIndex: number, contentIndex: number) => {
     if (confirm('Are you sure you want to remove this content item?')) {
         form.modules[moduleIndex].content.splice(contentIndex, 1)
-        // Update order numbers
         form.modules[moduleIndex].content.forEach((content, idx) => {
             content.order_number = idx + 1
         })
@@ -263,7 +285,7 @@ const resetContentFields = (moduleIndex: number, contentIndex: number) => {
     content.google_drive_pdf_url = ''
     content.pdf_source_type = 'upload'
     content.pdf_name = ''
-    content.pdf_page_count = null // ✅ NEW: Reset page count
+    content.pdf_page_count = null
 }
 
 const handlePdfUpload = (event: Event, moduleIndex: number, contentIndex: number) => {
@@ -272,7 +294,6 @@ const handlePdfUpload = (event: Event, moduleIndex: number, contentIndex: number
 
     if (file && file.type === 'application/pdf') {
         form.modules[moduleIndex].content[contentIndex].pdf_file = file
-        // Set default PDF name from file
         form.modules[moduleIndex].content[contentIndex].pdf_name = file.name
     }
 }
@@ -294,10 +315,8 @@ const getDifficultyBadgeColor = (level: string) => {
     }
 }
 
-// ✅ NEW: PDF validation helper
 const validatePdfContent = (content: ContentItem): string | null => {
     if (content.content_type === 'pdf') {
-        // Check if page count exists and is a valid number
         if (!content.pdf_page_count || content.pdf_page_count < 1) {
             return 'PDF page count is required and must be at least 1'
         }
@@ -305,7 +324,6 @@ const validatePdfContent = (content: ContentItem): string | null => {
             return 'Page count cannot exceed 1000'
         }
 
-        // Check source requirements
         if (content.pdf_source_type === 'upload' && !content.pdf_file) {
             return 'Please upload a PDF file'
         }
@@ -316,10 +334,7 @@ const validatePdfContent = (content: ContentItem): string | null => {
     return null
 }
 
-// Form submission
-// ✅ SIMPLIFIED: No conditional deadline logic needed
 const submit = () => {
-    // PDF validation (unchanged)
     for (let moduleIndex = 0; moduleIndex < form.modules.length; moduleIndex++) {
         const module = form.modules[moduleIndex]
         for (let contentIndex = 0; contentIndex < (module.content?.length || 0); contentIndex++) {
@@ -332,7 +347,6 @@ const submit = () => {
         }
     }
 
-    // ✅ ALWAYS SET: has_deadline is always true now
     form.post('/admin/course-online', {
         onSuccess: () => {
             form.reset()
@@ -472,8 +486,7 @@ const submit = () => {
                     </CardContent>
                 </Card>
 
-                <!-- ✅ NEW: Course Deadline Section -->
-                <!-- ✅ FIXED: Course Deadline Section - Always visible -->
+                <!-- Course Deadline Section -->
                 <Card>
                     <CardHeader>
                         <CardTitle class="flex items-center gap-2">
@@ -486,7 +499,7 @@ const submit = () => {
                         </CardDescription>
                     </CardHeader>
                     <CardContent class="space-y-6">
-                        <!-- ✅ ALWAYS VISIBLE: Deadline Date & Time -->
+                        <!-- Deadline Date & Time -->
                         <div class="space-y-2">
                             <Label for="deadline">📅 Deadline Date & Time *</Label>
                             <Input
@@ -506,7 +519,7 @@ const submit = () => {
                             </div>
                         </div>
 
-                        <!-- ✅ ALWAYS VISIBLE: Deadline Type -->
+                        <!-- Deadline Type -->
                         <div class="space-y-2">
                             <Label for="deadline_type">⚙️ Deadline Type</Label>
                             <select
@@ -519,7 +532,7 @@ const submit = () => {
                             </select>
                         </div>
 
-                        <!-- ✅ ALWAYS VISIBLE: Deadline Preview (when deadline is set) -->
+                        <!-- Deadline Preview -->
                         <div v-if="form.deadline && deadlinePreview" class="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg border">
                             <div class="flex items-start gap-3">
                                 <CalendarClock class="h-5 w-5 text-blue-600 mt-0.5" />
@@ -537,7 +550,7 @@ const submit = () => {
                             </div>
                         </div>
 
-                        <!-- ✅ MANDATORY NOTICE -->
+                        <!-- Mandatory Notice -->
                         <Alert>
                             <AlertTriangle class="h-4 w-4" />
                             <AlertDescription>
@@ -874,8 +887,32 @@ const submit = () => {
                                                         </div>
                                                     </div>
 
-                                                    <!-- Video Content Fields -->
+                                                    <!-- UPDATED: Video Content Fields with Category Filter -->
                                                     <div v-if="content.content_type === 'video'" class="space-y-4">
+                                                        <!-- NEW: Video Category Filter -->
+                                                       <div v-if="videoCategories && videoCategories.length > 0" class="space-y-2">
+        <Label>Filter by Category</Label>
+        <select
+            :value="videoCategoryFilters[`${moduleIndex}-${contentIndex}`] || ''"
+            @change="setVideoCategoryFilter(moduleIndex, contentIndex, ($event.target as HTMLSelectElement).value ? parseInt(($event.target as HTMLSelectElement).value) : null)"
+            class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+            <option value="">All Categories</option>
+            <option
+                v-for="category in videoCategories"
+                :key="category.id"
+                :value="category.id"
+            >
+                {{ category.name }} ({{ category.videos_count }} videos)
+            </option>
+        </select>
+        <p class="text-xs text-muted-foreground flex items-center gap-1">
+            <FolderOpen class="h-3 w-3" />
+            Filter videos by category to find what you need faster
+        </p>
+    </div>
+
+                                                        <!-- Video Selection Dropdown -->
                                                         <div class="space-y-2">
                                                             <Label>Select Video</Label>
                                                             <select
@@ -884,17 +921,29 @@ const submit = () => {
                                                                 class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                                             >
                                                                 <option value="">Choose a video</option>
+                                                                <!-- UPDATED: Use getFilteredVideos instead of availableVideos -->
                                                                 <option
-                                                                    v-for="video in availableVideos"
+                                                                    v-for="video in getFilteredVideos(moduleIndex, contentIndex)"
                                                                     :key="video.id"
                                                                     :value="video.id"
                                                                 >
-                                                                    {{ video.name }} ({{ video.formatted_duration }})
+                                                                    {{ video.name }}
+                                                                    <span v-if="video.category_name"> ({{ video.category_name }})</span>
+                                                                    - {{ video.formatted_duration }}
                                                                 </option>
                                                             </select>
+                                                            
+                                                            <!-- NEW: Show message when no videos match filter -->
+                                                            <p 
+                                                                v-if="getFilteredVideos(moduleIndex, contentIndex).length === 0" 
+                                                                class="text-sm text-amber-600 dark:text-amber-500 flex items-center gap-1"
+                                                            >
+                                                                <AlertTriangle class="h-3 w-3" />
+                                                                No videos found in this category. Try selecting a different category.
+                                                            </p>
                                                         </div>
 
-                                                        <!-- Video Preview -->
+                                                        <!-- UPDATED: Video Preview with Category Badge -->
                                                         <div v-if="content.video_id && getSelectedVideo(content.video_id)" class="p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
                                                             <div class="flex items-center gap-3">
                                                                 <img
@@ -905,16 +954,27 @@ const submit = () => {
                                                                 />
                                                                 <div class="flex-1">
                                                                     <p class="font-medium text-sm">{{ getSelectedVideo(content.video_id)!.name }}</p>
-                                                                </div>
-                                                                <div class="flex items-center gap-2 text-xs text-muted-foreground">
-                                                                    <Clock class="h-3 w-3" />
-                                                                    {{ getSelectedVideo(content.video_id)!.formatted_duration }}
+                                                                    <!-- NEW: Show category badge in preview -->
+                                                                    <div class="flex items-center gap-2 mt-1">
+                                                                        <Badge 
+                                                                            v-if="getSelectedVideo(content.video_id)!.category_name" 
+                                                                            variant="outline" 
+                                                                            class="text-xs"
+                                                                        >
+                                                                            <FolderOpen class="h-3 w-3 mr-1" />
+                                                                            {{ getSelectedVideo(content.video_id)!.category_name }}
+                                                                        </Badge>
+                                                                        <div class="flex items-center gap-1 text-xs text-muted-foreground">
+                                                                            <Clock class="h-3 w-3" />
+                                                                            {{ getSelectedVideo(content.video_id)!.formatted_duration }}
+                                                                        </div>
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         </div>
                                                     </div>
 
-                                                    <!-- ✅ ENHANCED: PDF Content Fields with Page Count -->
+                                                    <!-- PDF Content Fields -->
                                                     <div v-if="content.content_type === 'pdf'" class="space-y-4">
                                                         <div class="space-y-3">
                                                             <Label>PDF Source</Label>
@@ -967,7 +1027,7 @@ const submit = () => {
                                                             </div>
                                                         </div>
 
-                                                        <!-- ✅ NEW: PDF Page Count Field -->
+                                                        <!-- PDF Page Count Field -->
                                                         <div class="space-y-2">
                                                             <Label class="text-red-600">PDF Page Count *</Label>
                                                             <Input
@@ -979,7 +1039,6 @@ const submit = () => {
                                                                 required
                                                                 class="w-full"
                                                                 :class="{ 'border-red-500': !content.pdf_page_count }"
-
                                                             />
                                                             <p class="text-xs text-red-600">
                                                                 <strong>Required:</strong> Please count the pages manually and enter the exact number.

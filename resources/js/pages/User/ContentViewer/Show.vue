@@ -879,6 +879,8 @@ const onVideoSeeked = () => {
 }
 
 
+
+
 // ========== LIFECYCLE ==========
 // LIFECYCLE
 onMounted(async () => {
@@ -906,34 +908,31 @@ onMounted(async () => {
     }, 180000)
 
     // ✅ IMPROVED: Multiple cleanup handlers for reliability
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-        // Use sendBeacon for reliable cleanup during page unload
-        if (sessionId.value) {
-            const currentPosition = props.content.contenttype === 'video' 
-                ? currentTime.value 
-                : currentPage.value
+   const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+    console.log('🚨 beforeunload triggered', {
+        hasSession: !!sessionId.value,
+        sessionId: sessionId.value
+    })
+    
+    if (sessionId.value) {
+        const formData = new FormData()
+        formData.append('action', 'end')
+        formData.append('final_position', currentTime.value.toString())
+        formData.append('completion_percentage', progressPercentage.value.toString())
+        formData.append('final_watch_time', watchTimeSinceLastHeartbeat.value.toString())
+        formData.append('final_skip', skipCountSinceLastHeartbeat.value.toString())
+        formData.append('final_seek', seekCountSinceLastHeartbeat.value.toString())
+        formData.append('final_pause', pauseCountSinceLastHeartbeat.value.toString())
 
-            // sendBeacon is more reliable than axios during page unload
-            const payload = JSON.stringify({
-                action: 'end',
-                currentposition: currentPosition,
-                skipcount: skipCountSinceLastHeartbeat.value,
-                seekcount: seekCountSinceLastHeartbeat.value,
-                pausecount: pauseCountSinceLastHeartbeat.value,
-                watchtime: Math.floor(watchTimeSinceLastHeartbeat.value)
-            })
-
-            // Use sendBeacon - it works even when page is closing
-            navigator.sendBeacon(
-                `/content/${props.content.id}/session`,
-                new Blob([payload], { 
-                    type: 'application/json',
-                    // Add CSRF token to headers
-                    headers: { 'X-CSRF-TOKEN': csrfToken || '' }
-                })
-            )
-        }
+        const url = `/content/${props.content.id}/session`
+        
+        console.log('📤 Sending sendBeacon to:', url)
+        const success = navigator.sendBeacon(url, formData)
+        console.log('📬 sendBeacon result:', success ? 'SUCCESS' : 'FAILED')
     }
+}
+
+
 
     // ✅ Handle visibility changes (tab switching, minimizing)
     const handleVisibilityChange = async () => {
@@ -949,28 +948,37 @@ onMounted(async () => {
         }
     }
 
+    
+
     // ✅ Handle page hide (more reliable than beforeunload)
-    const handlePageHide = () => {
-        if (sessionId.value) {
-            const currentPosition = props.content.contenttype === 'video' 
-                ? currentTime.value 
-                : currentPage.value
+   const handlePageHide = () => {
+    if (sessionId.value) {
+        const currentPosition = props.content.contenttype === 'video' 
+            ? currentTime.value 
+            : currentPage.value
 
-            const payload = JSON.stringify({
-                action: 'end',
-                currentposition: currentPosition,
-                skipcount: skipCountSinceLastHeartbeat.value,
-                seekcount: seekCountSinceLastHeartbeat.value,
-                pausecount: pauseCountSinceLastHeartbeat.value,
-                watchtime: Math.floor(watchTimeSinceLastHeartbeat.value)
-            })
-
-            navigator.sendBeacon(
-                `/content/${props.content.id}/session`,
-                new Blob([payload], { type: 'application/json' })
-            )
+        // ✅ CHANGED: Use FormData instead of Blob with JSON
+        const formData = new FormData()
+        formData.append('action', 'end')
+        formData.append('final_position', currentPosition.toString())
+        formData.append('completion_percentage', progressPercentage.value.toString())
+        formData.append('final_watch_time', watchTimeSinceLastHeartbeat.value.toString())
+        formData.append('final_skip', skipCountSinceLastHeartbeat.value.toString())
+        formData.append('final_seek', seekCountSinceLastHeartbeat.value.toString())
+        formData.append('final_pause', pauseCountSinceLastHeartbeat.value.toString())
+        
+        // ✅ Add CSRF token
+        if (csrfToken) {
+            formData.append('_token', csrfToken)
         }
+
+        const url = `/content/${props.content.id}/session`
+        navigator.sendBeacon(url, formData)
+        
+        console.log('🏁 Session ended via pagehide')
     }
+}
+
 
     // Add all event listeners
     window.addEventListener('beforeunload', handleBeforeUnload)
@@ -980,10 +988,14 @@ onMounted(async () => {
     // ✅ Cleanup on component unmount
     onUnmounted(() => {
         // Clean up all listeners
+        
         window.removeEventListener('beforeunload', handleBeforeUnload)
         window.removeEventListener('pagehide', handlePageHide)
         document.removeEventListener('visibilitychange', handleVisibilityChange)
         document.removeEventListener('fullscreenchange', onFullscreenChange)
+        window.addEventListener('beforeunload', handleBeforeUnload)
+    window.addEventListener('pagehide', handlePageHide)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
         
         // End session before unmounting
         endSession()
@@ -994,6 +1006,9 @@ onMounted(async () => {
             videoElement.value.removeEventListener('seeked', onVideoSeeked)
         }
     })
+
+      window.addEventListener('beforeunload', handlePageClose);
+
 })
 
 
@@ -1003,6 +1018,8 @@ watch(currentPage, (newPage) => {
         updatePdfProgress()
     }
 })
+
+
 </script>
 
 <template>

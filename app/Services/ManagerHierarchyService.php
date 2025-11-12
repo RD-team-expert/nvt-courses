@@ -8,6 +8,8 @@ use App\Models\UserDepartmentRole;
 use App\Models\Department;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+
 
 class ManagerHierarchyService
 {
@@ -188,10 +190,49 @@ class ManagerHierarchyService
     /**
      * Get direct managers for a user (L2 only)
      */
-    public function getDirectManagersForUser(int $userId): array
-    {
-        return $this->getManagersForUser($userId, ['L2']);
+   /**
+ * ✅ FIXED: Get ONLY PRIMARY department manager
+ */
+public function getDirectManagersForUser(int $userId): array
+{
+    $user = User::with(['department', 'userLevel'])->find($userId);
+
+    if (!$user || !$user->department) {
+        return [];
     }
+
+    // ✅ Get ONLY ONE primary manager (the first one by ID)
+    $managerRole = UserDepartmentRole::with(['manager.userLevel', 'manager.department'])
+        ->where('department_id', $user->department_id)
+        ->where('is_primary', 1)
+        ->where(function($query) {
+            $query->whereNull('end_date')
+                  ->orWhere('end_date', '>', now());
+        })
+        ->orderBy('id', 'asc') // ✅ Take the oldest/first primary manager
+        ->first(); // ✅ FIRST() not get() - returns only ONE
+
+    if (!$managerRole || !$managerRole->manager) {
+        return [];
+    }
+
+    $managerLevel = $this->getUserLevelCode($managerRole->manager);
+
+    // Only include L2 managers
+    if ($managerLevel !== 'L2') {
+        return [];
+    }
+
+    return [[
+        'manager' => $managerRole->manager,
+        'level' => $managerLevel,
+        'relationship' => 'primary_department_manager',
+        'role_type' => $managerRole->role_type,
+        'is_primary' => true
+    ]];
+}
+
+
 
     /**
      * Get managers for multiple users (optimized)

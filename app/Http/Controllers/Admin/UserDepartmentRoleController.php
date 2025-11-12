@@ -94,21 +94,20 @@ class UserDepartmentRoleController extends Controller
 
         // ✅ FIXED: Get all employees with proper relationships
         $employees = User::where('status', 'active')
-            ->with(['userLevel', 'department']) // Make sure relationships are loaded
-            ->get()
-            ->map(function ($user) {
-                return [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'level' => $user->userLevel?->name, // This should not be null
-                    'levelcode' => $user->userLevel?->code, // Add level code
-                    'department' => $user->department?->name, // This should not be null
-                    'departmentid' => $user->department_id, // Add department ID
-                    'department_id' => $user->department_id, // Alternative field name
-                    'employeecode' => $user->employee_code,
-                ];
-            });
+        ->with(['userLevel', 'department'])
+        ->get()
+        ->map(function ($user) {
+            return [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'level' => $user->userLevel?->name,
+                'level_code' => $user->userLevel?->code,
+                'department' => $user->department?->name,
+                'department_id' => $user->department_id, // ✅ CRITICAL: Include this
+                'employee_code' => $user->employee_code,
+            ];
+        });
 
         Log::info('Controller data:');
         Log::info('Employees count: ' . $employees->count());
@@ -116,7 +115,6 @@ class UserDepartmentRoleController extends Controller
         foreach ($employees as $emp) {
             \Log::info("Employee: {$emp['name']} | Level: {$emp['level']} | Department: {$emp['department']}");
         }
-//        dd($employees);
 
         return Inertia::render('Admin/ManagerRoles/Assignment', [
             'managers' => $managers,
