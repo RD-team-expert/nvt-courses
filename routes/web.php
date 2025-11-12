@@ -389,7 +389,8 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/resend-login-links/bulk', [ResendLoginController::class, 'bulkResend'])->name('resend-login-links.bulk');
 
     // ===== COURSE MANAGEMENT (TRADITIONAL) =====
-    Route::resource('courses', AdminCourseController::class);
+    Route::resource('courses', AdminCourseController::class)->except('update');
+    Route::post('courses/{course}/update', [AdminCourseController::class, 'update'])->name('courses.update');
 
     // ===== COURSE ONLINE MANAGEMENT (NEW SYSTEM) =====
     Route::resource('course-online', App\Http\Controllers\Admin\CourseOnlineController::class);
@@ -422,13 +423,16 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::resource('audio', App\Http\Controllers\Admin\AudioController::class);
     Route::post('/audio/{audio}/toggle-active', [App\Http\Controllers\Admin\AudioController::class, 'toggleActive'])->name('audio.toggle-active');
 
-    // ===== VIDEO MANAGEMENT =====
-    Route::resource('video-categories', VideoCategoryController::class);
-    Route::post('video-categories/{videoCategory}/toggle-active', [VideoCategoryController::class, 'toggleActive'])->name('video-categories.toggle-active');
-    Route::resource('videos', App\Http\Controllers\Admin\VideoController::class);
-    Route::post('videos/{video}/toggle-active', [App\Http\Controllers\Admin\VideoController::class, 'toggleActive'])->name('videos.toggle-active');
-    Route::get('videos/{video}/streaming-url', [App\Http\Controllers\Admin\VideoController::class, 'getStreamingUrl'])->name('videos.streaming-url');
-    Route::post('videos/batch-refresh-urls', [App\Http\Controllers\Admin\VideoController::class, 'batchRefreshUrls'])->name('videos.batch-refresh-urls');
+   // ===== VIDEO MANAGEMENT =====
+Route::resource('video-categories', VideoCategoryController::class);
+Route::post('video-categories/{videoCategory}/toggle-active', [VideoCategoryController::class, 'toggleActive'])->name('video-categories.toggle-active');
+
+Route::post('videos/{video}/update', [App\Http\Controllers\Admin\VideoController::class, 'update'])->name('videos.update');
+
+Route::resource('videos', App\Http\Controllers\Admin\VideoController::class)->except('update');
+Route::post('videos/{video}/toggle-active', [App\Http\Controllers\Admin\VideoController::class, 'toggleActive'])->name('videos.toggle-active');
+Route::get('videos/{video}/streaming-url', [App\Http\Controllers\Admin\VideoController::class, 'getStreamingUrl'])->name('videos.streaming-url');
+Route::post('videos/batch-refresh-urls', [App\Http\Controllers\Admin\VideoController::class, 'batchRefreshUrls'])->name('videos.batch-refresh-urls');
 
     // ===== ASSIGNMENT MANAGEMENT =====
     Route::get('assignments', [App\Http\Controllers\Admin\AssignmentController::class, 'index'])->name('assignments.index');

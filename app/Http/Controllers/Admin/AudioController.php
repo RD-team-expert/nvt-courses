@@ -75,7 +75,7 @@ class AudioController extends Controller
             'description' => 'nullable|string|max:2000',
             'google_cloud_url' => 'required|url|max:500',
             'duration' => 'nullable|string',
-            'thumbnail' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
+            'thumbnail' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp',
             'thumbnail_url' => 'nullable|url|max:500',
             'audio_category_id' => 'nullable|exists:audio_categories,id',
             'is_active' => 'boolean'
@@ -250,7 +250,7 @@ class AudioController extends Controller
             'description' => 'nullable|string|max:2000',
             'google_cloud_url' => 'required|url|max:500',
             'duration' => 'nullable|integer|min:1|max:86400',
-            'thumbnail' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
+            'thumbnail' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp',
             'thumbnail_url' => 'nullable|url|max:500',
             'audio_category_id' => 'nullable|exists:audio_categories,id',
             'is_active' => 'boolean',

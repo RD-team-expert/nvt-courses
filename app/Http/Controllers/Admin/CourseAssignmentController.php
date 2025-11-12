@@ -104,186 +104,238 @@ class CourseAssignmentController extends Controller
      * Show form for creating new assignments
      */
     public function create(Request $request)
-    {
-        $courses = CourseOnline::active()
-            ->withCount(['modules', 'assignments'])
-            ->orderBy('name')
-            ->get()
-            ->map(fn($course) => [
-                'id' => $course->id,
-                'name' => $course->name,
-                'description' => $course->description,
-                'difficulty_level' => $course->difficulty_level,
-                'estimated_duration' => $course->estimated_duration,
-                'modules_count' => $course->modules_count,
-                'current_assignments' => $course->assignments_count,
-            ]);
+{
+    $selectedCourseId = $request->get('course_id');
+    
+    $courses = CourseOnline::active()
+        ->withCount(['modules', 'assignments'])
+        ->orderBy('name')
+        ->get()
+        ->map(fn($course) => [
+            'id' => $course->id,
+            'name' => $course->name,
+            'description' => $course->description,
+            'difficulty_level' => $course->difficulty_level,
+            'estimated_duration' => $course->estimated_duration,
+            'modules_count' => $course->modules_count,
+            'current_assignments' => $course->assignments_count,
+        ]);
 
-        $users = User::where('role', '!=', 'admin')
-            ->orderBy('name')
-            ->get()
-            ->map(fn($user) => [
+    $departments = \App\Models\Department::query()
+        ->orderBy('name')
+        ->get(['id', 'name']);
+
+    // ✅ FIXED: Check if user has THIS specific course
+    $users = User::where('role', '!=', 'admin')
+        ->with('department')
+        ->orderBy('name')
+        ->get()
+        ->map(function($user) use ($selectedCourseId) {
+            // ✅ Check if user has this SPECIFIC course assigned
+            $hasThisCourse = false;
+            if ($selectedCourseId) {
+                $hasThisCourse = \App\Models\CourseOnlineAssignment::where('user_id', $user->id)
+                    ->where('course_online_id', $selectedCourseId)
+                    ->exists();
+            }
+            
+            return [
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
+                'department_id' => $user->department_id,
+                'department_name' => $user->department?->name ?? 'No Department',
                 'active_assignments' => $user->courseAssignments()->where('status', 'in_progress')->count(),
-            ]);
+                'has_selected_course' => $hasThisCourse, // ✅ NEW: Flag for this specific course
+            ];
+        });
 
-        return Inertia::render('Admin/CourseAssignment/Create', [
-            'courses' => $courses,
-            'users' => $users,
-            'selectedCourseId' => $request->get('course_id'),
-            'selectedUserIds' => $request->get('user_ids', []),
-        ]);
-    }
+    return Inertia::render('Admin/CourseAssignment/Create', [
+        'courses' => $courses,
+        'users' => $users,
+        'departments' => $departments,
+        'selectedCourseId' => $selectedCourseId,
+        'selectedUserIds' => $request->get('user_ids', []),
+    ]);
+}
+
+
 
     /**
      * Store newly created assignments
      */
     public function store(Request $request)
-    {
-        Log::info('🎯 === COURSE ONLINE ASSIGNMENT START ===', [
-            'admin_id' => auth()->id(),
-            'admin_name' => auth()->user()->name,
-            'request_data' => $request->all(),
-        ]);
+{
+    Log::info('🎯 === COURSE ONLINE ASSIGNMENT START ===', [
+        'admin_id' => auth()->id(),
+        'admin_name' => auth()->user()->name,
+        'request_data' => $request->all(),
+    ]);
 
-        $validated = $request->validate([
-            'course_id' => 'required|exists:course_online,id',
-            'user_ids' => 'required|array|min:1',
-            'user_ids.*' => 'exists:users,id',
-            'send_notification' => 'boolean',
-        ]);
+    $validated = $request->validate([
+        'course_id' => 'required|exists:course_online,id',
+        'user_ids' => 'required|array|min:1',
+        'user_ids.*' => 'exists:users,id',
+        'send_notification' => 'boolean',
+    ]);
 
-        try {
-            $course = CourseOnline::with(['modules'])->findOrFail($validated['course_id']);
-            $users = User::with(['department'])->whereIn('id', $validated['user_ids'])->get();
+    try {
+        $course = CourseOnline::with(['modules'])->findOrFail($validated['course_id']);
+        $users = User::with(['department'])->whereIn('id', $validated['user_ids'])->get();
 
-            $assignmentCount = 0;
-            $skippedCount = 0;
-            $assignedUsers = [];
+        $assignmentCount = 0;
+        $skippedCount = 0;
+        
+        // ✅ NEW: Group users by manager
+        $usersByManager = [];
 
-            Log::info('📊 Course assignment details', [
-                'course_id' => $course->id,
-                'course_name' => $course->name,
-                'user_count' => $users->count(),
-                'module_count' => $course->modules->count(),
-                'send_notification' => $validated['send_notification'] ?? true,
-            ]);
+        foreach ($users as $user) {
+            $existingAssignment = CourseOnlineAssignment::where('course_online_id', $course->id)
+                ->where('user_id', $user->id)
+                ->first();
 
-            foreach ($users as $user) {
-                // Check if assignment already exists
-                $existingAssignment = CourseOnlineAssignment::where('course_online_id', $course->id)
-                    ->where('user_id', $user->id)
-                    ->first();
-
-                if ($existingAssignment) {
-                    Log::warning('⚠️ Assignment already exists', [
-                        'user_id' => $user->id,
-                        'user_email' => $user->email,
-                        'course_id' => $course->id,
-                        'existing_status' => $existingAssignment->status,
-                    ]);
-
-                    $skippedCount++;
-                    continue;
-                }
-
-                // Create new assignment
-                $assignment = CourseOnlineAssignment::create([
-                    'course_online_id' => $course->id,
+            if ($existingAssignment) {
+                Log::warning('⚠️ Assignment already exists', [
                     'user_id' => $user->id,
-                    'assigned_by' => auth()->id(),
-                    'assigned_at' => now(),
-                    'status' => 'assigned',
-                    'progress_percentage' => 0,
-                    'current_module_id' => $course->modules->first()?->id,
-                    'notification_sent' => false,
-                ]);
-
-                $assignedUsers[] = $user;
-                $assignmentCount++;
-
-                Log::info('✅ Assignment created', [
-                    'assignment_id' => $assignment->id,
-                    'user_id' => $user->id,
-                    'user_email' => $user->email,
                     'course_id' => $course->id,
                 ]);
+                $skippedCount++;
+                continue;
+            }
 
-                // ✅ Send notification using event (if enabled)
-                if ($validated['send_notification'] ?? true) {
-                    try {
-                        // Generate login link if user has no password
-                        $loginLink = $this->generateUserLoginLink($user, $course);
+            $assignment = CourseOnlineAssignment::create([
+                'course_online_id' => $course->id,
+                'user_id' => $user->id,
+                'assigned_by' => auth()->id(),
+                'assigned_at' => now(),
+                'status' => 'assigned',
+                'progress_percentage' => 0,
+                'current_module_id' => $course->modules->first()?->id,
+                'notification_sent' => false,
+            ]);
 
-                        // Dispatch email event
-                        CourseOnlineAssigned::dispatch(
-                            $course,
-                            $user,
-                            $loginLink,
-                            auth()->user(),
-                            [
-                                'assignment_type' => 'course_online',
-                                'assignment_id' => $assignment->id,
-                                'total_modules' => $course->modules->count(),
-                                'estimated_duration' => $course->estimated_duration,
-                                'difficulty_level' => $course->difficulty_level,
-                            ]
-                        );
+            $assignmentCount++;
 
-                        // Mark notification as sent
-                        $assignment->update(['notification_sent' => true]);
-
-                        Log::info('📧 Notification event dispatched', [
-                            'user_email' => $user->email,
-                            'course_name' => $course->name,
-                            'has_login_link' => !empty($loginLink),
-                        ]);
-
-                    } catch (\Exception $e) {
-                        Log::error('❌ Notification dispatch failed', [
-                            'user_id' => $user->id,
-                            'course_id' => $course->id,
-                            'error' => $e->getMessage(),
-                        ]);
+            // ✅ NEW: Group users by their managers
+            try {
+                $managers = app(\App\Services\ManagerHierarchyService::class)
+                    ->getDirectManagersForUser($user->id);
+                
+                foreach ($managers as $managerData) {
+                    $managerId = $managerData['manager']->id;
+                    
+                    if (!isset($usersByManager[$managerId])) {
+                        $usersByManager[$managerId] = [
+                            'manager' => $managerData['manager'],
+                            'users' => [],
+                            'relationship' => $managerData['relationship'],
+                            'level' => $managerData['level'],
+                        ];
                     }
+                    
+                    $usersByManager[$managerId]['users'][] = $user;
+                }
+            } catch (\Exception $e) {
+                Log::warning('⚠️ Could not get managers', [
+                    'user_id' => $user->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+            // ✅ Send notification to USER only (skip manager for now)
+            if ($validated['send_notification'] ?? true) {
+                try {
+                    $loginLink = $this->generateUserLoginLink($user, $course);
+
+                    CourseOnlineAssigned::dispatch(
+                        $course,
+                        $user,
+                        $loginLink,
+                        auth()->user(),
+                        [
+                            'assignment_type' => 'course_online',
+                            'assignment_id' => $assignment->id,
+                            'total_modules' => $course->modules->count(),
+                            'estimated_duration' => $course->estimated_duration,
+                            'difficulty_level' => $course->difficulty_level,
+                            'skip_manager_notification' => true, // ✅ Skip manager in listener
+                        ]
+                    );
+
+                    $assignment->update(['notification_sent' => true]);
+
+                } catch (\Exception $e) {
+                    Log::error('❌ User notification failed', [
+                        'user_id' => $user->id,
+                        'error' => $e->getMessage(),
+                    ]);
                 }
             }
-
-            Log::info('🎉 Course assignment completed', [
-                'total_assigned' => $assignmentCount,
-                'skipped' => $skippedCount,
-                'course_name' => $course->name,
-                'admin' => auth()->user()->name,
-            ]);
-
-            // Prepare success message
-            $message = "Successfully assigned the course to {$assignmentCount} user(s).";
-            if ($skippedCount > 0) {
-                $message .= " {$skippedCount} user(s) were already assigned to this course.";
-            }
-
-            if ($validated['send_notification'] ?? true) {
-                $message .= " Email notifications have been sent to users and their managers.";
-            }
-
-            return redirect()->route('admin.course-assignments.index')
-                ->with('success', $message);
-
-        } catch (\Exception $e) {
-            Log::error('❌ Course assignment failed', [
-                'admin_id' => auth()->id(),
-                'course_id' => $validated['course_id'] ?? null,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            return redirect()->back()
-                ->withInput()
-                ->withErrors(['error' => 'Failed to assign course: ' . $e->getMessage()]);
         }
+
+        // ✅ NEW: Send ONE email per manager with ALL their employees
+        if ($validated['send_notification'] ?? true) {
+            foreach ($usersByManager as $managerId => $data) {
+                try {
+                    $manager = $data['manager'];
+                    $employees = collect($data['users']);
+
+                    Log::info('📧 Sending consolidated manager notification', [
+                        'manager_email' => $manager->email,
+                        'employee_count' => $employees->count(),
+                    ]);
+
+                    Mail::to($manager->email)->send(
+                        new \App\Mail\CourseOnlineAssignmentManagerNotification(
+                            $course,
+                            $employees, // ✅ ALL employees at once
+                            auth()->user(),
+                            $manager,
+                            [
+                                'relationship' => $data['relationship'],
+                                'level' => $data['level'],
+                            ]
+                        )
+                    );
+
+                    Log::info('✅ Manager notification sent', [
+                        'manager_email' => $manager->email,
+                        'employee_count' => $employees->count(),
+                    ]);
+
+                } catch (\Exception $e) {
+                    Log::error('❌ Manager notification failed', [
+                        'manager_id' => $managerId,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+        }
+
+        Log::info('🎉 Course assignment completed', [
+            'total_assigned' => $assignmentCount,
+            'skipped' => $skippedCount,
+        ]);
+
+        $message = "Successfully assigned the course to {$assignmentCount} user(s).";
+        if ($skippedCount > 0) {
+            $message .= " {$skippedCount} user(s) were already assigned.";
+        }
+
+        return redirect()->route('admin.course-assignments.index')
+            ->with('success', $message);
+
+    } catch (\Exception $e) {
+        Log::error('❌ Course assignment failed', [
+            'error' => $e->getMessage(),
+        ]);
+
+        return redirect()->back()
+            ->withInput()
+            ->withErrors(['error' => 'Failed to assign course: ' . $e->getMessage()]);
     }
+}
+
 
     /**
      * ✅ PRIVATE: Generate login link for users without passwords

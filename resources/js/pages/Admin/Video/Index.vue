@@ -132,7 +132,6 @@
                                 <!-- Video Details -->
                                 <TableCell>
                                     <div class="flex items-center gap-3">
-                                        <!-- Thumbnail -->
                                         <div class="relative w-16 h-16 rounded-lg overflow-hidden bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-950/50 dark:to-purple-950/50 flex items-center justify-center shrink-0 border border-muted">
                                             <img
                                                 v-if="video.thumbnail_url"
@@ -194,8 +193,8 @@
                                         <div class="flex items-center gap-2 text-sm">
                                             <TrendingUp class="h-4 w-4 text-muted-foreground" />
                                             <span :class="getCompletionColor(video.avg_completion)">
-                        {{ Math.round(video.avg_completion) }}% completion
-                      </span>
+                                                {{ Math.round(video.avg_completion) }}% completion
+                                            </span>
                                         </div>
                                     </div>
                                 </TableCell>
@@ -276,7 +275,7 @@
 
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3'
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import AppLayout from '@/layouts/AppLayout.vue'
 import type { BreadcrumbItem } from '@/types'
 
@@ -348,6 +347,25 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Video Management', href: '/admin/videos' },
 ]
 
+// ✅ DEBUG LOGGING
+onMounted(() => {
+    console.log('====== VIDEO INDEX DEBUG ======')
+    console.log('Total videos:', props.videos.length)
+    console.log('Total categories:', props.categories.length)
+    console.log('Available categories:', props.categories)
+    console.log('----------------------------')
+    
+    props.videos.forEach((video, index) => {
+        console.log(`Video ${index + 1}: "${video.name}"`)
+        console.log('  - ID:', video.id)
+        console.log('  - Category object:', video.category)
+        console.log('  - Has category?:', !!video.category)
+        console.log('  - Category ID:', video.category?.id || 'NULL')
+        console.log('  - Category Name:', video.category?.name || 'NULL')
+        console.log('----------------------------')
+    })
+})
+
 // Statistics
 const stats = computed(() => ({
     total: props.videos.length,
@@ -402,7 +420,6 @@ function handleImageError(event: Event) {
     const img = event.target as HTMLImageElement
     img.style.display = 'none'
 
-    // Show fallback icon
     const parent = img.parentElement
     if (parent) {
         const fallback = parent.querySelector('.fallback-icon') as HTMLElement

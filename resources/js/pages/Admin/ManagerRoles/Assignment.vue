@@ -1,7 +1,3 @@
-<!--
-  Assign Manager Role Page
-  Create and configure management assignments with role types and responsibilities
--->
 <script setup lang="ts">
 import { useForm, Link } from '@inertiajs/vue3'
 import AdminLayout from '@/layouts/AdminLayout.vue'
@@ -39,19 +35,11 @@ import {
 const props = defineProps({
     managers: Array,
     departments: Array,
-    employees: Array, // ✅ Contains all employee data
+    employees: Array,
     roleTypes: Object,
 })
 
-// Add a mounted flag to prevent operations on unmounted component
 const isMounted = ref(true)
-
-// ✅ DEBUG: Log initial props data
-console.log('🚀 Initial Props Data:')
-console.log('📊 Departments:', props.departments)
-console.log('👥 Employees:', props.employees)
-console.log('👔 Managers:', props.managers)
-console.log('🏷️ RoleTypes:', props.roleTypes)
 
 const form = useForm({
     user_id: '',
@@ -66,7 +54,6 @@ const form = useForm({
     notes: '',
 })
 
-// ✅ Management type options
 const managementTypes = [
     {
         value: 'specific_user',
@@ -95,37 +82,31 @@ const managementTypes = [
 const handleManagerChange = (value: string) => {
     if (!isMounted.value) return
     form.user_id = value === 'none' ? '' : value
-    console.log('👤 Manager selected:', form.user_id)
 }
 
 const handleDepartmentChange = (value: string) => {
     if (!isMounted.value) return
     form.department_id = value === 'none' ? '' : value
-    console.log('🏢 Department selected:', form.department_id, getDepartmentName(form.department_id))
 }
 
 const handleRoleTypeChange = (value: string) => {
     if (!isMounted.value) return
     form.role_type = value === 'none' ? '' : value
-    console.log('🏷️ Role type selected:', form.role_type)
 }
 
 const handleAuthorityLevelChange = (value: string) => {
     if (!isMounted.value) return
     form.authority_level = parseInt(value)
-    console.log('⚡ Authority level selected:', form.authority_level)
 }
 
 const handleEmployeeChange = (value: string) => {
     if (!isMounted.value) return
     form.manages_user_id = value === 'none' ? '' : value
-    console.log('👥 Employee selected to manage:', form.manages_user_id)
 }
 
 const handleManagementTypeChange = (value: string) => {
     if (!isMounted.value) return
     form.management_type = value
-    console.log('🎯 Management type selected:', value)
 }
 
 const handlePrimaryRoleChange = (checked: boolean) => {
@@ -133,88 +114,34 @@ const handlePrimaryRoleChange = (checked: boolean) => {
     form.is_primary = checked
 }
 
-// ✅ FIXED: Filter employees by selected department (using existing props data)
+// ✅ FIXED: Filter employees by selected department
 const departmentEmployees = computed(() => {
-    console.log('Computing departmentEmployees...');
-    console.log('Selected departmentid:', form.department_id);
-
-    // TEMPORARY: Return ALL employees to test if filtering is the problem
-    console.log('TESTING: Returning ALL employees without filter');
-    console.log('All employees available:', props.employees?.length || 0);
-
-    const allEmployees = props.employees || [];
-
-    console.log('Returning all employees:', allEmployees);
-    return allEmployees;
-});
+    if (!form.department_id) return []
+    
+    return (props.employees || []).filter(emp => 
+        emp.department_id === parseInt(form.department_id)
+    )
+})
 
 // ✅ Filter employees that can be managed (exclude self)
 const availableEmployees = computed(() => {
-    console.log('👥 Computing availableEmployees...')
-    console.log('🔍 Department employees count:', departmentEmployees.value.length)
-    console.log('👤 Selected manager ID:', form.user_id)
-
-    const available = departmentEmployees.value.filter(emp => {
-        const notSelf = emp.id !== parseInt(form.user_id)
-        console.log(`   Employee ${emp.name} (ID: ${emp.id}) !== Manager (ID: ${form.user_id}) = ${notSelf}`)
-        return notSelf
-    })
-
-    console.log('✅ Available employees for management:', available.length)
-    console.log('📋 Available employees list:', available)
-
-    return available
-})
-
-// ✅ Watch for department changes
-watch(() => form.department_id, (newDeptId, oldDeptId) => {
-    if (!isMounted.value) return
-    console.log('🔄 Department changed from', oldDeptId, 'to', newDeptId)
-
-    if (newDeptId) {
-        const dept = props.departments?.find(d => d.id == newDeptId)
-        console.log('🏢 New department selected:', dept?.name)
-
-        // Trigger recomputation by accessing the computed property
-        console.log('🔍 This will trigger departmentEmployees computation...')
-        console.log('📊 Available employees after change:', availableEmployees.value.length)
-    }
+    return departmentEmployees.value.filter(emp => 
+        emp.id !== parseInt(form.user_id)
+    )
 })
 
 // ✅ Watch for management type changes
-watch(() => form.management_type, (newType, oldType) => {
+watch(() => form.management_type, (newType) => {
     if (!isMounted.value) return
-    console.log('🔄 Management type changed from', oldType, 'to', newType)
-
     if (newType !== 'specific_user') {
-        console.log('🧹 Clearing manages_user_id because type is not specific_user')
         form.manages_user_id = ''
     }
-})
-
-// ✅ Watch for form changes
-watch(() => form.manages_user_id, (newUserId, oldUserId) => {
-    if (!isMounted.value) return
-    console.log('👤 Manages user ID changed from', oldUserId, 'to', newUserId)
 })
 
 function submit() {
     if (!isMounted.value) return
 
-    console.log('📤 Form submission started...')
-    console.log('📋 Form data:', {
-        user_id: form.user_id,
-        department_id: form.department_id,
-        role_type: form.role_type,
-        manages_user_id: form.manages_user_id,
-        management_type: form.management_type,
-        is_primary: form.is_primary,
-        authority_level: form.authority_level
-    })
-
-    // ✅ Clear manages_user_id if not managing specific user
     if (form.management_type !== 'specific_user') {
-        console.log('🧹 Clearing manages_user_id for submission')
         form.manages_user_id = ''
     }
 
@@ -228,25 +155,17 @@ function submit() {
     })
 }
 
-// Helper function to get selected department name
 const getDepartmentName = (departmentId) => {
     const dept = props.departments?.find(d => d.id == departmentId)
-    const name = dept ? dept.name : ''
-    console.log('🏢 getDepartmentName for ID', departmentId, '=', name)
-    return name
+    return dept ? dept.name : ''
 }
 
-// ✅ DEBUG: Log when component mounts
-console.log('🎬 Component mounted!')
-
-// Breadcrumbs
 const breadcrumbs: BreadcrumbItemType[] = [
     { name: 'Dashboard', href: route('dashboard') },
     { name: 'Manager Roles', href: route('admin.manager-roles.index') },
     { name: 'Assign Role', href: route('admin.manager-roles.create') }
 ]
 
-// Cleanup on unmount
 onUnmounted(() => {
     isMounted.value = false
 })
@@ -413,7 +332,6 @@ onUnmounted(() => {
                                         </div>
                                     </div>
 
-                                    <!-- Selected indicator -->
                                     <div v-if="form.management_type === type.value" class="absolute top-2 right-2">
                                         <div class="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
                                             <CheckCircle class="w-4 h-4 text-primary-foreground" />
@@ -438,11 +356,6 @@ onUnmounted(() => {
 
                         <div class="space-y-2">
                             <Label for="employee" class="text-foreground">Select L1 Employee to Manage *</Label>
-
-                            <!-- DEBUG: Show employee count -->
-                            <Badge variant="secondary" class="mb-2 bg-secondary text-secondary-foreground">
-                                Debug: {{ availableEmployees.length }} employees available
-                            </Badge>
 
                             <Select
                                 :model-value="form.manages_user_id || 'none'"
@@ -525,7 +438,7 @@ onUnmounted(() => {
                                 <div v-if="form.errors.start_date" class="text-destructive text-sm">{{ form.errors.start_date }}</div>
                             </div>
 
-                            <!-- End Date (Optional) - FIXED: Proper closing tag -->
+                            <!-- End Date -->
                             <div class="space-y-2">
                                 <Label for="end-date" class="text-foreground">End Date <span class="text-muted-foreground font-normal">(Optional)</span></Label>
                                 <Input
@@ -588,7 +501,7 @@ onUnmounted(() => {
                     >
                         <Loader2 v-if="form.processing" class="mr-2 h-4 w-4 animate-spin" />
                         <span v-if="form.processing">Creating Assignment...</span>
-                        <span v-else>Create Role Assignment</span>
+                        <span v-else">Create Role Assignment</span>
                     </Button>
                     <Button
                         :as="Link"

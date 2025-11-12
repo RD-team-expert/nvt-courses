@@ -77,7 +77,7 @@ class CourseOnlineAssignmentManagerNotification extends Mailable
                 'manager' => $this->manager,
                 'metadata' => $this->metadata,
                 // ✅ NEW: Deadline-specific data for template
-                'hasDeadline' => $this->hasDeadline,
+                'hasDeadline' => false, // ✅ Set to false
                 'deadlineDate' => $this->deadlineDate,
                 'deadlineStatus' => $this->deadlineStatus,
                 'daysUntilDeadline' => $this->daysUntilDeadline,

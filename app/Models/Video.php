@@ -17,6 +17,7 @@ class Video extends Model
         'description',
         'google_drive_url',
         'duration',
+        'content_category_id', // ✅ ADD THIS
         'thumbnail_path',
         'is_active',
         'created_by',
@@ -41,7 +42,8 @@ class Video extends Model
      */
     public function category(): BelongsTo
     {
-        return $this->belongsTo(VideoCategory::class, 'video_category_id');
+        return $this->belongsTo(VideoCategory::class, 'content_category_id', 'id');
+        //                       Model name           Foreign key         Owner key
     }
 
     /**
