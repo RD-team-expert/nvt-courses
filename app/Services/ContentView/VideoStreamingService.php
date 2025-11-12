@@ -25,39 +25,41 @@ class VideoStreamingService
      * @return array|null ['streaming_url' => string, 'key_id' => int, 'key_name' => string] or null
      */
     public function getStreamingUrl(Video $video, ModuleContent $content): ?array
-    {
-        if (!$video || !$video->google_drive_url) {
-            Log::warning('❌ Video has no Google Drive URL', [
-                'video_id' => $video?->id,
-                'content_id' => $content->id,
-            ]);
-            return null;
-        }
+{
+    if (!$video || !$video->google_drive_url) {
+        Log::warning('❌ Video has no Google Drive URL', [
+            'video_id' => $video?->id,
+            'content_id' => $content->id,
+        ]);
+        return null;
+    }
 
-        // Process URL and get API key automatically
-        $result = $this->googleDriveService->processUrl($video->google_drive_url);
+    // ✅ CHANGED: Get URL WITHOUT incrementing active_users
+    // We'll pass increment: false to tell GoogleDriveService to NOT increment
+    $result = $this->googleDriveService->processUrl(
+        $video->google_drive_url,
+        $increment = false  // ✅ NEW: Don't increment on page load
+    );
 
-        if (!$result) {
-            Log::error('❌ Failed to process video URL - all API keys at capacity', [
-                'video_id' => $video->id,
-                'content_id' => $content->id,
-                'url' => $video->google_drive_url,
-            ]);
-            return null;
-        }
-
-        // Store key info in session for later release
-        $this->storeKeyInSession($content->id, $result);
-
-        Log::info('✅ Video streaming URL generated successfully', [
+    if (!$result) {
+        Log::error('❌ Failed to process video URL', [
             'video_id' => $video->id,
             'content_id' => $content->id,
-            'key_used' => $result['key_name'],
-            'key_id' => $result['key_id'],
         ]);
-
-        return $result;
+        return null;
     }
+
+    // ✅ Store key_id for later use (when session starts)
+    $this->storeKeyInSession($content->id, $result);
+
+    Log::info('✅ Video URL ready (active_users NOT incremented yet)', [
+        'video_id' => $video->id,
+        'content_id' => $content->id,
+        'key_id' => $result['key_id'],
+    ]);
+
+    return $result;
+}
 
     /**
      * Process Google Drive PDF URL for embedding
@@ -113,20 +115,18 @@ class VideoStreamingService
      * @param int $contentId The content ID
      * @param array $keyData The key data from GoogleDriveService
      */
-    protected function storeKeyInSession(int $contentId, array $keyData): void
-    {
-        session([
-            'drive_key_id_' . $contentId => $keyData['key_id'],
-            'drive_key_name_' . $contentId => $keyData['key_name'],
-        ]);
+   protected function storeKeyInSession(int $contentId, array $keyData): void
+{
+    session([
+        'content_' . $contentId . '_key_id' => $keyData['key_id'], // ✅ Changed
+        'content_' . $contentId . '_key_name' => $keyData['key_name'], // ✅ Changed
+    ]);
 
-        Log::debug('🔑 API key stored in session', [
-            'content_id' => $contentId,
-            'key_id' => $keyData['key_id'],
-            'key_name' => $keyData['key_name'],
-        ]);
-    }
-
+    Log::debug('🔑 API key stored in session', [
+        'content_id' => $contentId,
+        'key_id' => $keyData['key_id'],
+    ]);
+}
     /**
      * Get the assigned API key ID from session
      * 
@@ -134,9 +134,9 @@ class VideoStreamingService
      * @return int|null The key ID or null
      */
     public function getAssignedKeyId(int $contentId): ?int
-    {
-        return session('drive_key_id_' . $contentId);
-    }
+{
+    return session('content_' . $contentId . '_key_id'); // ✅ Changed
+}
 
     /**
      * Release the API key when user stops watching
@@ -148,32 +148,24 @@ class VideoStreamingService
      * @param int $contentId The content ID
      */
     public function releaseApiKey(int $contentId): void
-    {
-        $keyId = session('drive_key_id_' . $contentId);
-        $keyName = session('drive_key_name_' . $contentId);
+{
+    $keyId = session('content_' . $contentId . '_key_id'); // ✅ Changed
+    $keyName = session('content_' . $contentId . '_key_name'); // ✅ Changed
 
-        if ($keyId) {
-            // Release the key back to the pool
-            $this->googleDriveService->releaseKey($keyId);
+    if ($keyId) {
+        $this->googleDriveService->releaseKey($keyId);
 
-            // Clear from session
-            session()->forget([
-                'drive_key_id_' . $contentId,
-                'drive_key_name_' . $contentId,
-            ]);
+        session()->forget([
+            'content_' . $contentId . '_key_id', // ✅ Changed
+            'content_' . $contentId . '_key_name', // ✅ Changed
+        ]);
 
-            Log::info('🔓 API key released successfully', [
-                'content_id' => $contentId,
-                'key_id' => $keyId,
-                'key_name' => $keyName,
-            ]);
-        } else {
-            Log::debug('No API key to release', [
-                'content_id' => $contentId,
-                'reason' => 'Content might be PDF or key already released',
-            ]);
-        }
+        Log::info('🔓 API key released successfully', [
+            'content_id' => $contentId,
+            'key_id' => $keyId,
+        ]);
     }
+}
 
     /**
      * Check if content has an assigned API key
@@ -182,9 +174,10 @@ class VideoStreamingService
      * @return bool
      */
     public function hasAssignedKey(int $contentId): bool
-    {
-        return session()->has('drive_key_id_' . $contentId);
-    }
+{
+    return session()->has('content_' . $contentId . '_key_id'); // ✅ Changed
+}
+
 
     /**
      * Get current key status for debugging
@@ -193,11 +186,11 @@ class VideoStreamingService
      * @return array
      */
     public function getKeyStatus(int $contentId): array
-    {
-        return [
-            'has_key' => $this->hasAssignedKey($contentId),
-            'key_id' => $this->getAssignedKeyId($contentId),
-            'key_name' => session('drive_key_name_' . $contentId),
-        ];
-    }
+{
+    return [
+        'has_key' => $this->hasAssignedKey($contentId),
+        'key_id' => $this->getAssignedKeyId($contentId),
+        'key_name' => session('content_' . $contentId . '_key_name'), // ✅ Changed
+    ];
+}
 }

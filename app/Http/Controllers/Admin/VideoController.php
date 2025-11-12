@@ -11,6 +11,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
+use App\Models\VideoCategory; // ✅ ADD THIS LINE
+
 
 class VideoController extends Controller
 {
@@ -26,8 +28,8 @@ class VideoController extends Controller
      */
     public function index()
     {
-        $videos = Video::with(['creator'])  // ✅ Removed 'category' relationship
-        ->orderBy('created_at', 'desc')
+        $videos = Video::with(['creator', 'category']) // ✅ Load category
+            ->orderBy('created_at', 'desc')
             ->get()
             ->map(function ($video) {
                 return [
@@ -36,60 +38,75 @@ class VideoController extends Controller
                     'description' => $video->description,
                     'duration' => $video->duration,
                     'formatted_duration' => $video->formatted_duration,
-                    'thumbnail_url' => null,  // ✅ Set to null if column doesn't exist
                     'streaming_url' => $video->streaming_url,
                     'google_drive_url' => $video->google_drive_url,
                     'is_active' => $video->is_active,
-                    // ✅ REMOVED CATEGORY
+                    'category' => $video->category ? [ // ✅ Include category
+                        'id' => $video->category->id,
+                        'name' => $video->category->name,
+                    ] : null,
                     'creator' => [
                         'id' => $video->creator->id,
                         'name' => $video->creator->name,
                     ],
-                    'total_viewers' => 0,  // ✅ Simplified - no progress table
-                    'completed_viewers' => 0,
-                    'avg_completion' => 0,
                     'created_at' => $video->created_at->toDateTimeString(),
                 ];
             });
 
-        // ✅ REMOVED CATEGORIES
+        $categories = VideoCategory::active()
+            ->ordered()
+            ->get()
+            ->map(fn($cat) => [
+                'id' => $cat->id,
+                'name' => $cat->name,
+            ]);
         return Inertia::render('Admin/Video/Index', [
             'videos' => $videos,
-            'categories' => [],  // Empty array
+            'categories' => $categories,
         ]);
     }
+
 
     /**
      * Show the form for creating a new video
      */
     public function create()
     {
+        $categories = VideoCategory::active()
+            ->ordered()
+            ->get()
+            ->map(fn($cat) => [
+                'id' => $cat->id,
+                'name' => $cat->name,
+            ]);
+
         return Inertia::render('Admin/Video/Create', [
-            'categories' => [],  // ✅ Empty categories
+            'categories' => $categories,
         ]);
     }
+
 
     /**
      * Store a newly created video
      */
-    public function store(Request $request)
+   public function store(Request $request)
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:2000',
             'google_drive_url' => 'required|url|max:500',
             'duration' => 'nullable|integer|min:1|max:86400',
+            'content_category_id' => 'nullable|exists:content_categories,id', // ✅ Validate category
             'is_active' => 'boolean',
         ]);
 
         DB::beginTransaction();
 
         try {
-            // ✅ USE GoogleDriveService TO PROCESS URL
             $streamingUrl = $this->googleDriveService->processUrl($validated['google_drive_url']);
 
             if (!$streamingUrl) {
-                throw new \Exception('Could not process Google Drive URL. Please check the URL and try again.');
+                throw new \Exception('Could not process Google Drive URL.');
             }
 
             $videoData = [
@@ -98,6 +115,7 @@ class VideoController extends Controller
                 'google_drive_url' => $validated['google_drive_url'],
                 'streaming_url' => $streamingUrl,
                 'duration' => $validated['duration'],
+                'content_category_id' => $validated['content_category_id'], // ✅ Save category
                 'is_active' => $validated['is_active'] ?? true,
                 'created_by' => auth()->id(),
             ];
@@ -108,9 +126,7 @@ class VideoController extends Controller
 
             Log::info('Video created successfully', [
                 'video_id' => $video->id,
-                'video_name' => $video->name,
-                'streaming_url' => $streamingUrl,
-                'created_by' => auth()->id(),
+                'category_id' => $video->content_category_id,
             ]);
 
             return redirect()->route('admin.videos.index')
@@ -118,18 +134,13 @@ class VideoController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-
-            Log::error('Failed to create video', [
-                'error' => $e->getMessage(),
-                'google_drive_url' => $validated['google_drive_url']
-            ]);
+            Log::error('Failed to create video', ['error' => $e->getMessage()]);
 
             return redirect()->back()
                 ->withInput()
                 ->with('error', $e->getMessage());
         }
     }
-
     /**
      * Display the specified video
      */
@@ -174,21 +185,32 @@ class VideoController extends Controller
     /**
      * Show the form for editing the specified video
      */
-    public function edit(Video $video)
-    {
-        return Inertia::render('Admin/Video/Edit', [
-            'video' => [
-                'id' => $video->id,
-                'name' => $video->name,
-                'description' => $video->description,
-                'google_drive_url' => $video->google_drive_url,
-                'duration' => $video->duration,
-                'is_active' => $video->is_active,
-            ],
-            'categories' => [],  // ✅ Empty categories
+   public function edit(Video $video)
+{
+    $categories = VideoCategory::active()
+        ->ordered()
+        ->get()
+        ->map(fn($cat) => [
+            'id' => $cat->id,
+            'name' => $cat->name,
         ]);
-    }
 
+    return Inertia::render('Admin/Video/Edit', [
+        'video' => [
+            'id' => $video->id,
+            'name' => $video->name,
+            'description' => $video->description,
+            'google_drive_url' => $video->google_drive_url,
+            'duration' => $video->duration,
+            'thumbnail_url' => $video->thumbnail_url, // ✅ Add this
+            'content_category_id' => $video->content_category_id,
+            'is_active' => $video->is_active,
+            'total_viewers' => 0, // ✅ Add this (or calculate from progress)
+            'avg_completion' => 0, // ✅ Add this (or calculate from progress)
+        ],
+        'categories' => $categories,
+    ]);
+}
     /**
      * Update the specified video
      */
@@ -199,8 +221,8 @@ class VideoController extends Controller
             'description' => 'nullable|string|max:2000',
             'google_drive_url' => 'required|url|max:500',
             'duration' => 'nullable|integer|min:1|max:86400',
+            'content_category_id' => 'nullable|exists:content_categories,id', // ✅ Validate category
             'is_active' => 'boolean',
-            'refresh_streaming_url' => 'boolean',
         ]);
 
         DB::beginTransaction();
@@ -211,19 +233,15 @@ class VideoController extends Controller
                 'description' => $validated['description'],
                 'google_drive_url' => $validated['google_drive_url'],
                 'duration' => $validated['duration'],
+                'content_category_id' => $validated['content_category_id'], // ✅ Update category
                 'is_active' => $validated['is_active'] ?? true,
             ];
 
-            // ✅ REFRESH STREAMING URL IF REQUESTED OR URL CHANGED
-            if ($request->boolean('refresh_streaming_url') || $video->google_drive_url !== $validated['google_drive_url']) {
+            // Refresh streaming URL if needed
+            if ($video->google_drive_url !== $validated['google_drive_url']) {
                 $newStreamingUrl = $this->googleDriveService->processUrl($validated['google_drive_url']);
                 if ($newStreamingUrl) {
                     $updateData['streaming_url'] = $newStreamingUrl;
-
-                    Log::info('Video streaming URL refreshed', [
-                        'video_id' => $video->id,
-                        'new_streaming_url' => $newStreamingUrl
-                    ]);
                 }
             }
 
@@ -231,29 +249,18 @@ class VideoController extends Controller
 
             DB::commit();
 
-            Log::info('Video updated successfully', [
-                'video_id' => $video->id,
-                'video_name' => $video->name,
-                'updated_by' => auth()->id(),
-            ]);
-
             return redirect()->route('admin.videos.index')
                 ->with('success', 'Video updated successfully.');
 
         } catch (\Exception $e) {
             DB::rollBack();
-
-            Log::error('Failed to update video', [
-                'video_id' => $video->id,
-                'error' => $e->getMessage()
-            ]);
+            Log::error('Failed to update video', ['error' => $e->getMessage()]);
 
             return redirect()->back()
                 ->withInput()
-                ->with('error', 'Failed to update video. Please try again.');
+                ->with('error', 'Failed to update video.');
         }
     }
-
     /**
      * Remove the specified video
      */

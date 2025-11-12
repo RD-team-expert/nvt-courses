@@ -3,39 +3,34 @@
 namespace App\Services;
 
 use App\Models\LearningSession;
-
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class DriveKeyManager
 {
     /**
+     * ✅ CHANGED: Added $shouldIncrement parameter
      * Get an available API key with the least active users
-     * This is the "traffic cop" that assigns keys to users
+     * 
+     * @param bool $shouldIncrement Whether to increment active_users count
+     * @return array|null Key data or null if none available
      */
-    public function getAvailableKey(): ?array
+    public function getAvailableKey(bool $shouldIncrement = false): ?array
     {
         try {
-            
             // 🔒 Lock the database while we find and assign a key
-            // This prevents two users from getting the same key at the exact same time
-            $key = DB::transaction(function () {
+            $key = DB::transaction(function () use ($shouldIncrement) {
                 
-                // Find the best available key:
-                // 1. Must be active (is_active = 1)
-                // 2. Must have space (active_users < max_users)
-                // 3. Pick the one with LEAST active users (fair distribution)
-                // 4. If tied, pick the one used longest ago
+                // Find the best available key
                 $key = DB::table('drive_key_tracker')
                     ->where('is_active', true)
                     ->whereRaw('active_users < max_users')
                     ->orderBy('active_users', 'asc')
                     ->orderBy('last_used_at', 'asc')
-                    ->lockForUpdate() // 🔒 Lock this row so no one else can grab it
+                    ->lockForUpdate()
                     ->first();
 
                 if (!$key) {
-                    // All keys are full or disabled!
                     Log::error('❌ All API keys are at capacity or disabled', [
                         'timestamp' => now(),
                         'total_keys' => DB::table('drive_key_tracker')->count(),
@@ -44,10 +39,17 @@ class DriveKeyManager
                     return null;
                 }
 
-                // ✅ Found a key! Increment its user count
-                DB::table('drive_key_tracker')
-                    ->where('id', $key->id)
-                    ->increment('active_users');
+                // ✅ CHANGED: Only increment if requested
+                if ($shouldIncrement) {
+                    DB::table('drive_key_tracker')
+                        ->where('id', $key->id)
+                        ->increment('active_users');
+
+                    Log::info('✅ active_users incremented', [
+                        'key_id' => $key->id,
+                        'new_count' => $key->active_users + 1,
+                    ]);
+                }
 
                 // Update last used time
                 DB::table('drive_key_tracker')
@@ -61,29 +63,30 @@ class DriveKeyManager
                 return null;
             }
 
-            // 📊 Log the assignment for monitoring
+            // ✅ CHANGED: Adjust active_users based on whether we incremented
+            $currentActiveUsers = $shouldIncrement ? $key->active_users + 1 : $key->active_users;
+
+            // 📊 Log the assignment
             Log::info('✅ API key assigned to user', [
                 'key_id' => $key->id,
                 'key_name' => $key->key_name,
-                'active_users' => $key->active_users + 1, // +1 because we just incremented
+                'active_users' => $currentActiveUsers,
                 'max_users' => $key->max_users,
-                'utilization' => round((($key->active_users + 1) / $key->max_users) * 100, 1) . '%',
-                'timestamp' => now(),
+                'incremented' => $shouldIncrement ? 'YES' : 'NO', // ✅ NEW LOG
+                'utilization' => round(($currentActiveUsers / $key->max_users) * 100, 1) . '%',
             ]);
 
-            // Return the key data to use
             return [
                 'id' => $key->id,
                 'key_name' => $key->key_name,
-                'api_key' => env($key->key_name), // Get actual key from .env
-                'active_users' => $key->active_users + 1,
+                'api_key' => env($key->key_name),
+                'active_users' => $currentActiveUsers,
                 'max_users' => $key->max_users,
             ];
 
         } catch (\Exception $e) {
             Log::error('❌ Error getting available API key', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
             ]);
             return null;
         }
@@ -91,13 +94,11 @@ class DriveKeyManager
 
     /**
      * Release an API key when user stops watching
-     * This frees up the key for another user
      */
     public function releaseKey(int $keyId): void
     {
         try {
             DB::transaction(function () use ($keyId) {
-                // Decrease active user count (but never go below 0)
                 $updated = DB::table('drive_key_tracker')
                     ->where('id', $keyId)
                     ->where('active_users', '>', 0)
@@ -110,7 +111,6 @@ class DriveKeyManager
                         'key_id' => $keyId,
                         'key_name' => $key->key_name ?? 'unknown',
                         'remaining_active_users' => $key->active_users ?? 0,
-                        'timestamp' => now(),
                     ]);
                 } else {
                     Log::warning('⚠️ Attempted to release key that was already free', [
@@ -127,9 +127,8 @@ class DriveKeyManager
         }
     }
 
-    /**
-     * Get current status of all keys (for monitoring/debugging)
-     */
+    // ✅ Keep all other methods unchanged (getKeyStatus, disableKey, enableKey, cleanupExpiredSessions)
+    
     public function getKeyStatus(): array
     {
         try {
@@ -161,9 +160,6 @@ class DriveKeyManager
         }
     }
 
-    /**
-     * Helper: Get human-readable status label
-     */
     private function getKeyStatusLabel($key): string
     {
         if (!$key->is_active) {
@@ -187,9 +183,6 @@ class DriveKeyManager
         }
     }
 
-    /**
-     * Emergency: Disable a specific key (if Google blocks it)
-     */
     public function disableKey(int $keyId): bool
     {
         try {
@@ -198,13 +191,9 @@ class DriveKeyManager
                 ->update(['is_active' => false]);
 
             if ($updated) {
-                Log::warning('🚫 API key manually disabled', [
-                    'key_id' => $keyId,
-                    'timestamp' => now(),
-                ]);
+                Log::warning('🚫 API key manually disabled', ['key_id' => $keyId]);
                 return true;
             }
-
             return false;
 
         } catch (\Exception $e) {
@@ -216,9 +205,6 @@ class DriveKeyManager
         }
     }
 
-    /**
-     * Re-enable a disabled key
-     */
     public function enableKey(int $keyId): bool
     {
         try {
@@ -227,13 +213,9 @@ class DriveKeyManager
                 ->update(['is_active' => true]);
 
             if ($updated) {
-                Log::info('✅ API key re-enabled', [
-                    'key_id' => $keyId,
-                    'timestamp' => now(),
-                ]);
+                Log::info('✅ API key re-enabled', ['key_id' => $keyId]);
                 return true;
             }
-
             return false;
 
         } catch (\Exception $e) {
@@ -246,24 +228,48 @@ class DriveKeyManager
     }
 
     public function cleanupExpiredSessions(): void
-{
-    $timeout = now()->subSeconds(30);
+    {
+        $timeout = now()->subSeconds(30);
 
-    $expiredSessions = LearningSession::whereNull('session_end')
-        ->where('last_heartbeat', '<', $timeout)
-        ->get();
+        $expiredSessions = LearningSession::whereNull('session_end')
+            ->where('last_heartbeat', '<', $timeout)
+            ->get();
 
-    foreach ($expiredSessions as $session) {
-        if ($session->api_key_id) {
-            $this->releaseKey($session->api_key_id);
+        foreach ($expiredSessions as $session) {
+            if ($session->api_key_id) {
+                $this->releaseKey($session->api_key_id);
+            }
+
+            $session->session_end = now();
+            $session->save();
+
+            Log::info('Cleaned up expired session', ['session_id' => $session->id]);
         }
+    }
+    /**
+ * ✅ NEW: Increment active_users for a specific key
+ * Used when session starts (user presses play)
+ */
+public function incrementActiveUsers(int $keyId): void
+{
+    try {
+        DB::table('drive_key_tracker')
+            ->where('id', $keyId)
+            ->increment('active_users');
 
-        $session->session_end = now();
-        $session->save();
+        $key = DB::table('drive_key_tracker')->find($keyId);
 
-        Log::info('Cleaned up expired session', ['session_id' => $session->id]);
+        Log::info('✅ active_users incremented', [
+            'key_id' => $keyId,
+            'new_count' => $key->active_users ?? 0,
+        ]);
+
+    } catch (\Exception $e) {
+        Log::error('❌ Error incrementing active_users', [
+            'key_id' => $keyId,
+            'error' => $e->getMessage(),
+        ]);
     }
 }
-
 
 }

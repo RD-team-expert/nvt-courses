@@ -25,6 +25,9 @@ return Application::configure(basePath: dirname(__DIR__))
     ])
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->encryptCookies(except: ['appearance']);
+         $middleware->validateCsrfTokens(except: [
+            'content/*/session',  // Allow sendBeacon without CSRF token
+        ]);
 
         $middleware->alias([
             'admin' => \App\Http\Middleware\AdminMiddleware::class,

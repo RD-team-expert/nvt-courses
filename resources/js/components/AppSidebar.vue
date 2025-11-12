@@ -150,6 +150,12 @@ const reportsSubItems = [
         href: '/admin/audio-categories',
         icon: Volume2,
     },
+
+    {
+        title: 'Video Categories',
+        href: '/admin/video-categories',
+        icon: Volume2,
+    },
     {
         title: 'Bug Reports',
         href: '/admin/bug-reports',

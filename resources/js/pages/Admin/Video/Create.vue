@@ -59,7 +59,27 @@
                                 {{ form.errors.description }}
                             </div>
                         </div>
-
+<!-- Category -->
+                        <div class="space-y-2">
+                            <Label for="content_category_id">Category</Label>
+<Select v-model="form.content_category_id">
+                                <SelectTrigger :class="{ 'border-destructive': form.errors.video_category_id }">
+                                    <SelectValue placeholder="Select a category..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem
+                                        v-for="category in categories"
+                                        :key="category.id"
+                                        :value="category.id.toString()"
+                                    >
+                                        {{ category.name }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <div v-if="form.errors.video_category_id" class="text-sm text-destructive">
+                                {{ form.errors.video_category_id }}
+                            </div>
+                        </div>
 
                     </CardContent>
                 </Card>
@@ -274,7 +294,7 @@ const form = useForm({
     google_drive_url: '',
     duration: null as number | null,
     thumbnail: null as File | null,
-    video_category_id: null as string | null,
+    content_category_id: null as string | null, 
     is_active: true,
 })
 

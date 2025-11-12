@@ -11,6 +11,8 @@ class VideoCategory extends Model
 {
     use HasFactory;
 
+    protected $table = 'content_categories'; // ✅ Already fixed
+
     protected $fillable = [
         'name',
         'description',
@@ -26,39 +28,33 @@ class VideoCategory extends Model
 
     /**
      * Get all videos in this category
+     * ✅ FIXED: Use correct foreign key
      */
     public function videos(): HasMany
     {
-        return $this->hasMany(Video::class);
+        return $this->hasMany(Video::class, 'content_category_id');
     }
 
     /**
      * Get active videos in this category
+     * ✅ FIXED: Use correct foreign key
      */
     public function activeVideos(): HasMany
     {
-        return $this->hasMany(Video::class)->where('is_active', true);
+        return $this->hasMany(Video::class, 'content_category_id')
+            ->where('is_active', true);
     }
 
-    /**
-     * Scope to get only active categories
-     */
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
     }
 
-    /**
-     * Scope to order by sort_order
-     */
     public function scopeOrdered($query)
     {
         return $query->orderBy('sort_order')->orderBy('name');
     }
 
-    /**
-     * Auto-generate slug from name
-     */
     protected static function boot()
     {
         parent::boot();

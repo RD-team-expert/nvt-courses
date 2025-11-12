@@ -25,7 +25,7 @@ class LearningSessionService
     User $user,
     ModuleContent $content,
     float $position = 0,
-    ?int $apiKeyId = null  // ✅ Accept the parameter
+    ?int $apiKeyId = null
 ): LearningSession {
     // End existing sessions
     $existingSessions = LearningSession::where('user_id', $user->id)
@@ -41,19 +41,31 @@ class LearningSessionService
         $existingSession->save();
     }
 
-    Log::info('🔍 Creating new session with key', [
-        'user_id' => $user->id,
-        'content_id' => $content->id,
-        'api_key_id' => $apiKeyId,  // ✅ Log the parameter value
-        'session_key_name' => "content_{$content->id}_key_id"
-    ]);
+    // ✅ NEW: INCREMENT active_users when play button is pressed
+    if ($apiKeyId) {
+        try {
+            $driveKeyManager = app(\App\Services\DriveKeyManager::class);
+            $driveKeyManager->incrementActiveUsers($apiKeyId); // ✅ NEW METHOD
+            
+            Log::info('✅ active_users incremented on session start', [
+                'api_key_id' => $apiKeyId,
+                'user_id' => $user->id,
+                'content_id' => $content->id,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('❌ Failed to increment active_users', [
+                'api_key_id' => $apiKeyId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
 
     // Create new session
     $session = LearningSession::create([
         'user_id' => $user->id,
         'course_online_id' => $content->module->course_online_id,
         'content_id' => $content->id,
-        'api_key_id' => $apiKeyId,  // ✅ Use the parameter!
+        'api_key_id' => $apiKeyId,
         'session_start' => now(),
         'last_heartbeat' => now(),
         'current_position' => $position,
@@ -70,11 +82,12 @@ class LearningSessionService
         'session_id' => $session->id,
         'user_id' => $user->id,
         'content_id' => $content->id,
-        'api_key_id' => $session->api_key_id  // ✅ Verify it was saved
+        'api_key_id' => $session->api_key_id,
     ]);
 
     return $session;
 }
+
 
 
 

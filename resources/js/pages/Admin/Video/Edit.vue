@@ -66,28 +66,33 @@
                             </div>
                         </div>
 
-                        <!-- Category -->
-                        <div class="space-y-2">
-                            <Label for="video_category_id">Category</Label>
-                            <Select v-model="form.video_category_id">
-                                <SelectTrigger :class="{ 'border-destructive': form.errors.video_category_id }">
-                                    <SelectValue placeholder="Select a category..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="">No Category</SelectItem>
-                                    <SelectItem
-                                        v-for="category in categories"
-                                        :key="category.id"
-                                        :value="category.id.toString()"
-                                    >
-                                        {{ category.name }}
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <div v-if="form.errors.video_category_id" class="text-sm text-destructive">
-                                {{ form.errors.video_category_id }}
-                            </div>
-                        </div>
+                        <!-- Category ✅ FIXED -->
+                        <!-- Category ✅ FIXED -->
+<div class="space-y-2">
+    <Label for="content_category_id">Category</Label>
+    <Select v-model="form.content_category_id">
+        <SelectTrigger :class="{ 'border-destructive': form.errors.content_category_id }">
+            <SelectValue placeholder="Select a category..." />
+        </SelectTrigger>
+        <SelectContent>
+            <!-- ❌ REMOVED: <SelectItem value="">No Category</SelectItem> -->
+            <SelectItem
+                v-for="category in categories"
+                :key="category.id"
+                :value="category.id.toString()"
+            >
+                {{ category.name }}
+            </SelectItem>
+        </SelectContent>
+    </Select>
+    <div v-if="form.errors.content_category_id" class="text-sm text-destructive">
+        {{ form.errors.content_category_id }}
+    </div>
+    <div class="text-sm text-muted-foreground">
+        Select a category or leave unset for no category
+    </div>
+</div>
+
                     </CardContent>
                 </Card>
 
@@ -286,11 +291,11 @@
                         <CardContent>
                             <div class="grid grid-cols-2 gap-4">
                                 <div class="text-center">
-                                    <div class="text-2xl font-bold text-blue-600">{{ video.total_viewers }}</div>
+                                    <div class="text-2xl font-bold text-blue-600">{{ video.total_viewers || 0 }}</div>
                                     <div class="text-xs text-muted-foreground">Viewers</div>
                                 </div>
                                 <div class="text-center">
-                                    <div class="text-2xl font-bold text-green-600">{{ Math.round(video.avg_completion) }}%</div>
+                                    <div class="text-2xl font-bold text-green-600">{{ Math.round(video.avg_completion || 0) }}%</div>
                                     <div class="text-xs text-muted-foreground">Avg Progress</div>
                                 </div>
                             </div>
@@ -356,6 +361,7 @@ import {
     BarChart3
 } from 'lucide-vue-next'
 
+// ✅ FIXED interface
 interface Video {
     id: number
     name: string
@@ -364,9 +370,9 @@ interface Video {
     duration?: number
     thumbnail_url?: string
     is_active: boolean
-    video_category_id?: number
-    total_viewers: number
-    avg_completion: number
+    content_category_id?: number  // ✅ Changed from video_category_id
+    total_viewers?: number
+    avg_completion?: number
 }
 
 interface VideoCategory {
@@ -384,13 +390,14 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Edit Video', href: '' },
 ]
 
+// ✅ FIXED form field name
 const form = useForm({
     name: props.video.name,
     description: props.video.description || '',
     google_drive_url: props.video.google_drive_url,
     duration: props.video.duration,
     thumbnail: null as File | null,
-    video_category_id: props.video.video_category_id?.toString() || null,
+    content_category_id: props.video.content_category_id?.toString() || null,  // ✅ Fixed
     is_active: props.video.is_active,
     remove_thumbnail: false,
 })
@@ -408,7 +415,6 @@ const handleThumbnailChange = (event: Event) => {
         form.thumbnail = file
         form.remove_thumbnail = false
 
-        // Create preview URL
         const reader = new FileReader()
         reader.onload = (e) => {
             thumbnailPreview.value = e.target?.result as string
@@ -446,7 +452,7 @@ const testVideoUrl = async () => {
 }
 
 // Format duration helper
-const formatDuration = (seconds: number | null): string => {
+const formatDuration = (seconds: number | null | undefined): string => {
     if (!seconds) return '00:00'
 
     const hours = Math.floor(seconds / 3600)
@@ -461,9 +467,16 @@ const formatDuration = (seconds: number | null): string => {
 const submit = async () => {
     isSubmitting.value = true
 
-    form.put(`/admin/videos/${props.video.id}`, {
+    form.post(`/admin/videos/${props.video.id}/update`, {
+        forceFormData: true,  // ✅ Force multipart/form-data
         onFinish: () => {
             isSubmitting.value = false
+        },
+        onSuccess: () => {
+            console.log('Video updated successfully')
+        },
+        onError: (errors) => {
+            console.error('Update failed:', errors)
         }
     })
 }

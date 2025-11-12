@@ -129,7 +129,7 @@ class ContentAccessServiceTest extends TestCase
         // Assert
         $this->assertNotNull($result);
         $this->assertEquals($assignment->id, $result->id);
-    }
+     }
 
     public function test_has_any_assignments_returns_true_when_user_has_assignments()
     {

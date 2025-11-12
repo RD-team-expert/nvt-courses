@@ -26,32 +26,20 @@ class SendCourseOnlineAssignmentNotifications
      * Handle the event
      */
     public function handle(CourseOnlineAssigned $event): void
-    {
-        Log::info('🎧 Processing Course Online assignment notification', [
-            'course_id' => $event->course->id,
-            'course_name' => $event->course->name,
-            'user_id' => $event->user->id,
-            'user_email' => $event->user->email,
-            'assigned_by' => $event->assignedBy->name,
-        ]);
+{
+    try {
+        // ✅ STEP 1: Always send user notification
+        $this->sendUserNotification($event);
 
-        try {
-            // ✅ STEP 1: Send user notification
-            $this->sendUserNotification($event);
-
-            // ✅ STEP 2: Send manager notification (if applicable)
+        // ✅ STEP 2: Only send manager notification if NOT skipped
+        if (!($event->metadata['skip_manager_notification'] ?? false)) {
             $this->sendManagerNotification($event);
-
-        } catch (\Exception $e) {
-            Log::error('❌ Course Online assignment notification failed', [
-                'course_id' => $event->course->id,
-                'user_id' => $event->user->id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
         }
-    }
 
+    } catch (\Exception $e) {
+        Log::error('❌ Notification failed', ['error' => $e->getMessage()]);
+    }
+}
     /**
      * Send notification to the assigned user
      */
