@@ -134,10 +134,7 @@ class VideoController extends Controller
         if (!$streamingUrl) {
             // Fallback to original URL if processing fails
             $streamingUrl = $video->google_drive_url;
-            Log::warning('Using fallback URL for video', [
-                'video_id' => $video->id,
-                'original_url' => $video->google_drive_url,
-            ]);
+
         }
 
         // Get or create user progress

@@ -84,7 +84,7 @@
                     </CardContent>
                 </Card>
 
-                <!-- ✅ NEW: Storage Type Selection -->
+                <!-- Storage Type Selection -->
                 <Card>
                     <CardHeader>
                         <CardTitle class="flex items-center gap-2">
@@ -144,7 +144,7 @@
                         </CardDescription>
                     </CardHeader>
                     <CardContent class="space-y-4">
-                        <!-- ✅ Google Drive URL (show only if google_drive selected) -->
+                        <!-- Google Drive URL (show only if google_drive selected) -->
                         <div v-if="form.storage_type === 'google_drive'" class="space-y-2">
                             <Label for="google_drive_url">Google Drive Video URL</Label>
                             <div class="flex gap-2">
@@ -174,75 +174,23 @@
                             </div>
                         </div>
 
-                        <!-- ✅ NEW: Local Video Upload (show only if local selected) -->
+                        <!-- ✅ NEW: FilePond Chunked Upload (show only if local selected) -->
                         <div v-else-if="form.storage_type === 'local'" class="space-y-2">
                             <Label for="video_file">Video File</Label>
-                            <div class="space-y-3">
-                                <!-- File Input -->
-                                <div
-                                    class="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:border-primary transition-colors"
-                                    :class="{
-                                        'border-destructive': form.errors.video_file,
-                                        'border-primary bg-primary/5': uploadProgress > 0
-                                    }"
-                                    @click="$refs.videoFileInput?.click()"
-                                    @dragover.prevent="dragActive = true"
-                                    @dragleave.prevent="dragActive = false"
-                                    @drop.prevent="handleFileDrop"
-                                >
-                                    <input
-                                        ref="videoFileInput"
-                                        type="file"
-                                        accept="video/mp4,video/webm,video/avi,video/mov,video/x-matroska"
-                                        class="hidden"
-                                        @change="handleFileChange"
-                                    />
-
-                                    <div v-if="!form.video_file">
-                                        <Upload class="h-10 w-10 mx-auto text-muted-foreground mb-4" />
-                                        <p class="text-sm font-medium mb-1">
-                                            Click to upload or drag and drop
-                                        </p>
-                                        <p class="text-xs text-muted-foreground">
-                                            MP4, WebM, AVI, MOV, MKV (Max {{ maxFileSizeMB }}MB)
-                                        </p>
-                                    </div>
-
-                                    <div v-else class="flex items-center gap-3">
-                                        <FileVideo class="h-8 w-8 text-primary" />
-                                        <div class="flex-1 text-left">
-                                            <p class="text-sm font-medium">{{ form.video_file.name }}</p>
-                                            <p class="text-xs text-muted-foreground">
-                                                {{ formatFileSize(form.video_file.size) }}
-                                            </p>
-                                        </div>
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            @click.stop="clearVideoFile"
-                                        >
-                                            <X class="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                </div>
-
-                                <!-- Upload Progress -->
-                                <div v-if="uploadProgress > 0 && uploadProgress < 100" class="space-y-2">
-                                    <div class="flex justify-between text-sm">
-                                        <span>Uploading...</span>
-                                        <span>{{ uploadProgress }}%</span>
-                                    </div>
-                                    <div class="w-full bg-secondary rounded-full h-2">
-                                        <div
-                                            class="bg-primary h-2 rounded-full transition-all duration-300"
-                                            :style="{ width: `${uploadProgress}%` }"
-                                        ></div>
-                                    </div>
-                                </div>
+                            <ChunkUploader
+                                v-model="form.video_data"
+                                name="video_file"
+                                accept="video/*"
+                                :maxFileSize="maxFileSizeMB + 'MB'"
+                                @uploaded="handleUploadComplete"
+                                @error="handleUploadError"
+                                @progress="handleProgress"
+                            />
+                            <div v-if="form.errors.video_file || form.errors.video_data" class="text-sm text-destructive">
+                                {{ form.errors.video_file || form.errors.video_data }}
                             </div>
-                            <div v-if="form.errors.video_file" class="text-sm text-destructive">
-                                {{ form.errors.video_file }}
+                            <div class="text-sm text-muted-foreground">
+                                Video will be uploaded in 2MB chunks for reliability. Maximum {{ maxFileSizeMB }}MB
                             </div>
                         </div>
 
@@ -305,7 +253,7 @@
                     <Button as-child variant="outline">
                         <Link href="/admin/videos">Cancel</Link>
                     </Button>
-                    <Button type="submit" :disabled="isSubmitting || form.processing">
+                    <Button type="submit" :disabled="isSubmitting || form.processing || (form.storage_type === 'local' && !form.video_data)">
                         <Save class="h-4 w-4 mr-2" />
                         {{ isSubmitting ? 'Creating...' : 'Create Video Course' }}
                     </Button>
@@ -319,6 +267,7 @@
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import { ref, computed } from 'vue'
 import AppLayout from '@/layouts/AppLayout.vue'
+import ChunkUploader from '@/Components/ChunkUploader.vue' // ✅ Import ChunkUploader
 import type { BreadcrumbItem } from '@/types'
 
 // shadcn-vue components
@@ -342,9 +291,6 @@ import {
     Loader2,
     Cloud,
     HardDrive,
-    Upload,
-    FileVideo,
-    X
 } from 'lucide-vue-next'
 
 interface VideoCategory {
@@ -354,9 +300,7 @@ interface VideoCategory {
 
 const props = defineProps<{
     categories: VideoCategory[]
-    storageOptions?: Array<{value: string, label: string}>
     maxFileSize?: number
-    allowedMimes?: string[]
 }>()
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -367,9 +311,9 @@ const breadcrumbs: BreadcrumbItem[] = [
 const form = useForm({
     name: '',
     description: '',
-    storage_type: 'google_drive' as 'google_drive' | 'local', // ✅ NEW
+    storage_type: 'google_drive' as 'google_drive' | 'local',
     google_drive_url: '',
-    video_file: null as File | null, // ✅ NEW
+    video_data: '', // ✅ Changed from video_file to video_data (stores FilePond response)
     duration: null as number | null,
     content_category_id: null as string | null,
     is_active: true,
@@ -377,49 +321,25 @@ const form = useForm({
 
 const isSubmitting = ref(false)
 const testingUrl = ref(false)
-const uploadProgress = ref(0)
-const dragActive = ref(false)
-const videoFileInput = ref<HTMLInputElement | null>(null)
 
 // Computed
 const maxFileSizeMB = computed(() => Math.round((props.maxFileSize || 512000) / 1024))
 
-// ✅ NEW: Handle file selection
-const handleFileChange = (event: Event) => {
-    const target = event.target as HTMLInputElement
-    const file = target.files?.[0]
-    if (file) {
-        form.video_file = file
-        uploadProgress.value = 0
-    }
+// ✅ NEW: Handle chunk upload completion
+const handleUploadComplete = (data: any) => {
+    console.log('✅ Chunk upload complete:', data)
+    form.video_data = JSON.stringify(data) // Store the response data
 }
 
-// ✅ NEW: Handle drag and drop
-const handleFileDrop = (event: DragEvent) => {
-    dragActive.value = false
-    const file = event.dataTransfer?.files[0]
-    if (file) {
-        form.video_file = file
-        uploadProgress.value = 0
-    }
+// ✅ NEW: Handle chunk upload error
+const handleUploadError = (error: any) => {
+    console.error('❌ Chunk upload error:', error)
+    alert('Upload failed. Please try again.')
 }
 
-// ✅ NEW: Clear selected file
-const clearVideoFile = () => {
-    form.video_file = null
-    uploadProgress.value = 0
-    if (videoFileInput.value) {
-        videoFileInput.value.value = ''
-    }
-}
-
-// ✅ NEW: Format file size
-const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 Bytes'
-    const k = 1024
-    const sizes = ['Bytes', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
+// ✅ NEW: Handle upload progress
+const handleProgress = (progress: number) => {
+    console.log('Upload progress:', progress + '%')
 }
 
 // Test video URL
@@ -453,16 +373,15 @@ const submit = async () => {
     isSubmitting.value = true
 
     form.post('/admin/videos', {
-        forceFormData: true, // ✅ Important for file uploads
-        onProgress: (progress) => {
-            uploadProgress.value = Math.round((progress.percentage || 0))
-        },
+        preserveScroll: true,
         onFinish: () => {
             isSubmitting.value = false
-            uploadProgress.value = 0
         },
         onSuccess: () => {
-            console.log('Video created successfully')
+            console.log('✅ Video created successfully')
+        },
+        onError: (errors) => {
+            console.error('❌ Form errors:', errors)
         }
     })
 }

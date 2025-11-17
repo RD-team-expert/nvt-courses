@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\Video;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class VideoStreamController extends Controller
@@ -22,40 +21,25 @@ class VideoStreamController extends Controller
     {
         // 1. Security: Verify the request signature (signed URL)
         if (!$request->hasValidSignature()) {
-            Log::warning('❌ Invalid signature for video stream', [
-                'video_id' => $video->id,
-                'ip' => $request->ip(),
-                'user_id' => auth()->id(),
-            ]);
+
             abort(403, 'Invalid or expired video link');
         }
 
         // 2. Verify user is authenticated
         if (!auth()->check()) {
-            Log::warning('❌ Unauthenticated user tried to access video', [
-                'video_id' => $video->id,
-                'ip' => $request->ip(),
-            ]);
+
             abort(401, 'Authentication required');
         }
 
         // 3. Verify video is stored locally
         if ($video->storage_type !== 'local') {
-            Log::error('❌ Attempted to stream non-local video', [
-                'video_id' => $video->id,
-                'storage_type' => $video->storage_type,
-                'user_id' => auth()->id(),
-            ]);
+
             abort(400, 'This video cannot be streamed from local storage');
         }
 
         // 4. Verify file exists
         if (!$video->file_path || !Storage::disk('videos')->exists($video->file_path)) {
-            Log::error('❌ Video file not found', [
-                'video_id' => $video->id,
-                'file_path' => $video->file_path,
-                'user_id' => auth()->id(),
-            ]);
+
             abort(404, 'Video file not found');
         }
 
@@ -81,12 +65,7 @@ class VideoStreamController extends Controller
 
                 // Validate range
                 if ($start > $end || $start > $fileSize - 1 || $end > $fileSize - 1) {
-                    Log::warning('⚠️ Invalid byte range requested', [
-                        'video_id' => $video->id,
-                        'range' => $range,
-                        'file_size' => $fileSize,
-                        'user_id' => auth()->id(),
-                    ]);
+
                     fclose($stream);
                     return response('Requested Range Not Satisfiable', 416)
                         ->header('Content-Range', "bytes */{$fileSize}");
@@ -97,20 +76,10 @@ class VideoStreamController extends Controller
 
                 fseek($stream, $start);
 
-                Log::info('📹 Streaming video with byte range', [
-                    'video_id' => $video->id,
-                    'video_name' => $video->name,
-                    'range' => "{$start}-{$end}/{$fileSize}",
-                    'user_id' => auth()->id(),
-                ]);
+
             }
         } else {
-            Log::info('📹 Streaming complete video', [
-                'video_id' => $video->id,
-                'video_name' => $video->name,
-                'size' => $fileSize,
-                'user_id' => auth()->id(),
-            ]);
+
         }
 
         // 7. Create streamed response

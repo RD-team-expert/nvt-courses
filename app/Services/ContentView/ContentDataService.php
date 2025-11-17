@@ -5,7 +5,6 @@ namespace App\Services\ContentView;
 use App\Models\ModuleContent;
 use App\Models\UserContentProgress;
 use App\Models\Video;
-use Illuminate\Support\Facades\Log;
 
 class ContentDataService
 {
@@ -23,14 +22,14 @@ class ContentDataService
             'is_required' => $content->is_required,
             'duration' => $content->duration,
             'pdf_page_count' => $content->pdf_page_count,
-            
+
             // ✅ FIXED: Complete module data
             'module' => [
                 'id' => $content->module->id,
                 'title' => $content->module->title,  // ✅ Added title
                 'name' => $content->module->name,
                 'course_id' => $content->module->course_online_id,
-                
+
                 // ✅ FIXED: Add complete course data
                 'course' => [
                     'id' => $content->module->courseOnline->id ?? 0,
@@ -146,14 +145,14 @@ class ContentDataService
         'content' => $contentData,
         'progress' => $progressData,
         'navigation' => $navigationData,
-        
+
         // ✅ ADD THIS: Send course data separately for easier access
         'course' => [
             'id' => $content->module->courseOnline->id ?? 0,
             'name' => $content->module->courseOnline->name ?? 'Unknown Course',
             'title' => $content->module->courseOnline->title ?? 'Unknown Course',
         ],
-        
+
         // ✅ ADD THIS: Send module data separately
         'module' => [
             'id' => $content->module->id ?? 0,

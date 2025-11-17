@@ -316,12 +316,7 @@ class CourseController extends Controller
             'availabilities.*.session_duration_minutes' => 'nullable|integer|min:15|max:480',
         ]);
 
-        Log::info('Course update started', [
-            'course_id' => $course->id,
-            'current_privacy' => $course->privacy,
-            'new_privacy' => $validated['privacy'],
-            'user_id' => auth()->id()
-        ]);
+
 
         // Detect privacy change from private to public
         $wasPrivate = $course->privacy === 'private';
@@ -335,12 +330,7 @@ class CourseController extends Controller
                 ->pluck('user_id')
                 ->toArray();
 
-            Log::info('Privacy change detected: Private → Public', [
-                'course_id' => $course->id,
-                'course_name' => $course->name,
-                'previously_assigned_users' => count($previouslyAssignedUserIds),
-                'user_ids' => $previouslyAssignedUserIds
-            ]);
+
         }
 
         // Handle image upload
@@ -370,11 +360,6 @@ class CourseController extends Controller
             'duration' => $validated['duration'],
         ]);
 
-        Log::info('Course updated successfully', [
-            'course_id' => $course->id,
-            'course_name' => $course->name,
-            'privacy_changed_to_public' => $privacyChangedToPublic
-        ]);
 
         // Handle availabilities updates - FIXED
         $existingAvailabilityIds = [];
@@ -444,10 +429,7 @@ class CourseController extends Controller
 
         // Handle privacy change notification
         if ($privacyChangedToPublic) {
-            Log::info('Starting privacy change notification process', [
-                'course_id' => $course->id,
-                'excluded_users_count' => count($previouslyAssignedUserIds)
-            ]);
+
 
             $this->notifyUsersOnPrivacyChangeToPublic($course, $previouslyAssignedUserIds);
         }
@@ -475,21 +457,10 @@ class CourseController extends Controller
 
             $users = $query->get();
 
-            Log::info('Starting privacy change notifications (Private → Public)', [
-                'course_id' => $course->id,
-                'course_name' => $course->name,
-                'total_users_in_system' => User::count(),
-                'excluded_users_count' => count($excludedUserIds),
-                'excluded_user_ids' => $excludedUserIds,
-                'users_to_notify' => $users->count()
-            ]);
+
 
             if ($users->count() === 0) {
-                Log::warning('No users to notify - all users were excluded', [
-                    'course_id' => $course->id,
-                    'total_users' => User::count(),
-                    'excluded_count' => count($excludedUserIds)
-                ]);
+
                 return;
             }
 
@@ -499,7 +470,6 @@ class CourseController extends Controller
             foreach ($users as $user) {
                 try {
                     if (empty($user->email)) {
-                        Log::debug("Skipping user {$user->id}: no email address");
                         continue;
                     }
 
@@ -510,31 +480,18 @@ class CourseController extends Controller
                     Mail::to($user->email)->send(new CourseCreatedNotification($course, $user, $loginLink));
 
                     $successCount++;
-                    Log::info("Privacy change notification sent to: {$user->email} (User ID: {$user->id})");
 
                 } catch (\Exception $e) {
                     $failureCount++;
-                    Log::error("Failed to send privacy change notification to {$user->email} (User ID: {$user->id}): " . $e->getMessage());
                 }
 
                 usleep(200000); // 0.2 second delay
             }
 
-            Log::info('Privacy change notifications completed', [
-                'course_id' => $course->id,
-                'course_name' => $course->name,
-                'total_users_to_notify' => $users->count(),
-                'successful_sends' => $successCount,
-                'failed_sends' => $failureCount,
-                'excluded_users' => count($excludedUserIds)
-            ]);
+
 
         } catch (\Exception $e) {
-            Log::error('Failed to send privacy change notifications', [
-                'course_id' => $course->id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
+
         }
     }
 
@@ -558,11 +515,7 @@ class CourseController extends Controller
         try {
             $users = User::where('role', '!=', 'admin')->get();
 
-            Log::info('Starting public course notifications', [
-                'course_id' => $course->id,
-                'course_name' => $course->name,
-                'total_users' => $users->count()
-            ]);
+
 
             $successCount = 0;
             $failureCount = 0;
@@ -573,30 +526,18 @@ class CourseController extends Controller
                     Mail::to($user->email)->send(new CoursePublicAnnouncement($course, $user, $loginLink));
 
                     $successCount++;
-                    Log::debug("Public course notification sent successfully to: {$user->email}");
 
                 } catch (\Exception $e) {
                     $failureCount++;
-                    Log::error("Failed to send public course notification to {$user->email}: " . $e->getMessage());
                 }
 
                 sleep(1);
             }
 
-            Log::info('Public course notifications completed', [
-                'course_id' => $course->id,
-                'course_name' => $course->name,
-                'total_users' => $users->count(),
-                'successful_sends' => $successCount,
-                'failed_sends' => $failureCount
-            ]);
+
 
         } catch (\Exception $e) {
-            Log::error('Failed to send public course notifications', [
-                'course_id' => $course->id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
+
         }
     }
 }

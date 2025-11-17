@@ -87,7 +87,6 @@ class AudioController extends Controller
         $thumbnailPath = null;
         if ($request->hasFile('thumbnail')) {
             $thumbnailPath = $request->file('thumbnail')->store('audio/thumbnails', 'public');
-            Log::info('Thumbnail uploaded', ['path' => $thumbnailPath]);
         }
 
         // Convert HH:MM:SS to seconds for database storage
@@ -95,10 +94,7 @@ class AudioController extends Controller
         if (!empty($validated['duration'])) {
             $durationInSeconds = $this->convertTimeToSeconds($validated['duration']);
 
-            Log::info('Duration conversion', [
-                'input_format' => $validated['duration'],
-                'converted_seconds' => $durationInSeconds
-            ]);
+
         }
 
         $audio = Audio::create([
@@ -113,14 +109,7 @@ class AudioController extends Controller
             'created_by' => auth()->id(),
         ]);
 
-        Log::info('Audio created successfully', [
-            'audio_id' => $audio->id,
-            'audio_name' => $audio->name,
-            'duration_seconds' => $durationInSeconds,
-            'duration_formatted' => $validated['duration'],
-            'has_thumbnail' => !empty($thumbnailPath),
-            'created_by' => auth()->id()
-        ]);
+
 
         return redirect()->route('admin.audio.index')
             ->with('success', 'Audio created successfully.');
@@ -276,7 +265,6 @@ class AudioController extends Controller
 
             // Store new thumbnail
             $thumbnailPath = $request->file('thumbnail')->store('audio/thumbnails', 'public');
-            Log::info('Thumbnail updated', ['path' => $thumbnailPath]);
         }
 
         $audio->update([
@@ -290,12 +278,7 @@ class AudioController extends Controller
             'is_active' => $validated['is_active'] ?? true,
         ]);
 
-        Log::info('Audio updated successfully', [
-            'audio_id' => $audio->id,
-            'audio_name' => $audio->name,
-            'thumbnail_updated' => $request->hasFile('thumbnail'),
-            'updated_by' => auth()->id()
-        ]);
+
 
         return redirect()->route('admin.audio.index')
             ->with('success', 'Audio updated successfully.');
@@ -307,22 +290,13 @@ class AudioController extends Controller
     public function destroy(Audio $audio)
     {
         // Log before deletion
-        Log::info('Audio deletion initiated', [
-            'audio_id' => $audio->id,
-            'audio_name' => $audio->name,
-            'deleted_by' => auth()->id()
-        ]);
 
         // Delete related progress records (cascade will handle this, but for logging)
         $progressCount = $audio->progress()->count();
 
         $audio->delete();
 
-        Log::info('Audio deleted successfully', [
-            'audio_id' => $audio->id,
-            'audio_name' => $audio->name,
-            'deleted_progress_records' => $progressCount
-        ]);
+
 
         return redirect()->route('admin.audio.index')
             ->with('success', 'Audio deleted successfully.');
@@ -337,12 +311,7 @@ class AudioController extends Controller
 
         $status = $audio->is_active ? 'activated' : 'deactivated';
 
-        Log::info("Audio {$status}", [
-            'audio_id' => $audio->id,
-            'audio_name' => $audio->name,
-            'is_active' => $audio->is_active,
-            'updated_by' => auth()->id()
-        ]);
+
 
         return back()->with('success', "Audio {$status} successfully.");
     }

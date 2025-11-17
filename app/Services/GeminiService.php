@@ -32,24 +32,24 @@ class GeminiService
         try {
             // Get the instruction based on type or use custom instruction if provided
             $instruction = '';
-            
+
             if (isset($settings['customInstruction']) && !empty($settings['customInstruction'])) {
                 $instruction = $settings['customInstruction'];
             } else {
                 // This will be overridden by the controller if user data is included
                 $instruction = $this->instructions[$instructionType] ?? $this->instructions['default'];
             }
-            
+
             // Add concise mode instruction if enabled
             if (isset($settings['conciseMode']) && $settings['conciseMode']) {
                 $instruction .= "\n\nPlease provide brief, concise responses.";
             }
-            
+
             // Add user information to the instruction if authenticated
             if (auth()->check()) {
                 $user = auth()->user();
                 $instruction .= "\n\nYou are talking to " . $user->name . ". Always address them by name in your responses.";
-                
+
                 // Fetch courses with proper column selection
                 try {
                     // Get user's enrolled courses with only existing columns
@@ -58,7 +58,7 @@ class GeminiService
                         ->where('course_user.user_id', $user->id)
                         ->select('courses.*', 'course_user.created_at as enrolled_at', 'course_user.user_status')
                         ->get();
-                    
+
                     if ($enrolledCourses && $enrolledCourses->count() > 0) {
                         $instruction .= "\n\nUser's enrolled courses information:";
                         foreach ($enrolledCourses as $course) {
@@ -83,17 +83,14 @@ class GeminiService
                         $instruction .= "\n\nYou currently don't have any enrolled courses.";
                     }
                 } catch (\Exception $e) {
-                    Log::error('Error accessing course data: ' . $e->getMessage(), [
-                        'exception' => $e,
-                        'trace' => $e->getTraceAsString()
-                    ]);
+
                     $instruction .= "\n\nI have access to your basic user information, but I cannot access your course data at this time.";
                 }
             }
-            
+
             // Prepend instruction to the prompt
             $fullPrompt = $instruction . "\n\n" . $prompt;
-            
+
             // Build the request payload
             $payload = [
                 'contents' => [
@@ -104,35 +101,34 @@ class GeminiService
                     ]
                 ]
             ];
-            
+
             // Add generation settings if provided
             if (!empty($settings)) {
                 $generationConfig = [];
-                
+
                 if (isset($settings['temperature'])) {
                     $generationConfig['temperature'] = (float) $settings['temperature'];
                 }
-                
+
                 if (isset($settings['topK'])) {
                     $generationConfig['topK'] = (int) $settings['topK'];
                 }
-                
+
                 if (isset($settings['topP'])) {
                     $generationConfig['topP'] = (float) $settings['topP'];
                 }
-                
+
                 if (isset($settings['maxOutputTokens'])) {
                     $generationConfig['maxOutputTokens'] = (int) $settings['maxOutputTokens'];
                 }
-                
+
                 if (!empty($generationConfig)) {
                     $payload['generationConfig'] = $generationConfig;
                 }
             }
-            
+
             // Log the payload for debugging
-            Log::debug('Gemini API Request Payload', ['payload' => $payload]);
-            
+
             $response = $this->client->post($this->baseUrl . '?key=' . $this->apiKey, [
                 'headers' => [
                     'Content-Type' => 'application/json',
@@ -141,20 +137,18 @@ class GeminiService
             ]);
 
             $result = json_decode($response->getBody()->getContents(), true);
-            
+
             // Log the response for debugging
-            Log::debug('Gemini API Response', ['response' => $result]);
-            
+
             return $result;
         } catch (\Exception $e) {
-            Log::error('Gemini API Error: ' . $e->getMessage());
             return [
                 'error' => true,
                 'message' => $e->getMessage()
             ];
         }
     }
-    
+
     public function getInstructionTypes()
     {
         return array_keys($this->instructions);

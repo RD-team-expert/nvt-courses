@@ -46,7 +46,6 @@ class AnalyticsController extends Controller
 
     public function index(Request $request)
     {
-        Log::info('🔍 === ANALYTICS DASHBOARD START ===');
 
         $filters = $this->dashboardService->getDateFilters($request);
         $analytics = $this->dashboardService->getDashboardAnalytics($filters);
@@ -72,7 +71,6 @@ class AnalyticsController extends Controller
 
     public function userAnalytics(Request $request)
     {
-        Log::info('🔍 === USER ANALYTICS START ===');
 
         $filters = $request->only(['date_from', 'date_to', 'user_id', 'course_id']);
         $data = $this->userAnalyticsService->getUserAnalyticsData($request, $filters);
@@ -82,7 +80,6 @@ class AnalyticsController extends Controller
 
     public function cheatingDetection(Request $request)
     {
-        Log::info('🕵️‍♂️ === CHEATING DETECTION START ===');
 
         $filters = $request->only(['course_id', 'user_id', 'min_cheating_score']);
         $data = $this->cheatingDetectionService->getCheatingDetectionData($request, $filters);
@@ -92,7 +89,6 @@ class AnalyticsController extends Controller
 
     public function sessionDetails(Request $request, $sessionId)
     {
-        Log::info('🔍 === SESSION DETAILS INVESTIGATION START ===', ['session_id' => $sessionId]);
 
         try {
             $data = $this->sessionAnalyticsService->getSessionDetailsData($sessionId);
@@ -110,10 +106,7 @@ class AnalyticsController extends Controller
 
     public function export(Request $request)
     {
-        Log::info('📊 === EXPORT REQUEST START ===', [
-            'type' => $request->get('type', 'suspicious_activity'),
-            'admin' => auth()->user()->name,
-        ]);
+
 
         try {
             $type = $request->get('type', 'suspicious_activity');
@@ -140,10 +133,7 @@ class AnalyticsController extends Controller
 
     public function sendWarningEmail(Request $request, User $user)
     {
-        Log::info('📧 === SEND WARNING EMAIL START ===', [
-            'user_id' => $user->id,
-            'admin' => auth()->user()->name,
-        ]);
+
 
         try {
             $result = $this->notificationService->sendWarningEmail($user, $request, auth()->user());

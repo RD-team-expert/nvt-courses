@@ -20,9 +20,6 @@ class EvaluationEmailService
             'failed_to' => []
         ];
 
-        Log::info('=== Starting email sending ===');
-        Log::info('Managers to email: ' . json_encode($managers));
-        Log::info('Employees data: ' . $employees->count());
 
         // Flatten managers array
         $allManagers = [];
@@ -39,10 +36,8 @@ class EvaluationEmailService
             }
         }
 
-        Log::info('Total managers to email: ' . count($allManagers));
 
         if (empty($allManagers)) {
-            Log::warning('No managers found to send emails to');
             return $results;
         }
 
@@ -100,7 +95,6 @@ class EvaluationEmailService
         // Send emails to each manager
         foreach ($allManagers as $manager) {
             try {
-                Log::info("Sending email to {$manager['name']} ({$manager['email']})");
 
                 Mail::send('emails.manager-evaluation-report', [
                     'manager' => $manager,
@@ -117,13 +111,8 @@ class EvaluationEmailService
                 $results['success_count']++;
                 $results['sent_to'][] = $manager;
 
-                Log::info("Email sent successfully to {$manager['email']}");
 
             } catch (\Exception $e) {
-                Log::error("Single manager email failed", [
-                    'manager' => $manager,
-                    'error' => $e->getMessage()
-                ]);
 
                 $results['failed_count']++;
                 $results['failed_to'][] = [
@@ -133,7 +122,6 @@ class EvaluationEmailService
             }
         }
 
-        Log::info('Email sending completed', $results);
         return $results;
     }
 }

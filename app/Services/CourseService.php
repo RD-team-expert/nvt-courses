@@ -19,23 +19,15 @@ class CourseService
     {
         try {
             // Log the enrollment attempt with detailed information
-            Log::info('Attempting to enroll user in course', [
-                'user_id' => $user->id,
-                'user_email' => $user->email,
-                'course_id' => $course->id,
-                'course_name' => $course->name
-            ]);
+
             // Check if already enrolled
             $isEnrolled = $this->isUserEnrolled($course, $user);
-            Log::info('User enrollment check', ['is_already_enrolled' => $isEnrolled]);
 
             if ($isEnrolled) {
-                Log::info('User is already enrolled, skipping enrollment');
                 return false;
             }
 
             // Enroll the user
-            Log::info('Attaching user to course');
             $course->users()->attach($user->id, [
                 'user_status' => 'enrolled',
                 'created_at' => now(),
@@ -43,16 +35,10 @@ class CourseService
             ]);
             // Verify the enrollment was successful
             $verifyEnrollment = $this->isUserEnrolled($course, $user);
-            Log::info('Enrollment verification', ['enrollment_successful' => $verifyEnrollment]);
 
             return $verifyEnrollment;
         } catch (\Exception $e) {
-            Log::error('Error enrolling user in course', [
-                'user_id' => $user->id,
-                'course_id' => $course->id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
+
             report($e);
             return false;
         }
@@ -64,23 +50,16 @@ class CourseService
     public function markCourseCompleted(Course $course, User $user): bool
     {
         try {
-            // Log the completion attempt
-            Log::info('Attempting to mark course as completed', [
-                'user_id' => $user->id,
-                'course_id' => $course->id
-            ]);
+
 
             // Check if enrolled
             $isEnrolled = $this->isUserEnrolled($course, $user);
-            Log::info('User enrollment check for completion', ['is_enrolled' => $isEnrolled]);
 
             if (!$isEnrolled) {
-                Log::info('User is not enrolled, cannot mark as completed');
                 return false;
             }
 
             // Update status
-            Log::info('Updating user course status to completed');
 
             $course->users()->updateExistingPivot($user->id, [
                 'user_status' => 'completed',
@@ -88,16 +67,10 @@ class CourseService
             ]);
             // Verify the update was successful
             $status = $this->getUserCourseStatus($course, $user);
-            Log::info('Completion verification', ['status_after_update' => $status]);
 
             return $status === 'completed';
         } catch (\Exception $e) {
-            Log::error('Error marking course as completed', [
-                'user_id' => $user->id,
-                'course_id' => $course->id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
+
             report($e);
             return false;
         }
@@ -113,11 +86,7 @@ class CourseService
         }
 
         $exists = $course->users()->where('user_id', $user->id)->exists();
-        Log::debug('Checking if user is enrolled', [
-            'user_id' => $user->id,
-            'course_id' => $course->id,
-            'is_enrolled' => $exists
-        ]);
+
 
         return $exists;
     }
@@ -131,12 +100,7 @@ class CourseService
             ->where('user_id', $user->id)
             ->first();
 
-        Log::debug('CourseService Debug:', [
-            'query' => "SELECT * FROM course_registrations WHERE course_id = {$course->id} AND user_id = {$user->id}",
-            'found' => $registration ? 'YES' : 'NO',
-            'status' => $registration ? $registration->status : 'NULL',
-            'full_data' => $registration ? $registration->toArray() : null
-        ]);
+
 
         return $registration ? $registration->status : null;
     }
@@ -155,11 +119,7 @@ class CourseService
             $status = $this->getUserCourseStatus($course, $user);
 
             if ($status !== 'completed') {
-                Log::info('User has not completed the course yet', [
-                    'user_id' => $user->id,
-                    'course_id' => $course->id,
-                    'status' => $status
-                ]);
+
                 return null;
             }
 
@@ -175,19 +135,11 @@ class CourseService
                 ]
             );
 
-            Log::info('Course completion record created/updated', [
-                'user_id' => $user->id,
-                'course_id' => $course->id,
-                'completion_id' => $completion->id
-            ]);
+
 
             return $completion;
         } catch (\Exception $e) {
-            Log::error('Error creating course completion record', [
-                'message' => $e->getMessage(),
-                'user_id' => $user->id,
-                'course_id' => $course->id
-            ]);
+
 
             return null;
         }
@@ -210,10 +162,7 @@ class CourseService
             // This prevents timezone issues by explicitly setting the timezone to UTC
             return Carbon::parse($date)->startOfDay()->toDateString();
         } catch (\Exception $e) {
-            Log::error('Error formatting date', [
-                'date' => $date,
-                'error' => $e->getMessage()
-            ]);
+
             return $date; // Return original if parsing fails
         }
     }

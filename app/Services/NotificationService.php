@@ -23,14 +23,8 @@ class NotificationService
         // Send email
         Mail::to($user->email)->send(new SuspiciousActivityWarning($user, $warningData, $currentUser));
 
-        // Log the warning
-        $this->logWarningAction($user, $warningData, $currentUser);
 
-        Log::info('📧 Warning email sent successfully', [
-            'user_id' => $user->id,
-            'user_email' => $user->email,
-            'course' => $warningData['course_name'],
-        ]);
+
 
         return [
             'message' => "Warning email sent to {$user->name} successfully!",
@@ -128,25 +122,7 @@ class NotificationService
         }
     }
 
-    private function logWarningAction(User $user, array $warningData, $currentUser): void
-    {
-        try {
-            Log::info('📧 WARNING EMAIL SENT', [
-                'action' => 'warning_email_sent',
-                'user_id' => $user->id,
-                'user_name' => $user->name,
-                'user_email' => $user->email,
-                'admin_id' => $currentUser->id,
-                'admin_name' => $currentUser->name,
-                'warning_data' => $warningData,
-                'timestamp' => now()->toDateTimeString(),
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Failed to log warning action', [
-                'error' => $e->getMessage(),
-            ]);
-        }
-    }
+
 
     // Helper methods
     private function getActualSessionDuration($sessionStart, $sessionEnd)

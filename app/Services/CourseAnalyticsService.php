@@ -6,7 +6,6 @@ use App\Models\CourseOnline;
 use App\Models\CourseOnlineAssignment;
 use App\Models\LearningSession;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Log;
 
 class CourseAnalyticsService
 {
@@ -26,7 +25,6 @@ class CourseAnalyticsService
         try {
             $analytics = $courseOnline->getAnalytics();
         } catch (\Exception $e) {
-            Log::error('Error getting course analytics: ' . $e->getMessage());
 
             $analytics = (object) [
                 'total_enrollments' => 0,

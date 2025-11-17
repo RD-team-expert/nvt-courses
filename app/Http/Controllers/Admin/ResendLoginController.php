@@ -61,12 +61,10 @@ class ResendLoginController extends Controller
             // Send email with new login link
             Mail::to($user->email)->send(new PasswordResetWithLoginLink($user, $course, $loginLink));
 
-            Log::info("Login link resent to user {$user->email} for course {$course->name}");
 
             return back()->with('success', "Login link sent successfully to {$user->name}");
 
         } catch (\Exception $e) {
-            Log::error("Failed to resend login link to {$user->email}: " . $e->getMessage());
             return back()->with('error', 'Failed to send login link. Please try again.');
         }
     }
@@ -95,14 +93,12 @@ class ResendLoginController extends Controller
                     Mail::to($user->email)->send(new PasswordResetWithLoginLink($user, $course, $loginLink));
 
                     $successCount++;
-                    Log::info("Bulk login link sent to {$user->email}");
 
                     // Rate limiting
                     sleep(1);
 
                 } catch (\Exception $e) {
                     $failureCount++;
-                    Log::error("Failed to send bulk login link to {$user->email}: " . $e->getMessage());
                 }
             }
 
@@ -110,7 +106,6 @@ class ResendLoginController extends Controller
             return back()->with('success', $message);
 
         } catch (\Exception $e) {
-            Log::error("Bulk resend failed: " . $e->getMessage());
             return back()->with('error', 'Bulk operation failed. Please try again.');
         }
     }

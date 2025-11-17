@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Models\Clocking;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Log;
 
 class ClockingService
 {
@@ -15,10 +14,7 @@ class ClockingService
     public function clockIn(?int $course_id = null): Clocking
     {
         // Add logging for debugging
-        Log::info('Clock in attempt', [
-            'user_id' => Auth::id(),
-            'course_id' => $course_id
-        ]);
+
 
         // Optionally, ensure user does not have an open clocking session
         $openSession = Clocking::where('user_id', Auth::id())
@@ -27,11 +23,8 @@ class ClockingService
 
         if ($openSession) {
             // Log the issue
-            Log::warning('User already has an open session', [
-                'user_id' => Auth::id(),
-                'open_session_id' => $openSession->id
-            ]);
-            
+
+
             throw new \Exception('You must clock out before clocking in again.');
         }
 
@@ -43,11 +36,7 @@ class ClockingService
         ]);
 
         // Log success
-        Log::info('User clocked in successfully', [
-            'user_id' => Auth::id(),
-            'clocking_id' => $clocking->id,
-            'course_id' => $course_id
-        ]);
+
 
         return $clocking;
     }
@@ -71,7 +60,7 @@ class ClockingService
         $clocking->rating = $rating;
         $clocking->comment = $comment;
         $clocking->save();
-        
+
         // Calculate and save the duration
         $clocking->updateDuration();
 

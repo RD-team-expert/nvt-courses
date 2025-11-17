@@ -25,12 +25,7 @@ class MonthlyKpiService
         $startDate = $this->getReportStartDate($month, $year);
         $endDate = $this->getReportEndDate($month, $year);
 
-        Log::info('🎯 Generating Monthly KPI Report', [
-            'period' => "{$month}/{$year}",
-            'start_date' => $startDate,
-            'end_date' => $endDate,
-            'filters' => $filters
-        ]);
+
 
         return [
             'period' => [
@@ -249,7 +244,6 @@ class MonthlyKpiService
             return $count;
 
         } catch (\Exception $e) {
-            Log::error('Error calculating active participants', ['error' => $e->getMessage()]);
             return 0;
         }
     }
@@ -315,7 +309,6 @@ class MonthlyKpiService
             return round($avgDuration ?: 0, 1);
 
         } catch (\Exception $e) {
-            Log::error('Error calculating average time spent', ['error' => $e->getMessage()]);
             return 0;
         }
     }
@@ -457,7 +450,6 @@ class MonthlyKpiService
             return round(($improved->count() / $retakes->count()) * 100, 2);
 
         } catch (\Exception $e) {
-            Log::error('Error calculating improvement rate', ['error' => $e->getMessage()]);
             return 0;
         }
     }
@@ -508,7 +500,6 @@ class MonthlyKpiService
                 });
 
         } catch (\Exception $e) {
-            Log::error('Error getting top performing courses', ['error' => $e->getMessage()]);
             return collect();
         }
     }
@@ -569,7 +560,6 @@ class MonthlyKpiService
             });
 
         } catch (\Exception $e) {
-            Log::error('Error getting courses needing improvement', ['error' => $e->getMessage()]);
             return collect();
         }
     }
@@ -608,7 +598,6 @@ class MonthlyKpiService
             });
 
         } catch (\Exception $e) {
-            Log::error('Error getting top performing users', ['error' => $e->getMessage()]);
             return collect();
         }
     }
@@ -651,7 +640,6 @@ class MonthlyKpiService
             });
 
         } catch (\Exception $e) {
-            Log::error('Error getting low performing users', ['error' => $e->getMessage()]);
             return collect();
         }
     }
@@ -666,7 +654,6 @@ class MonthlyKpiService
             $this->applyFilters($query, $filters);
             return $query->get();
         } catch (\Exception $e) {
-            Log::error('Error getting quiz results', ['error' => $e->getMessage()]);
             return collect();
         }
     }
@@ -813,7 +800,6 @@ class MonthlyKpiService
             ];
 
         } catch (\Exception $e) {
-            Log::error('Error calculating feedback trends', ['error' => $e->getMessage()]);
             return [
                 'trend_direction' => 'stable',
                 'average_change' => 0,
@@ -1030,7 +1016,6 @@ class MonthlyKpiService
     private function getOnlineCourseDelivery($startDate, $endDate, $filters = [])
     {
         try {
-            Log::info('📊 Calculating online course delivery metrics');
 
             // Count online courses created in period
             $onlineCoursesQuery = DB::table('course_online')
@@ -1089,7 +1074,6 @@ class MonthlyKpiService
             ];
 
         } catch (\Exception $e) {
-            Log::error('Error calculating online course delivery', ['error' => $e->getMessage()]);
             return [
                 'online_courses_delivered' => 0,
                 'online_enrollments' => 0,
@@ -1106,7 +1090,6 @@ class MonthlyKpiService
     private function getOnlineVideoEngagement($startDate, $endDate, $filters = [])
     {
         try {
-            Log::info('🎥 Calculating video engagement metrics');
 
             // Get video progress data
             $progressQuery = DB::table('user_content_progress')
@@ -1157,7 +1140,6 @@ class MonthlyKpiService
             ];
 
         } catch (\Exception $e) {
-            Log::error('Error calculating video engagement', ['error' => $e->getMessage()]);
             return [
                 'total_videos_watched' => 0,
                 'avg_video_completion' => 0,
@@ -1173,7 +1155,6 @@ class MonthlyKpiService
     private function getOnlineModuleProgress($startDate, $endDate, $filters = [])
     {
         try {
-            Log::info('📚 Calculating module progress metrics');
 
             // Total modules available
             $totalModules = DB::table('course_modules')
@@ -1218,7 +1199,6 @@ class MonthlyKpiService
             ];
 
         } catch (\Exception $e) {
-            Log::error('Error calculating module progress', ['error' => $e->getMessage()]);
             return [
                 'total_modules' => 0,
                 'completed_modules' => 0,
@@ -1234,7 +1214,6 @@ class MonthlyKpiService
     private function getOnlineSessionAnalytics($startDate, $endDate, $filters = [])
     {
         try {
-            Log::info('⏱️ Calculating session analytics');
 
             $sessionsQuery = DB::table('learning_sessions')
                 ->whereBetween('started_at', [$startDate, $endDate]);
@@ -1284,7 +1263,6 @@ class MonthlyKpiService
             ];
 
         } catch (\Exception $e) {
-            Log::error('Error calculating session analytics', ['error' => $e->getMessage()]);
             return [
                 'total_sessions' => 0,
                 'avg_session_duration_minutes' => 0,
@@ -1301,7 +1279,6 @@ class MonthlyKpiService
     private function getOnlineTopPerformers($startDate, $endDate, $filters = [], $limit = 5)
     {
         try {
-            Log::info('🏆 Getting online top performers');
 
             // Top online courses by completion rate
             $topCourses = DB::table('course_online')
@@ -1359,7 +1336,6 @@ class MonthlyKpiService
             ];
 
         } catch (\Exception $e) {
-            Log::error('Error getting online top performers', ['error' => $e->getMessage()]);
             return [
                 'top_online_courses' => [],
                 'top_online_learners' => [],

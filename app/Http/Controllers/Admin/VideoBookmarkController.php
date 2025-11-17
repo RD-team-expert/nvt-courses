@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Video;
 use App\Models\VideoBookmark;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
 class VideoBookmarkController extends Controller
@@ -28,12 +27,7 @@ class VideoBookmarkController extends Controller
             'note' => $validated['note'],
         ]);
 
-        Log::info('Video bookmark created', [
-            'bookmark_id' => $bookmark->id,
-            'video_id' => $video->id,
-            'user_id' => auth()->id(),
-            'timestamp' => $validated['timestamp'],
-        ]);
+
 
         return response()->json([
             'success' => true,
@@ -105,10 +99,7 @@ class VideoBookmarkController extends Controller
 
         $bookmark->delete();
 
-        Log::info('Video bookmark deleted', [
-            'bookmark_id' => $bookmark->id,
-            'user_id' => auth()->id(),
-        ]);
+
 
         return response()->json(['success' => true]);
     }

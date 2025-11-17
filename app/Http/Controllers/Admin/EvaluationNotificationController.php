@@ -104,7 +104,6 @@ class EvaluationNotificationController extends Controller
      */
     public function previewNotification(Request $request)
     {
-        \Log::info('Preview notification request received', $request->all());
 
         $validated = $request->validate([
             'employee_ids' => 'required|array|min:1',
@@ -114,7 +113,6 @@ class EvaluationNotificationController extends Controller
             'email_subject' => 'nullable|string|max:255'
         ]);
 
-        \Log::info('Validation passed', $validated);
 
         try {
             // Get preview data (no L1 validation)
@@ -123,13 +121,11 @@ class EvaluationNotificationController extends Controller
                 $validated['target_manager_levels']
             );
 
-            \Log::info('Preview data generated', $preview);
 
             // Add email subject to preview
             $preview['email_subject'] = $validated['email_subject'] ??
                 'Evaluation Report - ' . ($preview['summary']['departments'][0] ?? 'Multiple Departments');
 
-            \Log::info('Returning preview data to frontend');
 
             // Get the same data as index method
             $departments = Department::select(['id', 'name'])->orderBy('name')->get();
@@ -169,12 +165,7 @@ class EvaluationNotificationController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            \Log::error('Preview notification failed', [
-                'employee_ids' => $validated['employee_ids'],
-                'target_levels' => $validated['target_manager_levels'],
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
+
 
             return back()->withErrors([
                 'preview' => 'Failed to generate preview: ' . $e->getMessage()
@@ -189,7 +180,6 @@ class EvaluationNotificationController extends Controller
      */
     public function sendNotifications(Request $request)
     {
-        Log::info('=== SEND NOTIFICATIONS STARTED ===');
 
         $validated = $request->validate([
             'employee_ids' => 'required|array|min:1',
@@ -200,36 +190,27 @@ class EvaluationNotificationController extends Controller
             'custom_message' => 'nullable|string|max:1000'
         ]);
 
-        Log::info('Validation passed');
 
         DB::beginTransaction();
         try {
-            Log::info('=== STEP 1: Validate L1 employees ===');
 
             // Validate L1 employees again
             $validation = $this->hierarchyService->validateL1Employees($validated['employee_ids']);
             if (!empty($validation['invalid'])) {
-                Log::warning('Invalid employees found');
                 return back()->withErrors(['send' => 'Invalid employee selection.']);
             }
 
-            Log::info('L1 validation passed');
 
-            Log::info('=== STEP 2: Get employee data ===');
             // Get employee and evaluation data
             $employees = User::with(['evaluations.history', 'department'])
                 ->whereIn('id', $validated['employee_ids'])
                 ->get();
 
-            Log::info('Employees loaded: ' . $employees->count());
 
             $evaluationIds = $employees->flatMap->evaluations->pluck('id')->toArray();
             $employeeNames = $employees->pluck('name')->toArray();
             $departmentName = $employees->first()->department?->name ?? 'Multiple Departments';
 
-            Log::info('Data prepared - Evaluations: ' . count($evaluationIds) . ', Names: ' . count($employeeNames));
-
-            Log::info('=== STEP 3: Create notification record ===');
 
             // Get the first employee's department_id
             $firstEmployee = $employees->first();
@@ -253,27 +234,21 @@ class EvaluationNotificationController extends Controller
                 'department_id' => $departmentId
             ]);
 
-            Log::info('Notification created successfully: ' . $notification->id);
 
-            Log::info('=== STEP 4: Set evaluation data (if methods exist) ===');
 
             // Set evaluation and employee data (only if methods exist)
             try {
                 if (method_exists($notification, 'setEvaluationIdsArray')) {
                     $notification->setEvaluationIdsArray($evaluationIds);
-                    Log::info('Evaluation IDs set');
                 }
 
                 if (method_exists($notification, 'setEmployeeNamesArray')) {
                     $notification->setEmployeeNamesArray($employeeNames);
-                    Log::info('Employee names set');
                 }
             } catch (\Exception $e) {
-                Log::warning('Failed to set evaluation data: ' . $e->getMessage());
                 // Continue anyway
             }
 
-            Log::info('=== STEP 5: Get managers ===');
 
             // Get managers and send emails
             $managers = $this->hierarchyService->getManagersForEmployees(
@@ -281,9 +256,6 @@ class EvaluationNotificationController extends Controller
                 $validated['target_manager_levels']
             );
 
-            Log::info('Managers found: ' . json_encode($managers));
-
-            Log::info('=== STEP 6: Send emails ===');
 
             // TEMPORARILY SKIP EMAIL SENDING TO ISOLATE THE ISSUE
 //            $emailResults = [
@@ -301,9 +273,6 @@ class EvaluationNotificationController extends Controller
             );
 
 
-            Log::info('Email results: ' . json_encode($emailResults));
-
-            Log::info('=== STEP 7: Update notification status ===');
 
             // Update notification status based on email results
             try {
@@ -331,14 +300,13 @@ class EvaluationNotificationController extends Controller
                     }
                 }
             } catch (\Exception $e) {
-                Log::warning('Failed to update notification status: ' . $e->getMessage());
             }
 
-            Log::info('=== STEP 8: Commit transaction ===');
+
 
             DB::commit();
 
-            Log::info('=== SUCCESS: All steps completed ===');
+
 
             // Prepare success message
             $successMessage = "Evaluation notifications processed successfully! ";
@@ -354,10 +322,7 @@ class EvaluationNotificationController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
 
-            Log::error('=== SEND NOTIFICATION FAILED ===');
-            Log::error('Error: ' . $e->getMessage());
-            Log::error('File: ' . $e->getFile() . ':' . $e->getLine());
-            Log::error('Trace: ' . $e->getTraceAsString());
+
 
             return back()->withErrors([
                 'send' => 'Failed to send notifications: ' . $e->getMessage()

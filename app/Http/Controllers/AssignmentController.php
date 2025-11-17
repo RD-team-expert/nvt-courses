@@ -287,21 +287,9 @@ class AssignmentController extends Controller
                 Mail::to($user->email)->queue(new CourseCreationNotification($course, $user));
             }
 
-            Log::info('Private course assignment notifications sent successfully', [
-                'course_id' => $course->id,
-                'course_name' => $course->name,
-                'assigned_by' => $assignedBy->id,
-                'assigned_by_name' => $assignedBy->name,
-                'user_count' => $assignedUsers->count(),
-                'user_emails' => $assignedUsers->pluck('email')->toArray(),
-                'user_ids' => $assignedUsers->pluck('id')->toArray()
-            ]);
+
         } catch (\Exception $e) {
-            Log::error('Failed to send course assignment notifications', [
-                'course_id' => $course->id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
+
         }
     }
 }

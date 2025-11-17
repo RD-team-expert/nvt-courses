@@ -9,7 +9,6 @@ use App\Models\ModuleContent;
 use App\Models\Video;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
 class ModuleContentController extends Controller
@@ -152,13 +151,7 @@ class ModuleContentController extends Controller
 
         $content = ModuleContent::create($contentData);
 
-        Log::info('Module content created', [
-            'content_id' => $content->id,
-            'module_id' => $courseModule->id,
-            'course_id' => $courseOnline->id,
-            'content_type' => $content->content_type,
-            'created_by' => auth()->id(),
-        ]);
+
 
         return redirect()->route('admin.module-content.index', [$courseOnline, $courseModule])
             ->with('success', 'Content added successfully.');
@@ -320,12 +313,7 @@ class ModuleContentController extends Controller
 
         $moduleContent->update($updateData);
 
-        Log::info('Module content updated', [
-            'content_id' => $moduleContent->id,
-            'module_id' => $courseModule->id,
-            'course_id' => $courseOnline->id,
-            'updated_by' => auth()->id(),
-        ]);
+
 
         return redirect()->route('admin.module-content.index', [$courseOnline, $courseModule])
             ->with('success', 'Content updated successfully.');
@@ -358,12 +346,6 @@ class ModuleContentController extends Controller
             ->where('order_number', '>', $orderNumber)
             ->decrement('order_number');
 
-        Log::info('Module content deleted', [
-            'content_title' => $title,
-            'module_id' => $courseModule->id,
-            'course_id' => $courseOnline->id,
-            'deleted_by' => auth()->id(),
-        ]);
 
         return redirect()->route('admin.module-content.index', [$courseOnline, $courseModule])
             ->with('success', 'Content deleted successfully.');

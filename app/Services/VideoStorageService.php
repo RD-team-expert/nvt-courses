@@ -46,11 +46,7 @@ class VideoStorageService
             // Store file
             Storage::disk($this->disk)->putFileAs($path, $file, $filename);
 
-            Log::info('Video uploaded successfully', [
-                'filename' => $filename,
-                'path' => $fullPath,
-                'size' => $file->getSize(),
-            ]);
+
 
             // Extract metadata
             $metadata = $this->extractMetadata($fullPath);
@@ -67,10 +63,7 @@ class VideoStorageService
             ];
 
         } catch (\Exception $e) {
-            Log::error('Failed to upload video', [
-                'error' => $e->getMessage(),
-                'file' => $file->getClientOriginalName(),
-            ]);
+
             throw $e;
         }
     }
@@ -154,14 +147,10 @@ class VideoStorageService
                 return ['duration' => $duration];
             }
 
-            Log::warning('No metadata extraction method available');
             return ['duration' => null];
 
         } catch (\Exception $e) {
-            Log::error('Failed to extract video metadata', [
-                'error' => $e->getMessage(),
-                'path' => $filePath,
-            ]);
+
             return ['duration' => null];
         }
     }
@@ -193,19 +182,14 @@ class VideoStorageService
                 exec($command, $output, $returnCode);
 
                 if ($returnCode === 0 && file_exists($fullThumbnailPath)) {
-                    Log::info('Thumbnail generated successfully', ['path' => $thumbnailPath]);
                     return $thumbnailPath;
                 }
             }
 
-            Log::warning('Could not generate thumbnail - FFmpeg not available');
             return null;
 
         } catch (\Exception $e) {
-            Log::error('Failed to generate thumbnail', [
-                'error' => $e->getMessage(),
-                'video_path' => $videoPath,
-            ]);
+
             return null;
         }
     }
@@ -219,16 +203,12 @@ class VideoStorageService
             if (Storage::disk($this->disk)->exists($filePath)) {
                 Storage::disk($this->disk)->delete($filePath);
 
-                Log::info('Video file deleted', ['path' => $filePath]);
                 return true;
             }
 
             return false;
         } catch (\Exception $e) {
-            Log::error('Failed to delete video file', [
-                'error' => $e->getMessage(),
-                'path' => $filePath,
-            ]);
+
             return false;
         }
     }
@@ -241,15 +221,11 @@ class VideoStorageService
         try {
             if (Storage::disk($this->disk)->exists($thumbnailPath)) {
                 Storage::disk($this->disk)->delete($thumbnailPath);
-                Log::info('Thumbnail deleted', ['path' => $thumbnailPath]);
                 return true;
             }
             return false;
         } catch (\Exception $e) {
-            Log::error('Failed to delete thumbnail', [
-                'error' => $e->getMessage(),
-                'path' => $thumbnailPath,
-            ]);
+
             return false;
         }
     }

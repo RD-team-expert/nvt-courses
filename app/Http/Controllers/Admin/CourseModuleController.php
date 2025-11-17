@@ -92,13 +92,7 @@ class CourseModuleController extends Controller
             'is_active' => $validated['is_active'] ?? true,
         ]);
 
-        Log::info('Course module created', [
-            'module_id' => $module->id,
-            'module_name' => $module->name,
-            'course_id' => $courseOnline->id,
-            'course_name' => $courseOnline->name,
-            'created_by' => auth()->id(),
-        ]);
+
 
         return redirect()->route('admin.course-modules.index', $courseOnline)
             ->with('success', 'Module created successfully.');
@@ -199,12 +193,7 @@ class CourseModuleController extends Controller
             'is_active' => $validated['is_active'] ?? $courseModule->is_active,
         ]);
 
-        Log::info('Course module updated', [
-            'module_id' => $courseModule->id,
-            'module_name' => $courseModule->name,
-            'course_id' => $courseOnline->id,
-            'updated_by' => auth()->id(),
-        ]);
+
 
         return redirect()->route('admin.course-modules.index', $courseOnline)
             ->with('success', 'Module updated successfully.');
@@ -232,11 +221,7 @@ class CourseModuleController extends Controller
             ->where('order_number', '>', $orderNumber)
             ->decrement('order_number');
 
-        Log::info('Course module deleted', [
-            'module_name' => $moduleName,
-            'course_id' => $courseOnline->id,
-            'deleted_by' => auth()->id(),
-        ]);
+
 
         return redirect()->route('admin.course-modules.index', $courseOnline)
             ->with('success', 'Module deleted successfully.');
@@ -259,11 +244,6 @@ class CourseModuleController extends Controller
                 ->update(['order_number' => $moduleData['order_number']]);
         }
 
-        Log::info('Course modules reordered', [
-            'course_id' => $courseOnline->id,
-            'module_count' => count($validated['modules']),
-            'updated_by' => auth()->id(),
-        ]);
 
         return redirect()->back()
             ->with('success', 'Module order updated successfully.');

@@ -4,6 +4,7 @@ use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\Admin\AnalyticsController;
 use App\Http\Controllers\Admin\AttendanceController;
 use App\Http\Controllers\Admin\AttendanceController as AdminAttendanceController;
+use App\Http\Controllers\Admin\ChunkUploadController;
 use App\Http\Controllers\Admin\CourseAssignmentController;
 use App\Http\Controllers\Admin\CourseController as AdminCourseController;
 use App\Http\Controllers\Admin\CourseOnlineReportController;
@@ -90,6 +91,8 @@ Route::get('/login/token/{user}/{course}', [AuthVaiEmailController::class, 'toke
 // ==========================================
 
 Route::middleware(['auth'])->group(function () {
+
+
 
     Route::get('/video/stream/{video}', [VideoStreamController::class, 'stream'])
         ->name('video.stream');
@@ -405,6 +408,10 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     // ===== COURSE MANAGEMENT (TRADITIONAL) =====
     Route::resource('courses', AdminCourseController::class)->except('update');
     Route::post('courses/{course}/update', [AdminCourseController::class, 'update'])->name('courses.update');
+
+
+    Route::post('videos/upload-chunk', [ChunkUploadController::class, 'upload'])
+        ->name('videos.upload-chunk');
 
     // ===== COURSE ONLINE MANAGEMENT (NEW SYSTEM) =====
     Route::resource('course-online', App\Http\Controllers\Admin\CourseOnlineController::class);

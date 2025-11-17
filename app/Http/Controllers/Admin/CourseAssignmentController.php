@@ -106,7 +106,7 @@ class CourseAssignmentController extends Controller
     public function create(Request $request)
 {
     $selectedCourseId = $request->get('course_id');
-    
+
     $courses = CourseOnline::active()
         ->withCount(['modules', 'assignments'])
         ->orderBy('name')
@@ -138,7 +138,7 @@ class CourseAssignmentController extends Controller
                     ->where('course_online_id', $selectedCourseId)
                     ->exists();
             }
-            
+
             return [
                 'id' => $user->id,
                 'name' => $user->name,
@@ -166,11 +166,7 @@ class CourseAssignmentController extends Controller
      */
     public function store(Request $request)
 {
-    Log::info('🎯 === COURSE ONLINE ASSIGNMENT START ===', [
-        'admin_id' => auth()->id(),
-        'admin_name' => auth()->user()->name,
-        'request_data' => $request->all(),
-    ]);
+
 
     $validated = $request->validate([
         'course_id' => 'required|exists:course_online,id',
@@ -185,7 +181,7 @@ class CourseAssignmentController extends Controller
 
         $assignmentCount = 0;
         $skippedCount = 0;
-        
+
         // ✅ NEW: Group users by manager
         $usersByManager = [];
 
@@ -220,10 +216,10 @@ class CourseAssignmentController extends Controller
             try {
                 $managers = app(\App\Services\ManagerHierarchyService::class)
                     ->getDirectManagersForUser($user->id);
-                
+
                 foreach ($managers as $managerData) {
                     $managerId = $managerData['manager']->id;
-                    
+
                     if (!isset($usersByManager[$managerId])) {
                         $usersByManager[$managerId] = [
                             'manager' => $managerData['manager'],
@@ -232,7 +228,7 @@ class CourseAssignmentController extends Controller
                             'level' => $managerData['level'],
                         ];
                     }
-                    
+
                     $usersByManager[$managerId]['users'][] = $user;
                 }
             } catch (\Exception $e) {
@@ -280,10 +276,7 @@ class CourseAssignmentController extends Controller
                     $manager = $data['manager'];
                     $employees = collect($data['users']);
 
-                    Log::info('📧 Sending consolidated manager notification', [
-                        'manager_email' => $manager->email,
-                        'employee_count' => $employees->count(),
-                    ]);
+
 
                     Mail::to($manager->email)->send(
                         new \App\Mail\CourseOnlineAssignmentManagerNotification(
@@ -312,10 +305,7 @@ class CourseAssignmentController extends Controller
             }
         }
 
-        Log::info('🎉 Course assignment completed', [
-            'total_assigned' => $assignmentCount,
-            'skipped' => $skippedCount,
-        ]);
+
 
         $message = "Successfully assigned the course to {$assignmentCount} user(s).";
         if ($skippedCount > 0) {
