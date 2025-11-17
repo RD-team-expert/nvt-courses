@@ -79,6 +79,8 @@ const getLevelColorScheme = (level: number | string) => {
         case 2: return { bg: 'bg-green-100', text: 'text-green-600', border: 'border-green-200' }
         case 3: return { bg: 'bg-orange-100', text: 'text-orange-600', border: 'border-orange-200' }
         case 4: return { bg: 'bg-red-100', text: 'text-red-600', border: 'border-red-200' }
+        case 5:return { bg: 'bg-indigo-100', text: 'text-indigo-600', variant: 'secondary' }
+        case 6:  return { bg: 'bg-pink-100', text: 'text-pink-600', variant: 'secondary' }
         default: return { bg: 'bg-purple-100', text: 'text-purple-600', border: 'border-purple-200' }
     }
 }
@@ -126,6 +128,8 @@ const breadcrumbs: BreadcrumbItemType[] = [
                                         <SelectItem value="3">Level 3 (Senior Managers)</SelectItem>
                                         <SelectItem value="4">Level 4 (Directors)</SelectItem>
                                         <SelectItem value="5">Level 5 (Executive)</SelectItem>
+                                        <SelectItem value="6">Level 6 (Business Owners)</SelectItem>
+
                                     </SelectContent>
                                 </Select>
                                 <p class="text-xs text-muted-foreground">Higher numbers indicate higher authority levels</p>

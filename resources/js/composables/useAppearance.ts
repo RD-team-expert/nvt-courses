@@ -8,6 +8,8 @@ export function updateTheme(value: Appearance) {
         return;
     }
 
+    document.documentElement.classList.add('dark');
+
     // Always use light mode
     // document.documentElement.classList.remove('dark');
 
@@ -27,6 +29,8 @@ export function initializeTheme() {
     if (typeof window === 'undefined') {
         return;
     }
+
+    document.documentElement.classList.add('dark');
 
     // Always initialize with light theme
     document.documentElement.classList.remove('light');

@@ -801,11 +801,22 @@ const onLoadedData = () => {
     isVideoReady.value = true
 }
 
-const onCanPlay = () => {
-    console.log('📹 Video can start playing')
-    isVideoLoading.value = false
-    isVideoReady.value = true
-}
+const onCanPlay = async () => {
+    console.log('✅ Video can start playing');
+    isVideoLoading.value = false;
+    isVideoReady.value = true;
+
+    // 🔥 NEW: Start session and increment API key usage when video is ready to play
+    if (props.video?.key_id && !sessionId.value) {
+        try {
+            await startSession(); // This will call your backend to increment active_users
+            console.log('✅ Session started, API key incremented');
+        } catch (error) {
+            console.error('❌ Failed to start session:', error);
+        }
+    }
+};
+
 
 const onWaiting = () => {
     console.log('📹 Video waiting for more data')
@@ -887,12 +898,12 @@ onMounted(async () => {
     document.addEventListener('fullscreenchange', onFullscreenChange)
 
     // Initialize based on content type
-    if (props.content.contenttype === 'pdf') {
+    if (props.content.content_type === 'pdf') {
         // ... your existing PDF initialization code ...
-    } else if (props.content.contenttype === 'video') {
+    } else if (props.content.content_type === 'video') {
         await nextTick()
         if (videoElement.value) {
-            videoElement.value.currentTime = safeUserProgress.value.currentposition || 0
+            videoElement.value.currentTime = safeUserProgress.value.current_position || 0
             videoElement.value.addEventListener('seeked', onVideoSeeked)
         }
     }
@@ -900,8 +911,8 @@ onMounted(async () => {
     // Progress tracking interval
     const progressInterval = setInterval(() => {
         if (
-            (props.content.contenttype === 'video' && isPlaying.value) ||
-            (props.content.contenttype === 'pdf' && isPdfLoaded.value && totalPages.value > 0)
+            (props.content.content_type === 'video' && isPlaying.value) ||
+            (props.content.content_type === 'pdf' && isPdfLoaded.value && totalPages.value > 0)
         ) {
             updateProgress()
         }
@@ -913,7 +924,7 @@ onMounted(async () => {
         hasSession: !!sessionId.value,
         sessionId: sessionId.value
     })
-    
+
     if (sessionId.value) {
         const formData = new FormData()
         formData.append('action', 'end')
@@ -925,7 +936,7 @@ onMounted(async () => {
         formData.append('final_pause', pauseCountSinceLastHeartbeat.value.toString())
 
         const url = `/content/${props.content.id}/session`
-        
+
         console.log('📤 Sending sendBeacon to:', url)
         const success = navigator.sendBeacon(url, formData)
         console.log('📬 sendBeacon result:', success ? 'SUCCESS' : 'FAILED')
@@ -948,13 +959,13 @@ onMounted(async () => {
         }
     }
 
-    
+
 
     // ✅ Handle page hide (more reliable than beforeunload)
    const handlePageHide = () => {
     if (sessionId.value) {
-        const currentPosition = props.content.contenttype === 'video' 
-            ? currentTime.value 
+        const currentPosition = props.content.content_type === 'video'
+            ? currentTime.value
             : currentPage.value
 
         // ✅ CHANGED: Use FormData instead of Blob with JSON
@@ -966,7 +977,7 @@ onMounted(async () => {
         formData.append('final_skip', skipCountSinceLastHeartbeat.value.toString())
         formData.append('final_seek', seekCountSinceLastHeartbeat.value.toString())
         formData.append('final_pause', pauseCountSinceLastHeartbeat.value.toString())
-        
+
         // ✅ Add CSRF token
         if (csrfToken) {
             formData.append('_token', csrfToken)
@@ -974,7 +985,7 @@ onMounted(async () => {
 
         const url = `/content/${props.content.id}/session`
         navigator.sendBeacon(url, formData)
-        
+
         console.log('🏁 Session ended via pagehide')
     }
 }
@@ -988,19 +999,15 @@ onMounted(async () => {
     // ✅ Cleanup on component unmount
     onUnmounted(() => {
         // Clean up all listeners
-        
         window.removeEventListener('beforeunload', handleBeforeUnload)
         window.removeEventListener('pagehide', handlePageHide)
         document.removeEventListener('visibilitychange', handleVisibilityChange)
         document.removeEventListener('fullscreenchange', onFullscreenChange)
-        window.addEventListener('beforeunload', handleBeforeUnload)
-    window.addEventListener('pagehide', handlePageHide)
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-        
+
         // End session before unmounting
         endSession()
         clearInterval(progressInterval)
-        
+
         // Cleanup video event listener
         if (videoElement.value) {
             videoElement.value.removeEventListener('seeked', onVideoSeeked)
@@ -1010,7 +1017,6 @@ onMounted(async () => {
       window.addEventListener('beforeunload', handlePageClose);
 
 })
-
 
 // Watch for page changes in PDF
 watch(currentPage, (newPage) => {
@@ -1026,17 +1032,17 @@ watch(currentPage, (newPage) => {
     <Head :title="content.title" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
+        <div class="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4 sm:space-y-6">
             <!-- Enhanced Content Header -->
-            <div class="flex items-center justify-between mb-6">
-                <div class="flex items-center space-x-4">
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6">
+                <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
                     <div class="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
                         <component :is="contentIcon" class="h-6 w-6 text-primary" />
                     </div>
                     <div>
-                        <h1 class="text-2xl font-bold">{{ content.title }}</h1>
-                        <p class="text-muted-foreground">{{ safeModule.name }} • {{ safeCourse.name }}</p>
-                        <div class="flex items-center gap-4 mt-2">
+                        <h1 class="text-xl sm:text-2xl font-bold break-words">{{ content.title }}</h1>
+                        <p class="text-sm sm:text-base text-muted-foreground break-words">{{ safeModule.name }} • {{ safeCourse.name }}</p>
+                        <div class="flex flex-wrap items-center gap-2 mt-2">
                             <Badge variant="outline" class="text-xs">
                                 {{ content.content_type.toUpperCase() }}
                             </Badge>
@@ -1074,7 +1080,7 @@ watch(currentPage, (newPage) => {
                         </div>
                     </div>
                 </div>
-                <Button asChild variant="outline">
+                <Button asChild variant="outline" class="w-full sm:w-auto">
                     <Link :href="route('courses-online.show', safeCourse.id)">
                         <ArrowLeft class="h-4 w-4 mr-2" />
                         Back to Course
@@ -1085,7 +1091,7 @@ watch(currentPage, (newPage) => {
             <!-- ✅ OPTIONAL: Debug Panel to show tracking data -->
             <Card v-if="sessionId" class="mb-4 border-blue-200 bg-blue-50/30">
                 <CardContent class="p-4">
-                    <div class="text-xs text-muted-foreground grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="text-xs text-muted-foreground grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4">
                         <div>
                             <strong>Session ID:</strong> {{ sessionId }}
                         </div>
@@ -1103,7 +1109,7 @@ watch(currentPage, (newPage) => {
             </Card>
 
             <!-- Split Layout - 3/4 for content, 1/4 for sidebar -->
-            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">
                 <!-- Main Content Area (3/4 width) -->
                 <div class="lg:col-span-3">
                     <!-- Enhanced Video Player with Loading State -->
@@ -1113,7 +1119,7 @@ watch(currentPage, (newPage) => {
                                 <!-- Video Element -->
                                 <video
                                     ref="videoElement"
-    :src="video?.streaming_url"  
+    :src="video?.streaming_url"
                                     :poster="video?.thumbnail_url || ''"
                                     class="w-full h-full"
                                     preload="metadata"
@@ -1159,7 +1165,7 @@ watch(currentPage, (newPage) => {
                                     </div>
 
                                     <div class="flex items-center justify-between text-white">
-                                        <div class="flex items-center gap-4">
+                                        <div class="flex items-center gap-2 sm:gap-4">
                                             <Button @click="togglePlay" variant="ghost" size="sm" class="text-white hover:bg-white/20">
                                                 <Play v-if="!isPlaying" class="h-5 w-5" />
                                                 <Pause v-else class="h-5 w-5" />
@@ -1172,10 +1178,10 @@ watch(currentPage, (newPage) => {
                                                 <SkipForward class="h-4 w-4" />
                                             </Button>
 
-                                            <span class="text-sm">{{ formattedCurrentTime }} / {{ formattedDuration }}</span>
+                                            <span class="text-xs sm:text-sm whitespace-nowrap">{{ formattedCurrentTime }} / {{ formattedDuration }}</span>
                                         </div>
 
-                                        <div class="flex items-center gap-4">
+                                        <div class="flex items-center gap-2 sm:gap-4">
                                             <div class="flex items-center gap-2">
                                                 <Volume2 class="h-4 w-4" />
                                                 <input
@@ -1202,8 +1208,8 @@ watch(currentPage, (newPage) => {
                     <!-- PDF Viewer -->
                     <Card v-if="content.content_type === 'pdf'" class="overflow-hidden">
                         <CardHeader>
-                            <div class="flex items-center justify-between">
-                                <CardTitle class="flex items-center gap-2">
+                            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                                <CardTitle class="flex items-center gap-2 text-base sm:text-lg break-words">
                                     <FileText class="h-5 w-5" />
                                     {{ content.pdf_name || content.title }}
                                 </CardTitle>
@@ -1258,59 +1264,58 @@ watch(currentPage, (newPage) => {
                         </div>
 
                         <!-- PDF Controls (show when we have page count) -->
-                        <div v-if="totalPages > 0" class="px-6 pb-4 flex items-center justify-between border-b">
-                            <div class="flex items-center gap-2">
-                                <Button @click="prevPdfPage" variant="outline" size="sm" :disabled="currentPage <= 1">
-                                    <ChevronLeft class="h-4 w-4" />
-                                </Button>
+                        <div v-if="totalPages > 0" class="px-3 sm:px-6 pb-3 sm:pb-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-b">
+    <div class="flex items-center gap-1 sm:gap-2 w-full sm:w-auto justify-center">
+        <Button @click="prevPdfPage" variant="outline" size="sm" :disabled="currentPage <= 1">
+            <ChevronLeft class="h-4 w-4" />
+        </Button>
 
-                                <div class="flex items-center gap-2 px-4">
-                                    <input
-                                        v-model.number="currentPage"
-                                        @change="gotoPage(currentPage)"
-                                        type="number"
-                                        :min="1"
-                                        :max="totalPages"
-                                        class="w-16 px-2 py-1 text-sm border rounded text-center"
-                                    />
-                                    <span class="text-sm text-muted-foreground">of {{ totalPages }}</span>
-                                </div>
+        <div class="flex items-center gap-2 px-4">
+            <input
+                v-model.number="currentPage"
+                @change="gotoPage(currentPage)"
+                type="number"
+                :min="1"
+                :max="totalPages"
+                class="w-12 sm:w-16 px-1 sm:px-2 py-1 text-xs sm:text-sm border rounded text-center"
+            />
+            <span class="text-sm text-muted-foreground">of {{ totalPages }}</span>
+        </div>
 
-                                <Button @click="nextPdfPage" variant="outline" size="sm" :disabled="currentPage >= totalPages">
-                                    <ChevronRight class="h-4 w-4" />
-                                </Button>
-                            </div>
+        <Button @click="nextPdfPage" variant="outline" size="sm" :disabled="currentPage >= totalPages">
+            <ChevronRight class="h-4 w-4" />
+        </Button>
+    </div>
 
-                            <div class="flex items-center gap-2">
-                                <Button @click="zoomPdf('out')" variant="outline" size="sm" :disabled="pdfZoom <= 50">
-                                    <ZoomOut class="h-4 w-4" />
-                                </Button>
+    <div class="flex flex-wrap items-center gap-2 justify-center sm:justify-start w-full sm:w-auto">
+        <Button @click="zoomPdf('out')" variant="outline" size="sm" :disabled="pdfZoom <= 50">
+            <ZoomOut class="h-4 w-4" />
+        </Button>
 
-                                <span class="px-3 py-1 text-sm bg-muted rounded">{{ pdfZoom }}%</span>
+        <span class="px-2 sm:px-3 py-1 text-xs sm:text-sm bg-muted rounded whitespace-nowrap">{{ pdfZoom }}%</span>
 
-                                <Button @click="zoomPdf('in')" variant="outline" size="sm" :disabled="pdfZoom >= 200">
-                                    <ZoomIn class="h-4 w-4" />
-                                </Button>
+        <Button @click="zoomPdf('in')" variant="outline" size="sm" :disabled="pdfZoom >= 200">
+            <ZoomIn class="h-4 w-4" />
+        </Button>
 
-                                <Separator orientation="vertical" class="h-6 mx-2" />
+        <Separator orientation="vertical" class="hidden sm:block h-6 mx-2" />
 
-                                <Button @click="rotatePdf" variant="outline" size="sm">
-                                    <RotateCw class="h-4 w-4" />
-                                </Button>
+        <Button @click="rotatePdf" variant="outline" size="sm">
+            <RotateCw class="h-4 w-4" />
+        </Button>
 
-                                <Button @click="togglePdfFullscreen" variant="outline" size="sm">
-                                    <Maximize v-if="!isPdfFullscreen" class="h-4 w-4" />
-                                    <Minimize v-else class="h-4 w-4" />
-                                </Button>
-                            </div>
-                        </div>
+        <Button @click="togglePdfFullscreen" variant="outline" size="sm">
+            <Maximize v-if="!isPdfFullscreen" class="h-4 w-4" />
+            <Minimize v-else class="h-4 w-4" />
+        </Button>
+    </div>
+</div>
 
                         <!-- PDF Content -->
                         <CardContent class="p-0">
                             <div
                                 ref="pdfContainer"
-                                class="relative bg-gray-100 dark:bg-gray-800"
-                                :style="{ minHeight: isPdfFullscreen ? '100vh' : '800px' }"
+                                :style="{ minHeight: isPdfFullscreen ? '100vh' : '500px' }" class="sm:min-h-[800px]"
                             >
                                 <!-- Strategy 1: For Local Storage PDFs ONLY - Use vue-pdf-embed -->
                                 <div v-if="detectPdfSource(content.file_url || '') === 'storage' && pdfSource"
@@ -1326,10 +1331,11 @@ watch(currentPage, (newPage) => {
                                             :source="pdfSource"
                                             :page="currentPage"
                                             :style="{
-                        height: isPdfFullscreen ? '90vh' : '700px',
-                        width: '100%',
-                        minWidth: '800px'
-                    }"
+    height: isPdfFullscreen ? '90vh' : '500px',
+    width: '100%',
+    minWidth: '100%'
+}"
+                                            class="sm:h-[700px] sm:min-w-[800px]"
                                             @loaded="onPdfLoaded"
                                             @loading-failed="onPdfLoadingFailed"
                                             @rendered="onPdfRendered"
@@ -1493,70 +1499,47 @@ watch(currentPage, (newPage) => {
             </div>
 
             <!-- Navigation Section -->
-            <div class="flex items-center justify-between pt-6">
-                <div class="flex-1">
-                    <Button
-                        v-if="safeNavigation.previous"
-                        @click="navigateContent(safeNavigation.previous.id)"
-                        variant="outline"
-                        class="flex items-center gap-3 max-w-xs hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-colors"
-                    >
-                        <SkipBack class="h-4 w-4" />
-                        <div class="text-left">
-                            <div class="font-medium text-sm">{{ safeNavigation.previous.title }}</div>
-                            <div class="text-xs text-muted-foreground">{{ safeNavigation.previous.content_type.toUpperCase() }}</div>
-                        </div>
-                    </Button>
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 pt-4 sm:pt-6">
+    <div class="w-full sm:flex-1">
+        <Button
+            v-if="safeNavigation.previous"
+            @click="navigateContent(safeNavigation.previous.id)"
+            variant="outline"
+            class="w-full sm:max-w-xs flex items-center gap-3 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-colors"
+        >
+            <SkipBack class="h-4 w-4" />
+            <div class="text-left">
+                <div class="font-medium text-sm">{{ safeNavigation.previous.title }}</div>
+                <div class="text-xs text-muted-foreground">{{ safeNavigation.previous.content_type.toUpperCase() }}</div>
+            </div>
+        </Button>
+    </div>
+
+    <div class="w-full sm:flex-1 sm:text-right">
+        <Button
+            v-if="safeNavigation.next"
+            @click="navigateContent(safeNavigation.next.id)"
+            variant="outline"
+            :disabled="!safeNavigation.next.is_unlocked"
+            class="w-full sm:max-w-xs flex items-center gap-3 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-colors sm:ml-auto"
+            :class="{ 'opacity-60 cursor-not-allowed': !safeNavigation.next.is_unlocked }"
+        >
+            <div class="text-left">
+                <div class="font-medium text-sm">{{ safeNavigation.next.title }}</div>
+                <div class="text-xs text-muted-foreground">
+                    {{ safeNavigation.next.content_type.toUpperCase() }}
+                    <span v-if="!safeNavigation.next.is_unlocked" class="ml-2 text-amber-600">🔒 Locked</span>
                 </div>
-
-                <div class="flex-1 text-right">
-                    <Button
-                        v-if="safeNavigation.next"
-                        @click="navigateContent(safeNavigation.next.id)"
-                        :variant="safeNavigation.next.is_unlocked ? 'default' : 'outline'"
-                        :disabled="!safeNavigation.next.is_unlocked"
-                        :class="[
-            'group relative flex items-center justify-between',
-            'px-6 py-4 rounded-xl font-medium transition-all duration-200',
-            'min-h-[80px] max-w-md ml-auto shadow-lg',
-            safeNavigation.next.is_unlocked
-                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 hover:shadow-xl'
-                : 'bg-gray-100 border-2 border-dashed border-gray-300 text-gray-500 cursor-not-allowed'
-        ]"
-                    >
-                        <!-- Progress indicator for locked content -->
-                        <div v-if="!safeNavigation.next.is_unlocked"
-                             class="absolute -top-2 -right-2 bg-amber-500 text-white text-xs px-2 py-1 rounded-full shadow-md">
-                            Locked
-                        </div>
-
-                        <div class="text-right flex-1 mr-4">
-                            <div class="font-semibold text-lg mb-1 leading-tight">
-                                {{ safeNavigation.next.title }}
-                            </div>
-                            <div class="text-sm opacity-90 tracking-wide uppercase flex items-center justify-end gap-2">
-                <span class="inline-flex items-center">
-                    {{ safeNavigation.next.content_type }}
-                </span>
-                                <span v-if="safeNavigation.next.duration" class="text-xs bg-black/20 px-2 py-1 rounded">
-                    {{ safeNavigation.next.duration }}
-                </span>
-                            </div>
-                        </div>
-
-                        <div :class="[
-            'flex-shrink-0 transition-transform duration-200',
-            safeNavigation.next.is_unlocked ? 'group-hover:translate-x-1' : ''
-        ]">
-                            <SkipForward class="h-6 w-6" />
-                        </div>
-                    </Button>
-                </div>            </div>
+            </div>
+            <SkipForward class="h-4 w-4" />
+        </Button>
+    </div>
+</div>
 
             <!-- Enhanced Completion Alert -->
             <Alert v-if="isCompleted" class="border-green-200 bg-green-50 dark:bg-green-950">
                 <CheckCircle class="h-4 w-4 text-green-600" />
-                <AlertDescription>
+                <AlertDescription class="text-sm break-words">
                     <strong class="text-green-800 dark:text-green-200">Excellent work!</strong>
                     You've successfully completed this content.
                     <span v-if="safeNavigation.next && safeNavigation.next.is_unlocked">

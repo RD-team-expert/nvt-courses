@@ -15,6 +15,7 @@ class EvaluationController extends Controller
 {
     public function index()
     {
+        // NEW: Filter configs based on applies_to (show all by default)
         $configs = EvaluationConfig::with('types')->get()->toArray();
 
         // Get existing incentives with their level and tier relationships
@@ -32,15 +33,18 @@ class EvaluationController extends Controller
         return inertia('Admin/Evaluations/Index', [
             'configs' => $configs,
             'incentives' => $incentives,
-            'userLevels' => $userLevels, // NEW: For level + tier selection
+            'userLevels' => $userLevels,
         ]);
     }
+
 
     public function store(Request $request)
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'max_score' => 'required|integer|min:1',
+            'applies_to' => 'required|in:regular,online,both', // NEW
+
         ]);
 
         $config = EvaluationConfig::create($validated);
@@ -53,6 +57,7 @@ class EvaluationController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'max_score' => 'required|integer|min:1',
+            'applies_to' => 'required|in:regular,online,both',
         ]);
 
         $evaluationConfig->update($validated);

@@ -583,6 +583,11 @@ export default {
             background: #fff3e0;
         }
 
+        .kpi-card.danger {
+            border-color: #dc3545;
+            background: #f8d7da;
+        }
+
         .kpi-icon {
             font-size: 32px;
             margin-bottom: 12px;
@@ -930,6 +935,37 @@ export default {
     </div>
 
     <div class="kpi-section">
+        <h2 class="section-title">💻 Online Course Analytics</h2>
+        <div class="kpi-cards-grid" style="grid-template-columns: repeat(5, 1fr);">
+            <div class="kpi-card blue">
+                <div class="kpi-icon">💻</div>
+                <div class="kpi-label">Online Courses</div>
+                <div class="kpi-value">${props.kpiData.online_course_analytics?.delivery?.online_courses_delivered || 0}</div>
+            </div>
+            <div class="kpi-card green">
+                <div class="kpi-icon">📝</div>
+                <div class="kpi-label">Enrollments</div>
+                <div class="kpi-value">${props.kpiData.online_course_analytics?.delivery?.online_enrollments || 0}</div>
+            </div>
+            <div class="kpi-card purple">
+                <div class="kpi-icon">✅</div>
+                <div class="kpi-label">Completed</div>
+                <div class="kpi-value">${props.kpiData.online_course_analytics?.delivery?.online_completed || 0}</div>
+            </div>
+            <div class="kpi-card orange">
+                <div class="kpi-icon">📊</div>
+                <div class="kpi-label">Completion Rate</div>
+                <div class="kpi-value">${props.kpiData.online_course_analytics?.delivery?.online_completion_rate || 0}%</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-icon">👥</div>
+                <div class="kpi-label">Active Learners</div>
+                <div class="kpi-value">${props.kpiData.online_course_analytics?.delivery?.active_online_learners || 0}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="kpi-section">
         <h2 class="section-title">🎯 Engagement & Attendance</h2>
         <div class="metrics-grid">
             <div class="metric-row">
@@ -952,6 +988,32 @@ export default {
     </div>
 
     <div class="kpi-section">
+        <h2 class="section-title">🎥 Video Engagement Metrics</h2>
+        <div class="kpi-cards-grid">
+            <div class="kpi-card blue">
+                <div class="kpi-icon">▶️</div>
+                <div class="kpi-label">Videos Watched</div>
+                <div class="kpi-value">${props.kpiData.online_course_analytics?.video_engagement?.total_videos_watched || 0}</div>
+            </div>
+            <div class="kpi-card green">
+                <div class="kpi-icon">✅</div>
+                <div class="kpi-label">Avg Completion</div>
+                <div class="kpi-value">${props.kpiData.online_course_analytics?.video_engagement?.avg_video_completion || 0}%</div>
+            </div>
+            <div class="kpi-card purple">
+                <div class="kpi-icon">⏱️</div>
+                <div class="kpi-label">Watch Time</div>
+                <div class="kpi-value">${props.kpiData.online_course_analytics?.video_engagement?.total_watch_time_hours || 0}h</div>
+            </div>
+            <div class="kpi-card orange">
+                <div class="kpi-icon">🔄</div>
+                <div class="kpi-label">Replays</div>
+                <div class="kpi-value">${props.kpiData.online_course_analytics?.video_engagement?.video_replay_count || 0}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="kpi-section">
         <h2 class="section-title">📈 Learning Outcomes</h2>
         <div class="outcomes-grid">
             <div class="outcome-card success">
@@ -969,6 +1031,32 @@ export default {
             <div class="outcome-card">
                 <div class="outcome-label">📈 Improvement Rate</div>
                 <div class="outcome-value">${props.kpiData.learning_outcomes?.improvement_rate || 0}%</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="kpi-section">
+        <h2 class="section-title">📚 Online Module Progress</h2>
+        <div class="kpi-cards-grid">
+            <div class="kpi-card blue">
+                <div class="kpi-icon">📚</div>
+                <div class="kpi-label">Total Modules</div>
+                <div class="kpi-value">${props.kpiData.online_course_analytics?.module_progress?.total_modules || 0}</div>
+            </div>
+            <div class="kpi-card green">
+                <div class="kpi-icon">✅</div>
+                <div class="kpi-label">Completed</div>
+                <div class="kpi-value">${props.kpiData.online_course_analytics?.module_progress?.completed_modules || 0}</div>
+            </div>
+            <div class="kpi-card purple">
+                <div class="kpi-icon">👤</div>
+                <div class="kpi-label">Avg Per User</div>
+                <div class="kpi-value">${props.kpiData.online_course_analytics?.module_progress?.avg_modules_per_user || 0}</div>
+            </div>
+            <div class="kpi-card orange">
+                <div class="kpi-icon">📈</div>
+                <div class="kpi-label">Completion Rate</div>
+                <div class="kpi-value">${props.kpiData.online_course_analytics?.module_progress?.module_completion_rate || 0}%</div>
             </div>
         </div>
     </div>
@@ -999,6 +1087,37 @@ export default {
                     <span class="sentiment-emoji">😞</span>
                     <span class="sentiment-text">Negative: ${props.kpiData.feedback_analysis?.feedback_sentiment?.negative || 0}%</span>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="kpi-section">
+        <h2 class="section-title">⏱️ Learning Session Analytics</h2>
+        <div class="kpi-cards-grid" style="grid-template-columns: repeat(5, 1fr);">
+            <div class="kpi-card blue">
+                <div class="kpi-icon">🎯</div>
+                <div class="kpi-label">Total Sessions</div>
+                <div class="kpi-value">${props.kpiData.online_course_analytics?.session_analytics?.total_sessions || 0}</div>
+            </div>
+            <div class="kpi-card green">
+                <div class="kpi-icon">⏱️</div>
+                <div class="kpi-label">Avg Duration</div>
+                <div class="kpi-value">${props.kpiData.online_course_analytics?.session_analytics?.avg_session_duration_minutes || 0}m</div>
+            </div>
+            <div class="kpi-card purple">
+                <div class="kpi-icon">👁️</div>
+                <div class="kpi-label">Attention Score</div>
+                <div class="kpi-value">${props.kpiData.online_course_analytics?.session_analytics?.avg_attention_score || 0}%</div>
+            </div>
+            <div class="kpi-card orange">
+                <div class="kpi-icon">⏰</div>
+                <div class="kpi-label">Learning Hours</div>
+                <div class="kpi-value">${props.kpiData.online_course_analytics?.session_analytics?.total_learning_hours || 0}h</div>
+            </div>
+            <div class="kpi-card danger">
+                <div class="kpi-icon">⚠️</div>
+                <div class="kpi-label">Suspicious Activity</div>
+                <div class="kpi-value">${props.kpiData.online_course_analytics?.session_analytics?.suspicious_activity_count || 0}</div>
             </div>
         </div>
     </div>
@@ -1036,6 +1155,46 @@ export default {
                             <div class="table-cell">${index + 1}. ${user.name}</div>
                             <div class="table-cell">${user.score}%</div>
                             <div class="table-cell">${user.courses_completed || 0}</div>
+                        </div>
+                    `).join('') || '<div class="table-row"><div class="table-cell">No data available</div><div class="table-cell">-</div><div class="table-cell">-</div></div>'}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="kpi-section">
+        <h2 class="section-title">🏆 Online Course Top Performers</h2>
+        <div class="tables-container">
+            <div class="performance-table-container">
+                <h3 class="table-title">🥇 Top Online Courses</h3>
+                <div class="simple-table">
+                    <div class="table-header">
+                        <div class="header-cell">Course Name</div>
+                        <div class="header-cell">Completion</div>
+                        <div class="header-cell">Enrolled</div>
+                    </div>
+                    ${(props.kpiData.online_course_analytics?.top_performers?.top_online_courses || []).slice(0, 5).map((course, index) => `
+                        <div class="table-row">
+                            <div class="table-cell">${index + 1}. ${course.name}</div>
+                            <div class="table-cell">${course.completion_rate}%</div>
+                            <div class="table-cell">${course.enrolled}</div>
+                        </div>
+                    `).join('') || '<div class="table-row"><div class="table-cell">No data available</div><div class="table-cell">-</div><div class="table-cell">-</div></div>'}
+                </div>
+            </div>
+            <div class="performance-table-container">
+                <h3 class="table-title">🌟 Top Online Learners</h3>
+                <div class="simple-table">
+                    <div class="table-header">
+                        <div class="header-cell">User Name</div>
+                        <div class="header-cell">Completed</div>
+                        <div class="header-cell">Progress</div>
+                    </div>
+                    ${(props.kpiData.online_course_analytics?.top_performers?.top_online_learners || []).slice(0, 5).map((user, index) => `
+                        <div class="table-row">
+                            <div class="table-cell">${index + 1}. ${user.name}</div>
+                            <div class="table-cell">${user.courses_completed}</div>
+                            <div class="table-cell">${user.avg_progress}%</div>
                         </div>
                     `).join('') || '<div class="table-row"><div class="table-cell">No data available</div><div class="table-cell">-</div><div class="table-cell">-</div></div>'}
                 </div>

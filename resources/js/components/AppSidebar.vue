@@ -260,9 +260,9 @@ console.log('Is admin:', isAdmin.value);
 
 </script>
 
-<template>
-    <Sidebar collapsible="icon" variant="inset">
-        <SidebarHeader>
+<template  >
+    <Sidebar collapsible="icon" variant="inset" class="bg-sidebar">
+        <SidebarHeader class="bg-background" >
             <SidebarMenu>
                 <SidebarMenuItem>
                     <SidebarMenuButton size="lg" as-child>
@@ -274,7 +274,7 @@ console.log('Is admin:', isAdmin.value);
             </SidebarMenu>
         </SidebarHeader>
 
-        <SidebarContent>
+        <SidebarContent class="bg-background">
             <!-- User Navigation -->
             <NavMain :items="mainNavItems" />
 
@@ -327,7 +327,7 @@ console.log('Is admin:', isAdmin.value);
             </template>
         </SidebarContent>
 
-        <SidebarFooter>
+        <SidebarFooter class="bg-background">
             <NavUser />
         </SidebarFooter>
     </Sidebar>

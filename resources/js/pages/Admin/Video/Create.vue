@@ -59,11 +59,12 @@
                                 {{ form.errors.description }}
                             </div>
                         </div>
-<!-- Category -->
+
+                        <!-- Category -->
                         <div class="space-y-2">
                             <Label for="content_category_id">Category</Label>
-<Select v-model="form.content_category_id">
-                                <SelectTrigger :class="{ 'border-destructive': form.errors.video_category_id }">
+                            <Select v-model="form.content_category_id">
+                                <SelectTrigger :class="{ 'border-destructive': form.errors.content_category_id }">
                                     <SelectValue placeholder="Select a category..." />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -76,11 +77,58 @@
                                     </SelectItem>
                                 </SelectContent>
                             </Select>
-                            <div v-if="form.errors.video_category_id" class="text-sm text-destructive">
-                                {{ form.errors.video_category_id }}
+                            <div v-if="form.errors.content_category_id" class="text-sm text-destructive">
+                                {{ form.errors.content_category_id }}
                             </div>
                         </div>
+                    </CardContent>
+                </Card>
 
+                <!-- ✅ NEW: Storage Type Selection -->
+                <Card>
+                    <CardHeader>
+                        <CardTitle class="flex items-center gap-2">
+                            <HardDrive class="h-5 w-5" />
+                            Storage Type
+                        </CardTitle>
+                        <CardDescription>
+                            Choose where to store your video
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent class="space-y-4">
+                        <RadioGroup v-model="form.storage_type" class="grid grid-cols-2 gap-4">
+                            <!-- Google Drive Option -->
+                            <Label
+                                for="google_drive"
+                                class="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground cursor-pointer"
+                                :class="{ 'border-primary': form.storage_type === 'google_drive' }"
+                            >
+                                <RadioGroupItem value="google_drive" id="google_drive" class="sr-only" />
+                                <Cloud class="mb-3 h-6 w-6" />
+                                <div class="space-y-1 text-center">
+                                    <p class="text-sm font-medium leading-none">Google Drive</p>
+                                    <p class="text-xs text-muted-foreground">
+                                        Store video on Google Drive
+                                    </p>
+                                </div>
+                            </Label>
+
+                            <!-- Local Storage Option -->
+                            <Label
+                                for="local"
+                                class="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground cursor-pointer"
+                                :class="{ 'border-primary': form.storage_type === 'local' }"
+                            >
+                                <RadioGroupItem value="local" id="local" class="sr-only" />
+                                <HardDrive class="mb-3 h-6 w-6" />
+                                <div class="space-y-1 text-center">
+                                    <p class="text-sm font-medium leading-none">Local Storage</p>
+                                    <p class="text-xs text-muted-foreground">
+                                        Upload video to server
+                                    </p>
+                                </div>
+                            </Label>
+                        </RadioGroup>
                     </CardContent>
                 </Card>
 
@@ -92,12 +140,12 @@
                             Video Source
                         </CardTitle>
                         <CardDescription>
-                            Configure the video source and metadata
+                            {{ form.storage_type === 'google_drive' ? 'Provide Google Drive URL' : 'Upload video file' }}
                         </CardDescription>
                     </CardHeader>
                     <CardContent class="space-y-4">
-                        <!-- Google Drive URL -->
-                        <div class="space-y-2">
+                        <!-- ✅ Google Drive URL (show only if google_drive selected) -->
+                        <div v-if="form.storage_type === 'google_drive'" class="space-y-2">
                             <Label for="google_drive_url">Google Drive Video URL</Label>
                             <div class="flex gap-2">
                                 <Input
@@ -106,7 +154,6 @@
                                     type="url"
                                     placeholder="https://drive.google.com/file/d/..."
                                     :class="{ 'border-destructive': form.errors.google_drive_url }"
-                                    required
                                 />
                                 <Button
                                     type="button"
@@ -124,6 +171,78 @@
                             </div>
                             <div class="text-sm text-muted-foreground">
                                 Paste the shareable link from Google Drive. Make sure the video is set to "Anyone with the link can view"
+                            </div>
+                        </div>
+
+                        <!-- ✅ NEW: Local Video Upload (show only if local selected) -->
+                        <div v-else-if="form.storage_type === 'local'" class="space-y-2">
+                            <Label for="video_file">Video File</Label>
+                            <div class="space-y-3">
+                                <!-- File Input -->
+                                <div
+                                    class="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:border-primary transition-colors"
+                                    :class="{
+                                        'border-destructive': form.errors.video_file,
+                                        'border-primary bg-primary/5': uploadProgress > 0
+                                    }"
+                                    @click="$refs.videoFileInput?.click()"
+                                    @dragover.prevent="dragActive = true"
+                                    @dragleave.prevent="dragActive = false"
+                                    @drop.prevent="handleFileDrop"
+                                >
+                                    <input
+                                        ref="videoFileInput"
+                                        type="file"
+                                        accept="video/mp4,video/webm,video/avi,video/mov,video/x-matroska"
+                                        class="hidden"
+                                        @change="handleFileChange"
+                                    />
+
+                                    <div v-if="!form.video_file">
+                                        <Upload class="h-10 w-10 mx-auto text-muted-foreground mb-4" />
+                                        <p class="text-sm font-medium mb-1">
+                                            Click to upload or drag and drop
+                                        </p>
+                                        <p class="text-xs text-muted-foreground">
+                                            MP4, WebM, AVI, MOV, MKV (Max {{ maxFileSizeMB }}MB)
+                                        </p>
+                                    </div>
+
+                                    <div v-else class="flex items-center gap-3">
+                                        <FileVideo class="h-8 w-8 text-primary" />
+                                        <div class="flex-1 text-left">
+                                            <p class="text-sm font-medium">{{ form.video_file.name }}</p>
+                                            <p class="text-xs text-muted-foreground">
+                                                {{ formatFileSize(form.video_file.size) }}
+                                            </p>
+                                        </div>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            @click.stop="clearVideoFile"
+                                        >
+                                            <X class="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                <!-- Upload Progress -->
+                                <div v-if="uploadProgress > 0 && uploadProgress < 100" class="space-y-2">
+                                    <div class="flex justify-between text-sm">
+                                        <span>Uploading...</span>
+                                        <span>{{ uploadProgress }}%</span>
+                                    </div>
+                                    <div class="w-full bg-secondary rounded-full h-2">
+                                        <div
+                                            class="bg-primary h-2 rounded-full transition-all duration-300"
+                                            :style="{ width: `${uploadProgress}%` }"
+                                        ></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div v-if="form.errors.video_file" class="text-sm text-destructive">
+                                {{ form.errors.video_file }}
                             </div>
                         </div>
 
@@ -148,58 +267,7 @@
                                 {{ form.errors.duration }}
                             </div>
                             <div class="text-sm text-muted-foreground">
-                                Video duration in seconds (optional - can be auto-detected)
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <!-- Thumbnail -->
-                <Card>
-                    <CardHeader>
-                        <CardTitle class="flex items-center gap-2">
-                            <Image class="h-5 w-5" />
-                            Thumbnail
-                        </CardTitle>
-                        <CardDescription>
-                            Upload a custom thumbnail for your video course
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent class="space-y-4">
-                        <!-- File Upload -->
-                        <div class="space-y-2">
-                            <Label for="thumbnail">Custom Thumbnail</Label>
-                            <div class="flex items-start gap-4">
-                                <!-- Preview -->
-                                <div class="w-32 h-24 rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/50 flex items-center justify-center overflow-hidden shrink-0">
-                                    <img
-                                        v-if="thumbnailPreview"
-                                        :src="thumbnailPreview"
-                                        class="w-full h-full object-cover"
-                                        alt="Thumbnail preview"
-                                    />
-                                    <div v-else class="text-center">
-                                        <Image class="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                                        <div class="text-xs text-muted-foreground">Preview</div>
-                                    </div>
-                                </div>
-
-                                <!-- Upload Input -->
-                                <div class="flex-1">
-                                    <Input
-                                        id="thumbnail"
-                                        type="file"
-                                        accept="image/*"
-                                        :class="{ 'border-destructive': form.errors.thumbnail }"
-                                        @change="handleThumbnailChange"
-                                    />
-                                    <div v-if="form.errors.thumbnail" class="text-sm text-destructive mt-1">
-                                        {{ form.errors.thumbnail }}
-                                    </div>
-                                    <div class="text-sm text-muted-foreground mt-1">
-                                        Recommended: 1280x720px (16:9 ratio), JPG or PNG, max 2MB
-                                    </div>
-                                </div>
+                                {{ form.storage_type === 'local' ? 'Optional - will be auto-detected from video file' : 'Video duration in seconds (optional)' }}
                             </div>
                         </div>
                     </CardContent>
@@ -249,7 +317,7 @@
 
 <script setup lang="ts">
 import { Head, Link, useForm } from '@inertiajs/vue3'
-import { ref, watch } from 'vue'
+import { ref, computed } from 'vue'
 import AppLayout from '@/layouts/AppLayout.vue'
 import type { BreadcrumbItem } from '@/types'
 
@@ -261,6 +329,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 
 // Icons
 import {
@@ -269,9 +338,13 @@ import {
     PlaySquare,
     Settings,
     Link2,
-    Image,
     TestTube,
-    Loader2
+    Loader2,
+    Cloud,
+    HardDrive,
+    Upload,
+    FileVideo,
+    X
 } from 'lucide-vue-next'
 
 interface VideoCategory {
@@ -281,6 +354,9 @@ interface VideoCategory {
 
 const props = defineProps<{
     categories: VideoCategory[]
+    storageOptions?: Array<{value: string, label: string}>
+    maxFileSize?: number
+    allowedMimes?: string[]
 }>()
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -291,51 +367,68 @@ const breadcrumbs: BreadcrumbItem[] = [
 const form = useForm({
     name: '',
     description: '',
+    storage_type: 'google_drive' as 'google_drive' | 'local', // ✅ NEW
     google_drive_url: '',
+    video_file: null as File | null, // ✅ NEW
     duration: null as number | null,
-    thumbnail: null as File | null,
-    content_category_id: null as string | null, 
+    content_category_id: null as string | null,
     is_active: true,
 })
 
 const isSubmitting = ref(false)
 const testingUrl = ref(false)
-const thumbnailPreview = ref<string | null>(null)
+const uploadProgress = ref(0)
+const dragActive = ref(false)
+const videoFileInput = ref<HTMLInputElement | null>(null)
 
-// Handle thumbnail file change
-const handleThumbnailChange = (event: Event) => {
+// Computed
+const maxFileSizeMB = computed(() => Math.round((props.maxFileSize || 512000) / 1024))
+
+// ✅ NEW: Handle file selection
+const handleFileChange = (event: Event) => {
     const target = event.target as HTMLInputElement
     const file = target.files?.[0]
-
     if (file) {
-        form.thumbnail = file
-
-        // Create preview URL
-        const reader = new FileReader()
-        reader.onload = (e) => {
-            thumbnailPreview.value = e.target?.result as string
-        }
-        reader.readAsDataURL(file)
-    } else {
-        form.thumbnail = null
-        thumbnailPreview.value = null
+        form.video_file = file
+        uploadProgress.value = 0
     }
+}
+
+// ✅ NEW: Handle drag and drop
+const handleFileDrop = (event: DragEvent) => {
+    dragActive.value = false
+    const file = event.dataTransfer?.files[0]
+    if (file) {
+        form.video_file = file
+        uploadProgress.value = 0
+    }
+}
+
+// ✅ NEW: Clear selected file
+const clearVideoFile = () => {
+    form.video_file = null
+    uploadProgress.value = 0
+    if (videoFileInput.value) {
+        videoFileInput.value.value = ''
+    }
+}
+
+// ✅ NEW: Format file size
+const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes'
+    const k = 1024
+    const sizes = ['Bytes', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
 }
 
 // Test video URL
 const testVideoUrl = async () => {
     if (!form.google_drive_url) return
-
     testingUrl.value = true
-
     try {
-        // This would be a call to your backend to test the URL
         console.log('Testing URL:', form.google_drive_url)
-
-        // Simulate API call
         await new Promise(resolve => setTimeout(resolve, 2000))
-
-        // Show success message or handle response
         alert('Video URL is valid!')
     } catch (error) {
         console.error('URL test failed:', error)
@@ -348,11 +441,9 @@ const testVideoUrl = async () => {
 // Format duration helper
 const formatDuration = (seconds: number | null): string => {
     if (!seconds) return '00:00'
-
     const hours = Math.floor(seconds / 3600)
     const minutes = Math.floor((seconds % 3600) / 60)
     const secs = seconds % 60
-
     return hours > 0
         ? `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
         : `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
@@ -362,8 +453,16 @@ const submit = async () => {
     isSubmitting.value = true
 
     form.post('/admin/videos', {
+        forceFormData: true, // ✅ Important for file uploads
+        onProgress: (progress) => {
+            uploadProgress.value = Math.round((progress.percentage || 0))
+        },
         onFinish: () => {
             isSubmitting.value = false
+            uploadProgress.value = 0
+        },
+        onSuccess: () => {
+            console.log('Video created successfully')
         }
     })
 }

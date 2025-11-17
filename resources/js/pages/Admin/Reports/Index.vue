@@ -11,9 +11,8 @@
                     <h1 class="text-xl sm:text-2xl font-bold text-foreground">Reports & Analytics</h1>
                     <p class="text-sm text-wrap max-w-11/12 text-muted-foreground mt-1">Comprehensive analytics and reporting interface for tracking system performance</p>
                 </div>
-
-
             </div>
+
             <!-- ✅ UPDATED: Report Buttons with Course Online Dropdown -->
             <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
                 <Button :as="'a'" :href="route('admin.reports.course-registrations')" variant="outline" class="w-full sm:w-auto">
@@ -170,8 +169,8 @@
                 </CardContent>
             </Card>
 
-            <!-- Summary Cards -->
-            <div v-if="analytics" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+            <!-- ✅ UPDATED: Summary Cards (Changed to 5 columns grid) -->
+            <div v-if="analytics" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
                 <!-- Users Card -->
                 <Card class="hover:shadow-lg transition-shadow duration-300">
                     <CardHeader class="pb-3">
@@ -233,31 +232,31 @@
                 </Card>
 
                 <!-- Registrations Card -->
-                <Card class="hover:shadow-lg transition-shadow duration-300">
-                    <CardHeader class="pb-3">
-                        <div class="flex items-center">
-                            <div class="p-2 bg-primary/10 rounded-lg mr-3">
-                                <ClipboardList class="h-5 w-5 text-primary" />
-                            </div>
-                            <CardTitle class="text-lg">Registrations</CardTitle>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div class="flex justify-between items-end">
-                            <div>
-                                <p class="text-3xl font-bold text-primary">{{ analytics.registrations && analytics.registrations.total ? analytics.registrations.total : 0 }}</p>
-                                <p class="text-sm text-wrap max-w-11/12 text-muted-foreground">Total Registrations</p>
-                            </div>
-                            <div class="text-right">
-                                <p class="text-xl font-semibold text-foreground">{{ analytics.registrations && analytics.registrations.completed ? analytics.registrations.completed : 0 }}</p>
-                                <p class="text-sm text-wrap max-w-11/12 text-muted-foreground">Completed</p>
-                                <Badge :variant="(analytics.registrations && analytics.registrations.completion_rate ? analytics.registrations.completion_rate : 0) >= 50 ? 'default' : 'secondary'" class="mt-1">
-                                    {{ analytics.registrations && analytics.registrations.completion_rate ? analytics.registrations.completion_rate : 0 }}% Completion
-                                </Badge>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
+<!--                <Card class="hover:shadow-lg transition-shadow duration-300">-->
+<!--                    <CardHeader class="pb-3">-->
+<!--                        <div class="flex items-center">-->
+<!--                            <div class="p-2 bg-primary/10 rounded-lg mr-3">-->
+<!--                                <ClipboardList class="h-5 w-5 text-primary" />-->
+<!--                            </div>-->
+<!--                            <CardTitle class="text-lg">Registrations</CardTitle>-->
+<!--                        </div>-->
+<!--                    </CardHeader>-->
+<!--                    <CardContent>-->
+<!--                        <div class="flex justify-between items-end">-->
+<!--                            <div>-->
+<!--                                <p class="text-3xl font-bold text-primary">{{ analytics.registrations && analytics.registrations.total ? analytics.registrations.total : 0 }}</p>-->
+<!--                                <p class="text-sm text-wrap max-w-11/12 text-muted-foreground">Total Registrations</p>-->
+<!--                            </div>-->
+<!--                            <div class="text-right">-->
+<!--                                <p class="text-xl font-semibold text-foreground">{{ analytics.registrations && analytics.registrations.completed ? analytics.registrations.completed : 0 }}</p>-->
+<!--                                <p class="text-sm text-wrap max-w-11/12 text-muted-foreground">Completed</p>-->
+<!--                                <Badge :variant="(analytics.registrations && analytics.registrations.completion_rate ? analytics.registrations.completion_rate : 0) >= 50 ? 'default' : 'secondary'" class="mt-1">-->
+<!--                                    {{ analytics.registrations && analytics.registrations.completion_rate ? analytics.registrations.completion_rate : 0 }}% Completion-->
+<!--                                </Badge>-->
+<!--                            </div>-->
+<!--                        </div>-->
+<!--                    </CardContent>-->
+<!--                </Card>-->
 
                 <!-- Attendance Card -->
                 <Card class="hover:shadow-lg transition-shadow duration-300">
@@ -278,14 +277,42 @@
                             <div class="text-right">
                                 <p class="text-xl font-semibold text-foreground">{{ analytics.attendance && analytics.attendance.average_duration ? analytics.attendance.average_duration : 0 }} min</p>
                                 <p class="text-sm text-wrap max-w-11/12 text-muted-foreground">Avg. Duration</p>
-                                <div class="flex items-center justify-end mt-2">
-                                    <span class="text-sm font-medium text-muted-foreground mr-1">Rating:</span>
-                                    <div class="flex">
+                                <!-- ✅ FIXED: Rating alignment -->
+                                <div class="flex items-center justify-end mt-2 gap-1">
+                                    <span class="text-sm font-medium text-muted-foreground">Rating:</span>
+                                    <div class="flex items-center">
                                         <Star v-for="i in 5" :key="i" class="h-4 w-4"
                                               :class="i <= Math.round(analytics.attendance && analytics.attendance.average_rating ? analytics.attendance.average_rating : 0) ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground'"
                                         />
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <!-- ✅ NEW: Online Courses Card -->
+                <Card class="hover:shadow-lg transition-shadow duration-300">
+                    <CardHeader class="pb-3">
+                        <div class="flex items-center">
+                            <div class="p-2 bg-primary/10 rounded-lg mr-3">
+                                <Monitor class="h-5 w-5 text-primary" />
+                            </div>
+                            <CardTitle class="text-lg">Online Courses</CardTitle>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <div class="flex justify-between items-end">
+                            <div>
+                                <p class="text-3xl font-bold text-primary">{{ analytics.online_courses && analytics.online_courses.total_enrollments ? analytics.online_courses.total_enrollments : 0 }}</p>
+                                <p class="text-sm text-wrap max-w-11/12 text-muted-foreground">Total Enrollments</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-xl font-semibold text-foreground">{{ analytics.online_courses && analytics.online_courses.completed ? analytics.online_courses.completed : 0 }}</p>
+                                <p class="text-sm text-wrap max-w-11/12 text-muted-foreground">Completed</p>
+                                <Badge :variant="(analytics.online_courses && analytics.online_courses.completion_rate ? analytics.online_courses.completion_rate : 0) >= 50 ? 'default' : 'secondary'" class="mt-1">
+                                    {{ analytics.online_courses && analytics.online_courses.completion_rate ? analytics.online_courses.completion_rate : 0 }}% Completion
+                                </Badge>
                             </div>
                         </div>
                     </CardContent>

@@ -144,14 +144,16 @@ class UserDepartmentRole extends Model
     /**
      * Get role display name
      */
-    public function getRoleDisplayName(): string
+   public function getRoleDisplayName(): string
     {
         return match($this->role_type) {
+            'director' => 'Director',
+            'senior_manager' => 'Senior Manager',
             'direct_manager' => 'Direct Manager',
             'project_manager' => 'Project Manager',
-            'department_head' => 'Department Head',
-            'senior_manager' => 'Senior Manager',
-            'team_lead' => 'Team Lead',
+            'supervisor' => 'Supervisor',
+            'president' => 'President',              // ✅ NEW
+            'business_owner' => 'Business Owner',    // ✅ NEW
             default => ucwords(str_replace('_', ' ', $this->role_type))
         };
     }

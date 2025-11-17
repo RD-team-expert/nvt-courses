@@ -30,7 +30,6 @@ import {
     TrendingUp,
     User,
     Calendar,
-    // ✅ NEW: Deadline icons
     AlarmClock,
     CalendarDays,
     Timer,
@@ -45,7 +44,6 @@ interface Course {
     difficulty_level: string
     estimated_duration: number
     is_active: boolean
-    // ✅ NEW: Course deadline fields
     has_deadline: boolean
     deadline: string | null
     deadline_type: 'flexible' | 'strict'
@@ -59,7 +57,7 @@ interface Assignment {
     started_at: string | null
     current_module_id: number | null
     time_spent: string
-    // ✅ NEW: Assignment deadline fields
+    time_spent_minutes: number
     deadline: string | null
     is_overdue: boolean
     deadline_info: {
@@ -135,7 +133,7 @@ const openModules = ref<Set<number>>(new Set())
 const currentContent = ref<Content | null>(null)
 const isStarting = ref(false)
 
-// ✅ NEW: Deadline computed properties
+// Deadline computed properties
 const hasDeadline = computed(() => props.course.has_deadline && props.assignment.deadline)
 
 const deadlineStatus = computed(() => props.assignment.deadline_info.status)
@@ -254,8 +252,6 @@ const startCourse = async () => {
 
     try {
         await router.post(route('courses-online.start', props.course.id))
-
-        // Reload page to get updated assignment status
         router.reload()
     } catch (error) {
         console.error('Failed to start course:', error)
@@ -269,8 +265,6 @@ const completeCourse = async () => {
 
     try {
         await router.post(route('courses-online.complete', props.course.id))
-
-        // Reload page to get updated assignment status
         router.reload()
     } catch (error) {
         console.error('Failed to complete course:', error)
@@ -283,8 +277,6 @@ const viewContent = (content: Content, module: Module) => {
         alert('This content is not yet unlocked. Complete previous content first.')
         return
     }
-
-    // Navigate to content viewer
     router.visit(route('content.show', content.id))
 }
 
@@ -328,12 +320,10 @@ const getProgressColor = (percentage: number) => {
 
 // Auto-open current module on mount
 onMounted(() => {
-    // Open the current module or first incomplete module
     const currentModuleId = props.assignment.current_module_id
     if (currentModuleId) {
         openModules.value.add(currentModuleId)
     } else {
-        // Open first incomplete module
         const firstIncomplete = props.modules.find(m => !m.progress.is_completed && m.is_unlocked)
         if (firstIncomplete) {
             openModules.value.add(firstIncomplete.id)
@@ -346,17 +336,18 @@ onMounted(() => {
     <Head :title="course.name" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="max-w-7xl mx-auto space-y-6">
-            <!-- ✅ NEW: Urgent Deadline Alert -->
-            <Alert v-if="isUrgentDeadline" class="border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-800">
-                <component :is="deadlineIcon" class="h-4 w-4" />
+        <!-- ✅ FIXED: Added proper padding and max-width constraints for mobile -->
+        <div class="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4 sm:space-y-6">
+            <!-- ✅ FIXED: Urgent Deadline Alert - Better mobile layout -->
+            <Alert v-if="isUrgentDeadline" :class="deadlineColor">
+                <component :is="deadlineIcon" class="h-4 w-4 flex-shrink-0" />
                 <AlertDescription>
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <strong class="text-red-800 dark:text-red-300">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="flex-1 min-w-0">
+                            <strong class="text-red-800 dark:text-red-300 block sm:inline">
                                 {{ deadlineStatus === 'overdue' ? '🚨 OVERDUE:' : '⚠️ URGENT:' }}
                             </strong>
-                            <span class="ml-2 text-red-700 dark:text-red-300">
+                            <span class="ml-0 sm:ml-2 text-red-700 dark:text-red-300 block sm:inline break-words">
                                 {{ assignment.deadline_info.message }}
                             </span>
                             <span v-if="assignment.deadline_info.formatted_deadline" class="block text-sm text-red-600 dark:text-red-400 mt-1">
@@ -368,6 +359,7 @@ onMounted(() => {
                             @click="continueWhere"
                             size="sm"
                             variant="destructive"
+                            class="w-full sm:w-auto flex-shrink-0"
                         >
                             Continue Now
                         </Button>
@@ -375,119 +367,121 @@ onMounted(() => {
                 </AlertDescription>
             </Alert>
 
-            <!-- Course Header -->
-            <div class="flex items-start gap-6">
+            <!-- ✅ FIXED: Course Header - Better mobile stacking -->
+            <div class="flex flex-col gap-4">
                 <!-- Course Image -->
-                <div v-if="course.image_path" class="flex-shrink-0">
+                <div v-if="course.image_path" class="w-full sm:hidden">
                     <img
                         :src="course.image_path"
                         :alt="course.name"
-                        class="w-32 h-24 rounded-lg object-full border"
+                        class="w-full h-48 rounded-lg object-cover border"
                     />
                 </div>
 
-                <!-- Course Info -->
-                <div class="flex-1">
-                    <div class="flex items-start justify-between mb-4">
-                        <div>
-                            <h1 class="text-3xl font-bold mb-2">{{ course.name }}</h1>
-                            <p class="text-lg text-muted-foreground mb-4">{{ course.description }}</p>
+                <div class="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
+                    <!-- Desktop Course Image -->
+                    <div v-if="course.image_path" class="hidden sm:block flex-shrink-0">
+                        <img
+                            :src="course.image_path"
+                            :alt="course.name"
+                            class="w-32 h-24 rounded-lg object-cover border"
+                        />
+                    </div>
 
-                            <div class="flex items-center gap-4 text-sm text-muted-foreground">
-                                <div class="flex items-center gap-1">
-                                    <Clock class="h-4 w-4" />
-                                    {{ course.estimated_duration }} minutes
+                    <!-- Course Info -->
+                    <div class="flex-1 min-w-0 w-full">
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-4">
+                            <div class="flex-1 min-w-0">
+                                <h1 class="text-2xl sm:text-3xl font-bold mb-2 break-words">{{ course.name }}</h1>
+                                <p class="text-base sm:text-lg text-muted-foreground mb-3 sm:mb-4 break-words">{{ course.description }}</p>
+
+                                <!-- ✅ FIXED: Better mobile wrapping for badges and info -->
+                                <div class="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                                    <div class="flex items-center gap-1 whitespace-nowrap">
+                                        <Clock class="h-4 w-4 flex-shrink-0" />
+                                        <span>{{ course.estimated_duration }} min</span>
+                                    </div>
+                                    <Badge :class="getDifficultyColor(course.difficulty_level)" class="whitespace-nowrap">
+                                        {{ course.difficulty_level }}
+                                    </Badge>
+                                    <div class="flex items-center gap-1 whitespace-nowrap">
+                                        <BookOpen class="h-4 w-4 flex-shrink-0" />
+                                        <span>{{ totalModules }} modules</span>
+                                    </div>
+                                    <Badge v-if="course.has_deadline" variant="outline" :class="course.deadline_type === 'strict' ? 'border-red-300 text-red-600 dark:border-red-700 dark:text-red-400' : 'border-blue-300 text-blue-600 dark:border-blue-700 dark:text-blue-400'" class="whitespace-nowrap">
+                                        {{ course.deadline_type === 'strict' ? 'Strict' : 'Flexible' }}
+                                    </Badge>
                                 </div>
-                                <Badge :class="getDifficultyColor(course.difficulty_level)">
-                                    {{ course.difficulty_level }}
-                                </Badge>
-                                <div class="flex items-center gap-1">
-                                    <BookOpen class="h-4 w-4" />
-                                    {{ totalModules }} modules
-                                </div>
-                                <!-- ✅ NEW: Deadline type badge -->
-                                <Badge v-if="course.has_deadline" variant="outline" :class="course.deadline_type === 'strict' ? 'border-red-300 text-red-600 dark:border-red-700 dark:text-red-400' : 'border-blue-300 text-blue-600 dark:border-blue-700 dark:text-blue-400'">
-                                    {{ course.deadline_type === 'strict' ? 'Strict Deadline' : 'Flexible Deadline' }}
-                                </Badge>
                             </div>
-                        </div>
 
-                        <!-- Back Button -->
-                        <Button asChild variant="outline">
-                            <Link href="/courses-online">
-                                <ArrowLeft class="h-4 w-4 mr-2" />
-                                Back to Courses
-                            </Link>
-                        </Button>
+                            <!-- Back Button -->
+                            <Button asChild variant="outline" size="sm" class="w-full sm:w-auto flex-shrink-0">
+                                <Link href="/courses-online" class="flex items-center justify-center">
+                                    <ArrowLeft class="h-4 w-4 mr-2" />
+                                    Back
+                                </Link>
+                            </Button>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- ✅ ENHANCED: Progress Overview with deadline information -->
-            <div class="grid gap-4 md:grid-cols-5">
-                <Card>
+            <!-- ✅ FIXED: Progress Overview - Responsive grid with proper mobile stacking -->
+            <div class="grid gap-3 sm:gap-4" style="grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));">
+                <Card class="overflow-hidden">
                     <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle class="text-sm font-medium">Status</CardTitle>
-                        <Target class="h-4 w-4 text-muted-foreground" />
+                        <Target class="h-4 w-4 text-muted-foreground flex-shrink-0" />
                     </CardHeader>
                     <CardContent>
                         <Badge :class="getStatusColor(assignment.status)" class="mb-2">
                             {{ getStatusText(assignment.status) }}
                         </Badge>
-                        <p class="text-xs text-muted-foreground">
+                        <p class="text-xs text-muted-foreground break-words">
                             {{ assignment.started_at ? `Started ${formatDate(assignment.started_at)}` : 'Not started yet' }}
                         </p>
                     </CardContent>
                 </Card>
 
-                <Card>
+                <Card class="overflow-hidden">
                     <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle class="text-sm font-medium">Progress</CardTitle>
-                        <TrendingUp class="h-4 w-4 text-muted-foreground" />
+                        <TrendingUp class="h-4 w-4 text-muted-foreground flex-shrink-0" />
                     </CardHeader>
                     <CardContent>
                         <div class="text-2xl font-bold mb-2">{{ Math.round(assignment.progress_percentage) }}%</div>
                         <Progress :value="assignment.progress_percentage" class="mb-2" />
                         <p class="text-xs text-muted-foreground">
-                            {{ completedModules }}/{{ totalModules }} modules completed
+                            {{ completedModules }}/{{ totalModules }} modules
                         </p>
                     </CardContent>
                 </Card>
 
-                <Card>
-                    <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle class="text-sm font-medium">Time Spent</CardTitle>
-                        <Clock class="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div class="text-2xl font-bold mb-2">{{ timeSpentDisplay }}</div>
-                        <p class="text-xs text-muted-foreground">Learning time</p>
-                    </CardContent>
-                </Card>
 
-                <!-- ✅ NEW: Deadline Status Card -->
-                <Card v-if="hasDeadline" :class="deadlineColor.split(' ').slice(0, 2).join(' ')">
+
+                <!-- Deadline Card -->
+                <Card v-if="hasDeadline" :class="deadlineColor" class="overflow-hidden">
                     <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle class="text-sm font-medium">Deadline</CardTitle>
-                        <component :is="deadlineIcon" class="h-4 w-4" :class="deadlineTextColor" />
+                        <component :is="deadlineIcon" class="h-4 w-4 flex-shrink-0" :class="deadlineTextColor" />
                     </CardHeader>
                     <CardContent>
-                        <div class="text-lg font-bold mb-2" :class="deadlineTextColor">
+                        <div class="text-base sm:text-lg font-bold mb-2 break-words" :class="deadlineTextColor">
                             {{ assignment.deadline_info.time_remaining }}
                         </div>
-                        <p class="text-xs" :class="deadlineTextColor">
+                        <p class="text-xs break-words" :class="deadlineTextColor">
                             {{ assignment.deadline_info.formatted_deadline }}
                         </p>
-                        <p class="text-xs text-muted-foreground mt-1">
-                            {{ course.deadline_type === 'strict' ? 'Access blocked after' : 'Late completion tracked' }}
+                        <p class="text-xs text-muted-foreground mt-1 break-words">
+                            {{ course.deadline_type === 'strict' ? 'Blocked after' : 'Late tracked' }}
                         </p>
                     </CardContent>
                 </Card>
 
-                <Card>
+                <Card class="overflow-hidden">
                     <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle class="text-sm font-medium">Actions</CardTitle>
-                        <User class="h-4 w-4 text-muted-foreground" />
+                        <User class="h-4 w-4 text-muted-foreground flex-shrink-0" />
                     </CardHeader>
                     <CardContent>
                         <!-- Start Course -->
@@ -497,8 +491,8 @@ onMounted(() => {
                             :disabled="isStarting"
                             class="w-full mb-2"
                         >
-                            <Play class="h-4 w-4 mr-2" />
-                            {{ isStarting ? 'Starting...' : 'Start Course' }}
+                            <Play class="h-4 w-4 mr-2 flex-shrink-0" />
+                            {{ isStarting ? 'Starting...' : 'Start' }}
                         </Button>
 
                         <!-- Continue Learning -->
@@ -508,8 +502,8 @@ onMounted(() => {
                             class="w-full mb-2"
                             :variant="isUrgentDeadline ? 'destructive' : 'default'"
                         >
-                            <Play class="h-4 w-4 mr-2" />
-                            {{ isUrgentDeadline ? 'Continue Urgently' : 'Continue Learning' }}
+                            <Play class="h-4 w-4 mr-2 flex-shrink-0" />
+                            Continue
                         </Button>
 
                         <!-- Complete Course -->
@@ -519,94 +513,93 @@ onMounted(() => {
                             variant="default"
                             class="w-full"
                         >
-                            <Award class="h-4 w-4 mr-2" />
-                            Complete Course
+                            <Award class="h-4 w-4 mr-2 flex-shrink-0" />
+                            Complete
                         </Button>
 
                         <!-- Already Completed -->
                         <div v-if="assignment.status === 'completed'" class="text-center">
                             <CheckCircle class="h-8 w-8 mx-auto text-green-600 mb-2" />
-                            <p class="text-sm font-medium text-green-600">Course Completed!</p>
-                            <p v-if="hasDeadline" class="text-xs text-muted-foreground mt-1">
-                                {{ assignment.deadline_info.is_overdue ? 'Completed after deadline' : 'Completed on time' }}
+                            <p class="text-sm font-medium text-green-600">Completed!</p>
+                            <p v-if="hasDeadline" class="text-xs text-muted-foreground mt-1 break-words">
+                                {{ assignment.deadline_info.is_overdue ? 'After deadline' : 'On time' }}
                             </p>
                         </div>
                     </CardContent>
                 </Card>
             </div>
 
-            <!-- ✅ ENHANCED: Deadline Information Card -->
-            <Card v-if="hasDeadline && !isUrgentDeadline" :class="deadlineColor">
+            <!-- ✅ FIXED: Deadline Information Card - Better mobile text wrapping -->
+            <Card v-if="hasDeadline && !isUrgentDeadline" :class="deadlineColor" class="overflow-hidden">
                 <CardHeader>
-                    <CardTitle class="flex items-center gap-2" :class="deadlineTextColor">
-                        <component :is="deadlineIcon" class="h-5 w-5" />
-                        Course Deadline Information
+                    <CardTitle class="flex items-center gap-2 text-base sm:text-lg break-words" :class="deadlineTextColor">
+                        <component :is="deadlineIcon" class="h-5 w-5 flex-shrink-0" />
+                        Deadline Info
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div class="grid gap-4 md:grid-cols-3">
-                        <div>
+                    <div class="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                        <div class="min-w-0">
                             <div class="text-sm font-medium text-muted-foreground mb-1">Status</div>
-                            <div class="font-medium" :class="deadlineTextColor">
+                            <div class="font-medium break-words" :class="deadlineTextColor">
                                 {{ assignment.deadline_info.message }}
                             </div>
                         </div>
-                        <div>
+                        <div class="min-w-0">
                             <div class="text-sm font-medium text-muted-foreground mb-1">Due Date</div>
-                            <div class="font-medium">
+                            <div class="font-medium break-words">
                                 {{ assignment.deadline_info.formatted_deadline }}
                             </div>
                         </div>
-                        <div>
+                        <div class="min-w-0 sm:col-span-2 lg:col-span-1">
                             <div class="text-sm font-medium text-muted-foreground mb-1">Type</div>
-                            <div class="font-medium">
-                                {{ course.deadline_type === 'strict' ? 'Strict (Access blocked after deadline)' : 'Flexible (Late completion allowed)' }}
+                            <div class="font-medium break-words">
+                                {{ course.deadline_type === 'strict' ? 'Strict (Blocked after)' : 'Flexible (Late allowed)' }}
                             </div>
                         </div>
                     </div>
                 </CardContent>
             </Card>
 
-            <!-- Next Content Alert -->
-            <Alert v-if="nextContent && assignment.status === 'in_progress'" class="border-blue-200 bg-blue-50 dark:bg-blue-950">
-                <Play class="h-4 w-4" />
+            <!-- ✅ FIXED: Next Content Alert - Better mobile layout -->
+            <Alert v-if="nextContent && assignment.status === 'in_progress'" class="border-blue-200 bg-blue-50 dark:bg-blue-950 overflow-hidden">
+                <Play class="h-4 w-4 flex-shrink-0" />
                 <AlertDescription>
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <strong>Continue where you left off:</strong>
-                            <span class="ml-2">{{ nextContent.content.title }}</span>
-                            <span class="text-muted-foreground ml-2">in {{ nextContent.module.name }}</span>
+                    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="flex-1 min-w-0">
+                            <strong class="block sm:inline">Continue:</strong>
+                            <span class="ml-0 sm:ml-2 block sm:inline break-words">{{ nextContent.content.title }}</span>
+                            <span class="text-muted-foreground block sm:inline sm:ml-2">in {{ nextContent.module.name }}</span>
                         </div>
-                        <Button @click="continueWhere" size="sm" :variant="isUrgentDeadline ? 'destructive' : 'default'">
+                        <Button @click="continueWhere" size="sm" :variant="isUrgentDeadline ? 'destructive' : 'default'" class="w-full sm:w-auto flex-shrink-0">
                             Continue
                         </Button>
                     </div>
                 </AlertDescription>
             </Alert>
 
-            <!-- Course Modules -->
-            <Card>
+            <!-- ✅ FIXED: Course Modules - Better mobile collapsible layout -->
+            <Card class="overflow-hidden">
                 <CardHeader>
-                    <CardTitle class="flex items-center gap-2">
-                        <BookOpen class="h-5 w-5 text-primary" />
-                        Course Modules
-                        <!-- ✅ NEW: Show deadline urgency in modules header -->
-                        <Badge v-if="isUrgentDeadline" variant="destructive" class="ml-2">
+                    <CardTitle class="flex flex-wrap items-center gap-2 text-base sm:text-lg">
+                        <BookOpen class="h-5 w-5 text-primary flex-shrink-0" />
+                        <span>Modules</span>
+                        <Badge v-if="isUrgentDeadline" variant="destructive" class="whitespace-nowrap">
                             {{ deadlineStatus === 'overdue' ? 'Overdue!' : 'Due Soon!' }}
                         </Badge>
                     </CardTitle>
-                    <CardDescription>
-                        Complete modules in order to progress through the course
+                    <CardDescription class="break-words">
+                        Complete modules in order
                         <span v-if="hasDeadline" :class="deadlineTextColor">
                             · {{ assignment.deadline_info.time_remaining }}
                         </span>
                     </CardDescription>
                 </CardHeader>
-                <CardContent class="space-y-4">
+                <CardContent class="space-y-3 sm:space-y-4">
                     <div
                         v-for="(module, index) in modules"
                         :key="module.id"
-                        class="border rounded-lg"
+                        class="border rounded-lg overflow-hidden"
                         :class="{
                             'border-green-200 bg-green-50 dark:bg-green-950': module.progress.is_completed,
                             'border-blue-200 bg-blue-50 dark:bg-blue-950': !module.progress.is_completed && module.is_unlocked,
@@ -616,63 +609,57 @@ onMounted(() => {
                         <Collapsible>
                             <CollapsibleTrigger
                                 @click="toggleModule(module.id)"
-                                class="w-full p-4 text-left hover:bg-accent/50 transition-colors"
+                                class="w-full p-3 sm:p-4 text-left hover:bg-accent/50 transition-colors"
                             >
-                                <div class="flex items-center justify-between">
-                                    <div class="flex items-center gap-3">
-                                        <!-- Module Number -->
-                                        <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold"
-                                             :class="{
-                                                'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300': module.progress.is_completed,
-                                                'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300': !module.progress.is_completed && module.is_unlocked,
-                                                'bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-400': !module.is_unlocked
-                                            }"
-                                        >
-                                            <CheckCircle v-if="module.progress.is_completed" class="w-4 h-4" />
-                                            <Lock v-else-if="!module.is_unlocked" class="w-4 h-4" />
-                                            <span v-else>{{ module.order_number }}</span>
-                                        </div>
+                                <div class="flex items-start gap-3">
+                                    <!-- Module Number -->
+                                    <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0"
+                                         :class="{
+                                            'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300': module.progress.is_completed,
+                                            'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300': !module.progress.is_completed && module.is_unlocked,
+                                            'bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-400': !module.is_unlocked
+                                        }"
+                                    >
+                                        <CheckCircle v-if="module.progress.is_completed" class="w-4 h-4" />
+                                        <Lock v-else-if="!module.is_unlocked" class="w-4 h-4" />
+                                        <span v-else>{{ module.order_number }}</span>
+                                    </div>
 
-                                        <!-- Module Info -->
-                                        <div class="flex-1">
-                                            <h3 class="font-semibold text-lg">{{ module.name }}</h3>
-                                            <p v-if="module.description" class="text-sm text-muted-foreground">{{ module.description }}</p>
-                                            <div class="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                                                <span>{{ module.content.length }} content items</span>
-                                                <span v-if="module.estimated_duration">~{{ module.estimated_duration }} minutes</span>
-                                                <Badge v-if="module.is_required" variant="outline" class="text-xs">Required</Badge>
-                                            </div>
+                                    <!-- Module Info -->
+                                    <div class="flex-1 min-w-0">
+                                        <h3 class="font-semibold text-base sm:text-lg break-words">{{ module.name }}</h3>
+                                        <p v-if="module.description" class="text-sm text-muted-foreground mt-1 break-words">{{ module.description }}</p>
+                                        <div class="flex flex-wrap items-center gap-2 sm:gap-4 mt-2 text-xs sm:text-sm text-muted-foreground">
+                                            <span class="whitespace-nowrap">{{ module.content.length }} items</span>
+                                            <span v-if="module.estimated_duration" class="whitespace-nowrap">~{{ module.estimated_duration }} min</span>
+                                            <Badge v-if="module.is_required" variant="outline" class="text-xs">Required</Badge>
                                         </div>
                                     </div>
 
-                                    <div class="flex items-center gap-4">
-                                        <!-- Progress -->
-                                        <div class="text-right min-w-[100px]">
-                                            <div class="text-sm font-medium">
-                                                {{ Math.round(module.progress.completion_percentage) }}%
-                                            </div>
-                                            <div class="text-xs text-muted-foreground">
-                                                {{ module.progress.completed_content }}/{{ module.progress.total_content }}
-                                            </div>
+                                    <!-- Progress & Expand -->
+                                    <div class="flex flex-col items-end gap-1 flex-shrink-0">
+                                        <div class="text-sm font-medium whitespace-nowrap">
+                                            {{ Math.round(module.progress.completion_percentage) }}%
                                         </div>
-
-                                        <!-- Expand Icon -->
+                                        <div class="text-xs text-muted-foreground whitespace-nowrap">
+                                            {{ module.progress.completed_content }}/{{ module.progress.total_content }}
+                                        </div>
                                         <ChevronDown
-                                            class="h-4 w-4 transition-transform"
+                                            class="h-4 w-4 transition-transform mt-1"
                                             :class="{ 'rotate-180': openModules.has(module.id) }"
                                         />
                                     </div>
                                 </div>
 
                                 <!-- Progress Bar -->
-                                <div class="mt-3">
+                                <div class="mt-3 ml-11">
                                     <Progress :value="module.progress.completion_percentage" class="h-2" />
                                 </div>
                             </CollapsibleTrigger>
 
                             <CollapsibleContent v-if="openModules.has(module.id)">
                                 <Separator />
-                                <div class="p-4 space-y-2">
+                                <div class="p-3 sm:p-4 space-y-2">
                                     <div
                                         v-for="content in module.content"
                                         :key="content.id"
@@ -685,7 +672,7 @@ onMounted(() => {
                                         }"
                                     >
                                         <!-- Content Icon -->
-                                        <div class="w-8 h-8 rounded-full flex items-center justify-center"
+                                        <div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
                                              :class="{
                                                 'bg-green-200 text-green-700 dark:bg-green-800 dark:text-green-300': content.progress.is_completed,
                                                 'bg-blue-200 text-blue-700 dark:bg-blue-800 dark:text-blue-300': !content.progress.is_completed && content.is_unlocked,
@@ -698,33 +685,33 @@ onMounted(() => {
                                         </div>
 
                                         <!-- Content Info -->
-                                        <div class="flex-1">
-                                            <div class="font-medium">{{ content.title }}</div>
-                                            <div class="flex items-center gap-4 text-sm text-muted-foreground">
-                                                <span class="capitalize">{{ content.content_type }}</span>
-                                                <span v-if="content.video">{{ content.video.formatted_duration }}</span>
+                                        <div class="flex-1 min-w-0">
+                                            <div class="font-medium text-sm sm:text-base break-words">{{ content.title }}</div>
+                                            <div class="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground mt-1">
+                                                <span class="capitalize whitespace-nowrap">{{ content.content_type }}</span>
+                                                <span v-if="content.video" class="whitespace-nowrap">{{ content.video.formatted_duration }}</span>
                                                 <Badge v-if="content.is_required" variant="outline" class="text-xs">Required</Badge>
                                             </div>
                                         </div>
 
                                         <!-- Progress Indicator -->
-                                        <div class="text-right">
-                                            <div v-if="content.progress.is_completed" class="text-green-600 font-medium text-sm">
+                                        <div class="text-right flex-shrink-0">
+                                            <div v-if="content.progress.is_completed" class="text-green-600 font-medium text-xs sm:text-sm whitespace-nowrap">
                                                 Complete
                                             </div>
-                                            <div v-else-if="content.progress.completion_percentage > 0" class="text-blue-600 font-medium text-sm">
+                                            <div v-else-if="content.progress.completion_percentage > 0" class="text-blue-600 font-medium text-xs sm:text-sm whitespace-nowrap">
                                                 {{ Math.round(content.progress.completion_percentage) }}%
                                             </div>
-                                            <div v-else-if="content.is_unlocked" class="text-gray-500 text-sm">
-                                                Not started
+                                            <div v-else-if="content.is_unlocked" class="text-gray-500 text-xs sm:text-sm whitespace-nowrap">
+                                                Start
                                             </div>
-                                            <div v-else class="text-gray-400 text-sm">
+                                            <div v-else class="text-gray-400 text-xs sm:text-sm whitespace-nowrap">
                                                 🔒 Locked
                                             </div>
                                         </div>
 
                                         <!-- Action Arrow -->
-                                        <ChevronRight v-if="content.is_unlocked" class="h-4 w-4 text-muted-foreground" />
+                                        <ChevronRight v-if="content.is_unlocked" class="h-4 w-4 text-muted-foreground flex-shrink-0" />
                                     </div>
                                 </div>
                             </CollapsibleContent>
@@ -732,8 +719,6 @@ onMounted(() => {
                     </div>
                 </CardContent>
             </Card>
-
-            <!-- Course Completion -->
         </div>
     </AppLayout>
 </template>

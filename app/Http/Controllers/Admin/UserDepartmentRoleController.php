@@ -116,18 +116,20 @@ class UserDepartmentRoleController extends Controller
             \Log::info("Employee: {$emp['name']} | Level: {$emp['level']} | Department: {$emp['department']}");
         }
 
-        return Inertia::render('Admin/ManagerRoles/Assignment', [
-            'managers' => $managers,
-            'departments' => $departments,
-            'employees' => $employees,
-            'roleTypes' => [
-                'direct_manager' => 'Direct Manager',
-                'project_manager' => 'Project Manager',
-                'director' => 'Director',
-                'senior_manager' => 'Senior Manager',
-                'supervisor ' => 'Supervisor ',
-            ]
-        ]);
+         return Inertia::render('Admin/ManagerRoles/Assignment', [
+        'managers' => $managers,
+        'departments' => $departments,
+        'employees' => $employees,
+        'roleTypes' => [
+            'president' => 'President',              // ✅ NEW - Add first (highest authority)
+            'business_owner' => 'Business Owner',    // ✅ NEW
+            'director' => 'Director',
+            'senior_manager' => 'Senior Manager',
+            'direct_manager' => 'Direct Manager',
+            'project_manager' => 'Project Manager',
+            'supervisor' => 'Supervisor',
+        ],
+    ]);
     }
     /**
      * Store new role assignment
@@ -137,7 +139,7 @@ class UserDepartmentRoleController extends Controller
         $validated = $request->validate([
             'user_id' => 'required|exists:users,id',
             'department_id' => 'required|exists:departments,id',
-            'role_type' => 'required|in:direct_manager,project_manager,director,senior_manager,supervisor',
+        'role_type' => 'required|in:president,business_owner,director,senior_manager,direct_manager,project_manager,supervisor', // ✅ UPDATED
             'manages_user_id' => 'nullable|exists:users,id',
             'is_primary' => 'boolean',
             'authority_level' => 'required|integer|min:1|max:3',
@@ -336,7 +338,7 @@ class UserDepartmentRoleController extends Controller
         $validated = $request->validate([
             'user_id' => 'required|exists:users,id',
             'department_id' => 'required|exists:departments,id',
-            'role_type' => 'required|in:direct_manager,project_manager,director,senior_manager,supervisor',
+        'role_type' => 'required|in:president,business_owner,director,senior_manager,direct_manager,project_manager,supervisor', // ✅ UPDATED
             'manages_user_id' => 'nullable|exists:users,id',
             'is_primary' => 'boolean',
             'authority_level' => 'required|integer|min:1|max:3',

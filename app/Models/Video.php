@@ -22,11 +22,20 @@ class Video extends Model
         'is_active',
         'created_by',
         'video_category_id',
+
+        // NEW FIELDS FOR DUAL STORAGE
+        'storage_type',
+        'file_path',
+        'file_size',
+        'mime_type',
+        'duration_seconds',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
         'duration' => 'integer',
+        'file_size' => 'integer',       // NEW
+        'duration_seconds' => 'integer', // NEW
     ];
 
     /**
@@ -146,5 +155,70 @@ class Video extends Model
     public function courseProgress(): HasMany
     {
         return $this->hasMany(UserContentProgress::class, 'video_id');
+    }
+    // ============================================
+    // NEW METHODS FOR DUAL STORAGE SUPPORT
+    // ============================================
+
+    /**
+     * Check if video is stored on Google Drive
+     */
+    public function isGoogleDrive(): bool
+    {
+        return $this->storage_type === 'google_drive';
+    }
+
+    /**
+     * Check if video is stored locally
+     */
+    public function isLocal(): bool
+    {
+        return $this->storage_type === 'local';
+    }
+
+    /**
+     * Get formatted file size (e.g., "125.5 MB")
+     */
+    public function getFormattedFileSizeAttribute(): ?string
+    {
+        if (!$this->file_size) {
+            return null;
+        }
+
+        $units = ['B', 'KB', 'MB', 'GB'];
+        $size = $this->file_size;
+        $unit = 0;
+
+        while ($size >= 1024 && $unit < count($units) - 1) {
+            $size /= 1024;
+            $unit++;
+        }
+
+        return round($size, 2) . ' ' . $units[$unit];
+    }
+
+    /**
+     * Delete physical file if local storage
+     */
+    public function deleteStoredFile(): bool
+    {
+        if ($this->isLocal() && $this->file_path) {
+            if (Storage::disk('videos')->exists($this->file_path)) {
+                return Storage::disk('videos')->delete($this->file_path);
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Get storage type label for display
+     */
+    public function getStorageTypeLabel(): string
+    {
+        return match($this->storage_type) {
+            'google_drive' => 'Google Drive',
+            'local' => 'Local Storage',
+            default => 'Unknown'
+        };
     }
 }

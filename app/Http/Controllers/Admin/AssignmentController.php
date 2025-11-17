@@ -9,6 +9,7 @@ use App\Mail\CourseAssignmentManagerNotification; // 🎯 NEW IMPORT
 use App\Models\CourseAssignment;
 use App\Models\Course;
 use App\Models\CourseRegistration;
+use App\Models\Department;
 use App\Models\User;
 use App\Services\ManagerHierarchyService;
 use Illuminate\Http\Request;
@@ -41,17 +42,35 @@ class AssignmentController extends Controller
      */
     public function create(Request $request)
     {
+        // Existing code
         $courses = Course::with('availabilities')->orderBy('name')->get();
 
-        // Filter out admin users (assuming you have is_admin field)
+        // Existing code - Filter out admin users
         $users = User::where('is_admin', false)->orderBy('name')->get();
+
+        // ✅ ADD THIS - Get departments with user count
+        $departments = Department::withCount(['users' => function($query) {
+            $query->where('is_admin', false); // Only count non-admin users
+        }])
+            ->orderBy('name')
+            ->get()
+            ->map(function($dept) {
+                return [
+                    'id' => $dept->id,
+                    'name' => $dept->name,
+                    'users_count' => $dept->users_count, // User count per department
+                ];
+            });
 
         return Inertia::render('Admin/Assignments/Create', [
             'courses' => $courses,
             'users' => $users,
-            'selectedCourseId' => $request->get('course_id') // For pre-selecting from course list
+            'departments' => $departments, // ✅ ADD THIS
+            'selectedCourseId' => $request->get('course_id'), // For pre-selecting from course list
         ]);
     }
+
+
 
     /**
      * Store a newly created assignment

@@ -491,11 +491,17 @@ onUnmounted(() => {
                         <h1 class="text-3xl font-bold text-foreground">User Performance Evaluation</h1>
                         <p class="mt-2 text-sm text-muted-foreground">Assess employee performance with Level + Tier based incentive calculations.</p>
                     </div>
-                    <Button :as="Link" :href="route('admin.evaluations.index')" variant="outline">
-                        <RotateCcw class="mr-2 h-4 w-4" />
-                        Back to Evaluations
-                    </Button>
+                    <div class="flex gap-2">
+                        <Button :as="Link" :href="route('admin.evaluations.online.index')" variant="outline">
+                            Online Courses
+                        </Button>
+                        <Button :as="Link" :href="route('admin.evaluations.index')" variant="outline">
+                            <RotateCcw class="mr-2 h-4 w-4" />
+                            Back to Evaluations
+                        </Button>
+                    </div>
                 </div>
+
             </div>
 
             <form @submit.prevent="submit" class="space-y-8">

@@ -90,6 +90,11 @@ const generateSuggestions = () => {
         form.name = 'Executive'
         form.description = 'C-level executives and senior leadership'
         form.can_manage_levels = ['L1', 'L2', 'L3', 'L4']
+    }else if (level === 6) {
+        form.code = 'L6';
+        form.name = 'Business Owner';
+        form.description = 'Business owners and C-suite executives with full organizational authority';
+        form.canmanagelevels = ['L1', 'L2', 'L3', 'L4', 'L5'];
     }
 }
 
@@ -128,7 +133,8 @@ const getLevelColorScheme = (level: number | string) => {
         case '3': return { bg: 'bg-orange-100', text: 'text-orange-600', border: 'border-orange-200' }
         case '4': return { bg: 'bg-red-100', text: 'text-red-600', border: 'border-red-200' }
         case '5': return { bg: 'bg-indigo-100', text: 'text-indigo-600', border: 'border-indigo-200' }
-        default: return { bg: 'bg-gray-100', text: 'text-gray-600', border: 'border-gray-200' }
+        case '6': return { bg: 'bg-pink-100', text: 'text-pink-600', border: 'border-pink-200' }
+        default:  return { bg: 'bg-gray-100', text: 'text-gray-600', border: 'border-gray-200' }
     }
 }
 
@@ -175,6 +181,13 @@ const quickSetupTemplates = [
         name: 'Executive',
         description: 'C-level executives and senior leadership',
         can_manage_levels: ['L1', 'L2', 'L3', 'L4']
+    },
+    {
+        level: 6,
+        code: 'L6',
+        name: 'Business Owner',
+        description: 'Business owners and C-suite executives with full organizational authority',
+        canmanagelevels: ['L1', 'L2', 'L3', 'L4', 'L5']
     }
 ]
 
@@ -261,6 +274,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
                                         <SelectItem value="3">Level 3 (Senior Managers)</SelectItem>
                                         <SelectItem value="4">Level 4 (Directors)</SelectItem>
                                         <SelectItem value="5">Level 5 (Executives)</SelectItem>
+                                        <SelectItem value="6">Level 6 (Business Owners)</SelectItem>
                                     </SelectContent>
                                 </Select>
                                 <p class="text-xs text-muted-foreground">
