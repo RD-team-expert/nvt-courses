@@ -23,20 +23,3 @@
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
 </IfModule>
-
-# ============================================
-# ✅ NEW: PHP Upload Limits (Safe to Add)
-# ============================================
-<IfModule mod_php.c>
-    php_value upload_max_filesize 512M
-    php_value post_max_size 550M
-    php_value memory_limit 512M
-    php_value max_execution_time 600
-    php_value max_input_time 600
-    php_value max_input_vars 10000
-</IfModule>
-
-# For PHP-FPM (if your server uses it)
-<IfModule mod_fcgid.c>
-    FcgidMaxRequestLen 576716800
-</IfModule>

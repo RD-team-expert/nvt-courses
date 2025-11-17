@@ -137,10 +137,7 @@ class AudioController extends Controller
         if (!$streamingUrl) {
             // Fallback to original URL if processing fails
             $streamingUrl = $audio->google_cloud_url;
-            Log::warning('Using fallback URL for audio', [
-                'audio_id' => $audio->id,
-                'original_url' => $audio->google_cloud_url
-            ]);
+
         }
 
         // Get or create user progress
@@ -171,11 +168,7 @@ class AudioController extends Controller
             $thumbnailUrl = $audio->attributes['thumbnail_url'];
         }
 
-        Log::info('Audio accessed by user', [
-            'audio_id' => $audio->id,
-            'user_id' => auth()->id(),
-            'current_progress' => $userProgress->completion_percentage
-        ]);
+
 
         return Inertia::render('Audio/Show', [
             'audio' => [
@@ -230,13 +223,7 @@ class AudioController extends Controller
             ]);
         }
 
-        Log::debug('Audio progress updated', [
-            'audio_id' => $audio->id,
-            'user_id' => auth()->id(),
-            'current_time' => $validated['current_time'],
-            'completion_percentage' => $userProgress->completion_percentage,
-            'is_completed' => $userProgress->is_completed
-        ]);
+
 
         return response()->json([
             'success' => true,
@@ -268,10 +255,7 @@ class AudioController extends Controller
             'last_accessed_at' => now(),
         ]);
 
-        Log::info('Audio manually marked as completed', [
-            'audio_id' => $audio->id,
-            'user_id' => auth()->id()
-        ]);
+
 
         return response()->json(['success' => true]);
     }

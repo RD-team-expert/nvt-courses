@@ -21,17 +21,14 @@ class ThumbnailService
     public function generateCourseThumbnail(string $imagePath, string $size = 'medium'): ?string
     {
         if (!extension_loaded('gd')) {
-            Log::error('GD extension not loaded');
             return null;
         }
 
         if (!isset($this->thumbnailSizes[$size])) {
-            Log::error('Invalid thumbnail size requested', ['size' => $size]);
             return null;
         }
 
         if (!Storage::disk('public')->exists($imagePath)) {
-            Log::error('Source image not found', ['path' => $imagePath]);
             return null;
         }
 
@@ -42,7 +39,6 @@ class ThumbnailService
             // Get image info
             $imageInfo = getimagesize($sourceImagePath);
             if (!$imageInfo) {
-                Log::error('Unable to get image information', ['path' => $imagePath]);
                 return null;
             }
 
@@ -51,7 +47,6 @@ class ThumbnailService
             // Create image resource based on type
             $sourceImage = $this->createImageFromFile($sourceImagePath, $imageType);
             if (!$sourceImage) {
-                Log::error('Unable to create image resource', ['path' => $imagePath]);
                 return null;
             }
 
@@ -103,25 +98,15 @@ class ThumbnailService
             imagedestroy($thumbnail);
 
             if ($success) {
-                Log::info('Thumbnail generated successfully', [
-                    'source' => $imagePath,
-                    'thumbnail' => $thumbnailPath,
-                    'size' => $size,
-                    'dimensions' => "{$thumbWidth}x{$thumbHeight}"
-                ]);
+
 
                 return $thumbnailPath;
             } else {
-                Log::error('Failed to save thumbnail', ['path' => $thumbnailPath]);
                 return null;
             }
 
         } catch (\Exception $e) {
-            Log::error('Failed to generate thumbnail', [
-                'source' => $imagePath,
-                'size' => $size,
-                'error' => $e->getMessage()
-            ]);
+
 
             return null;
         }
@@ -232,17 +217,13 @@ class ThumbnailService
             $imageContent = file_get_contents($thumbnailUrl, false, $context);
 
             if ($imageContent === false) {
-                Log::error('Failed to download thumbnail', [
-                    'url' => $thumbnailUrl,
-                    'video_id' => $videoId
-                ]);
+
                 return null;
             }
 
             // Create image from string
             $sourceImage = imagecreatefromstring($imageContent);
             if (!$sourceImage) {
-                Log::error('Failed to create image from downloaded content');
                 return null;
             }
 
@@ -280,25 +261,15 @@ class ThumbnailService
             imagedestroy($thumbnail);
 
             if ($success) {
-                Log::info('Video thumbnail generated from URL', [
-                    'source_url' => $thumbnailUrl,
-                    'thumbnail_path' => $thumbnailPath,
-                    'video_id' => $videoId,
-                    'dimensions' => "{$thumbWidth}x{$thumbHeight}"
-                ]);
+
 
                 return $thumbnailPath;
             } else {
-                Log::error('Failed to save video thumbnail');
                 return null;
             }
 
         } catch (\Exception $e) {
-            Log::error('Failed to generate video thumbnail', [
-                'source_url' => $thumbnailUrl,
-                'video_id' => $videoId,
-                'error' => $e->getMessage()
-            ]);
+
 
             return null;
         }
@@ -320,15 +291,11 @@ class ThumbnailService
             if (Storage::disk('public')->exists($thumbnailPath)) {
                 if (!Storage::disk('public')->delete($thumbnailPath)) {
                     $deleted = false;
-                    Log::warning('Failed to delete thumbnail', ['path' => $thumbnailPath]);
                 }
             }
         }
 
-        Log::info('Thumbnail deletion completed', [
-            'source' => $originalImagePath,
-            'success' => $deleted
-        ]);
+
 
         return $deleted;
     }
@@ -409,10 +376,7 @@ class ThumbnailService
         imagepng($image, $fullPath);
         imagedestroy($image);
 
-        Log::info('PDF placeholder thumbnail generated', [
-            'pdf_path' => $pdfPath,
-            'thumbnail_path' => $thumbnailPath
-        ]);
+
 
         return $thumbnailPath;
     }

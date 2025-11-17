@@ -162,28 +162,12 @@ class AssignmentController extends Controller
                     $enrollmentCount++;
                     $enrolledUsers->push($user);
 
-                    Log::info('Admin auto-assignment and enrollment', [
-                        'admin_id' => auth()->id(),
-                        'user_id' => $userId,
-                        'course_id' => $course->id,
-                        'assignment_id' => $assignment->id,
-                        'registration_id' => $registration->id,
-                        'availability_id' => $availabilityId,
-                        'auto_enrolled' => true
-                    ]);
+
                 } else {
                     // Don't auto-enroll: Multiple availabilities, user must choose
                     $assignedUsers->push($user);
 
-                    Log::info('Admin assignment without auto-enrollment', [
-                        'admin_id' => auth()->id(),
-                        'user_id' => $userId,
-                        'course_id' => $course->id,
-                        'assignment_id' => $assignment->id,
-                        'availability_id' => $availabilityId,
-                        'auto_enrolled' => false,
-                        'reason' => 'Multiple availabilities available'
-                    ]);
+
                 }
 
             } catch (\Exception $e) {
@@ -203,26 +187,14 @@ class AssignmentController extends Controller
         $allAssignedUsers = $enrolledUsers->merge($assignedUsers)->unique('id');
 
         if ($allAssignedUsers->isNotEmpty()) {
-            Log::info('📬 Sending notifications to all assigned users', [
-                'course_id' => $course->id,
-                'course_name' => $course->name,
-                'total_users' => $allAssignedUsers->count(),
-                'enrolled_users_count' => $enrolledUsers->count(),
-                'assigned_users_count' => $assignedUsers->count(),
-                'all_user_emails' => $allAssignedUsers->pluck('email')->toArray(),
-                'enrolled_emails' => $enrolledUsers->pluck('email')->toArray(),
-                'assigned_emails' => $assignedUsers->pluck('email')->toArray()
-            ]);
+
 
             // Send user notifications (only once per user)
             $this->notifyUsersOnCourseAssignment($course, $allAssignedUsers, auth()->user());
 
             // Send manager notifications for private courses (only once per user)
             if ($course->privacy === 'private') {
-                Log::info('🎯 Course is private, sending manager notifications', [
-                    'course_privacy' => $course->privacy,
-                    'users_for_manager_notification' => $allAssignedUsers->pluck('email')->toArray()
-                ]);
+
 
                 $this->notifyManagersOnCourseAssignment($course, $allAssignedUsers, auth()->user());
             } else {
@@ -286,15 +258,7 @@ class AssignmentController extends Controller
             }
         }
 
-        Log::info('🏁 Assignment process completed', [
-            'course_id' => $course->id,
-            'course_name' => $course->name,
-            'assignments_created' => $assignmentCount,
-            'enrollments_created' => $enrollmentCount,
-            'users_skipped' => $skippedCount,
-            'notifications_sent_to' => $allAssignedUsers->count(),
-            'manager_notifications' => $course->privacy === 'private' ? 'sent' : 'skipped'
-        ]);
+
 
         return redirect()->route('admin.assignments.index');
     }
@@ -480,22 +444,13 @@ class AssignmentController extends Controller
                 // ✅ Pass the course ID when generating the login link
                 $loginLink = $user->generateLoginLink($course->id);
 
-                Log::debug("Generated login link for {$user->email}: {$loginLink}");
 
                 // Dispatch event with the user and their login link
                 CourseAssigned::dispatch($course, $user, $loginLink);
                 sleep(3); // Rate limiting
             }
 
-            Log::info('Private course assignment notifications sent successfully', [
-                'course_id' => $course->id,
-                'course_name' => $course->name,
-                'assigned_by' => $assignedBy->id,
-                'assigned_by_name' => $assignedBy->name,
-                'user_count' => $assignedUsers->count(),
-                'user_emails' => $assignedUsers->pluck('email')->toArray(),
-                'user_ids' => $assignedUsers->pluck('id')->toArray()
-            ]);
+
         } catch (\Exception $e) {
             Log::error('Failed to send course assignment notifications', [
                 'course_id' => $course->id,
@@ -514,38 +469,25 @@ class AssignmentController extends Controller
     private function notifyManagersOnCourseAssignment(Course $course, $assignedUsers, $assignedBy)
 {
     try {
-        Log::info('🎯 Starting manager notifications for course assignment', [
-            'course_id' => $course->id,
-            'course_name' => $course->name,
-            'assigned_users_count' => $assignedUsers->count(),
-        ]);
+
 
         $managerService = new ManagerHierarchyService();
         $managersData = [];
 
         foreach ($assignedUsers as $user) {
             if (!$user->department) {
-                Log::warning('⚠️ User has no department, skipping', [
-                    'user_id' => $user->id,
-                ]);
+
                 continue;
             }
 
             // ✅ FIXED: ONLY get direct managers - NO FALLBACK
             $managers = $managerService->getDirectManagersForUser($user->id);
 
-            Log::info('👔 Direct managers found for user', [
-                'user_id' => $user->id,
-                'user_name' => $user->name,
-                'managers_count' => count($managers),
-            ]);
+
 
             // ✅ FIXED: If no direct manager, skip (don't send to all L2s)
             if (empty($managers)) {
-                Log::warning('⚠️ No direct manager found, skipping notification', [
-                    'user_id' => $user->id,
-                    'user_name' => $user->name,
-                ]);
+
                 continue;
             }
 
@@ -562,15 +504,11 @@ class AssignmentController extends Controller
 
                 $managersData[$managerId]['users']->push($user);
 
-                Log::info('👥 User added to manager team', [
-                    'user_name' => $user->name,
-                    'manager_name' => $manager->name,
-                ]);
+
             }
         }
 
         if (empty($managersData)) {
-            Log::warning('⚠️ No managers found for any assigned users');
             return;
         }
 
@@ -601,10 +539,7 @@ class AssignmentController extends Controller
 
                 $successCount++;
 
-                Log::info('✅ Manager notification sent', [
-                    'manager_email' => $manager->email,
-                    'team_members_count' => $teamMembers->count(),
-                ]);
+
 
             } catch (\Exception $e) {
                 $failureCount++;
@@ -617,10 +552,7 @@ class AssignmentController extends Controller
             usleep(500000); // 0.5 second delay
         }
 
-        Log::info('🏁 Manager notifications completed', [
-            'successful' => $successCount,
-            'failed' => $failureCount,
-        ]);
+
 
     } catch (\Exception $e) {
         Log::error('💥 Manager notification failed', [

@@ -9,7 +9,6 @@ use App\Models\UserLevel;
 use App\Models\UserLevelTier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -195,7 +194,6 @@ class UserLevelController extends Controller
                 ->route('admin.user-levels.index')
                 ->with('success', 'User level deleted successfully.');
         } catch (\Exception $e) {
-            Log::error('Failed to delete user level: ' . $e->getMessage());
 
             return back()->withErrors([
                 'delete' => 'Failed to delete user level. Please try again.'
@@ -238,13 +236,7 @@ class UserLevelController extends Controller
             // ✅ Get fresh user data to verify the update
             $updatedUser = User::find($validated['user_id']);
 
-            Log::info('Remove user from level - After DB update', [
-                'user_id' => $validated['user_id'],
-                'affected_rows' => $affected,
-                'previous_level' => $previousLevel,
-                'new_level_id' => $updatedUser->user_level_id,
-                'verification' => $updatedUser->user_level_id === null ? 'SUCCESS' : 'FAILED'
-            ]);
+
 
             if ($affected === 0) {
                 throw new \Exception('No rows were affected by the update');
@@ -259,10 +251,7 @@ class UserLevelController extends Controller
                 ->with('success', "User {$user->name} removed from {$previousLevel} level successfully.");
 
         } catch (\Exception $e) {
-            Log::error('Failed to remove user from level: ' . $e->getMessage(), [
-                'user_id' => $validated['user_id'] ?? null,
-                'error' => $e->getMessage()
-            ]);
+
 
             return back()->withErrors([
                 'remove_user' => 'Failed to remove user from level. Please try again.'

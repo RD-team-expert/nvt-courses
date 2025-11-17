@@ -15,7 +15,6 @@ use App\Models\UserLevel;
 use App\Models\UserLevelTier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Exception;
 
 class UserEvaluationController extends Controller
@@ -184,14 +183,7 @@ class UserEvaluationController extends Controller
                     ];
                 });
 
-            Log::info('UserEvaluation index data loaded', [
-                'users_count' => $users->count(),
-                'courses_count' => $courses->count(),
-                'categories_count' => $categories->count(),
-                'departments_count' => $departments->count(),
-                'incentives_count' => $incentives->count(),
-                'user_levels_count' => $userLevels->count()
-            ]);
+
 
             return inertia('Admin/Evaluations/UserEvaluation', [
                 'users' => $users,
@@ -203,10 +195,7 @@ class UserEvaluationController extends Controller
             ]);
 
         } catch (Exception $e) {
-            Log::error('Failed to load user evaluation page', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
+
 
             return inertia('Admin/Evaluations/UserEvaluation', [
                 'users' => [],
@@ -290,10 +279,7 @@ class UserEvaluationController extends Controller
             return response()->json(['users' => $users]);
 
         } catch (Exception $e) {
-            Log::error('Failed to get users by department', [
-                'department_id' => $departmentId,
-                'error' => $e->getMessage()
-            ]);
+
 
             return response()->json(['users' => [], 'error' => $e->getMessage()], 500);
         }
@@ -344,10 +330,7 @@ class UserEvaluationController extends Controller
             return response()->json(['courses' => $completedCourses]);
 
         } catch (Exception $e) {
-            Log::error('Failed to get user courses', [
-                'user_id' => $userId,
-                'error' => $e->getMessage()
-            ]);
+
 
             return response()->json(['courses' => [], 'error' => $e->getMessage()], 500);
         }
@@ -386,11 +369,7 @@ class UserEvaluationController extends Controller
                 $existingEvaluation->history()->delete();
                 $evaluation = $existingEvaluation;
 
-                Log::info('Updating existing evaluation', [
-                    'evaluation_id' => $evaluation->id,
-                    'user_id' => $validated['user_id'],
-                    'course_id' => $validated['course_id']
-                ]);
+
             } else {
                 // NEW: Include course_type when creating
                 $evaluation = Evaluation::create([
@@ -403,10 +382,7 @@ class UserEvaluationController extends Controller
                     'incentive_amount' => 0,
                 ]);
 
-                Log::info('Created new evaluation', [
-                    'evaluation_id' => $evaluation->id,
-                    'course_type' => 'regular' // NEW
-                ]);
+
             }
 
             if (!$evaluation || !$evaluation->id) {
@@ -446,14 +422,7 @@ class UserEvaluationController extends Controller
             // Calculate incentive amount using Level + Tier based system
             $incentiveAmount = $this->calculateLevelTierIncentiveAmount($user, $totalScore);
 
-            Log::info('Calculated Level+Tier incentive', [
-                'user_id' => $user->id,
-                'user_level' => $user->userLevel?->name,
-                'user_tier' => $user->userLevelTier?->tier_name,
-                'total_score' => $totalScore,
-                'incentive_amount' => $incentiveAmount,
-                'course_type' => 'regular' // NEW
-            ]);
+
 
             $evaluation->update([
                 'total_score' => $totalScore,
@@ -474,10 +443,7 @@ class UserEvaluationController extends Controller
         } catch (Exception $e) {
             DB::rollBack();
 
-            Log::error('Evaluation store process failed', [
-                'validated_data' => $validated,
-                'error' => $e->getMessage()
-            ]);
+
 
             return redirect()->back()
                 ->withErrors(['error' => $e->getMessage()])
@@ -498,11 +464,7 @@ class UserEvaluationController extends Controller
 
             // Check if user has level and tier assigned
             if (!$user->userLevel || !$user->userLevelTier) {
-                Log::warning('User missing level or tier assignment', [
-                    'user_id' => $user->id,
-                    'has_level' => !!$user->userLevel,
-                    'has_tier' => !!$user->userLevelTier
-                ]);
+
 
                 // Fallback to old system if no level/tier
                 return $this->calculateIncentiveAmount($totalScore);
@@ -517,12 +479,7 @@ class UserEvaluationController extends Controller
                 ->first();
 
             if ($incentive) {
-                Log::info('Found Level+Tier specific incentive', [
-                    'user_level' => $user->userLevel->name,
-                    'user_tier' => $user->userLevelTier->tier_name,
-                    'score_range' => $incentive->min_score . '-' . $incentive->max_score,
-                    'incentive_amount' => $incentive->incentive_amount
-                ]);
+
 
                 return (float)$incentive->incentive_amount;
             }
@@ -536,24 +493,15 @@ class UserEvaluationController extends Controller
                 ->first();
 
             if ($levelIncentive) {
-                Log::info('Found Level-only incentive as fallback', [
-                    'user_level' => $user->userLevel->name,
-                    'incentive_amount' => $levelIncentive->incentive_amount
-                ]);
 
                 return (float)$levelIncentive->incentive_amount;
             }
 
             // Final fallback: Use old system
-            Log::info('No Level+Tier incentive found, falling back to old system');
             return $this->calculateIncentiveAmount($totalScore);
 
         } catch (Exception $e) {
-            Log::error('Level+Tier incentive calculation error', [
-                'user_id' => $user->id,
-                'total_score' => $totalScore,
-                'error' => $e->getMessage()
-            ]);
+
 
             // Fallback to old system on error
             return $this->calculateIncentiveAmount($totalScore);
@@ -580,10 +528,7 @@ class UserEvaluationController extends Controller
             return $incentive ? (float)$incentive->incentive_amount : 0;
 
         } catch (Exception $e) {
-            Log::error('Legacy incentive calculation error', [
-                'total_score' => $totalScore,
-                'error' => $e->getMessage()
-            ]);
+
             return 0;
         }
     }

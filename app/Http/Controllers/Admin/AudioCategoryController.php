@@ -6,7 +6,6 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\AudioCategory;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
 class AudioCategoryController extends Controller
@@ -65,11 +64,7 @@ class AudioCategoryController extends Controller
             'sort_order' => $validated['sort_order'] ?? 0,
         ]);
 
-        Log::info('Audio category created', [
-            'category_id' => $category->id,
-            'category_name' => $category->name,
-            'created_by' => auth()->id()
-        ]);
+
 
         return redirect()->route('admin.audio-categories.index')
             ->with('success', 'Category created successfully.');
@@ -111,11 +106,7 @@ class AudioCategoryController extends Controller
             'sort_order' => $validated['sort_order'] ?? 0,
         ]);
 
-        Log::info('Audio category updated', [
-            'category_id' => $audioCategory->id,
-            'category_name' => $audioCategory->name,
-            'updated_by' => auth()->id()
-        ]);
+
 
         return redirect()->route('admin.audio-categories.index')
             ->with('success', 'Category updated successfully.');
@@ -137,10 +128,7 @@ class AudioCategoryController extends Controller
         $categoryName = $audioCategory->name;
         $audioCategory->delete();
 
-        Log::info('Audio category deleted', [
-            'category_name' => $categoryName,
-            'deleted_by' => auth()->id()
-        ]);
+
 
         return redirect()->route('admin.audio-categories.index')
             ->with('success', 'Category deleted successfully.');
@@ -155,12 +143,7 @@ class AudioCategoryController extends Controller
             'is_active' => !$audioCategory->is_active
         ]);
 
-        Log::info('Audio category status toggled', [
-            'category_id' => $audioCategory->id,
-            'category_name' => $audioCategory->name,
-            'new_status' => $audioCategory->is_active ? 'active' : 'inactive',
-            'updated_by' => auth()->id()
-        ]);
+
 
         return redirect()->back()
             ->with('success', 'Category status updated successfully.');

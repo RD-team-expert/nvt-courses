@@ -12,7 +12,6 @@ use App\Models\LearningSession;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
 class CourseOnlineController extends Controller
@@ -24,12 +23,7 @@ class CourseOnlineController extends Controller
     {
         $user = Auth::user();
 
-        // ✅ DEBUG: Dashboard access
-        Log::info('=== USER DASHBOARD DEBUG START ===', [
-            'user_id' => $user->id,
-            'user_name' => $user->name,
-            'timestamp' => now(),
-        ]);
+
 
         // Get user's course assignments with related data
         $assignments = CourseOnlineAssignment::with([
@@ -42,61 +36,30 @@ class CourseOnlineController extends Controller
             ->get()
             ->map(function ($assignment) use ($user) {
 
-                // ✅ DEBUG: Assignment processing start
-                Log::info('🔍 Processing assignment START', [
-                    'assignment_id' => $assignment->id,
-                    'course_id' => $assignment->courseOnline->id,
-                    'course_name' => $assignment->courseOnline->name,
-                    'original_progress' => $assignment->progress_percentage,
-                    'original_total_time_spent' => $assignment->total_time_spent,
-                ]);
+
 
                 // ✅ FIXED: Calculate real-time assignment progress
                 $realTimeProgress = $this->calculateCourseProgress($assignment->courseOnline->id, $user->id);
 
-                // ✅ DEBUG: Progress comparison
-                Log::info('🔍 Progress comparison', [
-                    'assignment_id' => $assignment->id,
-                    'stored_progress' => $assignment->progress_percentage,
-                    'calculated_progress' => $realTimeProgress,
-                    'needs_update' => $assignment->progress_percentage != $realTimeProgress,
-                ]);
+
 
                 // ✅ UPDATE: Update assignment with real progress if different
                 if ($assignment->progress_percentage != $realTimeProgress) {
                     $assignment->update(['progress_percentage' => $realTimeProgress]);
                     $assignment->refresh(); // Refresh the model with new data
 
-                    Log::info('✅ Assignment progress updated', [
-                        'assignment_id' => $assignment->id,
-                        'old_progress' => $assignment->getOriginal('progress_percentage'),
-                        'new_progress' => $assignment->progress_percentage,
-                    ]);
                 }
 
                 // ✅ DEBUG: Calculate time spent for this assignment
                 $timeSpentCalculation = $this->calculateAssignmentTimeSpent($assignment->courseOnline->id, $user->id);
 
-                Log::info('🔍 Assignment time calculation', [
-                    'assignment_id' => $assignment->id,
-                    'course_id' => $assignment->courseOnline->id,
-                    'calculated_time_minutes' => $timeSpentCalculation,
-                    'stored_total_time_spent' => $assignment->total_time_spent,
-                    'formatted_time' => $this->formatTimeSpent($timeSpentCalculation),
-                ]);
+
 
                 // Get next content for in-progress courses
                 $nextContent = null;
                 if ($assignment->status === 'in_progress' && $assignment->currentModule) {
                     $nextContent = $this->getNextUnlockedContent($assignment->courseOnline, $user->id);
 
-                    Log::info('🔍 Next content lookup', [
-                        'assignment_id' => $assignment->id,
-                        'current_module_id' => $assignment->currentModule->id,
-                        'next_content_found' => $nextContent ? 'YES' : 'NO',
-                        'next_content_id' => $nextContent?->id,
-                        'next_content_title' => $nextContent?->title,
-                    ]);
                 }
 
                 // ✅ NEW: Calculate deadline information
@@ -143,15 +106,7 @@ class CourseOnlineController extends Controller
                     ] : null,
                 ];
 
-                Log::info('🔍 Assignment data final', [
-                    'assignment_id' => $assignment->id,
-                    'final_progress' => $assignmentData['progress_percentage'],
-                    'final_time_spent' => $assignmentData['time_spent'],
-                    'status' => $assignmentData['status'],
-                    // ✅ NEW: Log deadline info
-                    'deadline_status' => $deadlineInfo['status'],
-                    'days_remaining' => $deadlineInfo['days_remaining'],
-                ]);
+
 
                 return $assignmentData;
             });
@@ -159,10 +114,7 @@ class CourseOnlineController extends Controller
         // ✅ DEBUG: Calculate total hours with detailed logging
         $totalMinutes = $this->calculateTotalMinutes($user->id);
 
-        Log::info('🔍 Total hours calculation for dashboard', [
-            'user_id' => $user->id,
-            'calculated_hours' => $totalMinutes,
-        ]);
+
 
         // Calculate user statistics
         $stats = [
@@ -178,12 +130,8 @@ class CourseOnlineController extends Controller
         ];
 
         // ✅ DEBUG: Final dashboard stats
-        Log::info('🔍 Dashboard stats final', [
-            'user_id' => $user->id,
-            'stats' => $stats,
-        ]);
 
-        Log::info('=== USER DASHBOARD DEBUG END ===');
+
 
         return Inertia::render('User/CourseOnline/Index', [
             'assignments' => $assignments,
@@ -198,11 +146,7 @@ class CourseOnlineController extends Controller
     {
         $user = Auth::user();
 
-        Log::info('=== USER COURSE SHOW DEBUG START ===', [
-            'user_id' => $user->id,
-            'course_id' => $courseOnline->id,
-            'course_name' => $courseOnline->name,
-        ]);
+
 
         // Check if user has access to this course
         $assignment = CourseOnlineAssignment::where('course_online_id', $courseOnline->id)
@@ -210,32 +154,15 @@ class CourseOnlineController extends Controller
             ->first();
 
         if (!$assignment) {
-            Log::warning('🚫 User denied access to course', [
-                'user_id' => $user->id,
-                'course_id' => $courseOnline->id,
-                'reason' => 'No assignment found',
-            ]);
+
 
             return redirect()->route('courses-online.index')
                 ->with('error', 'You do not have access to this course.');
         }
 
-        Log::info('✅ Assignment found', [
-            'user_id' => $user->id,
-            'assignment_id' => $assignment->id,
-            'assignment_status' => $assignment->status,
-            'stored_progress' => $assignment->progress_percentage,
-            'stored_total_time_spent' => $assignment->total_time_spent,
-        ]);
-
         // Update assignment progress with current calculation
         $currentProgress = $this->calculateCourseProgress($courseOnline->id, $user->id);
         if ($assignment->progress_percentage != $currentProgress) {
-            Log::info('🔄 Updating assignment progress', [
-                'assignment_id' => $assignment->id,
-                'old_progress' => $assignment->progress_percentage,
-                'new_progress' => $currentProgress,
-            ]);
 
             $assignment->update(['progress_percentage' => $currentProgress]);
             $assignment->refresh();
@@ -251,12 +178,7 @@ class CourseOnlineController extends Controller
             ->map(function ($module) use ($user) {
                 $progress = $this->getModuleProgress($module, $user->id);
 
-                Log::info('🔍 Module progress in show', [
-                    'user_id' => $user->id,
-                    'module_id' => $module->id,
-                    'module_name' => $module->name,
-                    'progress' => $progress,
-                ]);
+
 
                 // ✅ FIXED: Added missing array return structure
                 return [
@@ -295,10 +217,7 @@ class CourseOnlineController extends Controller
 
         // Mark assignment as started if not already
         if ($assignment->status === 'assigned') {
-            Log::info('🚀 Marking assignment as started', [
-                'assignment_id' => $assignment->id,
-                'user_id' => $user->id,
-            ]);
+
 
             $assignment->update([
                 'status' => 'in_progress',
@@ -310,16 +229,11 @@ class CourseOnlineController extends Controller
         // Calculate time spent for assignment display
         $assignmentTimeSpent = $this->calculateAssignmentTimeSpent($courseOnline->id, $user->id);
 
-        Log::info('🔍 Assignment time for display', [
-            'assignment_id' => $assignment->id,
-            'calculated_time_minutes' => $assignmentTimeSpent,
-            'formatted_time' => $this->formatTimeSpent($assignmentTimeSpent),
-        ]);
+
 
         // Calculate deadline info for course show
         $deadlineInfo = $this->calculateDeadlineInfo($assignment);
 
-        Log::info('=== USER COURSE SHOW DEBUG END ===');
 
         return Inertia::render('User/CourseOnline/Show', [
             'course' => [
@@ -440,10 +354,7 @@ class CourseOnlineController extends Controller
      */
     private function calculateAssignmentTimeSpent(int $courseId, int $userId): int
     {
-        Log::info('🔍 Calculating assignment time spent', [
-            'user_id' => $userId,
-            'course_id' => $courseId,
-        ]);
+
 
         // Get all learning sessions for this user and course
         $sessions = LearningSession::where('user_id', $userId)
@@ -451,31 +362,12 @@ class CourseOnlineController extends Controller
             ->select(['id', 'total_duration_minutes', 'session_start', 'session_end'])
             ->get();
 
-        Log::info('🔍 Learning sessions found', [
-            'user_id' => $userId,
-            'course_id' => $courseId,
-            'sessions_count' => $sessions->count(),
-            'sessions_data' => $sessions->map(function($session) {
-                return [
-                    'id' => $session->id,
-                    'duration' => $session->total_duration_minutes,
-                    'start' => $session->session_start,
-                    'end' => $session->session_end,
-                ];
-            })->toArray(),
-        ]);
 
         // ✅ FIXED: Only sum positive durations
         $totalMinutes = $sessions->where('total_duration_minutes', '>', 0)->sum('total_duration_minutes');
         $negativeCount = $sessions->where('total_duration_minutes', '<=', 0)->count();
 
-        Log::info('🔍 Assignment time calculation result', [
-            'user_id' => $userId,
-            'course_id' => $courseId,
-            'total_positive_minutes' => $totalMinutes,
-            'negative_sessions_count' => $negativeCount,
-            'final_result' => max(0, $totalMinutes),
-        ]);
+
 
         return max(0, intval($totalMinutes));
     }
@@ -485,48 +377,24 @@ class CourseOnlineController extends Controller
      */
     private function calculateTotalHours(int $userId): float
     {
-        Log::info('🔍 Calculating total hours for user', [
-            'user_id' => $userId,
-        ]);
+
 
         // Get all learning sessions for this user
         $allSessions = LearningSession::where('user_id', $userId)
             ->select(['id', 'total_duration_minutes', 'course_online_id', 'session_start'])
             ->get();
 
-        Log::info('🔍 All user learning sessions', [
-            'user_id' => $userId,
-            'total_sessions' => $allSessions->count(),
-            'positive_sessions' => $allSessions->where('total_duration_minutes', '>', 0)->count(),
-            'zero_sessions' => $allSessions->where('total_duration_minutes', '=', 0)->count(),
-            'negative_sessions' => $allSessions->where('total_duration_minutes', '<', 0)->count(),
-        ]);
+
 
         // ✅ DEBUG: Show sample session data
         $sampleSessions = $allSessions->take(5);
-        Log::info('🔍 Sample sessions data', [
-            'user_id' => $userId,
-            'sample_sessions' => $sampleSessions->map(function($session) {
-                return [
-                    'id' => $session->id,
-                    'course_id' => $session->course_online_id,
-                    'duration' => $session->total_duration_minutes,
-                    'start' => $session->session_start,
-                ];
-            })->toArray(),
-        ]);
+
 
         // ✅ FIXED: Only include positive duration values
         $positiveSessions = $allSessions->where('total_duration_minutes', '>', 0);
         $totalMinutes = $positiveSessions->sum('total_duration_minutes');
         $totalHours = round(max(0, $totalMinutes) / 60, 1);
 
-        Log::info('🔍 Total hours calculation final', [
-            'user_id' => $userId,
-            'positive_sessions_count' => $positiveSessions->count(),
-            'total_positive_minutes' => $totalMinutes,
-            'calculated_hours' => $totalHours,
-        ]);
 
         return $totalHours;
     }
@@ -536,19 +404,11 @@ class CourseOnlineController extends Controller
      */
     private function getModuleProgress(CourseModule $module, int $userId): array
     {
-        Log::info('🔍 Getting module progress', [
-            'user_id' => $userId,
-            'module_id' => $module->id,
-            'module_name' => $module->name,
-        ]);
 
         $totalContent = $module->content()->count();
 
         if ($totalContent === 0) {
-            Log::info('⚠️ Module has no content', [
-                'user_id' => $userId,
-                'module_id' => $module->id,
-            ]);
+
 
             return [
                 'total_content' => 0,
@@ -563,19 +423,7 @@ class CourseOnlineController extends Controller
             ->where('module_id', $module->id)
             ->get();
 
-        Log::info('🔍 Module progress records', [
-            'user_id' => $userId,
-            'module_id' => $module->id,
-            'total_content' => $totalContent,
-            'progress_records_found' => $progressRecords->count(),
-            'progress_data' => $progressRecords->map(function($record) {
-                return [
-                    'content_id' => $record->content_id,
-                    'completion_percentage' => $record->completion_percentage,
-                    'is_completed' => $record->is_completed,
-                ];
-            })->toArray(),
-        ]);
+
 
         // ✅ FIXED: Calculate total progress from all content
         $totalProgressSum = 0;
@@ -603,17 +451,7 @@ class CourseOnlineController extends Controller
             'is_completed' => $totalContent > 0 && $completedContent >= $totalContent,
         ];
 
-        Log::info('🔍 Module progress result', [
-            'user_id' => $userId,
-            'module_id' => $module->id,
-            'calculation' => [
-                'total_content' => $totalContent,
-                'total_progress_sum' => $totalProgressSum,
-                'average_progress' => $averageProgress,
-                'completed_content' => $completedContent,
-            ],
-            'result' => $result,
-        ]);
+
 
         return $result;
     }
@@ -642,10 +480,7 @@ class CourseOnlineController extends Controller
      */
     private function calculateCourseProgress(int $courseId, int $userId): float
     {
-        Log::info('🔍 Calculating course progress', [
-            'user_id' => $userId,
-            'course_id' => $courseId,
-        ]);
+
 
         // Get all required content in the course
         $totalContent = ModuleContent::whereHas('module', function ($query) use ($courseId) {
@@ -653,10 +488,7 @@ class CourseOnlineController extends Controller
         })->where('is_required', true)->count();
 
         if ($totalContent === 0) {
-            Log::info('⚠️ Course has no required content', [
-                'user_id' => $userId,
-                'course_id' => $courseId,
-            ]);
+
             return 0.0;
         }
 
@@ -670,32 +502,12 @@ class CourseOnlineController extends Controller
 
         $totalProgressSum = $progressRecords->sum('completion_percentage');
 
-        Log::info('🔍 Course progress calculation', [
-            'user_id' => $userId,
-            'course_id' => $courseId,
-            'total_required_content' => $totalContent,
-            'progress_records_count' => $progressRecords->count(),
-            'total_progress_sum' => $totalProgressSum,
-            'progress_records' => $progressRecords->map(function($record) {
-                return [
-                    'content_id' => $record->content_id,
-                    'completion_percentage' => $record->completion_percentage,
-                ];
-            })->toArray(),
-        ]);
+
 
         // ✅ FIXED: Calculate average progress
         $averageProgress = round($totalProgressSum / $totalContent, 2);
 
-        Log::info('🔍 Course progress final result', [
-            'user_id' => $userId,
-            'course_id' => $courseId,
-            'calculation' => [
-                'total_content' => $totalContent,
-                'total_progress_sum' => $totalProgressSum,
-                'average_progress' => $averageProgress,
-            ],
-        ]);
+
 
         return $averageProgress;
     }
@@ -827,10 +639,7 @@ class CourseOnlineController extends Controller
     {
         $user = Auth::user();
 
-        Log::info('=== COURSE COMPLETION REQUEST START ===', [
-            'user_id' => $user->id,
-            'course_id' => $courseOnline->id,
-        ]);
+       ;
 
         // Validate assignment exists
         $assignment = CourseOnlineAssignment::where('course_online_id', $courseOnline->id)
@@ -868,11 +677,6 @@ class CourseOnlineController extends Controller
                 'total_time_spent' => $finalTimeSpent,
             ]);
 
-            Log::info('✅ Course completed successfully', [
-                'assignment_id' => $assignment->id,
-                'final_time_spent' => $finalTimeSpent,
-            ]);
-
             // ✅ INERTIA REDIRECT: Navigate to success/dashboard page
             return redirect()->route('courses-online.index')
                 ->with('success', 'Congratulations! You have successfully completed the course!')
@@ -883,10 +687,7 @@ class CourseOnlineController extends Controller
                 ]);
 
         } catch (\Exception $e) {
-            Log::error('❌ Course completion failed', [
-                'user_id' => $user->id,
-                'error' => $e->getMessage(),
-            ]);
+
 
             return redirect()->back()
                 ->with('error', 'Failed to complete course. Please try again.');
@@ -909,19 +710,12 @@ class CourseOnlineController extends Controller
                 ->get(['id', 'name', 'description', 'difficulty_level', 'estimated_duration'])
                 ->toArray();
 
-            Log::info('🔍 Recommended courses found', [
-                'user_id' => $userId,
-                'completed_course_id' => $completedCourseId,
-                'recommended_count' => count($recommendedCourses),
-            ]);
+
 
             return $recommendedCourses;
 
         } catch (\Exception $e) {
-            Log::warning('Failed to get recommended courses', [
-                'user_id' => $userId,
-                'error' => $e->getMessage(),
-            ]);
+
 
             return [];
         }
@@ -935,11 +729,6 @@ class CourseOnlineController extends Controller
         // This is a placeholder - implement your certificate generation logic
         // You might want to create a Certificate model and generate PDF
 
-        Log::info('📜 Certificate generation placeholder', [
-            'assignment_id' => $assignment->id,
-            'user_id' => $assignment->user_id,
-            'course_id' => $assignment->course_online_id,
-        ]);
 
         return [
             'id' => 'cert_' . $assignment->id,
@@ -958,11 +747,6 @@ class CourseOnlineController extends Controller
         // This is a placeholder - implement your notification logic
         // You might want to send email, push notification, etc.
 
-        Log::info('📧 Completion notification placeholder', [
-            'assignment_id' => $assignment->id,
-            'user_email' => $assignment->user->email,
-            'course_name' => $assignment->courseOnline->name,
-        ]);
 
         // Example implementation:
         // Mail::to($assignment->user->email)->send(new CourseCompletedNotification($assignment));
@@ -971,22 +755,14 @@ class CourseOnlineController extends Controller
 
     private function calculateTotalMinutes(int $userId): int
     {
-        Log::info('🔍 Calculating total minutes for user', [
-            'user_id' => $userId,
-        ]);
+
 
 // Get all learning sessions for this user
         $allSessions = LearningSession::where('user_id', $userId)
             ->select(['id', 'total_duration_minutes', 'course_online_id', 'session_start'])
             ->get();
 
-        Log::info('🔍 All user learning sessions', [
-            'user_id' => $userId,
-            'total_sessions' => $allSessions->count(),
-            'positive_sessions' => $allSessions->where('total_duration_minutes', '>', 0)->count(),
-            'zero_sessions' => $allSessions->where('total_duration_minutes', '=', 0)->count(),
-            'negative_sessions' => $allSessions->where('total_duration_minutes', '<', 0)->count(),
-        ]);
+
 
 // Only include positive duration values
         $positiveSessions = $allSessions->where('total_duration_minutes', '>', 0);
@@ -995,11 +771,7 @@ class CourseOnlineController extends Controller
 // Ensure we never return negative values
         $totalMinutes = max(0, $totalMinutes);
 
-        Log::info('🔍 Total minutes calculation final', [
-            'user_id' => $userId,
-            'positive_sessions_count' => $positiveSessions->count(),
-            'total_minutes' => $totalMinutes,
-        ]);
+
 
         return (int) $totalMinutes;
     }

@@ -14,7 +14,6 @@ use App\Services\GoogleDriveService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\ValidationException;
 
@@ -76,11 +75,7 @@ class CourseProgressController extends Controller
             ]
         );
 
-        Log::info('Learning session started', [
-            'user_id' => $user->id,
-            'content_id' => $content->id,
-            'session_id' => $session->id,
-        ]);
+
 
         return response()->json([
             'success' => true,
@@ -215,12 +210,7 @@ class CourseProgressController extends Controller
         // Update course assignment progress
         $this->updateCourseProgress($session->moduleContent->module->courseOnline, $user->id);
 
-        Log::info('Learning session ended', [
-            'user_id' => $user->id,
-            'session_id' => $session->id,
-            'duration' => $totalDuration,
-            'completion' => $completionPercentage ?? 0,
-        ]);
+
 
         return response()->json([
             'success' => true,
@@ -351,13 +341,7 @@ class CourseProgressController extends Controller
             ),
         ]);
 
-        // Log for admin review
-        Log::warning('Suspicious learning activity detected', [
-            'user_id' => $user->id,
-            'session_id' => $session->id,
-            'activity_type' => $validated['activity_type'],
-            'details' => $validated['details'],
-        ]);
+
 
         return response()->json(['success' => true]);
     }

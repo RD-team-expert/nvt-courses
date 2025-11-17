@@ -8,7 +8,6 @@ use App\Models\UserLevel;
 use App\Models\UserLevelTier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -210,7 +209,6 @@ class UserLevelTierController extends Controller
                 ->with('success', "Tier '{$tierName}' deleted successfully.");
 
         } catch (\Exception $e) {
-            Log::error('Failed to delete tier: ' . $e->getMessage());
 
             return back()->withErrors([
                 'delete' => 'Failed to delete tier. Please try again.'
@@ -247,7 +245,6 @@ class UserLevelTierController extends Controller
                 ->with('success', '3 default tiers created successfully for ' . $userLevel->name);
 
         } catch (\Exception $e) {
-            Log::error('Failed to create default tiers: ' . $e->getMessage());
 
             return back()->withErrors([
                 'bulk_create' => 'Failed to create default tiers. Please try again.'

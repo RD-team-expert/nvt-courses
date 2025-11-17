@@ -15,10 +15,7 @@ class CheatingDetectionExportService
      */
     public function exportSuspiciousActivityReport($filters = [])
     {
-        Log::info('📊 === EXPORT SUSPICIOUS ACTIVITY REPORT START ===', [
-            'filters' => $filters,
-            'admin' => auth()->user()->name ?? 'unknown',
-        ]);
+
 
         try {
             // ✅ FIXED: Simplified query with error handling
@@ -29,29 +26,23 @@ class CheatingDetectionExportService
             // ✅ FIXED: Apply filters with validation
             if (!empty($filters['course_id']) && is_numeric($filters['course_id'])) {
                 $query->where('course_online_id', $filters['course_id']);
-                Log::info('📊 Course filter applied', ['course_id' => $filters['course_id']]);
             }
 
             if (!empty($filters['user_id']) && is_numeric($filters['user_id'])) {
                 $query->where('user_id', $filters['user_id']);
-                Log::info('📊 User filter applied', ['user_id' => $filters['user_id']]);
             }
 
             if (!empty($filters['date_from'])) {
                 try {
                     $query->whereDate('session_start', '>=', $filters['date_from']);
-                    Log::info('📊 Date from filter applied', ['date_from' => $filters['date_from']]);
                 } catch (\Exception $e) {
-                    Log::warning('📊 Invalid date_from filter', ['date_from' => $filters['date_from']]);
                 }
             }
 
             if (!empty($filters['date_to'])) {
                 try {
                     $query->whereDate('session_start', '<=', $filters['date_to']);
-                    Log::info('📊 Date to filter applied', ['date_to' => $filters['date_to']]);
                 } catch (\Exception $e) {
-                    Log::warning('📊 Invalid date_to filter', ['date_to' => $filters['date_to']]);
                 }
             }
 
@@ -60,9 +51,7 @@ class CheatingDetectionExportService
                 ->limit(1000) // Prevent memory overflow
                 ->get();
 
-            Log::info('📊 Sessions retrieved', [
-                'total_sessions' => $sessions->count(),
-            ]);
+
 
             // ✅ FIXED: Process each session with error handling
             $exportData = [];
@@ -74,7 +63,6 @@ class CheatingDetectionExportService
                 try {
                     // ✅ FIXED: Validate session has required relationships
                     if (!$session->user || !$session->courseOnline) {
-                        Log::warning('📊 Session missing relationships', ['session_id' => $session->id]);
                         continue;
                     }
 
@@ -128,10 +116,7 @@ class CheatingDetectionExportService
                     }
 
                 } catch (\Exception $e) {
-                    Log::error('📊 Error processing session for export', [
-                        'session_id' => $session->id ?? 'unknown',
-                        'error' => $e->getMessage(),
-                    ]);
+
                     continue; // Skip this session and continue with next
                 }
             }
@@ -150,11 +135,7 @@ class CheatingDetectionExportService
                 'Filter - Date To' => $filters['date_to'] ?? 'No limit',
             ];
 
-            Log::info('📊 Export data prepared successfully', [
-                'total_sessions' => $totalSessions,
-                'suspicious_sessions' => $suspiciousCount,
-                'export_records' => count($exportData),
-            ]);
+
 
             return [
                 'data' => $exportData,
@@ -163,10 +144,6 @@ class CheatingDetectionExportService
             ];
 
         } catch (\Exception $e) {
-            Log::error('📊 Export error', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
 
             throw $e;
         }
@@ -177,7 +154,6 @@ class CheatingDetectionExportService
      */
     public function exportHighRiskUsersReport()
     {
-        Log::info('📊 === EXPORT HIGH RISK USERS REPORT START ===');
 
         try {
             $users = User::where('role', '!=', 'admin')->get();
@@ -258,9 +234,7 @@ class CheatingDetectionExportService
             ];
 
         } catch (\Exception $e) {
-            Log::error('📊 High risk users export error', [
-                'error' => $e->getMessage(),
-            ]);
+
 
             throw $e;
         }
@@ -271,7 +245,6 @@ class CheatingDetectionExportService
      */
     public function exportCourseSecurityReport()
     {
-        Log::info('📊 === EXPORT COURSE SECURITY REPORT START ===');
 
         try {
             $courses = CourseOnline::all();
@@ -346,9 +319,7 @@ class CheatingDetectionExportService
             ];
 
         } catch (\Exception $e) {
-            Log::error('📊 Course security export error', [
-                'error' => $e->getMessage(),
-            ]);
+
 
             throw $e;
         }

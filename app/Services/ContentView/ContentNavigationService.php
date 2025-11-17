@@ -17,12 +17,7 @@ class ContentNavigationService
         $previous = $this->getPreviousContent($content);
         $next = $this->getNextContent($content);
 
-        Log::info('🧭 Navigation data retrieved', [
-            'content_id' => $content->id,
-            'user_id' => $userId,
-            'has_previous' => $previous !== null,
-            'has_next' => $next !== null,
-        ]);
+
 
         return [
             'previous' => $previous,
@@ -85,7 +80,7 @@ class ContentNavigationService
     {
         // For now, all content is unlocked
         // You can add logic here later to enforce sequential completion
-        
+
         // Example: Check if previous content is completed
         // $previous = $this->getPreviousContent($content);
         // if ($previous) {
@@ -156,7 +151,7 @@ class ContentNavigationService
             $prevProgress = UserContentProgress::where('user_id', $userId)
                 ->where('content_id', $navigation['previous']['id'])
                 ->first();
-            
+
             $navigation['previous']['is_completed'] = $prevProgress ? $prevProgress->is_completed : false;
             $navigation['previous']['completion_percentage'] = $prevProgress ? $prevProgress->completion_percentage : 0;
         }

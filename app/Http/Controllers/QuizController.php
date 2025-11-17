@@ -274,11 +274,7 @@ class QuizController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Quiz submission failed', [
-                'user_id' => $user->id,
-                'quiz_id' => $quiz->id,
-                'error' => $e->getMessage()
-            ]);
+
 
             return redirect()->back()->withErrors(['error' => 'Failed to submit quiz. Please try again.']);
         }

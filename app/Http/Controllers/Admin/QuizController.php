@@ -194,7 +194,6 @@ class QuizController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Failed to create quiz', ['error' => $e->getMessage()]);
             return back()->withErrors(['error' => 'Failed to create quiz: ' . $e->getMessage()]);
         }
     }
@@ -464,7 +463,6 @@ class QuizController extends Controller
                 ->get();
 
             foreach ($questionsToDelete as $questionToDelete) {
-                Log::info("Deleting question ID: {$questionToDelete->id} from quiz ID: {$quiz->id}");
                 $questionToDelete->delete();
             }
 
@@ -476,24 +474,13 @@ class QuizController extends Controller
 
             DB::commit();
 
-            Log::info("Successfully updated quiz ID: {$quiz->id}", [
-                'questions_processed' => count($processedQuestionIds),
-                'questions_deleted' => $questionsToDelete->count(),
-                'total_points' => $totalPoints,
-                'course_type' => $quiz->getCourseType()
-            ]);
 
             return redirect()->route('admin.quizzes.index')
                 ->with('success', 'Quiz updated successfully.');
 
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Failed to update quiz', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'quiz_id' => $quiz->id,
-                'data' => $validated
-            ]);
+
             return back()->withErrors(['error' => 'Failed to update quiz: ' . $e->getMessage()]);
         }
     }
@@ -517,7 +504,6 @@ class QuizController extends Controller
                 ->with('success', 'Quiz deleted successfully.');
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Failed to delete quiz', ['error' => $e->getMessage(), 'quiz_id' => $quiz->id]);
             return back()->withErrors(['error' => 'Failed to delete quiz.']);
         }
     }
@@ -570,7 +556,6 @@ class QuizController extends Controller
         $course = $quiz->getAssociatedCourse();
 
         if (!$course) {
-            Log::warning('No associated course found for quiz', ['quiz_id' => $quiz->id]);
             return collect();
         }
 
@@ -649,11 +634,6 @@ class QuizController extends Controller
             }
 
         } catch (\Exception $e) {
-            Log::warning('Failed to generate quiz route, using fallback', [
-                'quiz_id' => $quiz->id,
-                'course_type' => $quiz->getCourseType(),
-                'error' => $e->getMessage()
-            ]);
 
             // Ultimate fallback
             return route('admin.quizzes.show', $quiz->id);
@@ -669,29 +649,15 @@ class QuizController extends Controller
             $course = $quiz->getAssociatedCourse();
 
             if (!$course) {
-                Log::error('Cannot send notifications - no associated course found', ['quiz_id' => $quiz->id]);
                 return;
             }
 
             $enrolledUsers = $this->getEnrolledUsersForQuiz($quiz);
 
-            Log::info('Starting quiz notifications', [
-                'quiz_id' => $quiz->id,
-                'quiz_title' => $quiz->title,
-                'course_type' => $quiz->getCourseType(),
-                'course_id' => $course->id,
-                'course_name' => $course->name,
-                'has_deadline' => $quiz->has_deadline,
-                'deadline' => $quiz->deadline?->toDateTimeString(),
-                'enrolled_users_count' => $enrolledUsers->count()
-            ]);
+
 
             if ($enrolledUsers->count() === 0) {
-                Log::warning('No enrolled users found for quiz', [
-                    'quiz_id' => $quiz->id,
-                    'course_type' => $quiz->getCourseType(),
-                    'course_id' => $course->id
-                ]);
+
                 return;
             }
 
@@ -699,7 +665,6 @@ class QuizController extends Controller
             foreach ($enrolledUsers as $user) {
                 try {
                     if (empty($user->email)) {
-                        Log::debug("Skipping user {$user->id} - no email address");
                         continue;
                     }
 
@@ -710,28 +675,17 @@ class QuizController extends Controller
                     Mail::to($user->email)->send(new QuizCreatedNotification($quiz, $course, $user, $quizLink));
                     $successCount++;
 
-                    Log::info("Quiz notification sent to {$user->email} (User ID: {$user->id})");
 
                 } catch (\Exception $e) {
-                    Log::error("Failed to send quiz notification to {$user->email} (User ID: {$user->id}): " . $e->getMessage());
                 }
 
                 usleep(200000); // 0.2 second delay
             }
 
-            Log::info('Quiz notifications completed', [
-                'quiz_id' => $quiz->id,
-                'successful_sends' => $successCount,
-                'failed_sends' => ($enrolledUsers->count() - $successCount),
-                'course_type' => $quiz->getCourseType()
-            ]);
+
 
         } catch (\Exception $e) {
-            Log::error('Failed to send quiz notifications', [
-                'quiz_id' => $quiz->id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
+
         }
     }
 }

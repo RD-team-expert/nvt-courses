@@ -8,7 +8,6 @@ use App\Models\UserDepartmentRole;
 use App\Models\User;
 use App\Models\Department;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -109,12 +108,9 @@ class UserDepartmentRoleController extends Controller
             ];
         });
 
-        Log::info('Controller data:');
-        Log::info('Employees count: ' . $employees->count());
 
-        foreach ($employees as $emp) {
-            \Log::info("Employee: {$emp['name']} | Level: {$emp['level']} | Department: {$emp['department']}");
-        }
+
+
 
          return Inertia::render('Admin/ManagerRoles/Assignment', [
         'managers' => $managers,
@@ -378,7 +374,7 @@ class UserDepartmentRoleController extends Controller
                 ->route('admin.manager-roles.show', $userDepartmentRole)
                 ->with('success', 'Manager role updated successfully.');
         } catch (\Exception $e) {
-            \Log::error('Failed to update manager role: ' . $e->getMessage());
+
 
             return back()->withErrors([
                 'update_error' => 'Failed to update manager role. Please try again.'
@@ -458,8 +454,6 @@ class UserDepartmentRoleController extends Controller
 
     public function getEmployees(Department $department)
     {
-//        dd();
-        Log::info('Getting employees for department: ' . $department->name . ' (ID: ' . $department->id . ')');
 
         // Get all L1 users in this department
         $employees = User::where('department_id', $department->id)
@@ -480,15 +474,12 @@ class UserDepartmentRoleController extends Controller
                 ];
             });
 
-        Log::info('Found ' . $employees->count() . ' L1 employees in ' . $department->name);
 
         // ✅ Add debugging info
         if ($employees->isEmpty()) {
-            Log::warning('No L1 employees found in department: ' . $department->name);
 
             // Check what users ARE in this department
             $allUsers = User::where('department_id', $department->id)->with('userLevel')->get();
-            Log::info('All users in department: ' . $allUsers->pluck('name', 'userLevel.code')->toJson());
         }
 
         return response()->json($employees);

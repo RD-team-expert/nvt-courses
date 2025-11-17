@@ -28,9 +28,7 @@ class VideoStreamingService
     public function getStreamingUrl(Video $video, ModuleContent $content): ?array
     {
         if (!$video) {
-            Log::warning('❌ Video is null', [
-                'content_id' => $content->id,
-            ]);
+
             return null;
         }
 
@@ -59,10 +57,7 @@ class VideoStreamingService
     protected function getGoogleDriveStreamingUrl(Video $video, ModuleContent $content): ?array
     {
         if (!$video->google_drive_url) {
-            Log::warning('❌ Video has no Google Drive URL', [
-                'video_id' => $video->id,
-                'content_id' => $content->id,
-            ]);
+
             return null;
         }
 
@@ -74,22 +69,14 @@ class VideoStreamingService
         );
 
         if (!$result) {
-            Log::error('❌ Failed to process video URL', [
-                'video_id' => $video->id,
-                'content_id' => $content->id,
-            ]);
+
             return null;
         }
 
         // ✅ EXISTING LOGIC: Store key_id for later use (when session starts)
         $this->storeKeyInSession($content->id, $result);
 
-        Log::info('✅ Google Drive video URL ready (active_users NOT incremented yet)', [
-            'video_id' => $video->id,
-            'content_id' => $content->id,
-            'key_id' => $result['key_id'],
-            'storage_type' => 'google_drive',
-        ]);
+
 
         return $result;
     }
@@ -105,10 +92,7 @@ class VideoStreamingService
     protected function getLocalStreamingUrl(Video $video, ModuleContent $content): array
     {
         if (!$video->file_path) {
-            Log::error('❌ Local video has no file path', [
-                'video_id' => $video->id,
-                'content_id' => $content->id,
-            ]);
+
             return [
                 'streaming_url' => null,
                 'key_id' => null,
@@ -133,12 +117,7 @@ class VideoStreamingService
 
         $this->storeKeyInSession($content->id, $localKeyData);
 
-        Log::info('✅ Local video streaming URL generated', [
-            'video_id' => $video->id,
-            'content_id' => $content->id,
-            'file_path' => $video->file_path,
-            'storage_type' => 'local',
-        ]);
+
 
         return $localKeyData;
     }
@@ -173,20 +152,14 @@ class VideoStreamingService
         }
 
         if (!$fileId) {
-            Log::warning('Could not extract file ID from Google Drive PDF URL', [
-                'url' => $url
-            ]);
+
             return $url; // Return original URL as fallback
         }
 
         // Return embed URL for better compatibility
         $embedUrl = "https://drive.google.com/file/d/{$fileId}/preview";
 
-        Log::info('Google Drive PDF URL processed', [
-            'original' => $url,
-            'file_id' => $fileId,
-            'embed_url' => $embedUrl,
-        ]);
+
 
         return $embedUrl;
     }
@@ -206,11 +179,6 @@ class VideoStreamingService
             'content_' . $contentId . '_streaming_url' => $keyData['streaming_url'] ?? null, // ✅ NEW: Store streaming URL
         ]);
 
-        Log::debug('🔑 Video info stored in session', [
-            'content_id' => $contentId,
-            'key_id' => $keyData['key_id'] ?? null,
-            'key_name' => $keyData['key_name'] ?? null,
-        ]);
     }
 
     /**
@@ -245,15 +213,10 @@ class VideoStreamingService
         if ($keyId) {
             $this->googleDriveService->releaseKey($keyId);
 
-            Log::info('🔓 Google Drive API key released successfully', [
-                'content_id' => $contentId,
-                'key_id' => $keyId,
-            ]);
+
         } elseif ($keyName === 'local_storage') {
             // ✅ NEW: For local storage, just log (no key to release)
-            Log::info('🔓 Local storage session ended', [
-                'content_id' => $contentId,
-            ]);
+
         }
 
         // ✅ Always clear session data
