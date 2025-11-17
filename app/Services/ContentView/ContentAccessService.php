@@ -5,14 +5,13 @@ namespace App\Services\ContentView;
 use App\Models\User;
 use App\Models\ModuleContent;
 use App\Models\CourseOnlineAssignment;
-use Illuminate\Support\Facades\Log;
 
 class ContentAccessService
 {
     /**
      * Check if user has access to specific content
      * Returns the assignment if user has access, null otherwise
-     * 
+     *
      * This is the EXACT SAME logic from your controller - just moved here
      */
     public function checkAccess(User $user, ModuleContent $content): ?CourseOnlineAssignment
@@ -22,21 +21,7 @@ class ContentAccessService
             ->where('user_id', $user->id)
             ->first();
 
-        if (!$assignment) {
-            Log::error('🚫 User access denied to content', [
-                'user_id' => $user->id,
-                'content_id' => $content->id,
-                'course_id' => $content->module->course_online_id,
-                'reason' => 'No assignment found',
-            ]);
-        } else {
-            Log::info('✅ User access verified', [
-                'user_id' => $user->id,
-                'content_id' => $content->id,
-                'assignment_id' => $assignment->id,
-                'assignment_status' => $assignment->status,
-            ]);
-        }
+
 
         return $assignment;
     }

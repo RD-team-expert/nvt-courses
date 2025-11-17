@@ -15,7 +15,6 @@ use App\Models\UserLevel;
 use App\Models\UserLevelTier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Exception;
 
 class OnlineCourseEvaluationController extends Controller
@@ -145,14 +144,7 @@ class OnlineCourseEvaluationController extends Controller
                     ];
                 });
 
-            Log::info('OnlineCourseEvaluation index data loaded', [
-                'users_count' => $users->count(),
-                'courses_count' => $courses->count(),
-                'categories_count' => $categories->count(),
-                'departments_count' => $departments->count(),
-                'incentives_count' => $incentives->count(),
-                'user_levels_count' => $userLevels->count()
-            ]);
+
 
             return inertia('Admin/Evaluations/OnlineCourseEvaluation', [
                 'users' => $users,
@@ -164,10 +156,7 @@ class OnlineCourseEvaluationController extends Controller
             ]);
 
         } catch (Exception $e) {
-            Log::error('Failed to load online course evaluation page', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
+
 
             return inertia('Admin/Evaluations/OnlineCourseEvaluation', [
                 'users' => [],
@@ -217,11 +206,6 @@ class OnlineCourseEvaluationController extends Controller
                 $existingEvaluation->history()->delete();
                 $evaluation = $existingEvaluation;
 
-                Log::info('Updating existing online course evaluation', [
-                    'evaluation_id' => $evaluation->id,
-                    'user_id' => $validated['user_id'],
-                    'course_online_id' => $validated['course_online_id']
-                ]);
             } else {
                 // Create new evaluation for ONLINE course
                 $evaluation = Evaluation::create([
@@ -234,10 +218,7 @@ class OnlineCourseEvaluationController extends Controller
                     'incentive_amount' => 0,
                 ]);
 
-                Log::info('Created new online course evaluation', [
-                    'evaluation_id' => $evaluation->id,
-                    'course_type' => 'online'
-                ]);
+
             }
 
             if (!$evaluation || !$evaluation->id) {
@@ -277,14 +258,7 @@ class OnlineCourseEvaluationController extends Controller
             // Calculate incentive amount using Level + Tier based system
             $incentiveAmount = $this->calculateLevelTierIncentiveAmount($user, $totalScore);
 
-            Log::info('Calculated Level+Tier incentive for online course', [
-                'user_id' => $user->id,
-                'user_level' => $user->userLevel?->name,
-                'user_tier' => $user->userLevelTier?->tier_name,
-                'total_score' => $totalScore,
-                'incentive_amount' => $incentiveAmount,
-                'course_type' => 'online'
-            ]);
+
 
             $evaluation->update([
                 'total_score' => $totalScore,
@@ -305,10 +279,7 @@ class OnlineCourseEvaluationController extends Controller
         } catch (Exception $e) {
             DB::rollBack();
 
-            Log::error('Online course evaluation store process failed', [
-                'validated_data' => $validated,
-                'error' => $e->getMessage()
-            ]);
+
 
             return redirect()->back()
                 ->withErrors(['error' => $e->getMessage()])
@@ -371,10 +342,7 @@ class OnlineCourseEvaluationController extends Controller
             }
 
         } catch (Exception $e) {
-            Log::warning('Failed to get completed online courses for user', [
-                'user_id' => $userId,
-                'error' => $e->getMessage()
-            ]);
+
         }
 
         return $completedCourses;
@@ -387,11 +355,7 @@ class OnlineCourseEvaluationController extends Controller
     private function calculateLevelTierIncentiveAmount($user, $totalScore)
     {
         if (!$user->user_level_id || !$user->user_level_tier_id) {
-            Log::info('User missing level or tier for incentive calculation', [
-                'user_id' => $user->id,
-                'has_level' => !is_null($user->user_level_id),
-                'has_tier' => !is_null($user->user_level_tier_id)
-            ]);
+
             return 0;
         }
 
@@ -405,23 +369,11 @@ class OnlineCourseEvaluationController extends Controller
             ->first();
 
         if ($incentive) {
-            Log::info('Found matching incentive', [
-                'user_id' => $user->id,
-                'level_id' => $user->user_level_id,
-                'tier_id' => $user->user_level_tier_id,
-                'score' => $totalScore,
-                'incentive_id' => $incentive->id,
-                'amount' => $incentive->incentive_amount
-            ]);
+
             return $incentive->incentive_amount;
         }
 
-        Log::info('No matching incentive found', [
-            'user_id' => $user->id,
-            'level_id' => $user->user_level_id,
-            'tier_id' => $user->user_level_tier_id,
-            'score' => $totalScore
-        ]);
+
 
         return 0;
     }

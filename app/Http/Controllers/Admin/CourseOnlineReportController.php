@@ -12,7 +12,6 @@ use App\Models\Department;
 use App\Services\CsvExportService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Carbon\Carbon;
@@ -31,14 +30,10 @@ class CourseOnlineReportController extends Controller
      */
     public function progressReport(Request $request)
     {
-        Log::info('🔍 === PROGRESS REPORT COMPLETE FIXED VERSION START ===', [
-            'request_data' => $request->all(),
-            'timestamp' => now()->toDateTimeString(),
-        ]);
+
 
         try {
             $filters = $request->only(['course_id', 'status', 'date_from', 'date_to', 'user_id']);
-            Log::info('🔍 Filters applied', ['filters' => $filters]);
 
             // ✅ Check database tables
             $this->debugDatabaseTables();
@@ -53,23 +48,18 @@ class CourseOnlineReportController extends Controller
             // Apply filters
             if (!empty($filters['course_id'])) {
                 $query->where('course_online_assignments.course_online_id', $filters['course_id']);
-                Log::info('🔍 Course filter applied', ['course_id' => $filters['course_id']]);
             }
             if (!empty($filters['status'])) {
                 $query->where('course_online_assignments.status', $filters['status']);
-                Log::info('🔍 Status filter applied', ['status' => $filters['status']]);
             }
             if (!empty($filters['user_id'])) {
                 $query->where('course_online_assignments.user_id', $filters['user_id']);
-                Log::info('🔍 User filter applied', ['user_id' => $filters['user_id']]);
             }
             if (!empty($filters['date_from'])) {
                 $query->whereDate('course_online_assignments.assigned_at', '>=', $filters['date_from']);
-                Log::info('🔍 Date from filter applied', ['date_from' => $filters['date_from']]);
             }
             if (!empty($filters['date_to'])) {
                 $query->whereDate('course_online_assignments.assigned_at', '<=', $filters['date_to']);
-                Log::info('🔍 Date to filter applied', ['date_to' => $filters['date_to']]);
             }
 
             $query->select([
@@ -93,19 +83,10 @@ class CourseOnlineReportController extends Controller
                 ->paginate(15)
                 ->withQueryString();
 
-            Log::info('🔍 Assignments retrieved', [
-                'total_assignments' => $assignments->total(),
-                'current_page_count' => $assignments->count(),
-            ]);
 
             // ✅ COMPLETE FIXED: Process each assignment with REAL duration and SIMULATED attention
             $assignments->getCollection()->transform(function ($assignment, $index) {
-                Log::info("🔍 === PROCESSING ASSIGNMENT #{$index} ===", [
-                    'assignment_id' => $assignment->id,
-                    'user_name' => $assignment->user_name,
-                    'course_name' => $assignment->course_name,
-                    'stored_progress' => $assignment->progress_percentage,
-                ]);
+
 
                 try {
                     // ✅ Get sessions with detailed logging
@@ -115,11 +96,7 @@ class CourseOnlineReportController extends Controller
                         ->select('id', 'session_start', 'session_end', 'total_duration_minutes', 'attention_score', 'is_suspicious_activity')
                         ->get();
 
-                    Log::info('🔍 Raw sessions retrieved', [
-                        'assignment_id' => $assignment->id,
-                        'sessions_count' => $sessions->count(),
-                        'sample_sessions' => $sessions->take(2)->toArray(),
-                    ]);
+
 
                     // ✅ COMPLETE FIXED: Process with simulated attention
                     $sessionData = $this->processSessionsWithSimulatedAttention($sessions, $assignment->id);
@@ -135,10 +112,7 @@ class CourseOnlineReportController extends Controller
                         ')
                         ->first();
 
-                    Log::info('🔍 Progress data retrieved', [
-                        'assignment_id' => $assignment->id,
-                        'progress_data' => (array) $progressData,
-                    ]);
+
 
                     // ✅ Set calculated values using REAL durations and SIMULATED attention
                     $assignment->total_sessions = $sessionData['total_sessions'];
@@ -159,25 +133,9 @@ class CourseOnlineReportController extends Controller
                     );
                     $assignment->formatted_time_spent = $this->formatDuration($assignment->total_time_spent);
 
-                    Log::info('🔍 ✅ COMPLETE FIXED Assignment processed successfully', [
-                        'assignment_id' => $assignment->id,
-                        'user_name' => $assignment->user_name,
-                        'real_duration_minutes' => $assignment->total_time_spent,
-                        'formatted_time_spent' => $assignment->formatted_time_spent,
-                        'simulated_avg_attention_score' => $assignment->avg_attention_score, // ✅ FIXED!
-                        'engagement_level' => $assignment->engagement_level, // ✅ FIXED!
-                        'performance_rating' => $assignment->performance_rating, // ✅ FIXED!
-                        'progress_percentage' => $assignment->progress_percentage,
-                        'suspicious_sessions' => $assignment->suspicious_sessions,
-                    ]);
+
 
                 } catch (\Exception $e) {
-                    Log::error('🔍 ❌ Error processing assignment', [
-                        'assignment_id' => $assignment->id,
-                        'user_name' => $assignment->user_name,
-                        'error' => $e->getMessage(),
-                        'trace' => $e->getTraceAsString(),
-                    ]);
 
                     // Set reasonable defaults on error
                     $assignment->total_sessions = 0;
@@ -199,17 +157,12 @@ class CourseOnlineReportController extends Controller
             $courses = CourseOnline::where('is_active', true)->select('id', 'name')->orderBy('name')->get();
             $users = User::where('role', '!=', 'admin')->select('id', 'name', 'email')->orderBy('name')->get();
 
-            Log::info('🔍 Filter options retrieved', [
-                'courses_count' => $courses->count(),
-                'users_count' => $users->count(),
-            ]);
+
 
             // ✅ FIXED: Calculate stats with REAL durations and SIMULATED attention
             $stats = $this->calculateRealStatsWithSimulatedAttention();
 
-            Log::info('🔍 ✅ Statistics calculated', $stats);
 
-            Log::info('🔍 === PROGRESS REPORT COMPLETE FIXED VERSION SUCCESS ===');
 
             return Inertia::render('Admin/Reports/CourseOnlineProgress', [
                 'assignments' => $assignments,
@@ -220,12 +173,7 @@ class CourseOnlineReportController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            Log::error('🔍 === PROGRESS REPORT COMPLETE FIXED VERSION ERROR ===', [
-                'error_message' => $e->getMessage(),
-                'error_file' => $e->getFile(),
-                'error_line' => $e->getLine(),
-                'trace' => $e->getTraceAsString(),
-            ]);
+
 
             throw $e;
         }
@@ -236,11 +184,9 @@ class CourseOnlineReportController extends Controller
      */
     public function learningSessionsReport(Request $request)
     {
-        Log::info('🔍 === LEARNING SESSIONS REPORT START ===');
 
         try {
             $filters = $request->only(['course_id', 'user_id', 'date_from', 'date_to', 'suspicious_only']);
-            Log::info('🔍 Session filters applied', ['filters' => $filters]);
 
             $query = LearningSession::query()
                 ->join('users', 'learning_sessions.user_id', '=', 'users.id')
@@ -281,10 +227,7 @@ class CourseOnlineReportController extends Controller
                 ->paginate(20)
                 ->withQueryString();
 
-            Log::info('🔍 Sessions retrieved', [
-                'total_sessions' => $sessions->total(),
-                'current_page_count' => $sessions->count(),
-            ]);
+
 
             // ✅ FIXED: Transform data with REAL duration and SIMULATED attention
             $sessions->getCollection()->transform(function ($session) {
@@ -339,7 +282,6 @@ class CourseOnlineReportController extends Controller
             // ✅ FIXED: Session statistics with REAL durations and SIMULATED attention
             $sessionStats = $this->calculateSessionStatsWithSimulatedAttention();
 
-            Log::info('🔍 Session stats calculated', $sessionStats);
 
             return Inertia::render('Admin/Reports/LearningSessionsReport', [
                 'sessions' => $sessions,
@@ -350,10 +292,7 @@ class CourseOnlineReportController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            Log::error('🔍 Learning Sessions Report error', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
+
             throw $e;
         }
     }
@@ -363,11 +302,9 @@ class CourseOnlineReportController extends Controller
      */
     public function userPerformanceReport(Request $request)
     {
-        Log::info('🔍 === USER PERFORMANCE REPORT START ===');
 
         try {
             $filters = $request->only(['user_id', 'course_id', 'date_from', 'date_to']);
-            Log::info('🔍 Performance filters applied', ['filters' => $filters]);
 
             $query = User::query()
                 ->where('role', '!=', 'admin')
@@ -379,17 +316,11 @@ class CourseOnlineReportController extends Controller
 
             $users = $query->paginate(15)->withQueryString();
 
-            Log::info('🔍 Users retrieved for performance analysis', [
-                'total_users' => $users->total(),
-                'current_page_count' => $users->count(),
-            ]);
+
 
             // ✅ FIXED: Transform user data with REAL calculations and SIMULATED attention
             $users->getCollection()->transform(function ($user) use ($filters) {
-                Log::info("🔍 Processing user performance", [
-                    'user_id' => $user->id,
-                    'user_name' => $user->name,
-                ]);
+
 
                 // Get assignments with filters
                 $assignmentQuery = DB::table('course_online_assignments')->where('user_id', $user->id);
@@ -475,14 +406,7 @@ class CourseOnlineReportController extends Controller
                     'risk_level' => $this->calculateRiskLevel($suspiciousSessions, $totalSessions),
                 ];
 
-                Log::info("🔍 User performance calculated", [
-                    'user_name' => $user->name,
-                    'real_learning_hours' => $performanceData['total_learning_hours'],
-                    'simulated_avg_attention' => $performanceData['avg_attention_score'], // ✅ FIXED!
-                    'engagement_level' => $performanceData['engagement_level'], // ✅ FIXED!
-                    'performance_rating' => $performanceData['performance_rating'], // ✅ FIXED!
-                    'completion_rate' => $performanceData['completion_rate'],
-                ]);
+
 
                 return $performanceData;
             });
@@ -498,10 +422,7 @@ class CourseOnlineReportController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            Log::error('🔍 User Performance Report error', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
+
             throw $e;
         }
     }
@@ -562,11 +483,7 @@ class CourseOnlineReportController extends Controller
             return $score;
 
         } catch (\Exception $e) {
-            Log::error('🔧 Error calculating simulated attention', [
-                'error' => $e->getMessage(),
-                'session_start' => $sessionStart,
-                'session_end' => $sessionEnd,
-            ]);
+
             return 65; // Default decent score
         }
     }
@@ -621,20 +538,7 @@ class CourseOnlineReportController extends Controller
             ? array_sum($simulatedAttentionScores) / count($simulatedAttentionScores)
             : 0;
 
-        Log::info('🔧 ✅ FIXED Session processing with simulated attention complete', [
-            'assignment_id' => $assignmentId,
-            'total_sessions' => $totalSessions,
-            'calculated_duration_minutes' => $totalCalculatedMinutes,
-            'simulated_average_attention' => round($averageSimulatedAttention, 1),
-            'attention_distribution' => [
-                'high_attention_sessions' => count(array_filter($simulatedAttentionScores, fn($score) => $score >= 80)),
-                'medium_attention_sessions' => count(array_filter($simulatedAttentionScores, fn($score) => $score >= 60 && $score < 80)),
-                'low_attention_sessions' => count(array_filter($simulatedAttentionScores, fn($score) => $score >= 40 && $score < 60)),
-                'very_low_attention_sessions' => count(array_filter($simulatedAttentionScores, fn($score) => $score < 40)),
-            ],
-            'suspicious_count' => $suspiciousSessions,
-            'sample_sessions' => array_slice($sessionDetails, 0, 3),
-        ]);
+
 
         return [
             'total_sessions' => $totalSessions,
@@ -661,11 +565,7 @@ class CourseOnlineReportController extends Controller
 
             return max(0, $minutes); // Ensure non-negative
         } catch (\Exception $e) {
-            Log::error('🔧 Duration calculation error', [
-                'start' => $sessionStart,
-                'end' => $sessionEnd,
-                'error' => $e->getMessage(),
-            ]);
+
             return 0;
         }
     }
@@ -675,7 +575,6 @@ class CourseOnlineReportController extends Controller
      */
     private function calculateRealStatsWithSimulatedAttention()
     {
-        Log::info('🔧 Calculating real statistics with simulated attention');
 
         try {
             // Calculate REAL total learning time and SIMULATED attention
@@ -728,20 +627,11 @@ class CourseOnlineReportController extends Controller
                 ],
             ];
 
-            Log::info('🔧 Real statistics with simulated attention calculated', [
-                'stored_hours' => $stats['stored_learning_hours'],
-                'real_hours' => $stats['total_learning_hours'],
-                'stored_attention' => $stats['stored_average_attention_score'],
-                'simulated_attention' => $stats['average_attention_score'],
-                'engagement_distribution' => $stats['engagement_distribution'],
-            ]);
 
             return $stats;
 
         } catch (\Exception $e) {
-            Log::error('🔧 Error calculating real stats with simulated attention', [
-                'error' => $e->getMessage(),
-            ]);
+
 
             return [
                 'total_assignments' => 0,
@@ -808,9 +698,7 @@ class CourseOnlineReportController extends Controller
                 'average_attention_score' => round($avgSimulatedAttention, 1), // Use simulated
             ];
         } catch (\Exception $e) {
-            Log::error('🔧 Error calculating session stats with simulated attention', [
-                'error' => $e->getMessage(),
-            ]);
+
             return [];
         }
     }
@@ -860,7 +748,6 @@ class CourseOnlineReportController extends Controller
 
             foreach ($tables as $table) {
                 $count = DB::table($table)->count();
-                Log::info("🔧 Table stats: {$table}", ['count' => $count]);
 
                 if ($table === 'learning_sessions' && $count > 0) {
                     $sample = DB::table($table)
@@ -868,11 +755,9 @@ class CourseOnlineReportController extends Controller
                         ->limit(2)
                         ->get()
                         ->toArray();
-                    Log::info("🔧 Sample {$table} data", ['sample' => $sample]);
                 }
             }
         } catch (\Exception $e) {
-            Log::error('🔧 Database debug error', ['error' => $e->getMessage()]);
         }
     }
 
@@ -975,10 +860,7 @@ class CourseOnlineReportController extends Controller
      */
     public function exportLearningSessionsReport(Request $request)
     {
-        Log::info('📊 === EXPORT LEARNING SESSIONS START ===', [
-            'filters' => $request->all(),
-            'admin' => auth()->user()->name,
-        ]);
+
 
         try {
             $filters = $request->only(['course_id', 'user_id', 'date_from', 'date_to', 'suspicious_only']);
@@ -1073,18 +955,11 @@ class CourseOnlineReportController extends Controller
             // Generate CSV using your existing service
             $filename = 'learning_sessions_report_' . now()->format('Y-m-d_H-i-s') . '.csv';
 
-            Log::info('📊 Learning Sessions export completed', [
-                'total_records' => count($exportData),
-                'filename' => $filename,
-            ]);
+
 
             return $this->csvExportService->export($filename, $headers, $exportData);
 
         } catch (\Exception $e) {
-            Log::error('📊 Learning Sessions export failed', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
 
             return back()->with('error', 'Export failed: ' . $e->getMessage());
         }
@@ -1095,10 +970,7 @@ class CourseOnlineReportController extends Controller
      */
     public function exportUserPerformanceReport(Request $request)
     {
-        Log::info('📊 === EXPORT USER PERFORMANCE START ===', [
-            'filters' => $request->all(),
-            'admin' => auth()->user()->name,
-        ]);
+
 
         try {
             $filters = $request->only(['user_id', 'course_id', 'date_from', 'date_to']);
@@ -1210,18 +1082,11 @@ class CourseOnlineReportController extends Controller
             // Generate CSV using your existing service
             $filename = 'user_performance_report_' . now()->format('Y-m-d_H-i-s') . '.csv';
 
-            Log::info('📊 User Performance export completed', [
-                'total_records' => count($exportData),
-                'filename' => $filename,
-            ]);
 
             return $this->csvExportService->export($filename, $headers, $exportData);
 
         } catch (\Exception $e) {
-            Log::error('📊 User Performance export failed', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
+
 
             return back()->with('error', 'Export failed: ' . $e->getMessage());
         }
@@ -1232,10 +1097,7 @@ class CourseOnlineReportController extends Controller
      */
     public function exportProgressReport(Request $request)
     {
-        Log::info('📊 === EXPORT PROGRESS REPORT START ===', [
-            'filters' => $request->all(),
-            'admin' => auth()->user()->name,
-        ]);
+
 
         try {
             $filters = $request->only(['course_id', 'status', 'date_from', 'date_to', 'user_id']);
@@ -1350,18 +1212,12 @@ class CourseOnlineReportController extends Controller
             // Generate CSV using your existing service
             $filename = 'progress_report_' . now()->format('Y-m-d_H-i-s') . '.csv';
 
-            Log::info('📊 Progress Report export completed', [
-                'total_records' => count($exportData),
-                'filename' => $filename,
-            ]);
+
 
             return $this->csvExportService->export($filename, $headers, $exportData);
 
         } catch (\Exception $e) {
-            Log::error('📊 Progress Report export failed', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
+
 
             return back()->with('error', 'Export failed: ' . $e->getMessage());
         }

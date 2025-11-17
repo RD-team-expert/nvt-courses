@@ -5,7 +5,6 @@ namespace App\Services\ContentView;
 use App\Models\User;
 use App\Models\ModuleContent;
 use App\Models\LearningSession;
-use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 class LearningSessionService
@@ -46,17 +45,10 @@ class LearningSessionService
         try {
             $driveKeyManager = app(\App\Services\DriveKeyManager::class);
             $driveKeyManager->incrementActiveUsers($apiKeyId); // ✅ NEW METHOD
-            
-            Log::info('✅ active_users incremented on session start', [
-                'api_key_id' => $apiKeyId,
-                'user_id' => $user->id,
-                'content_id' => $content->id,
-            ]);
+
+
         } catch (\Exception $e) {
-            Log::error('❌ Failed to increment active_users', [
-                'api_key_id' => $apiKeyId,
-                'error' => $e->getMessage(),
-            ]);
+
         }
     }
 
@@ -78,12 +70,7 @@ class LearningSessionService
         'attention_score' => 0,
     ]);
 
-    Log::info('🎬 Learning session started', [
-        'session_id' => $session->id,
-        'user_id' => $user->id,
-        'content_id' => $content->id,
-        'api_key_id' => $session->api_key_id,
-    ]);
+
 
     return $session;
 }
@@ -123,12 +110,7 @@ class LearningSessionService
         'pause_count' => ($session->pause_count ?? 0) + $pauseCountIncrement,
     ]);
 
-    Log::debug('💓 Session heartbeat updated', [
-        'session_id' => $sessionId,
-        'duration_minutes' => $currentDuration,
-        'total_watch_time' => $session->video_watch_time,
-        'total_skips' => $session->video_skip_count,
-    ]);
+
 
     return $session->fresh();
 }
@@ -150,43 +132,25 @@ class LearningSessionService
     $content = $session->content;
 
     if ($session->session_end) {
-        Log::warning('⚠️ Attempted to end already-ended session', [
-            'session_id' => $sessionId,
-        ]);
+
         return $session;
     }
 
     // ✅ IMPORTANT: Release the API key BEFORE ending the session
     if ($session->api_key_id) {
-        Log::info('🔓 Releasing API key from session service', [
-            'session_id' => $sessionId,
-            'api_key_id' => $session->api_key_id,
-            'user_id' => $session->user_id,
-            'content_id' => $session->content_id
-        ]);
-        
+
+
         try {
             // Get the GoogleDriveService and release the key
             $driveService = app(\App\Services\GoogleDriveService::class);
             $driveService->releaseKey($session->api_key_id);
-            
-            Log::info('✅ API key successfully released', [
-                'session_id' => $sessionId,
-                'api_key_id' => $session->api_key_id
-            ]);
+
+
         } catch (\Exception $e) {
-            Log::error('❌ Failed to release API key', [
-                'session_id' => $sessionId,
-                'api_key_id' => $session->api_key_id,
-                'error' => $e->getMessage()
-            ]);
+
         }
     } else {
-        Log::warning('⚠️ Session has no api_key_id to release', [
-            'session_id' => $sessionId,
-            'user_id' => $session->user_id,
-            'content_id' => $session->content_id
-        ]);
+
     }
 
     // Calculate total duration
@@ -234,16 +198,7 @@ class LearningSessionService
         'is_suspicious_activity' => $isSuspicious,
     ]);
 
-    Log::info('🏁 Learning session ended', [
-        'session_id' => $sessionId,
-        'duration_minutes' => $totalDuration,
-        'watch_time' => $totalWatchTime,
-        'completion' => $completionPercentage,
-        'skips' => $totalSkips,
-        'attention_score' => $attentionScore,
-        'cheating_score' => $cheatingScore,
-        'is_suspicious' => $isSuspicious,
-    ]);
+
 
     return $session->fresh();
 }
@@ -394,10 +349,7 @@ class LearningSessionService
                 'total_duration_minutes' => $realDuration,
             ]);
 
-            Log::info('🔒 Ended existing session', [
-                'session_id' => $session->id,
-                'duration_minutes' => $realDuration,
-            ]);
+
         }
     }
 
@@ -434,10 +386,7 @@ class LearningSessionService
             ]);
         }
 
-        Log::info('🧹 Cleaned up abandoned sessions', [
-            'user_id' => $userId,
-            'count' => $abandoned->count(),
-        ]);
+
 
         return $abandoned->count();
     }

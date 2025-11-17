@@ -9,7 +9,6 @@ use App\Services\ThumbnailService;
 use App\Services\FileUploadService;
 use App\Services\VideoStorageService; // ✅ NEW
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use App\Models\VideoCategory;
@@ -196,11 +195,7 @@ class VideoController extends Controller
                     $videoData['duration'] = $uploadData['duration_seconds'];
                 }
 
-                Log::info('✅ Local video uploaded', [
-                    'file_path' => $uploadData['file_path'],
-                    'file_size' => $uploadData['file_size'],
-                    'duration' => $uploadData['duration_seconds'],
-                ]);
+
             }
 
             // Create video record
@@ -208,21 +203,14 @@ class VideoController extends Controller
 
             DB::commit();
 
-            Log::info('✅ Video created successfully', [
-                'video_id' => $video->id,
-                'storage_type' => $video->storage_type,
-                'category_id' => $video->content_category_id,
-            ]);
+
 
             return redirect()->route('admin.videos.index')
                 ->with('success', 'Video created successfully.');
 
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('❌ Failed to create video', [
-                'error' => $e->getMessage(),
-                'storage_type' => $validated['storage_type'] ?? 'unknown',
-            ]);
+
 
             return redirect()->back()
                 ->withInput()
@@ -364,20 +352,14 @@ class VideoController extends Controller
 
             DB::commit();
 
-            Log::info('✅ Video updated successfully', [
-                'video_id' => $video->id,
-                'storage_type' => $video->storage_type,
-            ]);
+
 
             return redirect()->route('admin.videos.index')
                 ->with('success', 'Video updated successfully.');
 
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('❌ Failed to update video', [
-                'error' => $e->getMessage(),
-                'video_id' => $video->id,
-            ]);
+
 
             return redirect()->back()
                 ->withInput()
@@ -399,30 +381,20 @@ class VideoController extends Controller
             if ($video->isLocal()) {
                 $deleted = $video->deleteStoredFile();
                 if (!$deleted) {
-                    Log::warning('⚠️ Could not delete video file', [
-                        'video_id' => $video->id,
-                        'file_path' => $video->file_path,
-                    ]);
+
                 }
             }
 
             // Delete database record
             $video->delete();
 
-            Log::info('✅ Video deleted', [
-                'video_name' => $videoName,
-                'storage_type' => $storageType,
-                'deleted_by' => auth()->id(),
-            ]);
+
 
             return redirect()->route('admin.videos.index')
                 ->with('success', 'Video deleted successfully.');
 
         } catch (\Exception $e) {
-            Log::error('❌ Failed to delete video', [
-                'video_id' => $video->id,
-                'error' => $e->getMessage()
-            ]);
+
 
             return redirect()->back()
                 ->with('error', 'Failed to delete video. Please try again.');
@@ -438,12 +410,6 @@ class VideoController extends Controller
         $video->update(['is_active' => !$video->is_active]);
         $status = $video->is_active ? 'activated' : 'deactivated';
 
-        Log::info("Video {$status}", [
-            'video_id' => $video->id,
-            'video_name' => $video->name,
-            'is_active' => $video->is_active,
-            'updated_by' => auth()->id(),
-        ]);
 
         return back()->with('success', "Video {$status} successfully.");
     }
@@ -480,10 +446,7 @@ class VideoController extends Controller
             ], 400);
 
         } catch (\Exception $e) {
-            Log::error('Failed to get streaming URL', [
-                'video_id' => $video->id,
-                'error' => $e->getMessage()
-            ]);
+
 
             return response()->json([
                 'success' => false,

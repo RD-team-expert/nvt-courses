@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\VideoCategory;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
 class VideoCategoryController extends Controller
@@ -64,11 +63,6 @@ class VideoCategoryController extends Controller
             'sort_order' => $validated['sort_order'] ?? 0,
         ]);
 
-        Log::info('Video category created', [
-            'category_id' => $category->id,
-            'category_name' => $category->name,
-            'created_by' => auth()->id(),
-        ]);
 
         return redirect()
             ->route('admin.video-categories.index')
@@ -111,11 +105,7 @@ class VideoCategoryController extends Controller
             'sort_order' => $validated['sort_order'] ?? 0,
         ]);
 
-        Log::info('Video category updated', [
-            'category_id' => $videoCategory->id,
-            'category_name' => $videoCategory->name,
-            'updated_by' => auth()->id(),
-        ]);
+
 
         return redirect()
             ->route('admin.video-categories.index')
@@ -139,10 +129,7 @@ class VideoCategoryController extends Controller
         $categoryName = $videoCategory->name;
         $videoCategory->delete();
 
-        Log::info('Video category deleted', [
-            'category_name' => $categoryName,
-            'deleted_by' => auth()->id(),
-        ]);
+
 
         return redirect()
             ->route('admin.video-categories.index')
@@ -158,12 +145,7 @@ class VideoCategoryController extends Controller
             'is_active' => !$videoCategory->is_active,
         ]);
 
-        Log::info('Video category status toggled', [
-            'category_id' => $videoCategory->id,
-            'category_name' => $videoCategory->name,
-            'new_status' => $videoCategory->is_active ? 'active' : 'inactive',
-            'updated_by' => auth()->id(),
-        ]);
+
 
         return redirect()
             ->back()

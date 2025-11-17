@@ -41,12 +41,6 @@ class FileUploadService
             $filename
         );
 
-        Log::info('PDF uploaded successfully', [
-            'original_name' => $file->getClientOriginalName(),
-            'stored_path' => $path,
-            'size' => $file->getSize(),
-            'course_id' => $courseId
-        ]);
 
         return [
             'path' => $path,
@@ -74,12 +68,7 @@ class FileUploadService
             $filename
         );
 
-        Log::info('Course image uploaded successfully', [
-            'original_name' => $file->getClientOriginalName(),
-            'stored_path' => $path,
-            'size' => $file->getSize(),
-            'course_id' => $courseId
-        ]);
+
 
         return [
             'path' => $path,
@@ -99,15 +88,11 @@ class FileUploadService
         if (Storage::disk('public')->exists($path)) {
             $deleted = Storage::disk('public')->delete($path);
 
-            Log::info('File deleted', [
-                'path' => $path,
-                'success' => $deleted
-            ]);
+
 
             return $deleted;
         }
 
-        Log::warning('File not found for deletion', ['path' => $path]);
         return false;
     }
 

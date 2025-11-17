@@ -251,15 +251,12 @@ class DepartmentController extends Controller
                 ];
             });
 
-        Log::info('Found ' . $employees->count() . ' L1 employees in ' . $department->name);
 
         // ✅ Add debugging info
         if ($employees->isEmpty()) {
-            Log::warning('No L1 employees found in department: ' . $department->name);
 
             // Check what users ARE in this department
             $allUsers = User::where('department_id', $department->id)->with('userLevel')->get();
-            Log::info('All users in department: ' . $allUsers->pluck('name', 'userLevel.code')->toJson());
         }
 
         return response()->json($employees);
@@ -323,10 +320,7 @@ class DepartmentController extends Controller
                 ->with('success', 'Manager role removed successfully.');
 
         } catch (\Exception $e) {
-            Log::error('Failed to remove manager: ' . $e->getMessage(), [
-                'department_id' => $department->id,
-                'role_id' => $role->id,
-            ]);
+
 
             return back()->withErrors(['error' => 'Failed to remove manager role. Please try again.']);
         }

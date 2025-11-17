@@ -16,7 +16,6 @@ use App\Services\MonthlyKpiService;
 use App\Services\ReportService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
@@ -1013,10 +1012,7 @@ class ReportController extends Controller
     public function monthlyKpiDashboard(Request $request)
     {
         try {
-            Log::info('🎯 Loading Monthly KPI Dashboard', [
-                'user_id' => auth()->id(),
-                'request_params' => $request->all()
-            ]);
+
 
             // Get filters from request with defaults
             $month = $request->get('month', Carbon::now()->month);
@@ -1029,11 +1025,7 @@ class ReportController extends Controller
             // Get dropdown data for filters
             $filterData = $this->getFilterDropdownData();
 
-            Log::info('✅ Monthly KPI Dashboard data loaded successfully', [
-                'period' => "{$month}/{$year}",
-                'filters_applied' => array_filter($filters),
-                'data_sections' => array_keys($kpiData)
-            ]);
+
 
             return Inertia::render('Admin/Reports/MonthlyKpiDashboard', [
                 'kpiData' => $kpiData,
@@ -1044,10 +1036,7 @@ class ReportController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            Log::error('❌ Error loading Monthly KPI Dashboard', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
+
 
             return back()->with('error', 'Failed to load KPI dashboard. Please try again.');
         }
@@ -1063,10 +1052,7 @@ class ReportController extends Controller
             $year = $request->get('year', Carbon::now()->year);
             $filters = $request->only(['department_id', 'course_id', 'user_level_id']);
 
-            Log::info('📊 AJAX KPI data request', [
-                'period' => "{$month}/{$year}",
-                'filters' => $filters
-            ]);
+
 
             $kpiData = $this->monthlyKpiService->generateCompleteKpiReport($month, $year, $filters);
 
@@ -1078,9 +1064,7 @@ class ReportController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            Log::error('❌ Error fetching KPI data via AJAX', [
-                'error' => $e->getMessage()
-            ]);
+
 
             return response()->json([
                 'success' => false,
@@ -1101,10 +1085,7 @@ class ReportController extends Controller
             $year = $request->get('year', Carbon::now()->year);
             $filters = $request->only(['department_id', 'course_id', 'user_level_id']);
 
-            Log::info("📄 Exporting Monthly KPI Report as {$format}", [
-                'period' => "{$month}/{$year}",
-                'filters' => $filters
-            ]);
+
 
             $kpiData = $this->monthlyKpiService->generateCompleteKpiReport($month, $year, $filters);
             $periodName = Carbon::createFromDate($year, $month, 1)->format('F_Y');
@@ -1117,10 +1098,7 @@ class ReportController extends Controller
 //            }
 
         } catch (\Exception $e) {
-            Log::error('❌ Error exporting Monthly KPI Report', [
-                'format' => $format ?? 'unknown',
-                'error' => $e->getMessage()
-            ]);
+
 
             return back()->with('error', 'Failed to export KPI report. Please try again.');
         }
@@ -1138,10 +1116,7 @@ class ReportController extends Controller
             $compareYear = $request->get('compare_year', Carbon::now()->subMonth()->year);
             $filters = $request->only(['department_id', 'course_id', 'user_level_id']);
 
-            Log::info('📊 KPI Comparison request', [
-                'current_period' => "{$currentMonth}/{$currentYear}",
-                'compare_period' => "{$compareMonth}/{$compareYear}"
-            ]);
+
 
             $currentData = $this->monthlyKpiService->generateCompleteKpiReport($currentMonth, $currentYear, $filters);
             $compareData = $this->monthlyKpiService->generateCompleteKpiReport($compareMonth, $compareYear, $filters);
@@ -1157,9 +1132,7 @@ class ReportController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            Log::error('❌ Error generating KPI comparison', [
-                'error' => $e->getMessage()
-            ]);
+
 
             return response()->json([
                 'success' => false,
@@ -1178,10 +1151,7 @@ class ReportController extends Controller
             $year = $request->get('year', Carbon::now()->year);
             $filters = $request->only(['department_id', 'course_id', 'user_level_id']);
 
-            Log::info("🎯 KPI Section drill-down: {$section}", [
-                'period' => "{$month}/{$year}",
-                'filters' => $filters
-            ]);
+
 
             $kpiData = $this->monthlyKpiService->generateCompleteKpiReport($month, $year, $filters);
 
@@ -1201,9 +1171,7 @@ class ReportController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            Log::error("❌ Error fetching KPI section: {$section}", [
-                'error' => $e->getMessage()
-            ]);
+
 
             return response()->json([
                 'success' => false,
@@ -1223,10 +1191,6 @@ class ReportController extends Controller
             $endYear = $request->get('year', Carbon::now()->year);
             $filters = $request->only(['department_id', 'course_id', 'user_level_id']);
 
-            Log::info("📈 KPI Trends request for {$months} months", [
-                'ending_period' => "{$endMonth}/{$endYear}",
-                'filters' => $filters
-            ]);
 
             $trends = [];
             $endDate = Carbon::createFromDate($endYear, $endMonth, 1);
@@ -1257,9 +1221,7 @@ class ReportController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            Log::error('❌ Error generating KPI trends', [
-                'error' => $e->getMessage()
-            ]);
+
 
             return response()->json([
                 'success' => false,
@@ -1296,9 +1258,7 @@ class ReportController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            Log::error('❌ Error fetching live KPI stats', [
-                'error' => $e->getMessage()
-            ]);
+
 
             return response()->json([
                 'success' => false,
@@ -1479,10 +1439,7 @@ class ReportController extends Controller
             $year = $request->get('year', Carbon::now()->year);
             $filters = $request->only(['department_id', 'course_id', 'user_level_id']);
 
-            Log::info('📄 Exporting Monthly KPI Report as CSV', [
-                'period' => "{$month}/{$year}",
-                'filters' => $filters
-            ]);
+
 
             // Generate the KPI data
             $kpiData = $this->monthlyKpiService->generateCompleteKpiReport($month, $year, $filters);
@@ -1513,10 +1470,7 @@ class ReportController extends Controller
             );
 
         } catch (\Exception $e) {
-            Log::error('❌ Error exporting Monthly KPI Report CSV', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
+
 
             return back()->with('error', 'Failed to export KPI report. Please try again.');
         }
@@ -1710,10 +1664,7 @@ class ReportController extends Controller
             $year = $request->get('year', Carbon::now()->year);
             $filters = $request->only(['department_id', 'course_id', 'user_level_id']);
 
-            Log::info('📸 Loading Monthly KPI Screenshot Report', [
-                'period' => "{$month}/{$year}",
-                'filters' => $filters
-            ]);
+
 
             // Generate the KPI data using the same service
             $kpiData = $this->monthlyKpiService->generateCompleteKpiReport($month, $year, $filters);
@@ -1736,10 +1687,7 @@ class ReportController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            Log::error('❌ Error loading Monthly KPI Screenshot Report', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
+
 
             return back()->with('error', 'Failed to load KPI screenshot report. Please try again.');
         }

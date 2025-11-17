@@ -34,13 +34,7 @@ class ContentProgressService
             ]
         );
 
-        Log::info('✅ Progress record retrieved/created', [
-            'progress_id' => $progress->id,
-            'user_id' => $user->id,
-            'content_id' => $content->id,
-            'completion' => $progress->completion_percentage,
-            'is_new' => $progress->wasRecentlyCreated,
-        ]);
+
 
         return $progress;
     }
@@ -56,7 +50,7 @@ class ContentProgressService
         ?int $watchTime = null
     ): UserContentProgress {
         $progress = UserContentProgress::findOrFail($progressId);
-        
+
         // Detect if user skipped content
         $previousPosition = $progress->playback_position ?? 0;
         $skipDetected = $this->detectSkip(
@@ -71,13 +65,8 @@ class ContentProgressService
             $positionJump = $currentPosition - $previousPosition;
             $skippedTime = max(0, $positionJump - 5); // Allow 5 second buffer
             $adjustedWatchTime = max(0, $watchTime - $skippedTime);
-            
-            Log::warning('⏩ Skip detected - adjusted watch time', [
-                'progress_id' => $progressId,
-                'position_jump' => $positionJump,
-                'original_watch_time' => $watchTime,
-                'adjusted_watch_time' => $adjustedWatchTime,
-            ]);
+
+
         }
 
         // Update progress
@@ -233,7 +222,7 @@ class ContentProgressService
             'completed_items' => (int) $stats->completed_items,
             'avg_completion' => round($stats->avg_completion ?? 0, 2),
             'total_watch_time_minutes' => (int) ($stats->total_watch_time ?? 0),
-            'completion_rate' => $stats->total_items > 0 
+            'completion_rate' => $stats->total_items > 0
                 ? round(($stats->completed_items / $stats->total_items) * 100, 2)
                 : 0,
         ];
@@ -254,7 +243,7 @@ class ContentProgressService
             if ($assignment) {
                 $assignment->update([
                     'progress_percentage' => $progressPercentage,
-                    'status' => $progressPercentage >= 100 ? 'completed' : 
+                    'status' => $progressPercentage >= 100 ? 'completed' :
                                ($progressPercentage > 0 ? 'in_progress' : 'assigned'),
                     'completed_at' => $progressPercentage >= 100 ? now() : null,
                 ]);

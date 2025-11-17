@@ -290,11 +290,7 @@ class CourseOnlineController extends Controller
                             // ✅ ALWAYS use admin-provided page count
                             $contentFields['pdf_page_count'] = $contentData['pdf_page_count'];
 
-                            Log::info('PDF content created with admin-provided page count', [
-                                'title' => $contentData['title'],
-                                'page_count' => $contentData['pdf_page_count'],
-                                'source' => $request->hasFile($fileKey) ? 'uploaded' : 'google_drive'
-                            ]);
+
                         }
 
                         // Create the content record
@@ -311,9 +307,7 @@ class CourseOnlineController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
 
-            Log::error('Course creation failed', [
-                'error' => $e->getMessage(),
-            ]);
+
 
             return redirect()->back()
                 ->withInput()
@@ -347,18 +341,13 @@ class CourseOnlineController extends Controller
         }
 
         if (!$fileId) {
-            Log::warning('📄 Could not extract file ID from Google Drive URL', ['url' => $url]);
             return $url; // Return original URL if we can't process it
         }
 
         // ✅ Convert to viewable/embeddable URL
         $viewUrl = "https://drive.google.com/file/d/{$fileId}/preview";
 
-        Log::info('📄 Google Drive URL processed', [
-            'original' => $url,
-            'file_id' => $fileId,
-            'processed' => $viewUrl,
-        ]);
+
 
         return $viewUrl;
     }
@@ -653,11 +642,6 @@ class CourseOnlineController extends Controller
                 'deadline' => $validated['deadline']
             ]);
 
-            Log::info('Updated assignment deadlines for course', [
-                'course_id' => $courseOnline->id,
-                'new_deadline' => $validated['deadline'],
-                'assignments_updated' => $courseOnline->assignments()->count()
-            ]);
 
             // ✅ REMOVED: dd() debug statement
 
@@ -716,10 +700,7 @@ class CourseOnlineController extends Controller
                                 // ✅ Update PDF page count
                                 if (isset($contentData['pdf_page_count']) && $contentData['pdf_page_count'] > 0) {
                                     $contentFields['pdf_page_count'] = $contentData['pdf_page_count'];
-                                    Log::info('Updating PDF page count', [
-                                        'content_id' => $contentData['id'] ?? 'new',
-                                        'page_count' => $contentData['pdf_page_count']
-                                    ]);
+
                                 }
                             }
 
@@ -745,10 +726,7 @@ class CourseOnlineController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
 
-            Log::error('Course update failed', [
-                'course_id' => $courseOnline->id,
-                'error' => $e->getMessage(),
-            ]);
+
 
             return redirect()->back()
                 ->withInput()

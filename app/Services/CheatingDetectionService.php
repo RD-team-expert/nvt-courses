@@ -8,17 +8,13 @@ use App\Models\CourseOnline;
 use App\Models\User;
 use App\Models\ModuleContent;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 
 class CheatingDetectionService
 {
     public function getCheatingDetectionData($request, array $filters): array
     {
-        Log::info('🚀 === CHEATING DETECTION SERVICE START (FIXED) ===', [
-            'filters' => $filters,
-            'timestamp' => now()->toDateTimeString(),
-        ]);
+
 
         // ✅ DEBUG: Get ALL sessions first to see what we have
         $allSessionsDebug = LearningSession::with(['user', 'courseOnline', 'content'])
@@ -26,25 +22,6 @@ class CheatingDetectionService
             ->orderBy('session_start', 'desc')
             ->get();
 
-        Log::info('📊 ALL SESSIONS IN DATABASE (DEBUG)', [
-            'total_sessions' => $allSessionsDebug->count(),
-            'recent_sessions' => $allSessionsDebug->take(10)->map(function($session) {
-                return [
-                    'id' => $session->id,
-                    'user_id' => $session->user_id,
-                    'user_name' => $session->user->name ?? 'Unknown',
-                    'course_id' => $session->course_online_id,
-                    'content_id' => $session->content_id,
-                    'content_title' => $session->content->title ?? 'Unknown',
-                    'start' => $session->session_start->toDateTimeString(),
-                    'end' => $session->session_end->toDateTimeString(),
-                    'skip_count' => $session->video_skip_count ?? 0,
-                    'seek_count' => $session->seek_count ?? 0,
-                    'completion' => $session->video_completion_percentage ?? 0,
-                    'duration_db' => $session->total_duration_minutes ?? 0,
-                ];
-            })->toArray(),
-        ]);
 
         // ✅ Get learning sessions with proper relationships
         $query = LearningSession::with(['user', 'courseOnline', 'content'])
@@ -53,30 +30,17 @@ class CheatingDetectionService
 
         if (!empty($filters['course_id'])) {
             $query->where('course_online_id', $filters['course_id']);
-            Log::info('🔍 Filtering by course_id', ['course_id' => $filters['course_id']]);
         }
 
         if (!empty($filters['user_id'])) {
             $query->where('user_id', $filters['user_id']);
-            Log::info('🔍 Filtering by user_id', ['user_id' => $filters['user_id']]);
         }
 
         $sessions = $query->get();
 
-        Log::info('📈 Sessions retrieved after filters', [
-            'total_sessions_count' => $sessions->count(),
-            'sessions_sample' => $sessions->take(3)->map(function($session) {
-                return [
-                    'id' => $session->id,
-                    'user_id' => $session->user_id,
-                    'course_id' => $session->course_online_id,
-                    'content_id' => $session->content_id,
-                ];
-            })->toArray(),
-        ]);
+
 
         if ($sessions->count() === 0) {
-            Log::warning('⚠️ No sessions found after filtering');
             return $this->getEmptyResponse($filters);
         }
 
@@ -85,10 +49,6 @@ class CheatingDetectionService
             return $session->user_id . '_' . $session->content_id;
         });
 
-        Log::info('📊 Sessions grouped correctly by user+content', [
-            'total_groups' => $sessionGroups->count(),
-            'sample_groups' => $sessionGroups->keys()->take(5)->toArray(),
-        ]);
 
         $suspiciousSessions = collect();
         $allCheatingData = [];
@@ -102,42 +62,24 @@ class CheatingDetectionService
             // Use the latest session as representative
             $representativeSession = $userSessions->sortByDesc('session_start')->first();
 
-            Log::info("🔍 Processing user+content group {$processedCount}/{$sessionGroups->count()}", [
-                'user_content_key' => $userContentKey,
-                'user_name' => $representativeSession->user->name ?? 'Unknown',
-                'course_name' => $representativeSession->courseOnline->name ?? 'Unknown',
-                'content_title' => $representativeSession->content?->title ?? 'Unknown Content',
-                'sessions_in_group' => $userSessions->count(),
-            ]);
+
 
             // ✅ FIXED: Extract real data using proper duration calculation
             $realData = $this->extractRealDataWithProperDuration($userSessions, $representativeSession);
 
-            Log::info("📊 Real data extracted with proper duration", [
-                'user_content_key' => $userContentKey,
-                'real_data' => $realData,
-            ]);
+
 
             // ✅ Analyze data for cheating patterns
             $cheatingAnalysis = $this->analyzeRealData($representativeSession, $realData);
 
-            Log::info("🚨 Cheating analysis complete", [
-                'user_content_key' => $userContentKey,
-                'analysis_result' => $cheatingAnalysis,
-            ]);
+
 
             $allCheatingData[] = $cheatingAnalysis;
 
             // ✅ FIXED: Lower minimum cheating score to show your sessions
             $minCheatingScore = $filters['min_cheating_score'] ?? 0; // ✅ Changed from 50 to 0
 
-            Log::info("🎯 Checking if session should be included", [
-                'user_content_key' => $userContentKey,
-                'cheating_score' => $cheatingAnalysis['cheating_score'],
-                'is_suspicious' => $cheatingAnalysis['is_suspicious'],
-                'min_cheating_score' => $minCheatingScore,
-                'will_include' => $cheatingAnalysis['is_suspicious'] || $cheatingAnalysis['cheating_score'] >= $minCheatingScore,
-            ]);
+
 
             // ✅ FIXED: Include sessions with any cheating score or suspicious activity
             if ($cheatingAnalysis['is_suspicious'] || $cheatingAnalysis['cheating_score'] >= $minCheatingScore) {
@@ -171,29 +113,12 @@ class CheatingDetectionService
 
                 $suspiciousSessions->push($sessionData);
 
-                Log::info("🚩 User+content group marked as suspicious", [
-                    'user_content_key' => $userContentKey,
-                    'suspicious_count' => $suspiciousCount,
-                    'cheating_score' => $cheatingAnalysis['cheating_score'],
-                    'completion' => $realData['completion_percentage'],
-                    'calculated_duration' => $realData['total_duration_minutes'],
-                    'sessions_aggregated' => $userSessions->count(),
-                ]);
             } else {
-                Log::info("✅ Session not included - below threshold", [
-                    'user_content_key' => $userContentKey,
-                    'cheating_score' => $cheatingAnalysis['cheating_score'],
-                    'min_required' => $minCheatingScore,
-                    'is_suspicious' => $cheatingAnalysis['is_suspicious'],
-                ]);
+
             }
         }
 
-        Log::info("🎯 Analysis complete", [
-            'total_user_content_groups_processed' => $processedCount,
-            'suspicious_groups_found' => $suspiciousCount,
-            'suspicious_percentage' => round(($suspiciousCount / max($processedCount, 1)) * 100, 1),
-        ]);
+
 
         $suspiciousSessions = $suspiciousSessions->sortByDesc('cheating_score');
         $cheatingStats = $this->calculateStatsFromAnalysis($allCheatingData);
@@ -214,11 +139,7 @@ class CheatingDetectionService
             'total' => $suspiciousSessions->count(),
         ];
 
-        Log::info("📊 Final result", [
-            'total_suspicious_sessions' => $suspiciousSessions->count(),
-            'paginated_count' => $paginatedSessions->count(),
-            'stats' => $cheatingStats,
-        ]);
+
 
         return [
             'suspiciousSessions' => $pagination,
@@ -243,12 +164,7 @@ class CheatingDetectionService
      */
     private function extractRealDataWithProperDuration($userSessions, $representativeSession): array
     {
-        Log::info("📊 Data extraction for SPECIFIC user+course combination", [
-            'user_id' => $representativeSession->user_id,
-            'course_id' => $representativeSession->course_online_id,
-            'content_id' => $representativeSession->content_id,
-            'sessions_count' => $userSessions->count(),
-        ]);
+
 
         $totalDurationMinutes = 0;
         $totalWatchTime = 0;
@@ -261,12 +177,7 @@ class CheatingDetectionService
             // ✅ VERIFY: Make sure we're only processing the right sessions
             if ($session->user_id !== $representativeSession->user_id ||
                 $session->content_id !== $representativeSession->content_id) {
-                Log::warning("🚨 Session does not match user+content scope", [
-                    'session_user_id' => $session->user_id,
-                    'session_content_id' => $session->content_id,
-                    'expected_user_id' => $representativeSession->user_id,
-                    'expected_content_id' => $representativeSession->content_id,
-                ]);
+
                 continue; // Skip this session
             }
 
@@ -286,10 +197,7 @@ class CheatingDetectionService
                     $totalDurationMinutes += $sessionDurationMinutes;
 
                 } catch (\Exception $e) {
-                    Log::warning('Duration calculation error', [
-                        'session_id' => $session->id,
-                        'error' => $e->getMessage()
-                    ]);
+
                     $sessionDurationMinutes = 0;
                 }
             }
@@ -309,13 +217,7 @@ class CheatingDetectionService
                 'calculated_minutes' => $sessionDurationMinutes,
             ];
 
-            Log::info("📊 Session processed for specific user+content", [
-                'session_id' => $session->id,
-                'user_id' => $session->user_id,
-                'content_id' => $session->content_id,
-                'course_id' => $session->course_online_id,
-                'duration_minutes' => $sessionDurationMinutes,
-            ]);
+
         }
 
         // ✅ Get completion for THIS specific user+content
@@ -363,15 +265,7 @@ class CheatingDetectionService
             'has_expected_duration' => $expectedDurationMinutes > 0,
         ];
 
-        Log::info("📊 FIXED: Data extraction for SPECIFIC user+content complete", [
-            'user_id' => $representativeSession->user_id,
-            'content_id' => $representativeSession->content_id,
-            'course_id' => $representativeSession->course_online_id,
-            'total_duration_minutes' => $totalDurationMinutes,
-            'formatted_duration' => $formattedTotalDuration,
-            'sessions_processed' => count($sessionDetails),
-            'completion' => $completionPercentage,
-        ]);
+
 
         return $realData;
     }
@@ -481,12 +375,7 @@ class CheatingDetectionService
      */
     private function analyzeRealData(LearningSession $session, array $realData): array
     {
-        Log::info("🕵️ Analysis starting", [
-            'session_id' => $session->id,
-            'calculated_duration' => $realData['total_duration_minutes'],
-            'expected' => $realData['expected_duration_minutes'],
-            'completion' => $realData['completion_percentage'],
-        ]);
+
 
         $cheatingScore = 0;
         $reasons = [];
@@ -497,21 +386,13 @@ class CheatingDetectionService
             if ($realData['has_expected_duration'] && $realData['expected_duration_minutes'] > 0) {
                 $timeEfficiency = $realData['total_duration_minutes'] / $realData['expected_duration_minutes'];
 
-                Log::info("⏱️ Time efficiency analysis with calculated duration", [
-                    'session_id' => $session->id,
-                    'time_efficiency' => $timeEfficiency,
-                    'calculated_duration' => $realData['total_duration_minutes'],
-                    'expected_duration' => $realData['expected_duration_minutes'],
-                ]);
+
 
                 if ($timeEfficiency < 0.1 && $realData['completion_percentage'] > 80) {
                     $cheatingScore += 70;
                     $reasons[] = "Impossibly fast: {$realData['completion_percentage']}% in {$realData['total_duration_minutes']} min (expected {$realData['expected_duration_minutes']} min)";
                     $isSuspicious = true;
-                    Log::warning("🚨 IMPOSSIBLY FAST COMPLETION DETECTED", [
-                        'session_id' => $session->id,
-                        'time_efficiency' => $timeEfficiency,
-                    ]);
+
                 } elseif ($timeEfficiency < 0.3 && $realData['completion_percentage'] > 70) {
                     $cheatingScore += 50;
                     $reasons[] = "Very fast completion: {$realData['completion_percentage']}% in {$realData['total_duration_minutes']} min";
@@ -561,13 +442,6 @@ class CheatingDetectionService
             $cheatingRisk = $this->calculateRiskLevel($cheatingScore, $isSuspicious);
             $isSuspicious = $isSuspicious || $cheatingScore >= 70;
 
-            Log::info('✅ Analysis complete with calculated duration', [
-                'session_id' => $session->id,
-                'cheating_score' => $cheatingScore,
-                'is_suspicious' => $isSuspicious,
-                'risk_level' => $cheatingRisk,
-                'reasons_count' => count($reasons),
-            ]);
 
             return [
                 'cheating_score' => $cheatingScore,
@@ -578,10 +452,7 @@ class CheatingDetectionService
             ];
 
         } catch (\Exception $e) {
-            Log::error('❌ Error in analysis', [
-                'session_id' => $session->id,
-                'error' => $e->getMessage(),
-            ]);
+
 
             return [
                 'cheating_score' => 0,
