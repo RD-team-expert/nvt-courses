@@ -102,6 +102,36 @@
                 </Card>
             </div>
 
+            <!-- ✅ NEW: Storage Stats Card (Optional) -->
+            <Card v-if="storageStats" class="bg-card border-border">
+                <CardHeader class="bg-card text-card-foreground">
+                    <CardTitle class="text-xl flex items-center gap-2">
+                        <HardDrive class="h-5 w-5" />
+                        Local Storage Statistics
+                    </CardTitle>
+                    <CardDescription class="text-muted-foreground">
+                        Monitor your local video storage usage
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div class="grid grid-cols-3 gap-6">
+                        <div>
+                            <p class="text-sm text-muted-foreground mb-1">Total Files</p>
+                            <p class="text-3xl font-bold text-foreground">{{ storageStats.total_files }}</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-muted-foreground mb-1">Storage Used</p>
+                            <p class="text-3xl font-bold text-foreground">{{ storageStats.total_size_mb }} MB</p>
+                            <p class="text-xs text-muted-foreground">({{ storageStats.total_size_gb }} GB)</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-muted-foreground mb-1">Storage Disk</p>
+                            <p class="text-3xl font-bold text-foreground">{{ storageStats.disk }}</p>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+
             <!-- Videos Table -->
             <Card class="bg-card border-border">
                 <CardHeader class="bg-card text-card-foreground">
@@ -115,6 +145,7 @@
                         <TableHeader>
                             <TableRow class="border-border">
                                 <TableHead class="text-foreground">Video</TableHead>
+                                <TableHead class="text-foreground">Storage</TableHead> <!-- ✅ NEW COLUMN -->
                                 <TableHead class="text-foreground">Category</TableHead>
                                 <TableHead class="text-foreground">Duration</TableHead>
                                 <TableHead class="text-foreground">Status</TableHead>
@@ -156,6 +187,22 @@
                                                 <span>by {{ video.creator.name }}</span>
                                             </div>
                                         </div>
+                                    </div>
+                                </TableCell>
+
+                                <!-- ✅ NEW: Storage Type Column -->
+                                <TableCell>
+                                    <Badge
+                                        :variant="video.storage_type === 'google_drive' ? 'secondary' : 'default'"
+                                        class="gap-1 bg-background border-border text-foreground"
+                                    >
+                                        <Cloud v-if="video.storage_type === 'google_drive'" class="h-3 w-3" />
+                                        <HardDrive v-else class="h-3 w-3" />
+                                        {{ video.storage_type_label || (video.storage_type === 'google_drive' ? 'Drive' : 'Local') }}
+                                    </Badge>
+                                    <!-- Show file size for local videos -->
+                                    <div v-if="video.storage_type === 'local' && video.formatted_file_size" class="text-xs text-muted-foreground mt-1">
+                                        {{ video.formatted_file_size }}
                                     </div>
                                 </TableCell>
 
@@ -251,7 +298,7 @@
 
                             <!-- Empty State -->
                             <TableRow v-if="videos.length === 0" class="border-border">
-                                <TableCell colspan="7" class="text-center py-16 text-muted-foreground">
+                                <TableCell colspan="8" class="text-center py-16 text-muted-foreground">
                                     <PlaySquare class="h-16 w-16 mx-auto text-muted-foreground mb-6" />
                                     <div class="text-lg font-medium mb-2 text-foreground">No video courses found</div>
                                     <p class="text-muted-foreground mb-4">
@@ -275,7 +322,7 @@
 
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3'
-import { computed, onMounted } from 'vue'
+import { computed } from 'vue'
 import AppLayout from '@/layouts/AppLayout.vue'
 import type { BreadcrumbItem } from '@/types'
 
@@ -308,7 +355,9 @@ import {
     ToggleRight,
     Play,
     FolderOpen,
-    BarChart3
+    BarChart3,
+    Cloud,        // ✅ NEW
+    HardDrive,    // ✅ NEW
 } from 'lucide-vue-next'
 
 interface Video {
@@ -319,6 +368,9 @@ interface Video {
     formatted_duration: string
     thumbnail_url?: string
     is_active: boolean
+    storage_type: 'google_drive' | 'local'           // ✅ NEW
+    storage_type_label?: string                      // ✅ NEW
+    formatted_file_size?: string                     // ✅ NEW
     category?: {
         id: number
         name: string
@@ -338,33 +390,24 @@ interface VideoCategory {
     name: string
 }
 
+// ✅ NEW: Storage stats interface
+interface StorageStats {
+    total_files: number
+    total_size_bytes: number
+    total_size_mb: number
+    total_size_gb: number
+    disk: string
+}
+
 const props = defineProps<{
     videos: Video[]
     categories: VideoCategory[]
+    storageStats?: StorageStats  // ✅ NEW: Optional storage stats
 }>()
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Video Management', href: '/admin/videos' },
 ]
-
-// ✅ DEBUG LOGGING
-onMounted(() => {
-    console.log('====== VIDEO INDEX DEBUG ======')
-    console.log('Total videos:', props.videos.length)
-    console.log('Total categories:', props.categories.length)
-    console.log('Available categories:', props.categories)
-    console.log('----------------------------')
-    
-    props.videos.forEach((video, index) => {
-        console.log(`Video ${index + 1}: "${video.name}"`)
-        console.log('  - ID:', video.id)
-        console.log('  - Category object:', video.category)
-        console.log('  - Has category?:', !!video.category)
-        console.log('  - Category ID:', video.category?.id || 'NULL')
-        console.log('  - Category Name:', video.category?.name || 'NULL')
-        console.log('----------------------------')
-    })
-})
 
 // Statistics
 const stats = computed(() => ({

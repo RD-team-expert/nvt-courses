@@ -53,7 +53,9 @@ import {
     Loader2,
     CheckCircle,
     AlertCircle,
-    Layers
+    Layers,
+    Monitor,
+    BookOpen
 } from 'lucide-vue-next'
 
 const props = defineProps<{
@@ -63,6 +65,7 @@ const props = defineProps<{
         max_score: number
         description?: string
         weight?: number
+        applies_to?: string  // NEW: Added applies_to field
         types?: Array<{
             id: number
             type_name: string
@@ -126,6 +129,7 @@ const categoryForm = useForm({
     name: '',
     max_score: 0,
     description: '',
+    applies_to: 'both',  // NEW: Added applies_to field with default value
 })
 
 const typeForm = useForm({
@@ -214,6 +218,20 @@ const getScoreBadgeVariant = (score: number, maxScore: number) => {
     return 'destructive'
 }
 
+// NEW: Get badge variant for applies_to
+const getAppliesToBadgeVariant = (appliesTo: string) => {
+    if (appliesTo === 'both') return 'secondary'
+    if (appliesTo === 'online') return 'default'
+    return 'outline'
+}
+
+// NEW: Get icon for applies_to
+const getAppliesToIcon = (appliesTo: string) => {
+    if (appliesTo === 'online') return Monitor
+    if (appliesTo === 'regular') return BookOpen
+    return Layers
+}
+
 // Methods
 const closeModals = () => {
     showCreateModal.value = false
@@ -242,6 +260,7 @@ const editConfig = (config: any) => {
     categoryForm.name = config.name || ''
     categoryForm.max_score = config.max_score || 0
     categoryForm.description = config.description || ''
+    categoryForm.applies_to = config.applies_to || 'both'  // NEW: Set applies_to when editing
     selectedConfig.value = config
     showEditModal.value = true
 }
@@ -281,12 +300,13 @@ const showTypeModal = (config: any) => {
 
 const addType = () => {
     if (!selectedConfig.value?.id) return
-    typeForm.post(route('admin.evaluations.types.store', selectedConfig.value.id), {
+    typeForm.post(route('admin.evaluations.types.store', selectedConfig.value.id), {  // ✅ Pass the config ID
         onSuccess: () => {
             closeTypeModal()
         },
     })
 }
+
 
 const confirmDeleteType = (type: any) => {
     typeToDelete.value = type
@@ -295,7 +315,7 @@ const confirmDeleteType = (type: any) => {
 
 const deleteType = () => {
     if (!typeToDelete.value?.id) return
-    router.delete(route('admin.evaluations.types.destroy', typeToDelete.value.id), {
+    router.delete(route('admin.evaluations.types.destroy', typeToDelete.value.id), {  // ✅ CORRECT
         onSuccess: () => {
             showDeleteTypeModal.value = false
             typeToDelete.value = null
@@ -311,7 +331,7 @@ const setTotalScore = () => {
 }
 
 const setIncentives = () => {
-    incentiveForm.post(route('admin.evaluations.set-incentives'), {
+    incentiveForm.post(route('admin.evaluations.set-incentives'), {  // ✅ CORRECT
         onSuccess: () => {
             // Form will be updated automatically when page reloads with new data
         },
@@ -320,6 +340,7 @@ const setIncentives = () => {
         }
     })
 }
+
 
 const addIncentive = () => {
     incentiveForm.incentives.push({
@@ -376,6 +397,17 @@ const removeIncentive = () => {
                                 <CardTitle class="flex items-center gap-2">
                                     <Settings class="h-5 w-5" />
                                     {{ config?.name || 'Unnamed Category' }}
+                                    <!-- NEW: Badge showing applies_to -->
+                                    <Badge
+                                        v-if="config?.applies_to"
+                                        :variant="getAppliesToBadgeVariant(config.applies_to)"
+                                        class="text-xs"
+                                    >
+                                        <component :is="getAppliesToIcon(config.applies_to)" class="mr-1 h-3 w-3" />
+                                        {{ config.applies_to === 'regular' ? 'Regular Only' :
+                                        config.applies_to === 'online' ? 'Online Only' :
+                                            'Both Types' }}
+                                    </Badge>
                                 </CardTitle>
                                 <CardDescription class="mt-1">
                                     Max Score: {{ config?.max_score || 0 }} points
@@ -560,6 +592,7 @@ const removeIncentive = () => {
                 </CardContent>
             </Card>
 
+            <!-- [INCENTIVES SECTION - KEEPING AS-IS, NO CHANGES NEEDED] -->
             <!-- Enhanced Level + Tier Based Incentives Configuration -->
             <Card class="mt-8">
                 <CardHeader>
@@ -625,14 +658,14 @@ const removeIncentive = () => {
                             <div class="font-medium">No User Levels Found</div>
                             <p class="text-sm mt-1">
                                 You need to create user levels and tiers before configuring incentives.
-                                <a :href="route('admin.user-levels.index')" class="underline hover:no-underline">
-                                    Go to User Level Management
+                                <a :href="route('admin.organizational.index')" class="underline hover:no-underline">
+                                    Go to Organizational Management
                                 </a>
                             </p>
                         </AlertDescription>
                     </Alert>
 
-                    <!-- New Incentive Form -->
+                    <!-- Incentive Form continues... (keeping the rest as-is) -->
                     <form v-if="hasUserLevels" @submit.prevent="setIncentives" class="space-y-6">
                         <div class="flex items-center gap-2 mb-4">
                             <Plus class="h-5 w-5 text-muted-foreground" />
@@ -839,6 +872,46 @@ const removeIncentive = () => {
                         </span>
                     </div>
 
+                    <!-- NEW: Applies To Selection -->
+                    <div class="space-y-2">
+                        <Label for="applies_to">Applies To</Label>
+                        <Select
+                            v-model="categoryForm.applies_to"
+                            :disabled="categoryForm.processing"
+                        >
+                            <SelectTrigger id="applies_to">
+                                <SelectValue placeholder="Select course type..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="regular">
+                                    <div class="flex items-center gap-2">
+                                        <BookOpen class="h-4 w-4" />
+                                        <span>Regular Courses Only</span>
+                                    </div>
+                                </SelectItem>
+                                <SelectItem value="online">
+                                    <div class="flex items-center gap-2">
+                                        <Monitor class="h-4 w-4" />
+                                        <span>Online Courses Only</span>
+                                    </div>
+                                </SelectItem>
+                                <SelectItem value="both">
+                                    <div class="flex items-center gap-2">
+                                        <Layers class="h-4 w-4" />
+                                        <span>Both Course Types</span>
+                                    </div>
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <p class="text-xs text-muted-foreground">
+                            Specify where this evaluation category can be used
+                        </p>
+                        <span v-if="categoryForm.errors.applies_to" class="text-sm text-destructive flex items-center">
+                            <AlertCircle class="mr-1 h-4 w-4" />
+                            {{ categoryForm.errors.applies_to }}
+                        </span>
+                    </div>
+
                     <div class="space-y-2">
                         <Label for="category_description">Description (Optional)</Label>
                         <Textarea
@@ -874,7 +947,7 @@ const removeIncentive = () => {
             </DialogContent>
         </Dialog>
 
-        <!-- Add Type Modal -->
+        <!-- Add Type Modal (keeping as-is) -->
         <Dialog :open="showAddTypeModal" @update:open="closeTypeModal">
             <DialogContent class="sm:max-w-md">
                 <DialogHeader>

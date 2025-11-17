@@ -46,8 +46,41 @@ class EvaluationEmailService
             return $results;
         }
 
-        // Prepare detailed evaluation data with history/detailed points
+        // ✅ NEW: Prepare detailed evaluation data with overall average
         $detailedEvaluations = $employees->map(function ($employee) {
+            $evaluations = $employee->evaluations->map(function ($evaluation) {
+                return [
+                    'id' => $evaluation->id,
+                    'course' => $evaluation->course ? $evaluation->course->name : 'Unknown Course',
+                    'total_score' => $evaluation->total_score,
+                    'incentive_amount' => $evaluation->incentive_amount,
+                    'created_at' => $evaluation->created_at->format('M d, Y'),
+                    'detailed_scores' => $evaluation->history->map(function ($history) {
+                        return [
+                            'category_name' => $history->category_name,
+                            'type_name' => $history->type_name,
+                            'score' => $history->score,
+                            'comments' => $history->comments ?? 'No comments'
+                        ];
+                    })->toArray()
+                ];
+            })->toArray();
+
+            // ✅ NEW: Calculate overall average across ALL evaluations
+            $allScores = collect($evaluations)->flatMap(function ($eval) {
+                return collect($eval['detailed_scores'])->pluck('score');
+            });
+
+            $overallAverage = $allScores->isNotEmpty()
+                ? round($allScores->average(), 2)
+                : 0;
+
+            // ✅ NEW: Also calculate course averages
+            $courseAverages = collect($evaluations)->map(function ($eval) {
+                $scores = collect($eval['detailed_scores'])->pluck('score');
+                return $scores->isNotEmpty() ? round($scores->average(), 2) : 0;
+            });
+
             return [
                 'employee' => [
                     'id' => $employee->id,
@@ -56,23 +89,11 @@ class EvaluationEmailService
                     'department' => $employee->department ? $employee->department->name : 'No Department',
                     'level' => $employee->userLevel ? $employee->userLevel->name : 'Unknown'
                 ],
-                'evaluations' => $employee->evaluations->map(function ($evaluation) {
-                    return [
-                        'id' => $evaluation->id,
-                        'course' => $evaluation->course ? $evaluation->course->name : 'Unknown Course',
-                        'total_score' => $evaluation->total_score,
-                        'incentive_amount' => $evaluation->incentive_amount,
-                        'created_at' => $evaluation->created_at->format('M d, Y'),
-                        'detailed_scores' => $evaluation->history->map(function ($history) {
-                            return [
-                                'category_name' => $history->category_name,
-                                'type_name' => $history->type_name,
-                                'score' => $history->score,
-                                'comments' => $history->comments ?? 'No comments'
-                            ];
-                        })->toArray()
-                    ];
-                })->toArray()
+                'evaluations' => $evaluations,
+                'overall_average' => $overallAverage,              // ✅ NEW: Overall average
+                'course_averages' => $courseAverages->toArray(),  // ✅ NEW: Individual course averages
+                'total_evaluations' => count($evaluations),       // ✅ NEW: Total count
+                'total_scores_count' => $allScores->count()       // ✅ NEW: Total individual scores
             ];
         })->toArray();
 
@@ -87,7 +108,7 @@ class EvaluationEmailService
                     'subject' => $subject,
                     'customMessage' => $customMessage,
                     'evaluations' => $employees->flatMap->evaluations,
-                    'detailedEvaluations' => $detailedEvaluations  // ✅ ADDED: Detailed evaluation data
+                    'detailedEvaluations' => $detailedEvaluations  // ✅ Now includes overall_average
                 ], function ($message) use ($manager, $subject) {
                     $message->to($manager['email'], $manager['name'])
                         ->subject($subject);

@@ -46,6 +46,14 @@ return [
             'throw' => false,
             'report' => false,
         ],
+        'videos' => [
+            'driver' => 'local',
+            'root' => storage_path('app/videos'),
+            'visibility' => 'private', // Important: private access only
+            'throw' => false,
+            'stream_url_expiry' => env('STREAM_URL_EXPIRY', 7200), // 2 hours in seconds
+
+        ],
 
         's3' => [
             'driver' => 's3',

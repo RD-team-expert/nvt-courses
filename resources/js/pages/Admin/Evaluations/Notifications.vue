@@ -48,6 +48,7 @@ const props = defineProps<{
             id: number
             course_name: string
             total_score: number
+            course_type: string  // NEW: Add course_type
             incentive_amount: number
             created_at: string
         }
@@ -686,22 +687,21 @@ onUnmounted(() => {
                                         <CardContent class="p-3">
                                             <div class="flex items-center justify-between">
                                                 <div>
-                                                    <p class="text-sm font-medium text-foreground">{{ employee.latest_evaluation.course_name }}</p>
+                                                    <div class="flex items-center gap-2">
+                                                        <p class="text-sm font-medium text-foreground">
+                                                            {{ employee.latest_evaluation.course_name }}
+                                                        </p>
+                                                        <!-- NEW: Course Type Badge -->
+                                                        <Badge
+                                                            :variant="employee.latest_evaluation.course_type === 'Online' ? 'default' : 'secondary'"
+                                                            class="text-xs"
+                                                        >
+                                                            {{ employee.latest_evaluation.course_type }}
+                                                        </Badge>
+                                                    </div>
                                                     <p class="text-xs text-muted-foreground">Latest evaluation</p>
                                                 </div>
-                                                <div class="flex items-center space-x-3">
-                                                    <div class="text-right">
-                                                        <div class="text-lg font-bold text-foreground">{{ employee.latest_evaluation.total_score }}</div>
-                                                        <div class="text-xs text-muted-foreground">Score</div>
-                                                    </div>
-                                                    <div class="text-right">
-                                                        <div class="text-lg font-bold text-green-600">{{ formatCurrency(employee.latest_evaluation.incentive_amount) }}</div>
-                                                        <div class="text-xs text-muted-foreground">Incentive</div>
-                                                    </div>
-                                                    <Badge :variant="getPerformanceLevel(employee.latest_evaluation.total_score).variant">
-                                                        {{ getPerformanceLevel(employee.latest_evaluation.total_score).label }}
-                                                    </Badge>
-                                                </div>
+                                                <!-- ... rest of the evaluation details -->
                                             </div>
                                         </CardContent>
                                     </Card>

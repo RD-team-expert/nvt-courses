@@ -436,19 +436,32 @@ class EvaluationNotificationController extends Controller
         $evaluations = [];
 
         if (!empty($evaluationIds)) {
-            $evaluations = Evaluation::with(['user', 'course', 'department', 'history']) // FIXED: Changed evaluationHistory to history
+            $evaluations = Evaluation::with(['user', 'course', 'courseOnline', 'department', 'history']) // ADDED: courseOnline
             ->whereIn('id', $evaluationIds)
                 ->get()
                 ->map(function ($evaluation) {
+                    // Determine course name based on type
+                    $courseName = 'Unknown Course';
+                    $courseType = 'Unknown';
+
+                    if ($evaluation->course_type === 'online' && $evaluation->courseOnline) {
+                        $courseName = $evaluation->courseOnline->name;
+                        $courseType = 'Online';
+                    } elseif ($evaluation->course) {
+                        $courseName = $evaluation->course->name;
+                        $courseType = 'Regular';
+                    }
+
                     return [
                         'id' => $evaluation->id,
                         'user' => $evaluation->user,
-                        'course' => $evaluation->course,
+                        'course_name' => $courseName,  // NEW: Use resolved course name
+                        'course_type' => $courseType,   // NEW: Add course type
                         'department' => $evaluation->department,
                         'total_score' => $evaluation->total_score,
                         'incentive_amount' => $evaluation->incentive_amount,
                         'created_at' => $evaluation->created_at->format('M d, Y'),
-                        'categories' => $evaluation->history->map(function ($history) { // FIXED: Changed evaluationHistory to history
+                        'categories' => $evaluation->history->map(function ($history) {
                             return [
                                 'category_name' => $history->category_name,
                                 'type_name' => $history->type_name,
@@ -482,6 +495,7 @@ class EvaluationNotificationController extends Controller
             'evaluations' => $evaluations
         ]);
     }
+
     /**
      * Get filtered L1 employees with evaluations
      */
@@ -493,8 +507,8 @@ class EvaluationNotificationController extends Controller
      */
     private function getFilteredL1Employees(array $filters = []): array
     {
-        // CHANGED: Get ALL employees with evaluations, not just L1
-        $query = User::with(['userLevel', 'evaluations.course', 'department'])
+        // Get ALL employees with evaluations (both regular and online)
+        $query = User::with(['userLevel', 'evaluations.course', 'evaluations.courseOnline', 'department'])
             ->has('evaluations') // Only users with evaluations
             ->where('status', 'active'); // Only active users
 
@@ -503,10 +517,15 @@ class EvaluationNotificationController extends Controller
             $query->where('department_id', $filters['department_id']);
         }
 
-        // Apply course filter (through evaluations)
+        // Apply course filter (UPDATED: Handle both regular AND online courses)
         if (!empty($filters['course_id'])) {
             $query->whereHas('evaluations', function ($q) use ($filters) {
-                $q->where('course_id', $filters['course_id']);
+                $q->where(function($subQ) use ($filters) {
+                    // Check regular courses
+                    $subQ->where('course_id', $filters['course_id'])
+                        // OR check online courses
+                        ->orWhere('course_online_id', $filters['course_id']);
+                });
             });
         }
 
@@ -537,6 +556,20 @@ class EvaluationNotificationController extends Controller
         return $employees->map(function ($employee) {
             $latestEvaluation = $employee->evaluations->sortByDesc('created_at')->first();
 
+            // Determine course name and type
+            $courseName = 'Unknown Course';
+            $courseType = 'Unknown';
+
+            if ($latestEvaluation) {
+                if ($latestEvaluation->course_type === 'online' && $latestEvaluation->courseOnline) {
+                    $courseName = $latestEvaluation->courseOnline->name;
+                    $courseType = 'Online';
+                } elseif ($latestEvaluation->course) {
+                    $courseName = $latestEvaluation->course->name;
+                    $courseType = 'Regular';
+                }
+            }
+
             return [
                 'id' => $employee->id,
                 'name' => $employee->name,
@@ -547,7 +580,8 @@ class EvaluationNotificationController extends Controller
                 'evaluation_count' => $employee->evaluations->count(),
                 'latest_evaluation' => $latestEvaluation ? [
                     'id' => $latestEvaluation->id,
-                    'course_name' => $latestEvaluation->course?->name ?? 'Unknown Course',
+                    'course_name' => $courseName,
+                    'course_type' => $courseType,  // NEW: Add course type
                     'total_score' => $latestEvaluation->total_score,
                     'incentive_amount' => $latestEvaluation->incentive_amount,
                     'created_at' => $latestEvaluation->created_at->format('M d, Y')
@@ -555,4 +589,5 @@ class EvaluationNotificationController extends Controller
             ];
         })->values()->toArray();
     }
+
 }

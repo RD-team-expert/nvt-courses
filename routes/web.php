@@ -12,6 +12,7 @@ use App\Http\Controllers\Admin\EvaluationAssignmentController;
 use App\Http\Controllers\Admin\EvaluationController;
 use App\Http\Controllers\Admin\EvaluationNotificationController;
 use App\Http\Controllers\Admin\HistoryController;
+use App\Http\Controllers\Admin\OnlineCourseEvaluationController;
 use App\Http\Controllers\Admin\OrganizationalController;
 use App\Http\Controllers\Admin\QuizController;
 use App\Http\Controllers\Admin\ReportController;
@@ -37,6 +38,7 @@ use App\Http\Controllers\User\ContentViewController;
 use App\Http\Controllers\User\CourseOnlineController;
 use App\Http\Controllers\UserTeamController;
 use App\Http\Controllers\VideoController;
+use App\Http\Controllers\VideoStreamController;
 use App\Models\Course;
 use Illuminate\Support\Facades\Route;
 
@@ -50,7 +52,16 @@ use Illuminate\Support\Facades\Route;
 // Replace the previous test route with this corrected one
 
 
-
+Route::get('/check-upload-limits', function () {
+    return response()->json([
+        'upload_max_filesize' => ini_get('upload_max_filesize'),
+        'post_max_size' => ini_get('post_max_size'),
+        'memory_limit' => ini_get('memory_limit'),
+        'max_execution_time' => ini_get('max_execution_time'),
+        'environment' => app()->environment(),
+        'server' => $_SERVER['SERVER_SOFTWARE'] ?? 'Unknown',
+    ]);
+})->middleware('auth'); // Only logged-in users can see this
 
 Route::get('/docs/{path?}', function ($path = 'index') {
     $filePath = public_path('docs/' . str_replace('/', DIRECTORY_SEPARATOR, $path) . '.html');
@@ -79,6 +90,9 @@ Route::get('/login/token/{user}/{course}', [AuthVaiEmailController::class, 'toke
 // ==========================================
 
 Route::middleware(['auth'])->group(function () {
+
+    Route::get('/video/stream/{video}', [VideoStreamController::class, 'stream'])
+        ->name('video.stream');
 
     // ===== ATTENDANCE SYSTEM =====
     Route::get('/attendance', [ClockingController::class, 'index'])->name('attendance.index');
@@ -527,6 +541,22 @@ Route::post('videos/batch-refresh-urls', [App\Http\Controllers\Admin\VideoContro
     Route::get('/evaluations/history/export', [HistoryController::class, 'export'])->name('evaluations.history.export');
     Route::get('/evaluations/history/export-summary', [HistoryController::class, 'exportSummary'])->name('evaluations.history.export-summary');
     Route::get('/evaluations/history/{evaluationId}', [HistoryController::class, 'details'])->name('evaluations.history.details');
+
+
+    // ===== NEW: ONLINE COURSE EVALUATION ROUTES (ADD THESE) =====
+    Route::prefix('evaluations/online')->name('evaluations.online.')->group(function () {
+        // Main page - List/Create evaluations for online courses
+        Route::get('/', [OnlineCourseEvaluationController::class, 'index'])->name('index');
+
+        // Store online course evaluation
+        Route::post('/', [OnlineCourseEvaluationController::class, 'store'])->name('store');
+
+        // Get users by department (for filtering)
+        Route::get('/users-by-department', [OnlineCourseEvaluationController::class, 'getUsersByDepartment'])->name('users-by-department');
+
+        // Get user's completed online courses
+        Route::get('/user-courses', [OnlineCourseEvaluationController::class, 'getUserOnlineCourses'])->name('user-courses');
+    });
 
     // Evaluation Notification Routes
     Route::get('/evaluations/notifications', [EvaluationNotificationController::class, 'index'])->name('evaluations.notifications');

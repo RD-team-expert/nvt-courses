@@ -31,9 +31,7 @@ class UserEvaluationController extends Controller
                     // Get actual completed courses for this user
                     $completedCourses = [];
 
-                    // Try to get real completed courses from course_registrations or course_user table
                     try {
-                        // First try course_registrations table
                         $registrations = DB::table('course_registrations')
                             ->join('courses', 'course_registrations.course_id', '=', 'courses.id')
                             ->where('course_registrations.user_id', $user->id)
@@ -49,7 +47,6 @@ class UserEvaluationController extends Controller
                             ];
                         }
                     } catch (Exception $e1) {
-                        // Fallback: try course_user pivot table
                         try {
                             $pivotData = DB::table('course_user')
                                 ->join('courses', 'course_user.course_id', '=', 'courses.id')
@@ -66,7 +63,6 @@ class UserEvaluationController extends Controller
                                 ];
                             }
                         } catch (Exception $e2) {
-                            // Final fallback: show all courses as completed (for testing)
                             $allCourses = Course::select(['id', 'name'])->get();
                             foreach ($allCourses as $course) {
                                 $completedCourses[] = [
@@ -84,7 +80,6 @@ class UserEvaluationController extends Controller
                         'email' => $user->email,
                         'department' => $user->department,
                         'department_id' => $user->department_id,
-                        // NEW: Include level and tier information
                         'user_level' => $user->userLevel ? [
                             'id' => $user->userLevel->id,
                             'name' => $user->userLevel->name,
@@ -99,8 +94,9 @@ class UserEvaluationController extends Controller
                     ];
                 });
 
-            // Get evaluation categories with types
-            $categories = EvaluationConfig::with(['types' => function ($query) {
+            // NEW: Get evaluation categories that apply to REGULAR courses
+            $categories = EvaluationConfig::forRegular() // Use the scope we created
+            ->with(['types' => function ($query) {
                 $query->orderBy('score_value', 'desc');
             }])
                 ->get()
@@ -111,6 +107,7 @@ class UserEvaluationController extends Controller
                         'description' => $config->description ?? 'Evaluation category for ' . $config->name,
                         'weight' => $config->weight ?? 25,
                         'max_score' => $config->max_score,
+                        'applies_to' => $config->applies_to, // NEW
                         'types' => $config->types->map(function ($type) {
                             return [
                                 'id' => $type->id,
@@ -137,7 +134,7 @@ class UserEvaluationController extends Controller
                     ];
                 });
 
-            // NEW: Get Level + Tier based incentives with relationship data
+            // Get Level + Tier based incentives with relationship data
             $incentives = Incentive::with(['userLevel', 'userLevelTier'])
                 ->orderBy('user_level_id')
                 ->orderBy('user_level_tier_id')
@@ -164,7 +161,7 @@ class UserEvaluationController extends Controller
                     ];
                 });
 
-            // NEW: Get user levels with tiers for frontend reference
+            // Get user levels with tiers for frontend reference
             $userLevels = UserLevel::with(['tiers' => function($query) {
                 $query->orderBy('tier_order');
             }])
@@ -202,7 +199,7 @@ class UserEvaluationController extends Controller
                 'departments' => $departments,
                 'courses' => $courses,
                 'incentives' => $incentives,
-                'userLevels' => $userLevels, // NEW: For frontend reference
+                'userLevels' => $userLevels,
             ]);
 
         } catch (Exception $e) {
@@ -222,6 +219,7 @@ class UserEvaluationController extends Controller
             ]);
         }
     }
+
 
     // Enhanced: Get users by department with level/tier info
     public function getUsersByDepartment(Request $request)
@@ -373,21 +371,19 @@ class UserEvaluationController extends Controller
         try {
             $totalScore = 0;
 
-            // Enhanced: Check if user exists with level and tier information
             $user = User::with(['department', 'userLevel', 'userLevelTier'])->find($validated['user_id']);
             if (!$user) {
                 throw new Exception('Selected user not found.');
             }
 
-            // Check for existing evaluation - UPDATE instead of failing
+            // Check for existing evaluation
             $existingEvaluation = Evaluation::where('user_id', $validated['user_id'])
                 ->where('course_id', $validated['course_id'])
+                ->where('course_type', 'regular') // NEW: Filter by course type
                 ->first();
 
             if ($existingEvaluation) {
-                // Delete existing history records to replace them
                 $existingEvaluation->history()->delete();
-
                 $evaluation = $existingEvaluation;
 
                 Log::info('Updating existing evaluation', [
@@ -396,17 +392,20 @@ class UserEvaluationController extends Controller
                     'course_id' => $validated['course_id']
                 ]);
             } else {
-                // Create new evaluation
+                // NEW: Include course_type when creating
                 $evaluation = Evaluation::create([
                     'user_id' => $validated['user_id'],
                     'course_id' => $validated['course_id'],
+                    'course_type' => 'regular', // NEW: Set as regular course
+                    'course_online_id' => null, // NEW: Explicitly null for regular courses
                     'department_id' => $validated['department_id'] ?? $user->department_id,
                     'total_score' => 0,
                     'incentive_amount' => 0,
                 ]);
 
                 Log::info('Created new evaluation', [
-                    'evaluation_id' => $evaluation->id
+                    'evaluation_id' => $evaluation->id,
+                    'course_type' => 'regular' // NEW
                 ]);
             }
 
@@ -424,19 +423,19 @@ class UserEvaluationController extends Controller
                 $score = $evaluationType->score_value;
                 $totalScore += $score;
 
-                // Get category name
                 $category = EvaluationConfig::find($categoryData['category_id']);
                 $categoryName = $category ? $category->name : 'Unknown Category';
 
-                // Store evaluation history record
+                // NEW: Include course_type in history
                 $historyData = [
                     'evaluation_id' => $evaluation->id,
                     'category_name' => $categoryName,
                     'type_name' => $evaluationType->type_name,
                     'score' => $score,
+                    'course_type' => 'regular', // NEW
+                    'course_online_id' => null, // NEW
                 ];
 
-                // Add comments if supported
                 if (in_array('comments', (new \App\Models\EvaluationHistory)->getFillable())) {
                     $historyData['comments'] = $categoryData['comments'] ?? null;
                 }
@@ -444,7 +443,7 @@ class UserEvaluationController extends Controller
                 $evaluation->history()->create($historyData);
             }
 
-            // NEW: Calculate incentive amount using enhanced Level + Tier based system
+            // Calculate incentive amount using Level + Tier based system
             $incentiveAmount = $this->calculateLevelTierIncentiveAmount($user, $totalScore);
 
             Log::info('Calculated Level+Tier incentive', [
@@ -452,13 +451,13 @@ class UserEvaluationController extends Controller
                 'user_level' => $user->userLevel?->name,
                 'user_tier' => $user->userLevelTier?->tier_name,
                 'total_score' => $totalScore,
-                'incentive_amount' => $incentiveAmount
+                'incentive_amount' => $incentiveAmount,
+                'course_type' => 'regular' // NEW
             ]);
 
-            // Update evaluation with final scores INCLUDING the incentive amount
             $evaluation->update([
                 'total_score' => $totalScore,
-                'incentive_amount' => $incentiveAmount // This will save the calculated incentive
+                'incentive_amount' => $incentiveAmount
             ]);
 
             DB::commit();
@@ -485,6 +484,7 @@ class UserEvaluationController extends Controller
                 ->withInput();
         }
     }
+
 
     /**
      * NEW: Enhanced incentive calculation based on User Level + Tier + Score

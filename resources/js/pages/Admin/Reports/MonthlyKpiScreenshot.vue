@@ -83,6 +83,71 @@
                 </CardContent>
             </Card>
 
+            <!-- ✅ NEW: Online Course Overview -->
+            <Card class="mb-8">
+                <CardHeader>
+                    <CardTitle class="flex items-center text-2xl">
+                        <Monitor class="mr-3 h-6 w-6" />
+                        Online Course Analytics Overview
+                    </CardTitle>
+                    <CardDescription>Comprehensive metrics for online learning platforms</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+                        <Card>
+                            <CardContent class="p-6 text-center">
+                                <div class="text-4xl mb-3">💻</div>
+                                <div class="text-sm text-muted-foreground mb-2">Online Courses</div>
+                                <div class="text-3xl font-bold text-foreground">
+                                    {{ kpiData.online_course_analytics?.delivery?.online_courses_delivered || 0 }}
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardContent class="p-6 text-center">
+                                <div class="text-4xl mb-3">📝</div>
+                                <div class="text-sm text-muted-foreground mb-2">Enrollments</div>
+                                <div class="text-3xl font-bold text-foreground">
+                                    {{ kpiData.online_course_analytics?.delivery?.online_enrollments || 0 }}
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardContent class="p-6 text-center">
+                                <div class="text-4xl mb-3">✅</div>
+                                <div class="text-sm text-muted-foreground mb-2">Completed</div>
+                                <div class="text-3xl font-bold text-green-600">
+                                    {{ kpiData.online_course_analytics?.delivery?.online_completed || 0 }}
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card class="border-primary bg-primary/5">
+                            <CardContent class="p-6 text-center">
+                                <div class="text-4xl mb-3">📊</div>
+                                <div class="text-sm text-muted-foreground mb-2">Completion Rate</div>
+                                <div class="text-3xl font-bold text-primary">
+                                    {{ kpiData.online_course_analytics?.delivery?.online_completion_rate || 0 }}%
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardContent class="p-6 text-center">
+                                <div class="text-4xl mb-3">👥</div>
+                                <div class="text-sm text-muted-foreground mb-2">Active Learners</div>
+                                <div class="text-3xl font-bold text-foreground">
+                                    {{ kpiData.online_course_analytics?.delivery?.active_online_learners || 0 }}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </CardContent>
+            </Card>
+
+
             <!-- Engagement Metrics -->
             <Card class="mb-8">
                 <CardHeader>
@@ -144,6 +209,69 @@
                 </CardContent>
             </Card>
 
+            <!-- ✅ NEW: Video Engagement Metrics -->
+            <Card class="mb-8">
+                <CardHeader>
+                    <CardTitle class="flex items-center text-2xl">
+                        <PlayCircle class="mr-3 h-6 w-6" />
+                        Video Engagement Metrics
+                    </CardTitle>
+                    <CardDescription>Student interaction with video content</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <Card class="border-blue-200 bg-blue-50">
+                            <CardContent class="p-6 text-center">
+                                <div class="flex items-center justify-center gap-2 mb-3">
+                                    <PlayCircle class="h-6 w-6 text-blue-600" />
+                                    <span class="text-sm text-muted-foreground">Videos Watched</span>
+                                </div>
+                                <div class="text-3xl font-bold text-blue-600">
+                                    {{ kpiData.online_course_analytics?.video_engagement?.total_videos_watched || 0 }}
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card class="border-green-200 bg-green-50">
+                            <CardContent class="p-6 text-center">
+                                <div class="flex items-center justify-center gap-2 mb-3">
+                                    <CheckCircle class="h-6 w-6 text-green-600" />
+                                    <span class="text-sm text-muted-foreground">Avg Completion</span>
+                                </div>
+                                <div class="text-3xl font-bold text-green-600">
+                                    {{ kpiData.online_course_analytics?.video_engagement?.avg_video_completion || 0 }}%
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardContent class="p-6 text-center">
+                                <div class="flex items-center justify-center gap-2 mb-3">
+                                    <Clock class="h-6 w-6" />
+                                    <span class="text-sm text-muted-foreground">Watch Time</span>
+                                </div>
+                                <div class="text-3xl font-bold text-foreground">
+                                    {{ kpiData.online_course_analytics?.video_engagement?.total_watch_time_hours || 0 }}h
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardContent class="p-6 text-center">
+                                <div class="flex items-center justify-center gap-2 mb-3">
+                                    <RotateCcw class="h-6 w-6" />
+                                    <span class="text-sm text-muted-foreground">Replays</span>
+                                </div>
+                                <div class="text-3xl font-bold text-foreground">
+                                    {{ kpiData.online_course_analytics?.video_engagement?.video_replay_count || 0 }}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </CardContent>
+            </Card>
+
+
             <!-- Learning Outcomes -->
             <Card class="mb-8">
                 <CardHeader>
@@ -196,6 +324,61 @@
                     </div>
                 </CardContent>
             </Card>
+
+            <!-- ✅ NEW: Online Module Progress -->
+            <Card class="mb-8">
+                <CardHeader>
+                    <CardTitle class="flex items-center text-2xl">
+                        <BookOpen class="mr-3 h-6 w-6" />
+                        Online Module Progress
+                    </CardTitle>
+                    <CardDescription>Module completion tracking</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <Card>
+                            <CardContent class="p-6 text-center">
+                                <div class="text-4xl mb-3">📚</div>
+                                <div class="text-sm text-muted-foreground mb-2">Total Modules</div>
+                                <div class="text-3xl font-bold text-foreground">
+                                    {{ kpiData.online_course_analytics?.module_progress?.total_modules || 0 }}
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card class="border-green-200 bg-green-50">
+                            <CardContent class="p-6 text-center">
+                                <div class="text-4xl mb-3">✅</div>
+                                <div class="text-sm text-muted-foreground mb-2">Completed</div>
+                                <div class="text-3xl font-bold text-green-600">
+                                    {{ kpiData.online_course_analytics?.module_progress?.completed_modules || 0 }}
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardContent class="p-6 text-center">
+                                <div class="text-4xl mb-3">👤</div>
+                                <div class="text-sm text-muted-foreground mb-2">Avg Per User</div>
+                                <div class="text-3xl font-bold text-foreground">
+                                    {{ kpiData.online_course_analytics?.module_progress?.avg_modules_per_user || 0 }}
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card class="border-primary bg-primary/5">
+                            <CardContent class="p-6 text-center">
+                                <div class="text-4xl mb-3">📈</div>
+                                <div class="text-sm text-muted-foreground mb-2">Completion Rate</div>
+                                <div class="text-3xl font-bold text-primary">
+                                    {{ kpiData.online_course_analytics?.module_progress?.module_completion_rate || 0 }}%
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </CardContent>
+            </Card>
+
 
             <!-- Feedback Analysis -->
             <Card class="mb-8">
@@ -276,6 +459,71 @@
                     </div>
                 </CardContent>
             </Card>
+
+            <!-- ✅ NEW: Learning Session Analytics -->
+            <Card class="mb-8">
+                <CardHeader>
+                    <CardTitle class="flex items-center text-2xl">
+                        <Timer class="mr-3 h-6 w-6" />
+                        Learning Session Analytics
+                    </CardTitle>
+                    <CardDescription>Student engagement and attention tracking</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+                        <Card>
+                            <CardContent class="p-6 text-center">
+                                <div class="text-4xl mb-3">🎯</div>
+                                <div class="text-sm text-muted-foreground mb-2">Total Sessions</div>
+                                <div class="text-3xl font-bold text-foreground">
+                                    {{ kpiData.online_course_analytics?.session_analytics?.total_sessions || 0 }}
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card class="border-blue-200 bg-blue-50">
+                            <CardContent class="p-6 text-center">
+                                <div class="text-4xl mb-3">⏱️</div>
+                                <div class="text-sm text-muted-foreground mb-2">Avg Duration</div>
+                                <div class="text-3xl font-bold text-blue-600">
+                                    {{ kpiData.online_course_analytics?.session_analytics?.avg_session_duration_minutes || 0 }}m
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card class="border-green-200 bg-green-50">
+                            <CardContent class="p-6 text-center">
+                                <div class="text-4xl mb-3">👁️</div>
+                                <div class="text-sm text-muted-foreground mb-2">Attention Score</div>
+                                <div class="text-3xl font-bold text-green-600">
+                                    {{ kpiData.online_course_analytics?.session_analytics?.avg_attention_score || 0 }}%
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardContent class="p-6 text-center">
+                                <div class="text-4xl mb-3">⏰</div>
+                                <div class="text-sm text-muted-foreground mb-2">Learning Hours</div>
+                                <div class="text-3xl font-bold text-foreground">
+                                    {{ kpiData.online_course_analytics?.session_analytics?.total_learning_hours || 0 }}h
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card class="border-red-200 bg-red-50">
+                            <CardContent class="p-6 text-center">
+                                <div class="text-4xl mb-3">⚠️</div>
+                                <div class="text-sm text-muted-foreground mb-2">Suspicious Activity</div>
+                                <div class="text-3xl font-bold text-red-600">
+                                    {{ kpiData.online_course_analytics?.session_analytics?.suspicious_activity_count || 0 }}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </CardContent>
+            </Card>
+
 
             <!-- Performance Analysis -->
             <Card class="mb-8">
@@ -486,7 +734,13 @@ import {
     XCircle,
     MessageCircle,
     Download,
-    Copy
+    Copy,
+    Monitor,      // ✅ NEW
+    PlayCircle,   // ✅ NEW
+    Clock,        // ✅ NEW
+    RotateCcw,    // ✅ NEW
+    BookOpen,     // ✅ NEW
+    Timer,        // ✅ NEW
 } from 'lucide-vue-next'
 
 export default {
@@ -522,7 +776,13 @@ export default {
         XCircle,
         MessageCircle,
         Download,
-        Copy
+        Copy,
+        Monitor,      // ✅ NEW
+        PlayCircle,   // ✅ NEW
+        Clock,        // ✅ NEW
+        RotateCcw,    // ✅ NEW
+        BookOpen,     // ✅ NEW
+        Timer,        // ✅ NEW
     },
 
     props: {
