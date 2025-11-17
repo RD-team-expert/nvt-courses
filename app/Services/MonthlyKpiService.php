@@ -34,36 +34,43 @@ class MonthlyKpiService
 
         return [
             'period' => [
-                'month' => $month ?: Carbon::now()->month,
-                'year' => $year ?: Carbon::now()->year,
+                'month' => $month ?? Carbon::now()->month,
+                'year' => $year ?? Carbon::now()->year,
                 'start_date' => $startDate,
                 'end_date' => $endDate,
-                'period_name' => Carbon::createFromDate($year, $month, 1)->format('F Y')
+                'period_name' => Carbon::create($year, $month, 1)->format('F Y'),
             ],
 
-            // 📊 Section 1: Training Delivery Overview
+            // Section 1: Training Delivery Overview
             'delivery_overview' => $this->getDeliveryOverview($startDate, $endDate, $filters),
 
-            // 🎯 Section 2: Attendance & Engagement
+            // Section 2: Attendance & Engagement Metrics
             'attendance_engagement' => $this->getAttendanceEngagement($startDate, $endDate, $filters),
 
-            // 📈 Section 3: Learning Outcomes
+            // Section 3: Learning Outcomes
             'learning_outcomes' => $this->getLearningOutcomes($startDate, $endDate, $filters),
 
-            // ⭐ Section 4: Course Quality & Feedback
+            // Section 4: Course Quality & Feedback
             'feedback_analysis' => $this->getFeedbackAnalysis($startDate, $endDate, $filters),
 
-            // 🏆 Section 5: Performance Analysis
+            // Section 5: Performance Analysis
             'performance_analysis' => $this->getPerformanceAnalysis($startDate, $endDate, $filters),
 
-            // 📈 Section 6: Monthly Engagement Trends
+            // Section 6: Engagement Trends
             'engagement_trends' => $this->getEngagementTrends($startDate, $endDate, $filters),
 
-            // 📋 Section 7: Detailed Analytics
-            'detailed_analytics' => $this->getDetailedAnalytics($startDate, $endDate, $filters),
+            // ✅ NEW: Section 7 - Online Course Analytics
+            'online_course_analytics' => [
+                'delivery' => $this->getOnlineCourseDelivery($startDate, $endDate, $filters),
+                'video_engagement' => $this->getOnlineVideoEngagement($startDate, $endDate, $filters),
+                'module_progress' => $this->getOnlineModuleProgress($startDate, $endDate, $filters),
+                'session_analytics' => $this->getOnlineSessionAnalytics($startDate, $endDate, $filters),
+                'top_performers' => $this->getOnlineTopPerformers($startDate, $endDate, $filters),
+            ],
 
-            // 🎯 Section 8: AI Insights & Recommendations
-            'insights_recommendations' => $this->generateAiInsights($startDate, $endDate, $filters)
+            // ✅ Metadata
+            'filters_applied' => array_filter($filters),
+            'generated_at' => Carbon::now()->toIso8601String(),
         ];
     }
 
@@ -1012,4 +1019,353 @@ class MonthlyKpiService
     private function calculateGrowthIndicators($type, $startDate, $endDate) {
         return ['direction' => 'up', 'percentage' => 5.2];
     }
+
+    // ===============================================
+    // 💻 ONLINE COURSE ANALYTICS METHODS - NEW
+    // ===============================================
+
+    /**
+     * 📊 Get online course delivery metrics
+     */
+    private function getOnlineCourseDelivery($startDate, $endDate, $filters = [])
+    {
+        try {
+            Log::info('📊 Calculating online course delivery metrics');
+
+            // Count online courses created in period
+            $onlineCoursesQuery = DB::table('course_online')
+                ->whereBetween('created_at', [$startDate, $endDate]);
+
+            if (!empty($filters['department_id'])) {
+                $onlineCoursesQuery->where('department_id', $filters['department_id']);
+            }
+
+            $onlineCoursesDelivered = $onlineCoursesQuery->count();
+
+            // Count online enrollments (assignments)
+            $enrollmentsQuery = DB::table('course_online_assignments')
+                ->whereBetween('assigned_at', [$startDate, $endDate]);
+
+            if (!empty($filters['course_id'])) {
+                $enrollmentsQuery->where('course_online_id', $filters['course_id']);
+            }
+
+            if (!empty($filters['department_id'])) {
+                $enrollmentsQuery->join('users', 'course_online_assignments.user_id', '=', 'users.id')
+                    ->where('users.department_id', $filters['department_id']);
+            }
+
+            $onlineEnrollments = $enrollmentsQuery->count();
+
+            // Count completed online courses
+            $completedQuery = DB::table('course_online_assignments')
+                ->where('status', 'completed')
+                ->whereBetween('completed_at', [$startDate, $endDate]);
+
+            if (!empty($filters['course_id'])) {
+                $completedQuery->where('course_online_id', $filters['course_id']);
+            }
+
+            $onlineCompleted = $completedQuery->count();
+
+            // Calculate completion rate
+            $onlineCompletionRate = $onlineEnrollments > 0
+                ? round(($onlineCompleted / $onlineEnrollments) * 100, 2)
+                : 0;
+
+            // Get active online learners
+            $activeLearners = DB::table('course_online_assignments')
+                ->whereBetween('assigned_at', [$startDate, $endDate])
+                ->whereIn('status', ['in_progress', 'completed'])
+                ->distinct('user_id')
+                ->count('user_id');
+
+            return [
+                'online_courses_delivered' => $onlineCoursesDelivered,
+                'online_enrollments' => $onlineEnrollments,
+                'online_completed' => $onlineCompleted,
+                'online_completion_rate' => $onlineCompletionRate,
+                'active_online_learners' => $activeLearners,
+            ];
+
+        } catch (\Exception $e) {
+            Log::error('Error calculating online course delivery', ['error' => $e->getMessage()]);
+            return [
+                'online_courses_delivered' => 0,
+                'online_enrollments' => 0,
+                'online_completed' => 0,
+                'online_completion_rate' => 0,
+                'active_online_learners' => 0,
+            ];
+        }
+    }
+
+    /**
+     * 🎥 Get online video engagement metrics
+     */
+    private function getOnlineVideoEngagement($startDate, $endDate, $filters = [])
+    {
+        try {
+            Log::info('🎥 Calculating video engagement metrics');
+
+            // Get video progress data
+            $progressQuery = DB::table('user_content_progress')
+                ->join('module_content', 'user_content_progress.content_id', '=', 'module_content.id')
+                ->where('module_content.content_type', 'video')
+                ->whereBetween('user_content_progress.updated_at', [$startDate, $endDate]);
+
+            if (!empty($filters['department_id'])) {
+                $progressQuery->join('users', 'user_content_progress.user_id', '=', 'users.id')
+                    ->where('users.department_id', $filters['department_id']);
+            }
+
+            // Total videos watched (started)
+            $videosWatched = $progressQuery->distinct('user_content_progress.content_id')->count('user_content_progress.content_id');
+
+            // Average completion rate
+            $avgVideoCompletion = DB::table('user_content_progress')
+                ->join('module_content', 'user_content_progress.content_id', '=', 'module_content.id')
+                ->where('module_content.content_type', 'video')
+                ->whereBetween('user_content_progress.updated_at', [$startDate, $endDate])
+                ->avg('user_content_progress.progress_percentage') ?: 0;
+
+            // Total watch time (sum of durations for completed videos)
+            $totalWatchTime = DB::table('user_content_progress')
+                ->join('module_content', 'user_content_progress.content_id', '=', 'module_content.id')
+                ->join('videos', 'module_content.video_id', '=', 'videos.id')
+                ->where('module_content.content_type', 'video')
+                ->where('user_content_progress.is_completed', true)
+                ->whereBetween('user_content_progress.updated_at', [$startDate, $endDate])
+                ->sum('videos.duration') ?: 0;
+
+            // Convert seconds to hours
+            $totalWatchTimeHours = round($totalWatchTime / 3600, 1);
+
+            // Count replays (users who watched same video multiple times)
+            $videoReplays = DB::table('user_content_progress')
+                ->join('module_content', 'user_content_progress.content_id', '=', 'module_content.id')
+                ->where('module_content.content_type', 'video')
+                ->whereBetween('user_content_progress.updated_at', [$startDate, $endDate])
+                ->where('user_content_progress.progress_percentage', '>', 100)
+                ->count();
+
+            return [
+                'total_videos_watched' => $videosWatched,
+                'avg_video_completion' => round($avgVideoCompletion, 2),
+                'total_watch_time_hours' => $totalWatchTimeHours,
+                'video_replay_count' => $videoReplays,
+            ];
+
+        } catch (\Exception $e) {
+            Log::error('Error calculating video engagement', ['error' => $e->getMessage()]);
+            return [
+                'total_videos_watched' => 0,
+                'avg_video_completion' => 0,
+                'total_watch_time_hours' => 0,
+                'video_replay_count' => 0,
+            ];
+        }
+    }
+
+    /**
+     * 📚 Get online module progress metrics
+     */
+    private function getOnlineModuleProgress($startDate, $endDate, $filters = [])
+    {
+        try {
+            Log::info('📚 Calculating module progress metrics');
+
+            // Total modules available
+            $totalModules = DB::table('course_modules')
+                ->join('course_online', 'course_modules.course_online_id', '=', 'course_online.id')
+                ->whereNotNull('course_modules.course_online_id')
+                ->count();
+
+            // Completed modules
+            $completedModules = DB::table('user_content_progress')
+                ->join('module_content', 'user_content_progress.content_id', '=', 'module_content.id')
+                ->join('course_modules', 'module_content.module_id', '=', 'course_modules.id')
+                ->whereNotNull('course_modules.course_online_id')
+                ->where('user_content_progress.is_completed', true)
+                ->whereBetween('user_content_progress.updated_at', [$startDate, $endDate])
+                ->count();
+
+            // Average modules completed per user
+            $usersWithProgress = DB::table('user_content_progress')
+                ->join('module_content', 'user_content_progress.content_id', '=', 'module_content.id')
+                ->join('course_modules', 'module_content.module_id', '=', 'course_modules.id')
+                ->whereNotNull('course_modules.course_online_id')
+                ->where('user_content_progress.is_completed', true)
+                ->whereBetween('user_content_progress.updated_at', [$startDate, $endDate])
+                ->select('user_content_progress.user_id', DB::raw('COUNT(DISTINCT course_modules.id) as modules_completed'))
+                ->groupBy('user_content_progress.user_id')
+                ->get();
+
+            $avgModulesPerUser = $usersWithProgress->isNotEmpty()
+                ? round($usersWithProgress->avg('modules_completed'), 1)
+                : 0;
+
+            // Module completion rate
+            $moduleCompletionRate = $totalModules > 0
+                ? round(($completedModules / $totalModules) * 100, 2)
+                : 0;
+
+            return [
+                'total_modules' => $totalModules,
+                'completed_modules' => $completedModules,
+                'avg_modules_per_user' => $avgModulesPerUser,
+                'module_completion_rate' => $moduleCompletionRate,
+            ];
+
+        } catch (\Exception $e) {
+            Log::error('Error calculating module progress', ['error' => $e->getMessage()]);
+            return [
+                'total_modules' => 0,
+                'completed_modules' => 0,
+                'avg_modules_per_user' => 0,
+                'module_completion_rate' => 0,
+            ];
+        }
+    }
+
+    /**
+     * ⏱️ Get online learning session analytics
+     */
+    private function getOnlineSessionAnalytics($startDate, $endDate, $filters = [])
+    {
+        try {
+            Log::info('⏱️ Calculating session analytics');
+
+            $sessionsQuery = DB::table('learning_sessions')
+                ->whereBetween('started_at', [$startDate, $endDate]);
+
+            if (!empty($filters['department_id'])) {
+                $sessionsQuery->join('users', 'learning_sessions.user_id', '=', 'users.id')
+                    ->where('users.department_id', $filters['department_id']);
+            }
+
+            // Total sessions
+            $totalSessions = $sessionsQuery->count();
+
+            // Average session duration (in minutes)
+            $avgSessionDuration = DB::table('learning_sessions')
+                ->whereBetween('started_at', [$startDate, $endDate])
+                ->whereNotNull('ended_at')
+                ->avg('duration') ?: 0;
+
+            $avgSessionMinutes = round($avgSessionDuration / 60, 1);
+
+            // Average attention score
+            $avgAttentionScore = DB::table('learning_sessions')
+                ->whereBetween('started_at', [$startDate, $endDate])
+                ->whereNotNull('attention_score')
+                ->avg('attention_score') ?: 0;
+
+            // Suspicious activity count
+            $suspiciousActivity = DB::table('learning_sessions')
+                ->whereBetween('started_at', [$startDate, $endDate])
+                ->where('has_suspicious_activity', true)
+                ->count();
+
+            // Total learning hours
+            $totalLearningHours = DB::table('learning_sessions')
+                ->whereBetween('started_at', [$startDate, $endDate])
+                ->whereNotNull('duration')
+                ->sum('duration') ?: 0;
+
+            $totalLearningHoursFormatted = round($totalLearningHours / 3600, 1);
+
+            return [
+                'total_sessions' => $totalSessions,
+                'avg_session_duration_minutes' => $avgSessionMinutes,
+                'avg_attention_score' => round($avgAttentionScore, 2),
+                'suspicious_activity_count' => $suspiciousActivity,
+                'total_learning_hours' => $totalLearningHoursFormatted,
+            ];
+
+        } catch (\Exception $e) {
+            Log::error('Error calculating session analytics', ['error' => $e->getMessage()]);
+            return [
+                'total_sessions' => 0,
+                'avg_session_duration_minutes' => 0,
+                'avg_attention_score' => 0,
+                'suspicious_activity_count' => 0,
+                'total_learning_hours' => 0,
+            ];
+        }
+    }
+
+    /**
+     * 🏆 Get online top performers
+     */
+    private function getOnlineTopPerformers($startDate, $endDate, $filters = [], $limit = 5)
+    {
+        try {
+            Log::info('🏆 Getting online top performers');
+
+            // Top online courses by completion rate
+            $topCourses = DB::table('course_online')
+                ->leftJoin('course_online_assignments', 'course_online.id', '=', 'course_online_assignments.course_online_id')
+                ->select([
+                    'course_online.id',
+                    'course_online.name',
+                    DB::raw('COUNT(course_online_assignments.id) as total_enrolled'),
+                    DB::raw('SUM(CASE WHEN course_online_assignments.status = "completed" THEN 1 ELSE 0 END) as total_completed'),
+                    DB::raw('ROUND((SUM(CASE WHEN course_online_assignments.status = "completed" THEN 1 ELSE 0 END) / COUNT(course_online_assignments.id) * 100), 2) as completion_rate')
+                ])
+                ->whereBetween('course_online_assignments.assigned_at', [$startDate, $endDate])
+                ->groupBy('course_online.id', 'course_online.name')
+                ->having('total_enrolled', '>', 0)
+                ->orderByDesc('completion_rate')
+                ->limit($limit)
+                ->get();
+
+            // Top online learners by progress
+            $topLearners = DB::table('users')
+                ->join('course_online_assignments', 'users.id', '=', 'course_online_assignments.user_id')
+                ->select([
+                    'users.id',
+                    'users.name',
+                    DB::raw('COUNT(course_online_assignments.id) as courses_enrolled'),
+                    DB::raw('SUM(CASE WHEN course_online_assignments.status = "completed" THEN 1 ELSE 0 END) as courses_completed'),
+                    DB::raw('AVG(course_online_assignments.progress_percentage) as avg_progress')
+                ])
+                ->whereBetween('course_online_assignments.assigned_at', [$startDate, $endDate])
+                ->groupBy('users.id', 'users.name')
+                ->having('courses_enrolled', '>', 0)
+                ->orderByDesc('courses_completed')
+                ->orderByDesc('avg_progress')
+                ->limit($limit)
+                ->get();
+
+            return [
+                'top_online_courses' => $topCourses->map(function ($course) {
+                    return [
+                        'id' => $course->id,
+                        'name' => $course->name,
+                        'completion_rate' => $course->completion_rate,
+                        'enrolled' => $course->total_enrolled,
+                        'completed' => $course->total_completed,
+                    ];
+                })->toArray(),
+                'top_online_learners' => $topLearners->map(function ($learner) {
+                    return [
+                        'id' => $learner->id,
+                        'name' => $learner->name,
+                        'courses_completed' => $learner->courses_completed,
+                        'avg_progress' => round($learner->avg_progress, 1),
+                    ];
+                })->toArray(),
+            ];
+
+        } catch (\Exception $e) {
+            Log::error('Error getting online top performers', ['error' => $e->getMessage()]);
+            return [
+                'top_online_courses' => [],
+                'top_online_learners' => [],
+            ];
+        }
+    }
+
+
 }

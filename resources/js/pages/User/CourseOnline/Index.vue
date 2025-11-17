@@ -82,7 +82,7 @@ interface Stats {
     total_assignments: number
     completed_courses: number
     in_progress_courses: number
-    total_hours_spent: number
+    total_minutes_spent: number // ✅ Changed from total_hours_spent
     average_completion_rate: number
     certificates_earned: number
     // ✅ NEW: Deadline stats
@@ -107,7 +107,7 @@ const stats = computed(() => ({
     total_assignments: props.stats?.total_assignments || 0,
     completed_courses: props.stats?.completed_courses || 0,
     in_progress_courses: props.stats?.in_progress_courses || 0,
-    total_hours_spent: props.stats?.total_hours_spent || 0,
+    total_minutes_spent: props.stats?.total_minutes_spent || 0,  // ✅ Changed
     average_completion_rate: props.stats?.average_completion_rate || 0,
     certificates_earned: props.stats?.certificates_earned || 0,
     // ✅ NEW: Deadline stats
@@ -243,7 +243,7 @@ const getSortedByDeadline = (assignments: Assignment[]) => {
             </div>
 
             <!-- ✅ ENHANCED: Urgent Deadline Alert -->
-            <div v-if="hasUrgentDeadlines" class="p-4 border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20 rounded-lg">
+            <div v-if="hasUrgentDeadlines" class="p-3 sm:p-4 border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20 rounded-lg">
                 <div class="flex items-start gap-3">
                     <AlertTriangle class="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5" />
                     <div class="flex-1">
@@ -258,7 +258,7 @@ const getSortedByDeadline = (assignments: Assignment[]) => {
             </div>
 
             <!-- ✅ ENHANCED: Stats with deadline information -->
-            <div class="grid gap-4 md:grid-cols-4 lg:grid-cols-7">
+            <div class="grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7">
                 <Card>
                     <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle class="text-sm font-medium">Total Courses</CardTitle>
@@ -322,11 +322,11 @@ const getSortedByDeadline = (assignments: Assignment[]) => {
 
                 <Card>
                     <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle class="text-sm font-medium">Hours Spent</CardTitle>
+                        <CardTitle class="text-sm font-medium">Minutes Spent</CardTitle> <!-- ✅ Changed title -->
                         <Clock class="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div class="text-2xl font-bold">{{ Math.round(stats.total_hours_spent) }}</div>
+                        <div class="text-2xl font-bold">{{ stats.total_minutes_spent }}</div> <!-- ✅ Changed variable, removed Math.round -->
                         <p class="text-xs text-muted-foreground">Learning time</p>
                     </CardContent>
                 </Card>
@@ -351,18 +351,19 @@ const getSortedByDeadline = (assignments: Assignment[]) => {
             </div>
 
             <!-- Course Tabs -->
-            <Tabs v-else default-value="in-progress" class="space-y-4">
-                <TabsList class="grid w-full grid-cols-3">
-                    <TabsTrigger value="in-progress">
-                        In Progress ({{ activeAssignments.length }})
-                    </TabsTrigger>
+            <Tabs v-else default-value="not-started" class="space-y-4">
+                <TabsList class="grid w-full grid-cols-1 sm:grid-cols-3 gap-1 h-full">
                     <TabsTrigger value="not-started">
                         Not Started ({{ notStartedAssignments.length }})
+                    </TabsTrigger>
+                    <TabsTrigger value="in-progress">
+                        In Progress ({{ activeAssignments.length }})
                     </TabsTrigger>
                     <TabsTrigger value="completed">
                         Completed ({{ completedAssignments.length }})
                     </TabsTrigger>
                 </TabsList>
+
 
                 <!-- In Progress Tab -->
                 <TabsContent value="in-progress" class="space-y-4">
@@ -372,11 +373,11 @@ const getSortedByDeadline = (assignments: Assignment[]) => {
                         <p class="text-muted-foreground mb-4">Start a new course to begin your learning journey</p>
                     </div>
 
-                    <div v-else class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    <div v-else class="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                         <Card
                             v-for="assignment in getSortedByDeadline(activeAssignments)"
                             :key="assignment.id"
-                            class="hover:shadow-lg transition-shadow"
+                            class="flex flex-col h-full hover:shadow-lg transition-shadow"
                             :class="{
                                 'border-red-200 dark:border-red-800': assignment.deadline_info.status === 'overdue',
                                 'border-orange-200 dark:border-orange-800': ['due_today', 'due_tomorrow', 'due_soon'].includes(assignment.deadline_info.status)
@@ -385,7 +386,8 @@ const getSortedByDeadline = (assignments: Assignment[]) => {
                             <CardHeader class="pb-3">
                                 <div class="flex items-start justify-between">
                                     <div class="flex-1">
-                                        <CardTitle class="text-lg line-clamp-2">{{ assignment.course.name }}</CardTitle>
+                                        <CardTitle class="text-base sm:text-lg line-clamp-2">
+                                            {{ assignment.course.name }}</CardTitle>
                                         <CardDescription class="line-clamp-2">{{ assignment.course.description }}</CardDescription>
                                     </div>
                                     <Badge :class="getStatusColor(assignment.status)" class="ml-2">
@@ -394,20 +396,24 @@ const getSortedByDeadline = (assignments: Assignment[]) => {
                                 </div>
                             </CardHeader>
 
-                            <CardContent class="space-y-4">
-                                <!-- Course Image -->
-                                <div v-if="assignment.course.image_path" class="aspect-video rounded-lg overflow-hidden bg-muted">
+                            <CardContent class="flex-1 flex flex-col space-y-4">
+                                <!-- Course Image (fixed height area, always present) -->
+                                <div class="aspect-video rounded-lg overflow-hidden bg-muted">
                                     <img
+                                        v-if="assignment.course.image_path"
                                         :src="assignment.course.image_path"
                                         :alt="assignment.course.name"
-                                        class="w-full h-full object-full"
+                                        class="w-full h-full object-cover"
                                     />
+                                    <div v-else class="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/10 to-primary/5">
+                                        <BookOpen class="h-16 w-16 text-muted-foreground/40" />
+                                    </div>
                                 </div>
 
                                 <!-- ✅ NEW: Deadline Alert -->
                                 <div v-if="assignment.course.has_deadline && assignment.deadline_info.status !== 'no_deadline'"
-                                     class="p-3 rounded-lg border" :class="getDeadlineColor(assignment.deadline_info.status)">
-                                    <div class="flex items-center gap-2">
+                                     class="p-2 sm:p-3 rounded-lg border" :class="getDeadlineColor(assignment.deadline_info.status)">
+                                    <div class="flex items-start sm:items-center gap-2">
                                         <component :is="getDeadlineIcon(assignment.deadline_info.status)" class="h-4 w-4" />
                                         <div class="flex-1">
                                             <div class="font-medium text-sm">
@@ -430,8 +436,8 @@ const getSortedByDeadline = (assignments: Assignment[]) => {
                                 </div>
 
                                 <!-- Course Details -->
-                                <div class="flex items-center justify-between text-sm text-muted-foreground">
-                                    <div class="flex items-center gap-4">
+                                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 text-sm text-muted-foreground">
+                                    <div class="flex items-center gap-2 sm:gap-4">
                                         <div class="flex items-center gap-1">
                                             <Clock class="h-3 w-3" />
                                             {{ assignment.course.estimated_duration }}min
@@ -448,6 +454,9 @@ const getSortedByDeadline = (assignments: Assignment[]) => {
                                     <div class="font-medium">{{ assignment.next_content.title }}</div>
                                     <div class="text-xs text-muted-foreground">{{ assignment.next_content.module_name }}</div>
                                 </div>
+
+                                <!-- Spacer to push button to bottom -->
+                                <div class="flex-1"></div>
 
                                 <!-- Action Button -->
                                 <Button asChild class="w-full" :variant="getActionButton(assignment).variant">
@@ -473,7 +482,7 @@ const getSortedByDeadline = (assignments: Assignment[]) => {
                         <Card
                             v-for="assignment in getSortedByDeadline(notStartedAssignments)"
                             :key="assignment.id"
-                            class="hover:shadow-lg transition-shadow"
+                            class="flex flex-col h-full hover:shadow-lg transition-shadow"
                             :class="{
                                 'border-red-200 dark:border-red-800': assignment.deadline_info.status === 'overdue',
                                 'border-orange-200 dark:border-orange-800': ['due_today', 'due_tomorrow', 'due_soon'].includes(assignment.deadline_info.status)
@@ -491,7 +500,20 @@ const getSortedByDeadline = (assignments: Assignment[]) => {
                                 </div>
                             </CardHeader>
 
-                            <CardContent class="space-y-4">
+                            <!-- Course Image Placeholder -->
+                            <div class="aspect-video rounded-lg overflow-hidden bg-muted mx-6 mb-4">
+                                <img
+                                    v-if="assignment.course.image_path"
+                                    :src="assignment.course.image_path"
+                                    :alt="assignment.course.name"
+                                    class="w-full h-full object-cover"
+                                />
+                                <div v-else class="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue/10 to-blue/5">
+                                    <BookOpen class="h-16 w-16 text-muted-foreground/40" />
+                                </div>
+                            </div>
+
+                            <CardContent class="flex-1 flex flex-col space-y-4">
                                 <!-- ✅ NEW: Deadline Alert for not started -->
                                 <div v-if="assignment.course.has_deadline && assignment.deadline_info.status !== 'no_deadline'"
                                      class="p-3 rounded-lg border" :class="getDeadlineColor(assignment.deadline_info.status)">
@@ -531,6 +553,9 @@ const getSortedByDeadline = (assignments: Assignment[]) => {
                                     Assigned {{ formatDate(assignment.assigned_at) }}
                                 </div>
 
+                                <!-- Spacer to push button down -->
+                                <div class="flex-1"></div>
+
                                 <!-- Action Button -->
                                 <Button asChild class="w-full">
                                     <Link :href="route('courses-online.show', assignment.course.id)">
@@ -555,9 +580,22 @@ const getSortedByDeadline = (assignments: Assignment[]) => {
                         <Card
                             v-for="assignment in completedAssignments"
                             :key="assignment.id"
-                            class="hover:shadow-lg transition-shadow border-green-200 dark:border-green-800"
+                            class="flex flex-col h-full hover:shadow-lg transition-shadow border-green-200 dark:border-green-800"
                         >
-                            <CardContent class="p-6 space-y-4">
+                            <CardContent class="flex-1 flex flex-col p-6 space-y-4">
+                                <!-- Course Image -->
+                                <div class="aspect-video rounded-lg overflow-hidden bg-muted mb-4">
+                                    <img
+                                        v-if="assignment.course.image_path"
+                                        :src="assignment.course.image_path"
+                                        :alt="assignment.course.name"
+                                        class="w-full h-full object-cover"
+                                    />
+                                    <div v-else class="w-full h-full flex items-center justify-center bg-gradient-to-br from-green/10 to-green/5">
+                                        <CheckCircle class="h-16 w-16 text-green-600/40" />
+                                    </div>
+                                </div>
+
                                 <div class="flex items-start justify-between">
                                     <div class="flex-1">
                                         <h3 class="font-semibold">{{ assignment.course.name }}</h3>
@@ -597,8 +635,11 @@ const getSortedByDeadline = (assignments: Assignment[]) => {
                                     </div>
                                 </div>
 
+                                <!-- Spacer to push buttons to bottom -->
+                                <div class="flex-1"></div>
+
                                 <!-- Action Buttons -->
-                                <div class="flex gap-2">
+                                <div class="flex flex-col sm:flex-row gap-2">
                                     <Button asChild variant="outline" class="flex-1">
                                         <Link :href="route('courses-online.show', assignment.course.id)">
                                             <Eye class="mr-2 h-4 w-4" />

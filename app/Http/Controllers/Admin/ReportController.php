@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Course;
+use App\Models\CourseOnlineAssignment;
 use App\Models\CourseRegistration;
 use App\Models\Department;
 use App\Models\Quiz;
@@ -52,12 +53,39 @@ class ReportController extends Controller
         $quizzes = Quiz::where('status', 'published')->select('id', 'title')->orderBy('title')->get();
         $users = User::select('id', 'name')->orderBy('name')->get();
 
+        // ✅ CORRECTED: Online Courses Analytics using CourseOnlineAssignment
+        $onlineCoursesQuery = CourseOnlineAssignment::query();
+
+        if (!empty($filters['date_from'])) {
+            $onlineCoursesQuery->where('assigned_at', '>=', $filters['date_from']);
+        }
+        if (!empty($filters['date_to'])) {
+            $onlineCoursesQuery->where('assigned_at', '<=', $filters['date_to']);
+        }
+        if (!empty($filters['user_id'])) {
+            $onlineCoursesQuery->where('user_id', $filters['user_id']);
+        }
+
+        // Get counts
+        $totalEnrollments = $onlineCoursesQuery->count();
+        $completedCount = $onlineCoursesQuery->clone()->where('status', 'completed')->count();
+        $inProgressCount = $onlineCoursesQuery->clone()->where('status', 'in_progress')->count();
+
+        $onlineCourses = [
+            'total_enrollments' => $totalEnrollments,
+            'completed' => $completedCount,
+            'in_progress' => $inProgressCount,
+            'completion_rate' => $totalEnrollments > 0
+                ? round(($completedCount / $totalEnrollments) * 100, 1)
+                : 0
+        ];
+
         return Inertia::render('Admin/Reports/Index', [
-            'analytics' => $analytics,
+            'analytics' => array_merge($analytics, ['online_courses' => $onlineCourses]),
             'courses' => $courses,
             'quizzes' => $quizzes,
             'users' => $users,
-            'filters' => $filters
+            'filters' => $filters,
         ]);
     }
 
@@ -995,7 +1023,7 @@ class ReportController extends Controller
             $year = $request->get('year', Carbon::now()->year);
             $filters = $request->only(['department_id', 'course_id', 'user_level_id']);
 
-            // Generate complete KPI data
+            // ✅ Generate complete KPI data (now includes online course data)
             $kpiData = $this->monthlyKpiService->generateCompleteKpiReport($month, $year, $filters);
 
             // Get dropdown data for filters

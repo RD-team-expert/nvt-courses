@@ -66,33 +66,77 @@
                             </div>
                         </div>
 
-                        <!-- Category ✅ FIXED -->
-                        <!-- Category ✅ FIXED -->
-<div class="space-y-2">
-    <Label for="content_category_id">Category</Label>
-    <Select v-model="form.content_category_id">
-        <SelectTrigger :class="{ 'border-destructive': form.errors.content_category_id }">
-            <SelectValue placeholder="Select a category..." />
-        </SelectTrigger>
-        <SelectContent>
-            <!-- ❌ REMOVED: <SelectItem value="">No Category</SelectItem> -->
-            <SelectItem
-                v-for="category in categories"
-                :key="category.id"
-                :value="category.id.toString()"
-            >
-                {{ category.name }}
-            </SelectItem>
-        </SelectContent>
-    </Select>
-    <div v-if="form.errors.content_category_id" class="text-sm text-destructive">
-        {{ form.errors.content_category_id }}
-    </div>
-    <div class="text-sm text-muted-foreground">
-        Select a category or leave unset for no category
-    </div>
-</div>
+                        <!-- Category -->
+                        <div class="space-y-2">
+                            <Label for="content_category_id">Category</Label>
+                            <Select v-model="form.content_category_id">
+                                <SelectTrigger :class="{ 'border-destructive': form.errors.content_category_id }">
+                                    <SelectValue placeholder="Select a category..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem
+                                        v-for="category in categories"
+                                        :key="category.id"
+                                        :value="category.id.toString()"
+                                    >
+                                        {{ category.name }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <div v-if="form.errors.content_category_id" class="text-sm text-destructive">
+                                {{ form.errors.content_category_id }}
+                            </div>
+                            <div class="text-sm text-muted-foreground">
+                                Select a category or leave unset for no category
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
 
+                <!-- ✅ NEW: Storage Information (Read-Only Display) -->
+                <Card v-if="video.storage_type">
+                    <CardHeader>
+                        <CardTitle class="flex items-center gap-2">
+                            <HardDrive class="h-5 w-5" />
+                            Storage Information
+                        </CardTitle>
+                        <CardDescription>
+                            Current storage configuration (cannot be changed after creation)
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent class="space-y-4">
+                        <!-- Storage Type Badge -->
+                        <div class="flex items-center gap-4 p-4 bg-muted rounded-lg">
+                            <Cloud v-if="video.storage_type === 'google_drive'" class="h-8 w-8 text-blue-500" />
+                            <HardDrive v-else class="h-8 w-8 text-green-500" />
+                            <div class="flex-1">
+                                <p class="font-semibold text-lg">{{ video.storage_type_label || (video.storage_type === 'google_drive' ? 'Google Drive' : 'Local Storage') }}</p>
+                                <p class="text-sm text-muted-foreground">
+                                    {{ video.storage_type === 'google_drive' ? 'Video stored on Google Drive' : 'Video stored on local server' }}
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- File Information (for local videos) -->
+                        <div v-if="video.storage_type === 'local'" class="space-y-3">
+                            <Alert>
+                                <AlertCircle class="h-4 w-4" />
+                                <AlertDescription>
+                                    Video files cannot be replaced after upload. To use a different video file, please create a new video entry.
+                                </AlertDescription>
+                            </Alert>
+
+                            <div v-if="video.formatted_file_size || video.file_path" class="p-3 bg-muted/50 rounded-lg space-y-2">
+                                <div v-if="video.formatted_file_size" class="flex items-center justify-between text-sm">
+                                    <span class="text-muted-foreground">File Size:</span>
+                                    <span class="font-medium">{{ video.formatted_file_size }}</span>
+                                </div>
+                                <div v-if="video.file_path" class="flex items-center justify-between text-sm">
+                                    <span class="text-muted-foreground">File Path:</span>
+                                    <span class="font-mono text-xs truncate max-w-md">{{ video.file_path }}</span>
+                                </div>
+                            </div>
+                        </div>
                     </CardContent>
                 </Card>
 
@@ -104,12 +148,12 @@
                             Video Source
                         </CardTitle>
                         <CardDescription>
-                            Update the video source and metadata
+                            {{ video.storage_type === 'local' ? 'Video file information' : 'Update the video source and metadata' }}
                         </CardDescription>
                     </CardHeader>
                     <CardContent class="space-y-4">
-                        <!-- Google Drive URL -->
-                        <div class="space-y-2">
+                        <!-- ✅ Google Drive URL (Only editable for Google Drive videos) -->
+                        <div v-if="!video.storage_type || video.storage_type === 'google_drive'" class="space-y-2">
                             <Label for="google_drive_url">Google Drive Video URL</Label>
                             <div class="flex gap-2">
                                 <Input
@@ -158,6 +202,9 @@
                             </div>
                             <div v-if="form.errors.duration" class="text-sm text-destructive">
                                 {{ form.errors.duration }}
+                            </div>
+                            <div v-if="video.storage_type === 'local'" class="text-sm text-muted-foreground">
+                                Duration for local videos (auto-detected during upload if available)
                             </div>
                         </div>
                     </CardContent>
@@ -346,6 +393,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 
 // Icons
 import {
@@ -358,10 +406,12 @@ import {
     TestTube,
     Loader2,
     Trash2,
-    BarChart3
+    BarChart3,
+    Cloud,          // ✅ NEW
+    HardDrive,      // ✅ NEW
+    AlertCircle,    // ✅ NEW
 } from 'lucide-vue-next'
 
-// ✅ FIXED interface
 interface Video {
     id: number
     name: string
@@ -370,9 +420,14 @@ interface Video {
     duration?: number
     thumbnail_url?: string
     is_active: boolean
-    content_category_id?: number  // ✅ Changed from video_category_id
+    content_category_id?: number
     total_viewers?: number
     avg_completion?: number
+    storage_type?: 'google_drive' | 'local'           // ✅ NEW
+    storage_type_label?: string                        // ✅ NEW
+    file_path?: string                                 // ✅ NEW
+    formatted_file_size?: string                       // ✅ NEW
+    created_at?: string                                // ✅ NEW
 }
 
 interface VideoCategory {
@@ -390,14 +445,13 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Edit Video', href: '' },
 ]
 
-// ✅ FIXED form field name
 const form = useForm({
     name: props.video.name,
     description: props.video.description || '',
     google_drive_url: props.video.google_drive_url,
     duration: props.video.duration,
     thumbnail: null as File | null,
-    content_category_id: props.video.content_category_id?.toString() || null,  // ✅ Fixed
+    content_category_id: props.video.content_category_id?.toString() || null,
     is_active: props.video.is_active,
     remove_thumbnail: false,
 })
@@ -406,7 +460,6 @@ const isSubmitting = ref(false)
 const testingUrl = ref(false)
 const thumbnailPreview = ref<string | null>(null)
 
-// Handle thumbnail file change
 const handleThumbnailChange = (event: Event) => {
     const target = event.target as HTMLInputElement
     const file = target.files?.[0]
@@ -426,14 +479,12 @@ const handleThumbnailChange = (event: Event) => {
     }
 }
 
-// Remove current thumbnail
 const removeThumbnail = () => {
     form.remove_thumbnail = true
     form.thumbnail = null
     thumbnailPreview.value = null
 }
 
-// Test video URL
 const testVideoUrl = async () => {
     if (!form.google_drive_url) return
 
@@ -451,7 +502,6 @@ const testVideoUrl = async () => {
     }
 }
 
-// Format duration helper
 const formatDuration = (seconds: number | null | undefined): string => {
     if (!seconds) return '00:00'
 
@@ -468,7 +518,7 @@ const submit = async () => {
     isSubmitting.value = true
 
     form.post(`/admin/videos/${props.video.id}/update`, {
-        forceFormData: true,  // ✅ Force multipart/form-data
+        forceFormData: true,
         onFinish: () => {
             isSubmitting.value = false
         },
@@ -487,7 +537,6 @@ const deleteVideo = () => {
     }
 }
 
-// Reset remove_thumbnail when new file is selected
 watch(() => form.thumbnail, (newValue) => {
     if (newValue) {
         form.remove_thumbnail = false

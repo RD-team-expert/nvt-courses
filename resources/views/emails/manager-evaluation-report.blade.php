@@ -84,6 +84,44 @@
         .employee-info div {
             margin: 5px 0;
         }
+        /* ✅ NEW: Overall summary card styles */
+        .overall-summary {
+            background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .overall-summary h4 {
+            color: #667eea;
+            margin: 0 0 15px 0;
+            font-size: 16px;
+        }
+        .stats-grid {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        .stat-card {
+            flex: 1;
+            min-width: 180px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .stat-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+        .stat-label {
+            color: #666;
+            font-size: 13px;
+        }
+        /* End new styles */
         .evaluation-details {
             margin: 20px 0;
             background: white;
@@ -221,11 +259,32 @@
                             <div><strong>Email:</strong> {{ $employeeData['employee']['email'] }}</div>
                         </div>
 
-                        @foreach($employeeData['evaluations'] as $evaluation)
+                        {{-- ✅ NEW: Overall Performance Summary --}}
+                        <div class="overall-summary">
+                            <h4>📊 Overall Performance Summary</h4>
+                            <div class="stats-grid">
+                                <div class="stat-card">
+                                    <div class="stat-value">{{ $employeeData['overall_average'] }}%</div>
+                                    <div class="stat-label">Overall Average Score</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-value">{{ $employeeData['total_evaluations'] }}</div>
+                                    <div class="stat-label">Total Courses</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-value">{{ $employeeData['total_scores_count'] }}</div>
+                                    <div class="stat-label">Total Evaluations</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Individual Course Evaluations --}}
+                        @foreach($employeeData['evaluations'] as $index => $evaluation)
                             <div class="evaluation-details">
                                 <div class="summary-table">
                                     <h4>{{ $evaluation['course'] }} - Evaluation Summary</h4>
                                     <div style="display: flex; justify-content: space-between; flex-wrap: wrap;">
+                                        <div><strong>Course Average:</strong> <span class="score-highlight">{{ $employeeData['course_averages'][$index] ?? 'N/A' }}%</span></div>
                                         <div><strong>Total Score:</strong> <span class="score-highlight">{{ $evaluation['total_score'] }}</span></div>
                                         <div><strong>Incentive:</strong> ${{ $evaluation['incentive_amount'] }}</div>
                                         <div><strong>Date:</strong> {{ $evaluation['created_at'] }}</div>

@@ -25,7 +25,9 @@ import { Progress } from '@/components/ui/progress'
 
 const props = defineProps({
     courses: Array,
-    users: Array
+    users: Array,
+    departments: Array<any>  // ✅ ADD THIS
+
 })
 
 const form = useForm({
@@ -104,13 +106,30 @@ function closeProgressModal() {
 
 // Select all users
 function selectAllUsers() {
-    form.user_ids = props.users.map(u => u.id)
+    form.user_ids = filteredUsers.value.map(user => user.id)  // ✅ NEW
 }
 
 // Clear all users
 function clearAllUsers() {
     form.user_ids = []
 }
+
+// 1. Store selected department
+const selectedDepartment = ref('all') // ✅ NEW
+
+// 2. Filter users based on department
+const filteredUsers = computed(() => {
+    if (!selectedDepartment.value || selectedDepartment.value === 'all') {  // ✅ NEW
+        return props.users // Show all users if no department selected
+    }
+
+    return props.users.filter(user =>
+        user.department_id?.toString() === selectedDepartment.value
+    )
+})
+
+// 3. Use filteredUsers instead of props.users in the user list
+
 </script>
 
 <template>
@@ -250,6 +269,29 @@ function clearAllUsers() {
                             <div v-if="form.errors.course_id" class="text-destructive text-sm">{{ form.errors.course_id }}</div>
                         </div>
 
+
+                        <!-- Department Filter (NEW - Add after course selection) -->
+                        <div class="space-y-3">
+                            <Label>Filter by Department (Optional)</Label>
+                            <Select v-model="selectedDepartment">
+                                <SelectTrigger>
+                                    <SelectValue placeholder="All Departments" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Departments</SelectItem>
+                                    <SelectItem
+                                        v-for="dept in departments"
+                                        :key="dept.id"
+                                        :value="dept.id.toString()"
+                                    >
+                                        {{ dept.name }} ({{ dept.users_count }} users)
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+
+
                         <!-- User Selection -->
                         <div class="space-y-3">
                             <Label class="text-sm font-semibold">Select Users *</Label>
@@ -257,7 +299,7 @@ function clearAllUsers() {
                                 <CardContent class="p-4">
                                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-80 overflow-y-auto">
                                         <div
-                                            v-for="user in users"
+                                            v-for="user in filteredUsers"
                                             :key="user.id"
                                             class="flex items-center space-x-3 p-3 bg-background rounded-lg border hover:border-primary/50 hover:bg-accent/50 transition-colors cursor-pointer"
                                             :class="{ 'border-primary bg-accent': form.user_ids.includes(user.id) }"

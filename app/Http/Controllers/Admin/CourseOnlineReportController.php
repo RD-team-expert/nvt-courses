@@ -545,24 +545,6 @@ class CourseOnlineReportController extends Controller
             }
 
             // ✅ Time of day factor (learning effectiveness patterns)
-            $hour = $start->hour;
-            if ($hour >= 9 && $hour <= 11) {
-                $score += 15; // Peak morning learning time
-            } elseif ($hour >= 14 && $hour <= 16) {
-                $score += 10; // Good afternoon learning time
-            } elseif ($hour >= 19 && $hour <= 21) {
-                $score += 5;  // Evening study time
-            } elseif ($hour >= 22 || $hour <= 6) {
-                $score -= 20; // Late night/early morning - less focused
-            }
-
-            // ✅ Day of week factor
-            $dayOfWeek = $start->dayOfWeek;
-            if ($dayOfWeek >= 1 && $dayOfWeek <= 5) {
-                $score += 10; // Weekdays - more focused
-            } else {
-                $score -= 5; // Weekends - potentially less focused
-            }
 
             // ✅ Session continuity bonus (if session completed properly)
             if ($sessionEnd) {
@@ -576,22 +558,6 @@ class CourseOnlineReportController extends Controller
             // Ensure score is in realistic range (25-100)
             $score = max(25, min(100, $score));
 
-            Log::info('🔧 Simulated attention score calculated', [
-                'session_start' => $sessionStart,
-                'duration_minutes' => $calculatedDuration,
-                'hour_of_day' => $hour,
-                'day_of_week' => $dayOfWeek,
-                'day_name' => $start->dayName,
-                'base_score' => 70,
-                'final_score' => $score,
-                'factors' => [
-                    'duration_bonus' => $calculatedDuration >= 10 && $calculatedDuration <= 45 ? 20 : ($calculatedDuration < 5 ? -25 : 0),
-                    'time_bonus' => $hour >= 9 && $hour <= 11 ? 15 : 0,
-                    'day_bonus' => $dayOfWeek >= 1 && $dayOfWeek <= 5 ? 10 : -5,
-                    'completion_bonus' => $sessionEnd ? 5 : 0,
-                    'random_factor' => $randomFactor,
-                ],
-            ]);
 
             return $score;
 
