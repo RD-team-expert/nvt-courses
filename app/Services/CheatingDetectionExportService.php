@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Models\LearningSession;
 use App\Models\User;
 use App\Models\CourseOnline;
-use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 class CheatingDetectionExportService

@@ -291,10 +291,8 @@ class CourseAssignmentController extends Controller
                         )
                     );
 
-                    Log::info('✅ Manager notification sent', [
-                        'manager_email' => $manager->email,
-                        'employee_count' => $employees->count(),
-                    ]);
+                    
+                    
 
                 } catch (\Exception $e) {
                     Log::error('❌ Manager notification failed', [
@@ -334,23 +332,24 @@ class CourseAssignmentController extends Controller
     {
         try {
             // Check if user has a password
-            if (!empty($user->password)) {
-                return null; // User can use regular login
-            }
+            
+ 
 
             // Generate temporary login token
-            $token = Str::random(60);
+             $token = Str::random(64);
+
+ $expiresAt = now()->addHours(24);
 
             // Store token in user record or cache (you might want to create a separate table)
             $user->update([
-                'login_token' => Hash::make($token),
-                'login_token_expires' => now()->addDays(7), // Token expires in 7 days
+               'login_token' => hash('sha256', $token),
+               'login_token_expires_at' => $expiresAt,
             ]);
 
             // Create signed URL for token login
             $loginUrl = URL::temporarySignedRoute(
                 'auth.token-login',
-                now()->addDays(7),
+               $expiresAt, 
                 [
                     'user' => $user->id,
                     'course' => $course->id,
@@ -623,11 +622,7 @@ class CourseAssignmentController extends Controller
             $course->analytics->updateAnalytics();
         }
 
-        Log::info('Course assignment deleted', [
-            'course_name' => $courseName,
-            'user_name' => $userName,
-            'deleted_by' => auth()->id(),
-        ]);
+       
 
         return redirect()->route('admin.course-assignments.index')
             ->with('success', "Assignment for {$userName} in {$courseName} has been removed.");
@@ -681,14 +676,7 @@ class CourseAssignmentController extends Controller
             }
         }
 
-        Log::info('Bulk course assignments created', [
-            'courses_count' => count($courses),
-            'users_count' => count($users),
-            'assignments_created' => $totalAssignments,
-            'assignments_skipped' => $skippedAssignments,
-            'assigned_by' => auth()->id(),
-        ]);
-
+       
         $message = "Successfully created {$totalAssignments} assignments across " . count($courses) . " courses.";
         if ($skippedAssignments > 0) {
             $message .= " {$skippedAssignments} assignments were skipped (already exist).";
@@ -746,11 +734,8 @@ class CourseAssignmentController extends Controller
             // You can implement email sending here
             // Mail::to($user->email)->send(new CourseAssigned($course, $user, $assignment));
 
-            Log::info('Assignment notification sent', [
-                'course_id' => $course->id,
-                'user_id' => $user->id,
-                'user_email' => $user->email,
-            ]);
+          
+            
         } catch (\Exception $e) {
             Log::error('Failed to send assignment notification', [
                 'course_id' => $course->id,

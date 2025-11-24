@@ -18,7 +18,6 @@ class SendCourseNotification
             // ✅ Send email with password
             Mail::to($user->email)->send(new CourseCreatedNotification($course, $user, $loginLink));
 
-            Log::info("Course notification sent successfully to: {$user->email}");
 
         } catch (\Exception $e) {
             Log::error("Failed to send course notification to {$user->email}: " . $e->getMessage());

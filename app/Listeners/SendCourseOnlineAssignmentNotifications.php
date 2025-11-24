@@ -46,10 +46,7 @@ class SendCourseOnlineAssignmentNotifications
     private function sendUserNotification(CourseOnlineAssigned $event): void
     {
         try {
-            Log::info('📧 Sending user notification', [
-                'to_email' => $event->user->email,
-                'course_name' => $event->course->name,
-            ]);
+           
 
             Mail::to($event->user->email)
                 ->send(new CourseOnlineAssignmentNotification(
@@ -60,17 +57,10 @@ class SendCourseOnlineAssignmentNotifications
                     $event->metadata
                 ));
 
-            Log::info('✅ User notification sent successfully', [
-                'user_email' => $event->user->email,
-                'course_name' => $event->course->name,
-            ]);
+         
 
         } catch (\Exception $e) {
-            Log::error('❌ User notification failed', [
-                'user_email' => $event->user->email,
-                'course_name' => $event->course->name,
-                'error' => $e->getMessage(),
-            ]);
+          
         }
     }
 
@@ -82,10 +72,7 @@ class SendCourseOnlineAssignmentNotifications
         try {
             // Skip if user has no department
             if (!$event->user->department) {
-                Log::info('👤 User has no department, skipping manager notification', [
-                    'user_id' => $event->user->id,
-                    'user_email' => $event->user->email,
-                ]);
+              
                 return;
             }
 
@@ -93,10 +80,7 @@ class SendCourseOnlineAssignmentNotifications
             $managers = $this->managerService->getDirectManagersForUser($event->user->id);
 
             if (empty($managers)) {
-                Log::info('👔 No managers found for user', [
-                    'user_id' => $event->user->id,
-                    'user_department' => $event->user->department->name,
-                ]);
+               
                 return;
             }
 
@@ -105,13 +89,7 @@ class SendCourseOnlineAssignmentNotifications
                 $manager = $managerData['manager'];
 
                 try {
-                    Log::info('📧 Sending manager notification', [
-                        'to_email' => $manager->email,
-                        'manager_name' => $manager->name,
-                        'team_member' => $event->user->name,
-                        'course_name' => $event->course->name,
-                    ]);
-
+                  
                     Mail::to($manager->email)
                         ->send(new CourseOnlineAssignmentManagerNotification(
                             $event->course,
@@ -124,11 +102,7 @@ class SendCourseOnlineAssignmentNotifications
                             ])
                         ));
 
-                    Log::info('✅ Manager notification sent successfully', [
-                        'manager_email' => $manager->email,
-                        'team_member' => $event->user->name,
-                        'course_name' => $event->course->name,
-                    ]);
+                   
 
                 } catch (\Exception $e) {
                     Log::error('❌ Manager notification failed', [

@@ -8,7 +8,6 @@ use App\Models\UserDepartmentRole;
 use App\Models\Department;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Log;
 
 
 class ManagerHierarchyService

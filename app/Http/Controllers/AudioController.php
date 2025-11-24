@@ -7,7 +7,6 @@ use App\Models\AudioCategory;
 use App\Models\AudioProgress;
 use App\Services\GoogleDriveService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 

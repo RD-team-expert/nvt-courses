@@ -10,6 +10,7 @@ use App\Models\LearningSession;
 use App\Models\UserContentProgress;
 use App\Models\Department;
 use App\Services\CsvExportService;
+use App\Services\DepartmentPerformanceService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -19,10 +20,12 @@ use Carbon\Carbon;
 class CourseOnlineReportController extends Controller
 {
     protected $csvExportService;
+    protected $departmentPerformanceService;
 
-    public function __construct(CsvExportService $csvExportService)
+    public function __construct(CsvExportService $csvExportService, DepartmentPerformanceService $departmentPerformanceService)
     {
         $this->csvExportService = $csvExportService;
+        $this->departmentPerformanceService = $departmentPerformanceService;
     }
 
     /**
@@ -33,7 +36,7 @@ class CourseOnlineReportController extends Controller
 
 
         try {
-            $filters = $request->only(['course_id', 'status', 'date_from', 'date_to', 'user_id']);
+            $filters = $request->only(['course_id', 'status', 'date_from', 'date_to', 'user_id', 'department_id']);
 
             // ✅ Check database tables
             $this->debugDatabaseTables();
@@ -60,6 +63,9 @@ class CourseOnlineReportController extends Controller
             }
             if (!empty($filters['date_to'])) {
                 $query->whereDate('course_online_assignments.assigned_at', '<=', $filters['date_to']);
+            }
+            if (!empty($filters['department_id'])) {
+                $query->where('users.department_id', $filters['department_id']);
             }
 
             $query->select([
@@ -156,6 +162,7 @@ class CourseOnlineReportController extends Controller
             // Get filter options
             $courses = CourseOnline::where('is_active', true)->select('id', 'name')->orderBy('name')->get();
             $users = User::where('role', '!=', 'admin')->select('id', 'name', 'email')->orderBy('name')->get();
+            $departments = Department::where('is_active', true)->select('id', 'name')->orderBy('name')->get();
 
 
 
@@ -168,6 +175,7 @@ class CourseOnlineReportController extends Controller
                 'assignments' => $assignments,
                 'courses' => $courses,
                 'users' => $users,
+                'departments' => $departments,
                 'filters' => $filters,
                 'stats' => $stats,
             ]);
@@ -186,7 +194,7 @@ class CourseOnlineReportController extends Controller
     {
 
         try {
-            $filters = $request->only(['course_id', 'user_id', 'date_from', 'date_to', 'suspicious_only']);
+            $filters = $request->only(['course_id', 'user_id', 'date_from', 'date_to', 'suspicious_only', 'department_id']);
 
             $query = LearningSession::query()
                 ->join('users', 'learning_sessions.user_id', '=', 'users.id')
@@ -206,6 +214,9 @@ class CourseOnlineReportController extends Controller
             }
             if (!empty($filters['date_to'])) {
                 $query->whereDate('learning_sessions.session_start', '<=', $filters['date_to']);
+            }
+            if (!empty($filters['department_id'])) {
+                $query->where('users.department_id', $filters['department_id']);
             }
 
             $sessions = $query->select([
@@ -278,6 +289,7 @@ class CourseOnlineReportController extends Controller
 
             $courses = CourseOnline::where('is_active', true)->select('id', 'name')->orderBy('name')->get();
             $users = User::where('role', '!=', 'admin')->select('id', 'name', 'email')->orderBy('name')->get();
+            $departments = Department::where('is_active', true)->select('id', 'name')->orderBy('name')->get();
 
             // ✅ FIXED: Session statistics with REAL durations and SIMULATED attention
             $sessionStats = $this->calculateSessionStatsWithSimulatedAttention();
@@ -287,6 +299,7 @@ class CourseOnlineReportController extends Controller
                 'sessions' => $sessions,
                 'courses' => $courses,
                 'users' => $users,
+                'departments' => $departments,
                 'filters' => $filters,
                 'stats' => $sessionStats,
             ]);
@@ -304,7 +317,7 @@ class CourseOnlineReportController extends Controller
     {
 
         try {
-            $filters = $request->only(['user_id', 'course_id', 'date_from', 'date_to']);
+            $filters = $request->only(['user_id', 'course_id', 'date_from', 'date_to', 'department_id']);
 
             $query = User::query()
                 ->where('role', '!=', 'admin')
@@ -312,6 +325,10 @@ class CourseOnlineReportController extends Controller
 
             if (!empty($filters['user_id'])) {
                 $query->where('id', $filters['user_id']);
+            }
+
+            if (!empty($filters['department_id'])) {
+                $query->where('department_id', $filters['department_id']);
             }
 
             $users = $query->paginate(15)->withQueryString();
@@ -413,11 +430,13 @@ class CourseOnlineReportController extends Controller
 
             $courses = CourseOnline::where('is_active', true)->select('id', 'name')->orderBy('name')->get();
             $allUsers = User::where('role', '!=', 'admin')->select('id', 'name', 'email')->orderBy('name')->get();
+            $departments = Department::where('is_active', true)->select('id', 'name')->orderBy('name')->get();
 
             return Inertia::render('Admin/Reports/UserPerformanceReport', [
                 'users' => $users,
                 'courses' => $courses,
                 'allUsers' => $allUsers,
+                'departments' => $departments,
                 'filters' => $filters,
             ]);
 
@@ -1221,6 +1240,85 @@ class CourseOnlineReportController extends Controller
 
             return back()->with('error', 'Export failed: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * 📊 NEW: Department Performance Report
+     */
+    public function departmentPerformanceReport(Request $request)
+    {
+        $filters = $request->only(['department_id', 'date_from', 'date_to']);
+        
+        $data = $this->departmentPerformanceService->getDepartmentPerformance($filters);
+        $departments = Department::where('is_active', true)->select('id', 'name')->orderBy('name')->get();
+
+        return Inertia::render('Admin/Reports/DepartmentPerformance', [
+            'departments' => $departments, // For the filter dropdown
+            'reportData' => $data['departments'], // The actual report data
+            'stats' => $data['stats'],
+            'filters' => $filters
+        ]);
+    }
+
+    /**
+     * 📤 NEW: Export Department Performance Report
+     */
+    public function exportDepartmentPerformanceReport(Request $request)
+    {
+        $filters = $request->only(['department_id', 'date_from', 'date_to']);
+        
+        $data = $this->departmentPerformanceService->getDepartmentPerformance($filters);
+
+        $csvData = [];
+        foreach ($data['departments'] as $dept) {
+            // Add Top Performers
+            foreach ($dept['top_performers'] as $user) {
+                $csvData[] = [
+                    'Department' => $dept['name'],
+                    'Rank Type' => 'Top Performer',
+                    'Rank' => $user->rank,
+                    'Employee Code' => $user->employee_code,
+                    'Name' => $user->name,
+                    'Email' => $user->email,
+                    'Total Evaluations' => $user->total_evaluations,
+                    'Average Score' => $user->avg_score,
+                    'Regular Courses' => $user->regular_courses,
+                    'Online Courses' => $user->online_courses,
+                ];
+            }
+
+            // Add Bottom Performers
+            foreach ($dept['bottom_performers'] as $user) {
+                $csvData[] = [
+                    'Department' => $dept['name'],
+                    'Rank Type' => 'Needs Support',
+                    'Rank' => $user->rank, // Note: rank might need adjustment if we want 1,2,3 from bottom
+                    'Employee Code' => $user->employee_code,
+                    'Name' => $user->name,
+                    'Email' => $user->email,
+                    'Total Evaluations' => $user->total_evaluations,
+                    'Average Score' => $user->avg_score,
+                    'Regular Courses' => $user->regular_courses,
+                    'Online Courses' => $user->online_courses,
+                ];
+            }
+        }
+
+        $filename = 'department-performance-report-' . now()->format('Y-m-d') . '.csv';
+        $headers = [
+            'Department',
+            'Rank Type',
+            'Rank',
+            'Employee Code',
+            'Name',
+            'Email',
+            'Total Evaluations',
+            'Average Score',
+            'Regular Courses',
+            'Online Courses',
+        ];
+
+        return $this->csvExportService->export($filename, $headers, $csvData);
     }
 
 }

@@ -385,10 +385,18 @@ class OnlineCourseEvaluationController extends Controller
     {
         $departmentId = $request->input('department_id');
 
-        $users = User::with(['department', 'userLevel', 'userLevelTier'])
-            ->when($departmentId, function ($query) use ($departmentId) {
-                return $query->where('department_id', $departmentId);
-            })
+                            // After processing all categories, update evaluation record
+                            $evaluation->total_score = $totalScore;
+                            // Map score to performance level
+                            $performanceLevel = \App\Enums\PerformanceLevel::getLevelByScore($totalScore);
+                            $levelMeta = \App\Enums\PerformanceLevel::getById($performanceLevel);
+                            $evaluation->performance_level = $performanceLevel;
+                            $evaluation->performance_points_min = $levelMeta['min_score'] ?? null;
+                            $evaluation->performance_points_max = $levelMeta['max_score'] ?? null;
+                            $evaluation->save();
+  
+                            $users = User::where('department_id', $departmentId)
+
             ->select(['id', 'name', 'email', 'department_id', 'user_level_id', 'user_level_tier_id'])
             ->get()
             ->map(function ($user) {

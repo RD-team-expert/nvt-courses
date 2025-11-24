@@ -6,7 +6,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Log;
 
 class CourseOnlineAssignment extends Model
 {
@@ -121,11 +120,6 @@ class CourseOnlineAssignment extends Model
             $session->endSession(); // Uses the existing endSession() method from LearningSession model
         }
 
-        Log::info('All active sessions ended for completed course', [
-            'user_id' => $this->user_id,
-            'course_id' => $this->course_online_id,
-            'sessions_ended' => $activeSessions->count(),
-        ]);
     }
 
     public function getTimeSpentAttribute(): ?int

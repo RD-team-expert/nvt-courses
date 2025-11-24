@@ -106,6 +106,11 @@ const reportsSubItems = [
         icon: LayoutList,
     },
     {
+        title: 'Quizzes Assignment',
+        href: '/admin/quiz-assignments/create',
+        icon: LayoutList,
+    },
+    {
         title: 'Users',
         href: '/admin/users',
         icon: Users,

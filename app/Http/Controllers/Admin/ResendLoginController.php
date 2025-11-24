@@ -8,7 +8,6 @@ use App\Models\Course;
 use App\Mail\PasswordResetWithLoginLink;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
 class ResendLoginController extends Controller

@@ -4,7 +4,6 @@ namespace App\Services\ContentView;
 
 use App\Models\ModuleContent;
 use App\Models\UserContentProgress;
-use Illuminate\Support\Facades\Log;
 
 class ContentNavigationService
 {

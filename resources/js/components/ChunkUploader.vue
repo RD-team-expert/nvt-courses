@@ -1,15 +1,3 @@
-<template>
-    <div class="chunk-uploader">
-        <input
-            ref="fileInput"
-            type="file"
-            :accept="accept"
-            class="filepond"
-        />
-        <input type="hidden" :name="name" v-model="fileData" />
-    </div>
-</template>
-
 <script setup>
 import { ref, onMounted, watch, onBeforeUnmount } from 'vue';
 import * as FilePond from 'filepond';
@@ -42,13 +30,12 @@ const fileInput = ref(null);
 const fileData = ref(props.modelValue);
 let pond = null;
 
-// Register FilePond plugins
 FilePond.registerPlugin(
     FilePondPluginFileValidateType,
     FilePondPluginFileValidateSize
 );
 
-// ✅ Get XSRF token from cookie (Laravel's way)
+// Get XSRF token from cookie
 const getXSRFToken = () => {
     const name = 'XSRF-TOKEN=';
     const decodedCookie = decodeURIComponent(document.cookie);
@@ -67,62 +54,112 @@ onMounted(() => {
     const xsrfToken = getXSRFToken();
 
     if (!xsrfToken) {
-        console.warn('⚠️ XSRF-TOKEN cookie not found. This is normal on first load.');
+        console.warn('⚠️ XSRF-TOKEN cookie not found');
     }
 
-    // Create FilePond instance
+    // ✅ Store the final response here
+    let finalResponse = null;
+
     pond = FilePond.create(fileInput.value, {
-        acceptedFileTypes: ['video/*'],
+        acceptedFileTypes: props.accept ? [props.accept] : ['video/*'],
         maxFileSize: props.maxFileSize,
+        
         chunkUploads: true,
-        chunkSize: 2097152, // 2MB chunks
+        chunkSize: 1048576,
+        chunkForce: true,
         chunkRetryDelays: [500, 1000, 3000],
+        
         server: {
-            url: window.location.origin,
             process: {
                 url: '/admin/videos/upload-chunk',
                 method: 'POST',
                 headers: {
-                    'X-XSRF-TOKEN': xsrfToken || '', // ✅ Use XSRF cookie token
-                    'Accept': 'application/json',
+                    'X-XSRF-TOKEN': xsrfToken || '',
                 },
-                withCredentials: true, // ✅ Important: send cookies
-                onload: (response) => {
-                    console.log('✅ Upload response:', response);
-                    const data = JSON.parse(response);
-                    fileData.value = JSON.stringify(data);
-                    emit('update:modelValue', JSON.stringify(data));
-                    emit('uploaded', data);
-                    return data.path;
+                withCredentials: true,
+                onload: (xhr) => {
+                    console.log('✅ POST Response:', xhr.responseText);
+                    return xhr.responseText;
                 },
-                onerror: (response) => {
-                    console.error('❌ Upload error:', response);
-                    const error = response || 'Upload failed';
-                    emit('error', error);
-                    return error;
+                onerror: (xhr) => {
+                    console.error('❌ POST Error:', xhr.responseText);
+                    return xhr.responseText || 'Upload failed';
                 }
             },
-            revert: null,
-            restore: null,
-            load: null,
-            fetch: null,
+            patch: {
+                url: '/admin/videos/upload-chunk?patch=',
+                method: 'PATCH',
+                headers: {
+                    'X-XSRF-TOKEN': xsrfToken || '',
+                },
+                withCredentials: true,
+                onload: (xhr) => {
+                    const responseText = xhr.responseText;
+                    console.log('✅ PATCH Response:', responseText);
+                    
+                    // Try to parse and store the final response
+                    try {
+                        const parsed = JSON.parse(responseText);
+                        if (parsed && parsed.path) {
+                            console.log('✅ Saving final response:', parsed);
+                            finalResponse = parsed;
+                        }
+                    } catch (e) {
+                        console.log('Not JSON or incomplete');
+                    }
+                    
+                    return responseText;
+                },
+                onerror: (xhr) => {
+                    console.error('❌ PATCH Error:', xhr.responseText);
+                    return xhr.responseText || 'Chunk upload failed';
+                }
+            },
+            revert: '/admin/videos/upload-chunk/revert',
         },
-        labelIdle: 'Drag & Drop your video or <span class="filepond--label-action">Browse</span>',
-        labelFileProcessing: 'Uploading',
-        labelFileProcessingComplete: 'Upload complete',
-        labelFileProcessingAborted: 'Upload cancelled',
-        labelFileProcessingError: 'Error during upload',
-        labelTapToCancel: 'tap to cancel',
-        labelTapToRetry: 'tap to retry',
-        labelTapToUndo: 'tap to undo',
-    });
 
-    // Track progress
-    pond.on('processfileprogress', (file, progress) => {
-        emit('progress', Math.round(progress * 100));
+        onprocessfile: (error, file) => {
+            if (error) {
+                console.error('❌ File process error:', error);
+                emit('error', error);
+                return;
+            }
+            
+            console.log('✅ File uploaded successfully!');
+            
+            // Use the stored response from PATCH
+            if (finalResponse && finalResponse.path) {
+                console.log('✅ Using final response:', finalResponse);
+                emit('uploaded', finalResponse);
+                finalResponse = null;  // Reset for next upload
+            } else {
+                console.error('❌ No valid response found');
+                emit('error', 'Upload completed but no valid response received');
+            }
+        },
+        
+        onprocessfileprogress: (file, progress) => {
+            const progressPercent = Math.round(progress * 100);
+            console.log(`📊 Progress: ${progressPercent}%`);
+            emit('progress', progressPercent);
+        },
+        
+        onprocessfileerror: (error) => {
+            console.error('❌ Upload error:', error);
+            emit('error', error.body || error.message || 'Upload failed');
+        },
+
+        labelIdle: 'Drag & Drop your video or <span class="filepond--label-action">Browse</span>',
     });
 
     console.log('✅ FilePond initialized');
+
+    // Event listeners for debugging
+    pond.on('addfile', (error, file) => {
+        if (!error) {
+            console.log('✅ File added:', file.filename, 'Size:', file.fileSize);
+        }
+    });
 });
 
 onBeforeUnmount(() => {
@@ -136,12 +173,23 @@ watch(() => props.modelValue, (newValue) => {
 });
 </script>
 
+<template>
+    <div class="chunk-uploader">
+        <input
+            ref="fileInput"
+            type="file"
+            :accept="accept"
+            class="filepond"
+        />
+        <input type="hidden" :name="name" v-model="fileData" />
+    </div>
+</template>
+
 <style scoped>
 .chunk-uploader {
     width: 100%;
 }
 
-/* Custom FilePond styling */
 :deep(.filepond--root) {
     font-family: inherit;
 }

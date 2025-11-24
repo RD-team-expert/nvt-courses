@@ -8,7 +8,6 @@ use App\Models\VideoCategory;
 use App\Models\VideoProgress;
 use App\Services\GoogleDriveService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
@@ -175,12 +174,7 @@ class VideoController extends Controller
             })
             ->toArray(); // ✅ Convert to array to ensure it's never null
 
-        Log::info('Video accessed by user', [
-            'video_id' => $video->id,
-            'user_id' => auth()->id(),
-            'current_progress' => $userProgress->completion_percentage,
-            'bookmarks_count' => count($bookmarks),
-        ]);
+      
 
         return Inertia::render('Video/Show', [
             'video' => [
@@ -238,13 +232,7 @@ class VideoController extends Controller
             $userProgress->update(['playback_speed' => $validated['playback_speed']]);
         }
 
-        Log::debug('Video progress updated', [
-            'video_id' => $video->id,
-            'user_id' => auth()->id(),
-            'current_time' => $validated['current_time'],
-            'completion_percentage' => $userProgress->completion_percentage,
-            'is_completed' => $userProgress->is_completed,
-        ]);
+       
 
         return response()->json([
             'success' => true,
@@ -276,11 +264,9 @@ class VideoController extends Controller
             'last_accessed_at' => now(),
         ]);
 
-        Log::info('Video manually marked as completed', [
-            'video_id' => $video->id,
-            'user_id' => auth()->id(),
-        ]);
-
+        
         return response()->json(['success' => true]);
     }
+
+  
 }
