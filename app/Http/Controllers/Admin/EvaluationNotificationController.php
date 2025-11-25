@@ -13,7 +13,6 @@ use App\Services\ManagerHierarchyService;
 use App\Services\EvaluationEmailService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
 class EvaluationNotificationController extends Controller

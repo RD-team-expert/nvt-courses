@@ -90,37 +90,40 @@ class VideoStreamingService
      * @return array
      */
     protected function getLocalStreamingUrl(Video $video, ModuleContent $content): array
-    {
-        if (!$video->file_path) {
-
-            return [
-                'streaming_url' => null,
-                'key_id' => null,
-                'key_name' => 'local_storage_error',
-            ];
-        }
-
-        // ✅ Generate signed URL with 2-hour expiration (security)
-        // This prevents unauthorized access to video files
-        $streamingUrl = URL::temporarySignedRoute(
-            'video.stream',
-            now()->addSeconds((int) config('filesystems.stream_url_expiry', 7200)),
-            ['video' => $video->id]
-        );
-
-        // ✅ Store in session (for consistency with Google Drive approach)
-        $localKeyData = [
-            'streaming_url' => $streamingUrl,
-            'key_id' => null, // No API key needed for local videos
-            'key_name' => 'local_storage',
+{
+    if (!$video->file_path) {
+        Log::error('Video file path is empty for local video', [
+            'video_id' => $video->id,
+            'content_id' => $content->id,
+        ]);
+        
+        return [
+            'streaming_url' => null,
+            'key_id' => null,
+            'key_name' => 'local_storage_error',
         ];
-
-        $this->storeKeyInSession($content->id, $localKeyData);
-
-
-
-        return $localKeyData;
     }
+
+    // ✅ FIX: Generate simple route URL (not temporarySignedRoute)
+    $streamingUrl = route('video.stream', ['video' => $video->id]);
+
+    Log::info('Generated local streaming URL', [
+        'video_id' => $video->id,
+        'content_id' => $content->id,
+        'url' => $streamingUrl,
+    ]);
+
+    $localKeyData = [
+        'streaming_url' => $streamingUrl,
+        'key_id' => null,
+        'key_name' => 'local_storage',
+    ];
+
+    $this->storeKeyInSession($content->id, $localKeyData);
+
+    return $localKeyData;
+}
+
 
     /**
      * Process Google Drive PDF URL for embedding

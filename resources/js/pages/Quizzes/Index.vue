@@ -421,16 +421,17 @@ const getCourseTypeClass = (quiz) => {
 
                                         <!-- View Results Button (For completed/failed quizzes) -->
                                         <Button
-                                            v-else-if="isQuizCompleted(quiz)"
+                                            v-else-if="isQuizCompleted(quiz) && quiz.latest_attempt_id"
                                             asChild
                                             variant="secondary"
                                             class="w-full"
                                         >
-                                            <Link :href="route('quiz-attempts.results', quiz.id)">
+                                            <Link :href="route('quiz-attempts.results', quiz.latest_attempt_id)">
                                                 <BarChart3 class="w-4 h-4 mr-2" />
                                                 View Results
                                             </Link>
                                         </Button>
+
 
                                         <!-- Fallback disabled button -->
                                         <Button

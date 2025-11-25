@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Models\Video;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use FFMpeg\FFMpeg;
 use FFMpeg\Coordinate\TimeCode;

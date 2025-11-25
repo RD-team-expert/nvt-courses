@@ -178,8 +178,7 @@
                         <div v-else-if="form.storage_type === 'local'" class="space-y-2">
                             <Label for="video_file">Video File</Label>
                             <ChunkUploader
-                                v-model="form.video_data"
-                                name="video_file"
+                                name="file"
                                 accept="video/*"
                                 :maxFileSize="maxFileSizeMB + 'MB'"
                                 @uploaded="handleUploadComplete"

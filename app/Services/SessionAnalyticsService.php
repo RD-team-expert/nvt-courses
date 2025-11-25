@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Models\LearningSession;
 use App\Models\UserContentProgress;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Log;
 
 class SessionAnalyticsService
 {

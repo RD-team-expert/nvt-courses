@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Enums\PerformanceLevel;
 
 class Evaluation extends Model
 {
@@ -15,12 +16,18 @@ class Evaluation extends Model
         'course_online_id',
         'department_id',
         'total_score',
-        'incentive_amount',
+        'performance_level',
+        'performance_points_min',
+        'performance_points_max',
+        'incentive_amount', // deprecated - retained for legacy data during transition
     ];
 
     protected $casts = [
         'course_type' => 'string',
         'total_score' => 'integer',
+        'performance_level' => 'integer',
+        'performance_points_min' => 'integer',
+        'performance_points_max' => 'integer',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
@@ -114,6 +121,54 @@ class Evaluation extends Model
                 $evaluation->course_online_id = null;
             }
         });
+    }
+
+    /**
+     * Get performance level label (e.g. "Outstanding").
+     *
+     * @return string|null
+     */
+    public function getPerformanceLevelLabel()
+    {
+        if (!$this->performance_level) return null;
+        return PerformanceLevel::getLabelByLevel($this->performance_level);
+    }
+
+    /**
+     * Get the points range string for the performance level (e.g. "13-15" or "Below 7").
+     *
+     * @return string|null
+     */
+    public function getPerformancePointsRange()
+    {
+        if (!$this->performance_level) return null;
+        return PerformanceLevel::getRangeByLevel($this->performance_level);
+    }
+
+    /**
+     * Full description for tooltips/helper text.
+     */
+    public function getPerformanceLevelDescription()
+    {
+        if (!$this->performance_level) return null;
+        return PerformanceLevel::getDescriptionByLevel($this->performance_level);
+    }
+
+    /**
+     * Color for UI badges.
+     */
+    public function getPerformanceLevelColor()
+    {
+        if (!$this->performance_level) return null;
+        return PerformanceLevel::getColorByLevel($this->performance_level);
+    }
+
+    /**
+     * Scope to filter by performance level
+     */
+    public function scopeWherePerformanceLevel($query, $level)
+    {
+        return $query->where('performance_level', $level);
     }
 
 }

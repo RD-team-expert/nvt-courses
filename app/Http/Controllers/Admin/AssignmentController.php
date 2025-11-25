@@ -198,15 +198,10 @@ class AssignmentController extends Controller
 
                 $this->notifyManagersOnCourseAssignment($course, $allAssignedUsers, auth()->user());
             } else {
-                Log::info('ℹ️ Course is public, skipping manager notifications', [
-                    'course_privacy' => $course->privacy
-                ]);
+              
             }
         } else {
-            Log::info('ℹ️ No users to notify', [
-                'enrolled_users_count' => $enrolledUsers->count(),
-                'assigned_users_count' => $assignedUsers->count()
-            ]);
+          
         }
 
         // ✅ Enhanced messaging system with different messages
@@ -444,7 +439,7 @@ class AssignmentController extends Controller
                 // ✅ Pass the course ID when generating the login link
                 $loginLink = $user->generateLoginLink($course->id);
 
-
+// dd($loginLink);
                 // Dispatch event with the user and their login link
                 CourseAssigned::dispatch($course, $user, $loginLink);
                 sleep(3); // Rate limiting

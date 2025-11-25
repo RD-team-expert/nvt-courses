@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\LearningSession;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 class DriveKeyManager
 {
@@ -59,7 +58,6 @@ class DriveKeyManager
             // ✅ CHANGED: Adjust active_users based on whether we incremented
             $currentActiveUsers = $shouldIncrement ? $key->active_users + 1 : $key->active_users;
 
-            // 📊 Log the assignment
 
             return [
                 'id' => $key->id,

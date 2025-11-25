@@ -7,7 +7,6 @@ use App\Models\Course;
 use App\Models\User;
 use App\Mail\CourseCreationNotification;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Inertia\Inertia;
 use Carbon\Carbon;

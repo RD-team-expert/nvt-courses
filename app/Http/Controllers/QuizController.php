@@ -9,7 +9,6 @@ use App\Models\QuizQuestion;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 
 class QuizController extends Controller
@@ -43,6 +42,9 @@ class QuizController extends Controller
             $attemptCount = $userAttempts->count();
             $hasPassed = $userAttempts->contains('passed', true);
 
+            $latestAttempt = $userAttempts->sortByDesc('created_at')->first();
+
+
             // Get associated course
             $associatedCourse = $quiz->getAssociatedCourse();
 
@@ -59,6 +61,8 @@ class QuizController extends Controller
                     'name' => $associatedCourse->name,
                 ] : null,
                 'course_type' => $quiz->getCourseType(),
+
+                'latest_attempt_id' => $latestAttempt?->id,
 
                 // Attempt information
                 'attempts' => $attemptCount,

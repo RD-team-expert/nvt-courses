@@ -17,26 +17,37 @@ class ContentProgressService
      */
     public function getOrCreateProgress(User $user, ModuleContent $content): UserContentProgress
     {
-        $progress = UserContentProgress::firstOrCreate(
-            [
-                'user_id' => $user->id,
-                'content_id' => $content->id,
-            ],
-            [
-                'course_online_id' => $content->module->course_online_id,
-                'module_id' => $content->module_id,
-                'video_id' => $content->video_id,
-                'content_type' => $content->content_type,
-                'watch_time' => 0,
-                'completion_percentage' => 0,
-                'is_completed' => false,
-                'task_completed' => false,
-            ]
-        );
+        return DB::transaction(function () use ($user, $content) {
+            // Try to find it first to avoid locking if possible
+            $progress = UserContentProgress::where('user_id', $user->id)
+                ->where('content_id', $content->id)
+                ->first();
 
+            if ($progress) {
+                return $progress;
+            }
 
-
-        return $progress;
+            // If not found, acquire lock to ensure uniqueness
+            // We lock the user row or use a mutex if available, but for now, we'll use atomic creation
+            // The unique constraint on the DB table (user_id, content_id) should also be there.
+            
+            return UserContentProgress::firstOrCreate(
+                [
+                    'user_id' => $user->id,
+                    'content_id' => $content->id,
+                ],
+                [
+                    'course_online_id' => $content->module->course_online_id,
+                    'module_id' => $content->module_id,
+                    'video_id' => $content->video_id,
+                    'content_type' => $content->content_type,
+                    'watch_time' => 0,
+                    'completion_percentage' => 0,
+                    'is_completed' => false,
+                    'task_completed' => false,
+                ]
+            );
+        });
     }
 
     /**
@@ -79,12 +90,7 @@ class ContentProgressService
             'completed_at' => $completionPercentage >= 95 ? now() : $progress->completed_at,
         ]);
 
-        Log::info('📊 Progress updated', [
-            'progress_id' => $progressId,
-            'position' => $currentPosition,
-            'completion' => $completionPercentage,
-            'skip_detected' => $skipDetected,
-        ]);
+      
 
         return $progress->fresh();
     }
@@ -115,12 +121,7 @@ class ContentProgressService
         // Update course assignment progress
         $this->updateCourseProgress($progress->course_online_id, $progress->user_id);
 
-        Log::info('✅ Content marked as completed', [
-            'progress_id' => $progress->id,
-            'content_id' => $progress->content_id,
-            'user_id' => $progress->user_id,
-            'final_position' => $finalPosition,
-        ]);
+       
 
         return $progress->fresh();
     }
@@ -147,13 +148,7 @@ class ContentProgressService
 
         $progressPercentage = round(($completedContent / $totalContent) * 100, 2);
 
-        Log::info('📈 Course progress calculated', [
-            'course_id' => $courseId,
-            'user_id' => $userId,
-            'total_content' => $totalContent,
-            'completed_content' => $completedContent,
-            'progress_percentage' => $progressPercentage,
-        ]);
+       
 
         return $progressPercentage;
     }
@@ -248,11 +243,7 @@ class ContentProgressService
                     'completed_at' => $progressPercentage >= 100 ? now() : null,
                 ]);
 
-                Log::info('✅ Course assignment updated', [
-                    'assignment_id' => $assignment->id,
-                    'progress_percentage' => $progressPercentage,
-                    'status' => $assignment->status,
-                ]);
+              
             }
         } catch (\Exception $e) {
             Log::error('❌ Failed to update course progress', [

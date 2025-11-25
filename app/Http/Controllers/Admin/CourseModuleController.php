@@ -7,7 +7,6 @@ use App\Models\CourseOnline;
 use App\Models\CourseModule;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use Illuminate\Support\Facades\Log;
 
 class CourseModuleController extends Controller
 {

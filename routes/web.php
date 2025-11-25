@@ -53,16 +53,6 @@ use Illuminate\Support\Facades\Route;
 // Replace the previous test route with this corrected one
 
 
-Route::get('/check-upload-limits', function () {
-    return response()->json([
-        'upload_max_filesize' => ini_get('upload_max_filesize'),
-        'post_max_size' => ini_get('post_max_size'),
-        'memory_limit' => ini_get('memory_limit'),
-        'max_execution_time' => ini_get('max_execution_time'),
-        'environment' => app()->environment(),
-        'server' => $_SERVER['SERVER_SOFTWARE'] ?? 'Unknown',
-    ]);
-})->middleware('auth'); // Only logged-in users can see this
 
 Route::get('/docs/{path?}', function ($path = 'index') {
     $filePath = public_path('docs/' . str_replace('/', DIRECTORY_SEPARATOR, $path) . '.html');
@@ -344,11 +334,13 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         Route::get('/progress', [CourseOnlineReportController::class, 'progressReport'])->name('progress');
         Route::get('/learning-sessions', [CourseOnlineReportController::class, 'learningSessionsReport'])->name('learning-sessions');
         Route::get('/user-performance', [CourseOnlineReportController::class, 'userPerformanceReport'])->name('user-performance');
+        Route::get('/department-performance', [CourseOnlineReportController::class, 'departmentPerformanceReport'])->name('department-performance'); // ✅ ADD THIS
 
         // Exports
 
         Route::get('/export/learning-sessions', [CourseOnlineReportController::class, 'exportLearningSessionsReport'])->name('export.learning-sessions'); // ✅ ADD THIS
         Route::get('/export/user-performance', [CourseOnlineReportController::class, 'exportUserPerformanceReport'])->name('export.user-performance');
+        Route::get('/export/department-performance', [CourseOnlineReportController::class, 'exportDepartmentPerformanceReport'])->name('export.department-performance'); // ✅ ADD THIS
         Route::get('/export/progress', [CourseOnlineReportController::class, 'exportProgressReport'])->name('export.progress');
     });
 
@@ -410,8 +402,11 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('courses/{course}/update', [AdminCourseController::class, 'update'])->name('courses.update');
 
 
-    Route::post('videos/upload-chunk', [ChunkUploadController::class, 'upload'])
-        ->name('videos.upload-chunk');
+   Route::post('videos/upload-chunk', [ChunkUploadController::class, 'upload']);
+Route::patch('videos/upload-chunk', [ChunkUploadController::class, 'uploadChunk']);
+
+        Route::delete('videos/upload-chunk/revert', [ChunkUploadController::class, 'revert'])
+    ->name('videos.upload-chunk.revert');
 
     // ===== COURSE ONLINE MANAGEMENT (NEW SYSTEM) =====
     Route::resource('course-online', App\Http\Controllers\Admin\CourseOnlineController::class);
@@ -470,6 +465,11 @@ Route::post('videos/batch-refresh-urls', [App\Http\Controllers\Admin\VideoContro
     Route::get('quiz-attempts', [\App\Http\Controllers\Admin\QuizAttemptController::class, 'index'])->name('quiz-attempts.index');
     Route::get('quiz-attempts/{attempt}', [\App\Http\Controllers\Admin\QuizAttemptController::class, 'show'])->name('quiz-attempts.show');
     Route::put('quiz-attempts/{attempt}', [\App\Http\Controllers\Admin\QuizAttemptController::class, 'update'])->name('quiz-attempts.update');
+
+    // ===== QUIZ ASSIGNMENT =====
+    Route::get('quiz-assignments/create', [\App\Http\Controllers\Admin\QuizAssignmentController::class, 'create'])->name('quiz-assignments.create');
+    Route::post('quiz-assignments', [\App\Http\Controllers\Admin\QuizAssignmentController::class, 'store'])->name('quiz-assignments.store');
+    Route::post('quiz-assignments/notify', [\App\Http\Controllers\Admin\QuizAssignmentController::class, 'notify'])->name('quiz-assignments.notify');
 
     // ===== ATTENDANCE MANAGEMENT =====
     Route::get('attendance', [AdminAttendanceController::class, 'index'])->name('attendance.index');
