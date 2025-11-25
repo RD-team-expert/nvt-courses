@@ -15,7 +15,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Inertia\Inertia;
-use Illuminate\Support\Facades\Log;
 
 class CourseController extends Controller
 {
@@ -310,20 +309,7 @@ class CourseController extends Controller
             ];
         });
 
-        Log::info('Returning data with NEW multiple shift scheduling fields', [
-            'isEnrolled' => $isEnrolled,
-            'userStatus' => $userStatus,
-            'completion_exists' => !!$completion,
-            'selectedAvailability_has_scheduling' => $selectedAvailability ? isset($selectedAvailability['formatted_days']) : false,
-            'selectedAvailability_has_shifts' => $selectedAvailability ?
-                (isset($selectedAvailability['session_time_shift_2']) || isset($selectedAvailability['session_time_shift_3'])) : false,
-            'availabilities_count' => $availabilities->count(),
-            'first_availability_days' => $availabilities->first()['formatted_days'] ?? 'none',
-            'first_availability_shift_times' => $availabilities->first() ? [
-                'shift_2' => $availabilities->first()['session_time_shift_2'],
-                'shift_3' => $availabilities->first()['session_time_shift_3']
-            ] : 'none'
-        ]);
+       
 
         return Inertia::render('Courses/Show', [
             'course' => $course,

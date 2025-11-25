@@ -27,17 +27,29 @@ class LearningSessionService
     ?int $apiKeyId = null
 ): LearningSession {
     // End existing sessions
-    $existingSessions = LearningSession::where('user_id', $user->id)
+    // End existing sessions (Bulk Update)
+    LearningSession::where('user_id', $user->id)
         ->where('content_id', $content->id)
         ->whereNull('session_end')
+        ->update(['session_end' => now()]);
+
+    // Release keys if necessary (this still needs a loop if keys are involved, but we can optimize)
+    // Note: If keys need to be released individually via an external service, we might still need to fetch them.
+    // However, for the session end timestamp, the bulk update above is sufficient for the DB.
+    // If you strictly need to release keys, we should fetch only those with keys.
+    
+    $sessionsWithKeys = LearningSession::where('user_id', $user->id)
+        ->where('content_id', $content->id)
+        ->whereNotNull('api_key_id')
+        ->where('session_end', now()) // We just updated them
         ->get();
 
-    foreach ($existingSessions as $existingSession) {
-        if ($existingSession->api_key_id) {
-            app(\App\Services\GoogleDriveService::class)->releaseKey($existingSession->api_key_id);
-        }
-        $existingSession->session_end = now();
-        $existingSession->save();
+    foreach ($sessionsWithKeys as $sessionWithKey) {
+         try {
+            app(\App\Services\GoogleDriveService::class)->releaseKey($sessionWithKey->api_key_id);
+         } catch (\Exception $e) {
+             // Ignore errors during cleanup
+         }
     }
 
     // ✅ NEW: INCREMENT active_users when play button is pressed

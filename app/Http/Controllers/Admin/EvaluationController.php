@@ -113,12 +113,9 @@ class EvaluationController extends Controller
             'incentives' => 'required|array',
             'incentives.*.user_level_id' => 'required|exists:user_levels,id',
             'incentives.*.user_level_tier_id' => 'required|exists:user_level_tiers,id',
-            'incentives.*.min_score' => 'required|integer|min:0',
-            'incentives.*.max_score' => 'required|integer|min:0',
-            'incentives.*.incentive_amount' => 'required|numeric|min:0',
+            'incentives.*.performance_level' => 'required|integer|between:1,4',
         ]);
 
-        // Validate that each tier belongs to its level
         foreach ($validated['incentives'] as $incentive) {
             $tier = UserLevelTier::find($incentive['user_level_tier_id']);
             if ($tier->user_level_id != $incentive['user_level_id']) {
@@ -126,31 +123,30 @@ class EvaluationController extends Controller
                     'error' => 'Tier must belong to the selected level.'
                 ]);
             }
-
-            // Validate min_score < max_score
-            if ($incentive['min_score'] >= $incentive['max_score']) {
-                return redirect()->back()->withErrors([
-                    'error' => 'Minimum score must be less than maximum score.'
-                ]);
-            }
         }
 
-        // Optional: Clear existing incentives (or handle updates differently)
-        // Incentive::truncate();
-
-        // Save new incentives
+        // Save new incentives (now using performance_level)
         foreach ($validated['incentives'] as $incentive) {
+            $levelMeta = \App\Enums\PerformanceLevel::getById($incentive['performance_level']);
             Incentive::updateOrCreate([
                 'user_level_id' => $incentive['user_level_id'],
                 'user_level_tier_id' => $incentive['user_level_tier_id'],
-                'min_score' => $incentive['min_score'],
-                'max_score' => $incentive['max_score'],
+                'min_score' => $levelMeta['min_score'],
+                'max_score' => $levelMeta['max_score'],
             ], [
-                'incentive_amount' => $incentive['incentive_amount'],
+                'performance_level' => $incentive['performance_level'],
             ]);
         }
 
-        return redirect()->back()->with('success', 'Level-Tier based incentives saved successfully.');
+        return redirect()->back()->with('success', 'Performance level incentives saved successfully.');
+    }
+
+    /**
+     * Map a total score to a performance level
+     */
+    public function mapScoreToPerformanceLevel($score)
+    {
+        return \App\Enums\PerformanceLevel::getLevelByScore($score);
     }
 
     /**

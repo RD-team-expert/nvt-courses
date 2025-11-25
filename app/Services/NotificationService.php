@@ -7,7 +7,6 @@ use App\Models\LearningSession;
 use App\Mail\SuspiciousActivityWarning;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Log;
 
 class NotificationService
 {

@@ -200,15 +200,7 @@ class Video extends Model
     /**
      * Delete physical file if local storage
      */
-    public function deleteStoredFile(): bool
-    {
-        if ($this->isLocal() && $this->file_path) {
-            if (Storage::disk('videos')->exists($this->file_path)) {
-                return Storage::disk('videos')->delete($this->file_path);
-            }
-        }
-        return true;
-    }
+    
 
     /**
      * Get storage type label for display
@@ -221,4 +213,31 @@ class Video extends Model
             default => 'Unknown'
         };
     }
+
+   
+    /**
+     * Delete the stored file(s) for local videos
+     */
+    public function deleteStoredFile(): bool
+    {
+        $deletedMain = true;
+        $deletedThumb = true;
+
+        // 🧹 Delete main video file (only for local storage)
+        if ($this->isLocal() && $this->file_path) {
+            if (Storage::disk('public')->exists($this->file_path)) {
+                $deletedMain = Storage::disk('public')->delete($this->file_path);
+            }
+        }
+
+        // 🧹 (Optional) Delete thumbnail if you store it locally
+        if (!empty($this->thumbnail_path)) {
+            if (Storage::disk('public')->exists($this->thumbnail_path)) {
+                $deletedThumb = Storage::disk('public')->delete($this->thumbnail_path);
+            }
+        }
+
+        return $deletedMain && $deletedThumb;
+    }
 }
+

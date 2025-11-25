@@ -6,7 +6,6 @@ use App\Models\LearningSession;
 use App\Models\CourseOnline;
 use App\Models\User;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Log;
 
 class ExportAnalyticsService
 {

@@ -122,18 +122,20 @@ const props = defineProps<{
     course?: Course
     userProgress?: UserProgress
     navigation?: Navigation
-    video?: Video  // ✅ ADD THIS!
+    video?: Video  
+    pdf?: any
+
 
 
 
 }>()
 
-console.log('📦 Props received:', {
-    content: props.content,
-    video: props.video,  // ✅ Use props.video directly!
-    has_streaming_url: !!props.video?.streaming_url,
-    streaming_url: props.video?.streaming_url
-});
+// console.log('📦 Props received:', {
+//     content: props.content,
+//     video: props.video,  // ✅ Use props.video directly!
+//     has_streaming_url: !!props.video?.streaming_url,
+//     streaming_url: props.video?.streaming_url
+// });
 
 // ✅ GET CSRF TOKEN
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
@@ -191,6 +193,7 @@ const sessionStartTime = ref<number | null>(null)
 const completionPercentage = ref(safeUserProgress.value.completion_percentage || 0)
 const isCompleted = ref(safeUserProgress.value.is_completed || false)
 const timeSpent = ref(safeUserProgress.value.time_spent || 0)
+const isCreatingSession = ref(false)  // ✅ NEW: Prevent duplicate session creation
 
 // ✅ NEW: Skip/Seek Tracking Variables
 const totalSkipCount = ref(0)
@@ -240,48 +243,93 @@ const detectPdfSource = (url: string) => {
     return 'external'
 }
 
+
+// ✅ Normalize Google Drive URLs to /preview form for embedding
+const normalizeGoogleDriveUrl = (url: string): string => {
+    if (!url) return url
+
+    // Already a preview/embed URL
+    if (url.includes('/preview') || url.includes('/embedded')) {
+        return url
+    }
+
+    // Pattern: https://drive.google.com/file/d/FILE_ID/view?...
+    const fileMatch = url.match(/\/file\/d\/([^/]+)\//)
+    if (fileMatch) {
+        return `https://drive.google.com/file/d/${fileMatch[1]}/preview`
+    }
+
+    // Pattern: https://drive.google.com/open?id=FILE_ID
+    const openMatch = url.match(/[?&]id=([^&]+)/)
+    if (openMatch) {
+        return `https://drive.google.com/file/d/${openMatch[1]}/preview`
+    }
+
+    // Fallback – keep as is
+    return url
+}
+
+
+const effectivePdfUrl = computed(() => {
+    // 1) Local storage file
+    if (props.pdf?.file_url) {
+        return props.pdf.file_url
+    }
+
+    // 2) Google Drive link
+    if (props.pdf?.google_drive_url) {
+        return normalizeGoogleDriveUrl(props.pdf.google_drive_url)
+    }
+
+    // 3) Fallback to content.file_url if it exists
+    if (props.content?.file_url) {
+        return props.content.file_url
+    }
+
+    return ''
+})
+
+
 // ✅ ENHANCED: Get PDF source for vue-pdf-embed
 const pdfSource = computed(() => {
-    if (!props.content.file_url) return ''
+    const fileUrl = effectivePdfUrl.value
 
-    const url = props.content.file_url
-    const source = detectPdfSource(url)
+    // console.log('🔍 Initial fileUrl:', fileUrl)
 
-    console.log(`🔍 PDF source detected: ${source} for URL: ${url}`)
-
-    switch (source) {
-        case 'google_drive':
-            const fileIdMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) ||
-                url.match(/id=([a-zA-Z0-9_-]+)/) ||
-                url.match(/open\?id=([a-zA-Z0-9_-]+)/)
-
-            if (fileIdMatch && fileIdMatch[1]) {
-                const fileId = fileIdMatch[1]
-                return `https://drive.google.com/file/d/${fileId}/preview`
-            }
-            return url
-
-        case 'storage':
-            let storageUrl = url
-
-            if (!storageUrl.startsWith('http://') && !storageUrl.startsWith('https://')) {
-                if (storageUrl.startsWith('/storage/')) {
-                    storageUrl = storageUrl
-                } else if (storageUrl.includes('app/public/')) {
-                    storageUrl = storageUrl.replace(/.*app\/public\//, '/storage/')
-                } else if (storageUrl.startsWith('/')) {
-                    storageUrl = storageUrl
-                } else {
-                    storageUrl = `/storage/${storageUrl}`
-                }
-            }
-            return storageUrl
-
-        case 'external':
-        default:
-            return url
+    if (!fileUrl) {
+        // console.log('content.file_url:', props.content.file_url)
+        // console.log('pdf.file_url:', props.pdf?.file_url)
+        // console.warn('⚠️ No PDF URL provided')
+        return null
     }
+
+    const source = detectPdfSource(fileUrl)
+    // console.log('🔍 Detected source type:', source)
+
+    if (source === 'storage') {
+        let storageUrl = fileUrl
+
+        if (!storageUrl.startsWith('http://') && !storageUrl.startsWith('https://')) {
+            if (storageUrl.startsWith('/storage/')) {
+                storageUrl = `${window.location.origin}${storageUrl}`
+            } else if (storageUrl.includes('app/public/')) {
+                const path = storageUrl.split('app/public/')[1]
+                storageUrl = `${window.location.origin}/storage/${path}`
+            } else {
+                storageUrl = `${window.location.origin}/storage/${storageUrl.replace(/^\/+/, '')}`
+            }
+        }
+
+        // console.log('✅ Final storage URL:', storageUrl)
+        return storageUrl
+    }
+
+    return fileUrl
 })
+
+
+
+
 
 // ========== UTILITY METHODS ==========
 const formatTime = (seconds: number): string => {
@@ -305,9 +353,11 @@ const resetIncrementalCounters = () => {
 
 // ========== SESSION MANAGEMENT ==========
 const startSession = async () => {
-    if (sessionId.value) return
+    // ✅ FIXED: Prevent duplicate session creation with lock
+    if (sessionId.value || isCreatingSession.value) return
 
-    console.log('🚀 Starting session for content:', props.content.id)
+    isCreatingSession.value = true
+    // console.log('🚀 Starting session for content:', props.content.id)
 
     try {
         // ✅ Get the key_id from the video data passed from backend
@@ -321,10 +371,12 @@ const startSession = async () => {
 
         if (response.data.success) {
             sessionId.value = response.data.session_id
-            console.log('✅ Session started:', sessionId.value)
+            // console.log('✅ Session started:', sessionId.value)
         }
     } catch (error) {
-        console.error('❌ Failed to start session:', error)
+        // console.error('❌ Failed to start session:', error)
+    } finally {
+        isCreatingSession.value = false
     }
 }
 
@@ -352,7 +404,7 @@ const updateProgress = async () => {
             watch_time: sessionTimeMinutes,
         }
 
-        console.log('📤 Sending progress update:', payload)
+        // console.log('📤 Sending progress update:', payload)
 
         const response = await axios.post(`/content/${props.content.id}/progress`, payload, {
             headers: {
@@ -367,14 +419,14 @@ const updateProgress = async () => {
             isCompleted.value = response.data.is_completed || false
             timeSpent.value = response.data.total_watch_time || sessionTimeMinutes
 
-            console.log('✅ Progress updated:', completionPercentage.value + '%')
+            // console.log('✅ Progress updated:', completionPercentage.value + '%')
         }
 
-        // ✅ Send heartbeat with skip/seek data
-        await sendHeartbeat()
+        // ✅ REMOVED: Don't call sendHeartbeat here to reduce API calls
+        // Heartbeat is now sent separately every 10 minutes
 
     } catch (error) {
-        console.error('❌ Failed to update progress:', error)
+        // console.error('❌ Failed to update progress:', error)
     }
 }
 
@@ -407,27 +459,27 @@ const sendHeartbeat = async () => {
             watch_time: Math.floor(watchTimeSinceLastHeartbeat.value),
         }
 
-        console.log('💓 Sending heartbeat with skip/seek data:', payload)
+        // console.log('💓 Sending heartbeat with skip/seek data:', payload)
 
         const response = await axios.post(`/content/${props.content.id}/session`, payload, {
             headers: { 'X-CSRF-TOKEN': csrfToken }
         })
 
         if (response.data.success) {
-            console.log('✅ Heartbeat sent successfully')
+            // console.log('✅ Heartbeat sent successfully')
             // Reset incremental counters after successful heartbeat
             resetIncrementalCounters()
         }
 
     } catch (error) {
-        console.error('❌ Failed to send heartbeat:', error)
+        // console.error('❌ Failed to send heartbeat:', error)
     }
 }
 
 const endSession = async () => {
     if (!sessionId.value) return
 
-    console.log('🛑 Ending session:', sessionId.value)
+    // console.log('🛑 Ending session:', sessionId.value)
 
     try {
         const payload = {
@@ -444,16 +496,16 @@ const endSession = async () => {
             headers: { 'X-CSRF-TOKEN': csrfToken }
         })
 
-        console.log('✅ Session ended')
+        // console.log('✅ Session ended')
         sessionId.value = null
         sessionStartTime.value = null
     } catch (error) {
-        console.error('❌ Failed to end session:', error)
+        // console.error('❌ Failed to end session:', error)
     }
 }
 
 const markCompleted = async () => {
-    console.log('🎯 Marking content as completed:', props.content.id)
+    // console.log('🎯 Marking content as completed:', props.content.id)
 
     try {
         isLoading.value = true
@@ -465,7 +517,7 @@ const markCompleted = async () => {
             })
         } catch (error) {
             if (error.response?.status === 404) {
-                console.log('🔄 /complete route not found, trying /mark-complete')
+                // console.log('🔄 /complete route not found, trying /mark-complete')
                 response = await axios.post(`/content/${props.content.id}/mark-complete`, {}, {
                     headers: { 'X-CSRF-TOKEN': csrfToken }
                 })
@@ -478,7 +530,7 @@ const markCompleted = async () => {
             isCompleted.value = true
             completionPercentage.value = 100
 
-            console.log('✅ Content marked as completed successfully!')
+            // console.log('✅ Content marked as completed successfully!')
 
             if (safeNavigation.value.next?.is_unlocked) {
                 setTimeout(() => {
@@ -491,7 +543,7 @@ const markCompleted = async () => {
             }
         }
     } catch (error) {
-        console.error('❌ Failed to mark as completed:', error)
+        // console.error('❌ Failed to mark as completed:', error)
 
         if (error.response?.data?.message) {
             alert(`Error: ${error.response.data.message}`)
@@ -529,12 +581,12 @@ const seek = (seconds: number) => {
         seekCountSinceLastHeartbeat.value++
         totalSeekCount.value++
 
-        console.log('🔍 Seek detected:', {
-            from: oldTime,
-            to: newTime,
-            diff: timeDiff,
-            totalSeeks: totalSeekCount.value
-        })
+        // console.log('🔍 Seek detected:', {
+        //     from: oldTime,
+        //     to: newTime,
+        //     diff: timeDiff,
+        //     totalSeeks: totalSeekCount.value
+        // })
     }
 }
 
@@ -545,10 +597,10 @@ const seekRelative = (seconds: number) => {
         skipCountSinceLastHeartbeat.value++
         totalSkipCount.value++
 
-        console.log('⏭️ Skip detected:', {
-            seconds: seconds,
-            totalSkips: totalSkipCount.value
-        })
+        // console.log('⏭️ Skip detected:', {
+        //     seconds: seconds,
+        //     totalSkips: totalSkipCount.value
+        // })
     }
 
     seek(currentTime.value + seconds)
@@ -577,16 +629,16 @@ const toggleFullscreen = async () => {
 
 // ========== PDF METHODS ==========
 const tryAlternativeLoad = () => {
-    console.log('🔄 Trying alternative loading method...')
+    // console.log('🔄 Trying alternative loading method...')
 
     const sourceType = detectPdfSource(props.content.file_url || '')
 
     if (sourceType === 'google_drive') {
         loadingStrategy.value = 'google-embed'
-        console.log('📄 Switching to Google Drive embed')
+        // console.log('📄 Switching to Google Drive embed')
     } else {
         loadingStrategy.value = 'iframe'
-        console.log('📄 Switching to iframe loading')
+        // console.log('📄 Switching to iframe loading')
     }
 
     pdfLoadingError.value = false
@@ -603,21 +655,21 @@ const tryIframeLoad = () => {
     loadingStrategy.value = 'iframe'
     pdfLoadingError.value = false
     isLoading.value = true
-    console.log('📄 Trying iframe loading strategy')
+    // console.log('📄 Trying iframe loading strategy')
 }
 
 const onPdfLoaded = async (pdf: any) => {
-    console.log('✅ PDF loaded successfully via vue-pdf-embed:', pdf)
+    // console.log('✅ PDF loaded successfully via vue-pdf-embed:', pdf)
 
     if (props.content.pdf_page_count && props.content.pdf_page_count > 0) {
         totalPages.value = props.content.pdf_page_count
-        console.log('🎯 Using database page count:', props.content.pdf_page_count)
+        // console.log('🎯 Using database page count:', props.content.pdf_page_count)
     } else if (detectPdfSource(props.content.file_url || '') === 'storage' && pdf.numPages > 0) {
         totalPages.value = pdf.numPages
-        console.log('📄 Using vue-pdf-embed page count for local PDF:', pdf.numPages)
+        // console.log('📄 Using vue-pdf-embed page count for local PDF:', pdf.numPages)
     } else {
         totalPages.value = 10
-        console.warn('⚠️ No database page count found, using default: 10')
+        // console.warn('⚠️ No database page count found, using default: 10')
     }
 
     estimatedReadingTime.value = Math.ceil((totalPages.value * 2))
@@ -633,7 +685,7 @@ const onPdfLoaded = async (pdf: any) => {
 }
 
 const onPdfLoadingFailed = (error: any) => {
-    console.error('❌ vue-pdf-embed loading failed:', error)
+    // console.error('❌ vue-pdf-embed loading failed:', error)
 
     errorMessage.value = error.message || 'Failed to load PDF with vue-pdf-embed'
     pdfLoadingError.value = true
@@ -646,30 +698,30 @@ const onPdfLoadingFailed = (error: any) => {
         isPdfLoaded.value = true
         pdfLoadingError.value = false
 
-        console.log('✅ Using database page count despite loading failure:', totalPages.value)
+        // console.log('✅ Using database page count despite loading failure:', totalPages.value)
 
         if (!sessionId.value) {
             startSession()
         }
     } else {
         setTimeout(() => {
-            console.log('🔄 Auto-trying alternative loading method...')
+            // console.log('🔄 Auto-trying alternative loading method...')
             tryAlternativeLoad()
         }, 2000)
     }
 }
 
 const onPdfRendered = () => {
-    console.log('📄 PDF page rendered successfully')
+    // console.log('📄 PDF page rendered successfully')
     isLoading.value = false
 }
 
 const onIframeLoad = () => {
-    console.log('✅ Iframe PDF loaded successfully')
+    // console.log('✅ Iframe PDF loaded successfully')
 
     if (props.content.pdf_page_count && props.content.pdf_page_count > 0) {
         totalPages.value = props.content.pdf_page_count
-        console.log('🎯 Using database page count for iframe:', totalPages.value)
+        // console.log('🎯 Using database page count for iframe:', totalPages.value)
     } else {
         totalPages.value = 10
     }
@@ -685,10 +737,10 @@ const onIframeLoad = () => {
 }
 
 const onIframeError = () => {
-    console.error('❌ Iframe PDF loading failed')
+    // console.error('❌ Iframe PDF loading failed')
 
     if (detectPdfSource(props.content.file_url || '') === 'google_drive') {
-        console.log('🔄 Trying Google Drive embed...')
+        // console.log('🔄 Trying Google Drive embed...')
         loadingStrategy.value = 'google-embed'
     } else {
         pdfLoadingError.value = true
@@ -698,14 +750,14 @@ const onIframeError = () => {
 }
 
 const onGoogleEmbedLoad = async () => {
-    console.log('✅ Google Drive embed loaded')
+    // console.log('✅ Google Drive embed loaded')
 
     if (props.content.pdf_page_count && props.content.pdf_page_count > 0) {
         totalPages.value = props.content.pdf_page_count
-        console.log('🎯 Using database page count for Google Drive:', totalPages.value)
+        // console.log('🎯 Using database page count for Google Drive:', totalPages.value)
     } else {
         totalPages.value = 15
-        console.log('📊 Using default page count for Google Drive embed:', totalPages.value)
+        // console.log('📊 Using default page count for Google Drive embed:', totalPages.value)
     }
 
     estimatedReadingTime.value = Math.ceil((totalPages.value * 2))
@@ -790,19 +842,19 @@ const navigateContent = (contentId: number) => {
 
 // ========== VIDEO EVENT HANDLERS ==========
 const onLoadStart = () => {
-    console.log('📹 Video loading started')
+    // console.log('📹 Video loading started')
     isVideoLoading.value = true
     isVideoReady.value = false
 }
 
 const onLoadedData = () => {
-    console.log('📹 Video data loaded')
+    // console.log('📹 Video data loaded')
     isVideoLoading.value = false
     isVideoReady.value = true
 }
 
 const onCanPlay = async () => {
-    console.log('✅ Video can start playing');
+    // console.log('✅ Video can start playing');
     isVideoLoading.value = false;
     isVideoReady.value = true;
 
@@ -810,21 +862,21 @@ const onCanPlay = async () => {
     if (props.video?.key_id && !sessionId.value) {
         try {
             await startSession(); // This will call your backend to increment active_users
-            console.log('✅ Session started, API key incremented');
+            // console.log('✅ Session started, API key incremented');
         } catch (error) {
-            console.error('❌ Failed to start session:', error);
+            // console.error('❌ Failed to start session:', error);
         }
     }
 };
 
 
 const onWaiting = () => {
-    console.log('📹 Video waiting for more data')
+    // console.log('📹 Video waiting for more data')
     isVideoLoading.value = true
 }
 
 const onPlaying = () => {
-    console.log('📹 Video started playing')
+    // console.log('📹 Video started playing')
     isVideoLoading.value = false
 }
 
@@ -835,9 +887,15 @@ const onLoadedMetadata = () => {
     }
 }
 
+// ✅ FIXED: Throttle timeUpdate to once per second to reduce CPU usage
+let lastTimeUpdate = 0
 const onTimeUpdate = () => {
     if (videoElement.value) {
-        currentTime.value = videoElement.value.currentTime
+        const now = Date.now()
+        if (now - lastTimeUpdate >= 1000) {  // Throttle to 1 second
+            currentTime.value = videoElement.value.currentTime
+            lastTimeUpdate = now
+        }
     }
 }
 
@@ -858,7 +916,7 @@ const onPause = () => {
     pauseCountSinceLastHeartbeat.value++
     totalPauseCount.value++
 
-    console.log('⏸️ Pause detected, total pauses:', totalPauseCount.value)
+    // console.log('⏸️ Pause detected, total pauses:', totalPauseCount.value)
 
     updateProgress()
 }
@@ -884,7 +942,7 @@ const onFullscreenChange = () => {
 
 // ✅ Video seek event handler (will be added in onMounted)
 const onVideoSeeked = () => {
-    console.log('🔍 Manual seek detected via timeline')
+    // console.log('🔍 Manual seek detected via timeline')
     seekCountSinceLastHeartbeat.value++
     totalSeekCount.value++
 }
@@ -908,7 +966,7 @@ onMounted(async () => {
         }
     }
 
-    // Progress tracking interval
+    // ✅ FIXED: Progress tracking interval - changed from 3 min to 10 min to reduce server load
     const progressInterval = setInterval(() => {
         if (
             (props.content.content_type === 'video' && isPlaying.value) ||
@@ -916,14 +974,14 @@ onMounted(async () => {
         ) {
             updateProgress()
         }
-    }, 180000)
+    }, 600000)  // ✅ CHANGED: 10 minutes (was 180000 = 3 minutes) - reduces API calls by 70%
 
     // ✅ IMPROVED: Multiple cleanup handlers for reliability
    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-    console.log('🚨 beforeunload triggered', {
-        hasSession: !!sessionId.value,
-        sessionId: sessionId.value
-    })
+    // console.log('🚨 beforeunload triggered', {
+    //     hasSession: !!sessionId.value,
+    //     sessionId: sessionId.value
+    // })
 
     if (sessionId.value) {
         const formData = new FormData()
@@ -937,26 +995,23 @@ onMounted(async () => {
 
         const url = `/content/${props.content.id}/session`
 
-        console.log('📤 Sending sendBeacon to:', url)
+        // console.log('📤 Sending sendBeacon to:', url)
         const success = navigator.sendBeacon(url, formData)
-        console.log('📬 sendBeacon result:', success ? 'SUCCESS' : 'FAILED')
+        // console.log('📬 sendBeacon result:', success ? 'SUCCESS' : 'FAILED')
     }
 }
 
 
 
-    // ✅ Handle visibility changes (tab switching, minimizing)
+    // ✅ FIXED: Handle visibility changes (tab switching, minimizing)
     const handleVisibilityChange = async () => {
         if (document.visibilityState === 'hidden') {
-            // User left the tab - send heartbeat
+            // User left the tab - save progress only
             await updateProgress()
-            await sendHeartbeat()
-        } else if (document.visibilityState === 'visible') {
-            // User came back - restart session tracking
-            if (!sessionId.value && (isPlaying.value || isPdfLoaded.value)) {
-                await startSession()
-            }
+            // ✅ REMOVED: Don't send separate heartbeat to reduce API calls
         }
+        // ✅ FIXED: Don't create new sessions when user returns to tab
+        // Session should persist across tab switches
     }
 
 
@@ -986,7 +1041,7 @@ onMounted(async () => {
         const url = `/content/${props.content.id}/session`
         navigator.sendBeacon(url, formData)
 
-        console.log('🏁 Session ended via pagehide')
+        // console.log('🏁 Session ended via pagehide')
     }
 }
 
@@ -1014,7 +1069,7 @@ onMounted(async () => {
         }
     })
 
-      window.addEventListener('beforeunload', handlePageClose);
+// ✅ REMOVED: Duplicate event listener (line 1064) - was causing double sendBeacon calls
 
 })
 
@@ -1029,6 +1084,7 @@ watch(currentPage, (newPage) => {
 </script>
 
 <template>
+
     <Head :title="content.title" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
@@ -1041,7 +1097,8 @@ watch(currentPage, (newPage) => {
                     </div>
                     <div>
                         <h1 class="text-xl sm:text-2xl font-bold break-words">{{ content.title }}</h1>
-                        <p class="text-sm sm:text-base text-muted-foreground break-words">{{ safeModule.name }} • {{ safeCourse.name }}</p>
+                        <p class="text-sm sm:text-base text-muted-foreground break-words">{{ safeModule.name }} • {{
+                            safeCourse.name }}</p>
                         <div class="flex flex-wrap items-center gap-2 mt-2">
                             <Badge variant="outline" class="text-xs">
                                 {{ content.content_type.toUpperCase() }}
@@ -1049,31 +1106,31 @@ watch(currentPage, (newPage) => {
                             <Badge v-if="content.is_required" variant="destructive" class="text-xs">
                                 Required
                             </Badge>
-                            <Badge v-if="content.content_type === 'pdf' && content.file_url"
-                                   variant="outline"
-                                   class="text-xs"
-                                   :class="{
-                                    'bg-blue-50 text-blue-700': detectPdfSource(content.file_url) === 'google_drive',
-                                    'bg-green-50 text-green-700': detectPdfSource(content.file_url) === 'storage',
-                                    'bg-gray-50 text-gray-700': detectPdfSource(content.file_url) === 'external'
-                                }">
+                            <Badge v-if="content.content_type === 'pdf' && effectivePdfUrl" variant="outline"
+                                class="text-xs" :class="{
+        'bg-blue-50 text-blue-700': detectPdfSource(effectivePdfUrl) === 'google_drive',
+        'bg-green-50 text-green-700': detectPdfSource(effectivePdfUrl) === 'storage',
+        'bg-gray-50 text-gray-700': detectPdfSource(effectivePdfUrl) === 'external'
+}">
                                 {{
-                                    detectPdfSource(content.file_url) === 'google_drive' ? 'Google Drive' :
-                                        detectPdfSource(content.file_url) === 'storage' ? 'Local Storage' :
-                                            'External PDF'
+                                detectPdfSource(effectivePdfUrl) === 'google_drive' ? 'Google Drive' :
+                                detectPdfSource(effectivePdfUrl) === 'storage' ? 'Local Storage' :
+                                'External PDF'
                                 }}
                             </Badge>
-                            <Badge v-if="content.content_type === 'pdf' && content.pdf_page_count"
-                                   variant="outline"
-                                   class="text-xs bg-green-50 text-green-700">
+
+                            <Badge v-if="content.content_type === 'pdf' && content.pdf_page_count" variant="outline"
+                                class="text-xs bg-green-50 text-green-700">
                                 {{ content.pdf_page_count }} pages (DB)
                             </Badge>
 
-                            <span v-if="content.content_type === 'video' && content.video?.duration" class="text-xs text-muted-foreground flex items-center gap-1">
+                            <span v-if="content.content_type === 'video' && content.video?.duration"
+                                class="text-xs text-muted-foreground flex items-center gap-1">
                                 <Clock class="h-3 w-3" />
                                 {{ Math.ceil(content.video.duration / 60) }} min
                             </span>
-                            <span v-if="content.content_type === 'pdf' && totalPages > 0" class="text-xs text-muted-foreground flex items-center gap-1">
+                            <span v-if="content.content_type === 'pdf' && totalPages > 0"
+                                class="text-xs text-muted-foreground flex items-center gap-1">
                                 <BookOpen class="h-3 w-3" />
                                 {{ totalPages }} pages • ~{{ Math.ceil(totalPages * 2) }}min read
                             </span>
@@ -1082,8 +1139,8 @@ watch(currentPage, (newPage) => {
                 </div>
                 <Button asChild variant="outline" class="w-full sm:w-auto">
                     <Link :href="route('courses-online.show', safeCourse.id)">
-                        <ArrowLeft class="h-4 w-4 mr-2" />
-                        Back to Course
+                    <ArrowLeft class="h-4 w-4 mr-2" />
+                    Back to Course
                     </Link>
                 </Button>
             </div>
@@ -1091,7 +1148,8 @@ watch(currentPage, (newPage) => {
             <!-- ✅ OPTIONAL: Debug Panel to show tracking data -->
             <Card v-if="sessionId" class="mb-4 border-blue-200 bg-blue-50/30">
                 <CardContent class="p-4">
-                    <div class="text-xs text-muted-foreground grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4">
+                    <div
+                        class="text-xs text-muted-foreground grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4">
                         <div>
                             <strong>Session ID:</strong> {{ sessionId }}
                         </div>
@@ -1117,85 +1175,71 @@ watch(currentPage, (newPage) => {
                         <CardContent class="p-0">
                             <div class="relative bg-black aspect-video">
                                 <!-- Video Element -->
-                                <video
-                                    ref="videoElement"
-    :src="video?.streaming_url"
-                                    :poster="video?.thumbnail_url || ''"
-                                    class="w-full h-full"
-                                    preload="metadata"
-                                    @loadstart="onLoadStart"
-                                    @loadeddata="onLoadedData"
-                                    @canplay="onCanPlay"
-                                    @waiting="onWaiting"
-                                    @playing="onPlaying"
-                                    @loadedmetadata="onLoadedMetadata"
-                                    @timeupdate="onTimeUpdate"
-                                    @play="onPlay"
-                                    @pause="onPause"
-                                    @ended="onEnded"
-                                    @volumechange="onVolumeChange"
-                                >
+                                <video ref="videoElement" :src="video?.streaming_url"
+                                    :poster="video?.thumbnail_url || ''" class="w-full h-full" preload="metadata"
+                                    @loadstart="onLoadStart" @loadeddata="onLoadedData" @canplay="onCanPlay"
+                                    @waiting="onWaiting" @playing="onPlaying" @loadedmetadata="onLoadedMetadata"
+                                    @timeupdate="onTimeUpdate" @play="onPlay" @pause="onPause" @ended="onEnded"
+                                    @volumechange="onVolumeChange">
                                     Your browser does not support the video tag.
                                 </video>
 
                                 <!-- Video Loading Overlay -->
-                                <div v-if="isVideoLoading || !isVideoReady" class="absolute inset-0 flex flex-col items-center justify-center bg-black/70 z-10">
+                                <div v-if="isVideoLoading || !isVideoReady"
+                                    class="absolute inset-0 flex flex-col items-center justify-center bg-black/70 z-10">
                                     <div class="text-center text-white">
                                         <Loader2 class="h-12 w-12 animate-spin mx-auto mb-4" />
                                         <p class="text-lg font-medium">Loading video...</p>
                                         <p class="text-sm text-gray-300 mt-2">{{ content.video?.name }}</p>
                                         <div class="mt-4">
                                             <div class="w-48 h-1 bg-white/20 rounded-full mx-auto">
-                                                <div class="h-1 bg-primary rounded-full animate-pulse" style="width: 60%"></div>
+                                                <div class="h-1 bg-primary rounded-full animate-pulse"
+                                                    style="width: 60%"></div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
 
                                 <!-- Video Controls -->
-                                <div v-if="isVideoReady && !isVideoLoading" class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
+                                <div v-if="isVideoReady && !isVideoLoading"
+                                    class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
                                     <div class="mb-4">
-                                        <input
-                                            type="range"
-                                            :value="currentTime"
-                                            :max="duration"
+                                        <input type="range" :value="currentTime" :max="duration"
                                             @input="seek(Number(($event.target as HTMLInputElement).value))"
-                                            class="w-full h-1 bg-white/30 rounded-lg appearance-none cursor-pointer slider"
-                                        />
+                                            class="w-full h-1 bg-white/30 rounded-lg appearance-none cursor-pointer slider" />
                                     </div>
 
                                     <div class="flex items-center justify-between text-white">
                                         <div class="flex items-center gap-2 sm:gap-4">
-                                            <Button @click="togglePlay" variant="ghost" size="sm" class="text-white hover:bg-white/20">
+                                            <Button @click="togglePlay" variant="ghost" size="sm"
+                                                class="text-white hover:bg-white/20">
                                                 <Play v-if="!isPlaying" class="h-5 w-5" />
                                                 <Pause v-else class="h-5 w-5" />
                                             </Button>
 
-                                            <Button @click="seekRelative(-10)" variant="ghost" size="sm" class="text-white hover:bg-white/20">
+                                            <Button @click="seekRelative(-10)" variant="ghost" size="sm"
+                                                class="text-white hover:bg-white/20">
                                                 <RotateCcw class="h-4 w-4" />
                                             </Button>
-                                            <Button @click="seekRelative(10)" variant="ghost" size="sm" class="text-white hover:bg-white/20">
+                                            <Button @click="seekRelative(10)" variant="ghost" size="sm"
+                                                class="text-white hover:bg-white/20">
                                                 <SkipForward class="h-4 w-4" />
                                             </Button>
 
-                                            <span class="text-xs sm:text-sm whitespace-nowrap">{{ formattedCurrentTime }} / {{ formattedDuration }}</span>
+                                            <span class="text-xs sm:text-sm whitespace-nowrap">{{ formattedCurrentTime
+                                                }} / {{ formattedDuration }}</span>
                                         </div>
 
                                         <div class="flex items-center gap-2 sm:gap-4">
                                             <div class="flex items-center gap-2">
                                                 <Volume2 class="h-4 w-4" />
-                                                <input
-                                                    type="range"
-                                                    :value="volume"
-                                                    min="0"
-                                                    max="1"
-                                                    step="0.1"
+                                                <input type="range" :value="volume" min="0" max="1" step="0.1"
                                                     @input="setVolume(Number(($event.target as HTMLInputElement).value))"
-                                                    class="w-20 h-1 bg-white/30 rounded-lg appearance-none cursor-pointer"
-                                                />
+                                                    class="w-20 h-1 bg-white/30 rounded-lg appearance-none cursor-pointer" />
                                             </div>
 
-                                            <Button @click="toggleFullscreen" variant="ghost" size="sm" class="text-white hover:bg-white/20">
+                                            <Button @click="toggleFullscreen" variant="ghost" size="sm"
+                                                class="text-white hover:bg-white/20">
                                                 <Maximize class="h-4 w-4" />
                                             </Button>
                                         </div>
@@ -1231,7 +1275,8 @@ watch(currentPage, (newPage) => {
                         </CardHeader>
 
                         <!-- PDF Loading State -->
-                        <div v-if="isLoading && !isPdfLoaded && !pdfLoadingError && totalPages === 0" class="flex items-center justify-center py-16">
+                        <div v-if="isLoading && !isPdfLoaded && !pdfLoadingError && totalPages === 0"
+                            class="flex items-center justify-center py-16">
                             <div class="text-center">
                                 <Loader2 class="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
                                 <p class="text-muted-foreground">Loading PDF...</p>
@@ -1242,7 +1287,8 @@ watch(currentPage, (newPage) => {
                         </div>
 
                         <!-- PDF Error State with Solutions -->
-                        <div v-else-if="pdfLoadingError && totalPages === 0" class="flex items-center justify-center py-16">
+                        <div v-else-if="pdfLoadingError && totalPages === 0"
+                            class="flex items-center justify-center py-16">
                             <div class="text-center max-w-md">
                                 <AlertCircle class="h-12 w-12 text-destructive mx-auto mb-4" />
                                 <p class="text-destructive font-medium">Failed to load PDF</p>
@@ -1264,7 +1310,11 @@ watch(currentPage, (newPage) => {
                         </div>
 
                         <!-- PDF Controls (show when we have page count) -->
-                        <div v-if="totalPages > 0" class="px-3 sm:px-6 pb-3 sm:pb-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-b">
+                   <!-- PDF Controls (show only when NOT Google Drive) -->
+<div
+  v-if="totalPages > 0 && detectPdfSource(effectivePdfUrl) !== 'google_drive'"
+  class="px-3 sm:px-6 pb-3 sm:pb-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-b"
+>
     <div class="flex items-center gap-1 sm:gap-2 w-full sm:w-auto justify-center">
         <Button @click="prevPdfPage" variant="outline" size="sm" :disabled="currentPage <= 1">
             <ChevronLeft class="h-4 w-4" />
@@ -1292,7 +1342,9 @@ watch(currentPage, (newPage) => {
             <ZoomOut class="h-4 w-4" />
         </Button>
 
-        <span class="px-2 sm:px-3 py-1 text-xs sm:text-sm bg-muted rounded whitespace-nowrap">{{ pdfZoom }}%</span>
+        <span class="px-2 sm:px-3 py-1 text-xs sm:text-sm bg-muted rounded whitespace-nowrap">
+            {{ pdfZoom }}%
+        </span>
 
         <Button @click="zoomPdf('in')" variant="outline" size="sm" :disabled="pdfZoom >= 200">
             <ZoomIn class="h-4 w-4" />
@@ -1311,73 +1363,56 @@ watch(currentPage, (newPage) => {
     </div>
 </div>
 
+
                         <!-- PDF Content -->
                         <CardContent class="p-0">
-                            <div
-                                ref="pdfContainer"
-                                :style="{ minHeight: isPdfFullscreen ? '100vh' : '500px' }" class="sm:min-h-[800px]"
-                            >
+                            <div ref="pdfContainer" :style="{ minHeight: isPdfFullscreen ? '100vh' : '500px' }"
+                                class="sm:min-h-[800px] fixed inset-0 z-50 bg-white overflow-auto"
+                                :class="isPdfFullscreen ? 'fixed inset-0' : 'relative'">
                                 <!-- Strategy 1: For Local Storage PDFs ONLY - Use vue-pdf-embed -->
-                                <div v-if="detectPdfSource(content.file_url || '') === 'storage' && pdfSource"
-                                     class="flex items-center justify-center p-4">
-                                    <div
-                                        class="bg-white shadow-lg transition-transform duration-300"
-                                        :style="{
+                                <div v-if="detectPdfSource(effectivePdfUrl) === 'storage' && pdfSource"
+                                    class="flex items-center justify-center p-4 w-full h-full">
+                                    <div class="bg-white shadow-lg transition-transform duration-300" :style="{
                     transform: `scale(${pdfZoom / 100}) rotate(${pdfRotation}deg)`,
                     transformOrigin: 'center center'
-                }"
-                                    >
-                                        <VuePdfEmbed
-                                            :source="pdfSource"
-                                            :page="currentPage"
-                                            :style="{
-    height: isPdfFullscreen ? '90vh' : '500px',
-    width: '100%',
-    minWidth: '100%'
-}"
-                                            class="sm:h-[700px] sm:min-w-[800px]"
-                                            @loaded="onPdfLoaded"
-                                            @loading-failed="onPdfLoadingFailed"
-                                            @rendered="onPdfRendered"
-                                        />
+                }">
+                                        <VuePdfEmbed :source="pdfSource" :page="currentPage" :style="{
+                        height: isPdfFullscreen ? '90vh' : '500px',
+                        width: '100%',
+                        minWidth: '100%'
+                    }" class="sm:h-[700px] sm:min-w-[800px]" @loaded="onPdfLoaded" @loading-failed="onPdfLoadingFailed"
+                                            @rendered="onPdfRendered" />
                                     </div>
                                 </div>
 
                                 <!-- Strategy 2: For Google Drive PDFs - Use iframe ONLY (no vue-pdf-embed) -->
-                                <div v-else-if="detectPdfSource(content.file_url || '') === 'google_drive' && pdfSource"
-                                     class="w-full h-full">
-                                    <iframe
-                                        :src="pdfSource"
-                                        class="w-full h-full border-0"
+                                <div v-else-if="detectPdfSource(effectivePdfUrl) === 'google_drive' && pdfSource"
+                                    class="w-full h-full">
+                                    <iframe :src="pdfSource" class="w-full h-full border-0"
                                         :style="{ height: isPdfFullscreen ? '90vh' : '700px' }"
-                                        @load="onGoogleEmbedLoad"
-                                        allow="autoplay"
+                                        @load="onGoogleEmbedLoad" allow="autoplay"
                                         sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
-                                        title="Google Drive PDF Viewer"
-                                    />
+                                        title="Google Drive PDF Viewer" />
                                 </div>
 
                                 <!-- Strategy 3: For External PDFs - Try iframe -->
-                                <div v-else-if="detectPdfSource(content.file_url || '') === 'external' && pdfSource"
-                                     class="w-full h-full">
-                                    <iframe
-                                        :src="pdfSource"
-                                        class="w-full h-full border-0"
-                                        :style="{ height: isPdfFullscreen ? '90vh' : '700px' }"
-                                        @load="onIframeLoad"
-                                        @error="onIframeError"
-                                        title="External PDF Viewer"
-                                    />
+                                <div v-else-if="detectPdfSource(effectivePdfUrl) === 'external' && pdfSource"
+                                    class="w-full h-full">
+                                    <iframe :src="pdfSource" class="w-full h-full border-0"
+                                        :style="{ height: isPdfFullscreen ? '90vh' : '700px' }" @load="onIframeLoad"
+                                        @error="onIframeError" title="External PDF Viewer" />
                                 </div>
+
 
                                 <!-- Fallback: Database Page Count Available - Show Progress Even if PDF Fails -->
                                 <div v-else-if="content.pdf_page_count && content.pdf_page_count > 0"
-                                     class="flex items-center justify-center h-96 w-full bg-muted">
+                                    class="flex items-center justify-center h-96 w-full bg-muted">
                                     <div class="text-center max-w-md">
                                         <BookOpen class="h-16 w-16 text-primary mx-auto mb-4" />
                                         <h3 class="text-lg font-medium mb-2">PDF Preview Not Available</h3>
                                         <p class="text-muted-foreground mb-4">
-                                            The PDF cannot be displayed in the viewer, but you can still track your progress through the {{ content.pdf_page_count }} pages from the database.
+                                            The PDF cannot be displayed in the viewer, but you can still track your
+                                            progress through the {{ content.pdf_page_count }} pages from the database.
                                         </p>
                                         <div class="space-y-2">
                                             <Button @click="tryDirectUrl" variant="outline" class="w-full">
@@ -1385,7 +1420,8 @@ watch(currentPage, (newPage) => {
                                                 Open PDF in New Tab
                                             </Button>
                                             <p class="text-xs text-muted-foreground">
-                                                Progress tracking will work based on the {{ content.pdf_page_count }} pages stored in the database.
+                                                Progress tracking will work based on the {{ content.pdf_page_count }}
+                                                pages stored in the database.
                                             </p>
                                         </div>
                                     </div>
@@ -1473,12 +1509,8 @@ watch(currentPage, (newPage) => {
                     <!-- Complete Button Card -->
                     <Card v-if="!isCompleted && (progressPercentage >= 90 || completionPercentage >= 90)">
                         <CardContent class="p-4">
-                            <Button
-                                @click="markCompleted"
-                                :disabled="isLoading"
-                                variant="default"
-                                class="w-full bg-green-600 hover:bg-green-700"
-                            >
+                            <Button @click="markCompleted" :disabled="isLoading" variant="default"
+                                class="w-full bg-green-600 hover:bg-green-700">
                                 <Loader2 v-if="isLoading" class="h-4 w-4 mr-2 animate-spin" />
                                 <CheckCircle v-else class="h-4 w-4 mr-2" />
                                 {{ isLoading ? 'Completing...' : 'Mark as Complete' }}
@@ -1489,7 +1521,8 @@ watch(currentPage, (newPage) => {
                     <!-- Completion Badge Card -->
                     <Card v-if="isCompleted">
                         <CardContent class="p-4 text-center">
-                            <Badge variant="outline" class="px-4 py-2 text-green-600 border-green-200 bg-green-50 w-full justify-center">
+                            <Badge variant="outline"
+                                class="px-4 py-2 text-green-600 border-green-200 bg-green-50 w-full justify-center">
                                 <CheckCircle class="h-4 w-4 mr-2" />
                                 Completed
                             </Badge>
@@ -1500,41 +1533,36 @@ watch(currentPage, (newPage) => {
 
             <!-- Navigation Section -->
             <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 pt-4 sm:pt-6">
-    <div class="w-full sm:flex-1">
-        <Button
-            v-if="safeNavigation.previous"
-            @click="navigateContent(safeNavigation.previous.id)"
-            variant="outline"
-            class="w-full sm:max-w-xs flex items-center gap-3 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-colors"
-        >
-            <SkipBack class="h-4 w-4" />
-            <div class="text-left">
-                <div class="font-medium text-sm">{{ safeNavigation.previous.title }}</div>
-                <div class="text-xs text-muted-foreground">{{ safeNavigation.previous.content_type.toUpperCase() }}</div>
-            </div>
-        </Button>
-    </div>
+                <div class="w-full sm:flex-1">
+                    <Button v-if="safeNavigation.previous" @click="navigateContent(safeNavigation.previous.id)"
+                        variant="outline"
+                        class="w-full sm:max-w-xs flex items-center gap-3 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-colors">
+                        <SkipBack class="h-4 w-4" />
+                        <div class="text-left">
+                            <div class="font-medium text-sm">{{ safeNavigation.previous.title }}</div>
+                            <div class="text-xs text-muted-foreground">{{
+                                safeNavigation.previous.content_type.toUpperCase() }}</div>
+                        </div>
+                    </Button>
+                </div>
 
-    <div class="w-full sm:flex-1 sm:text-right">
-        <Button
-            v-if="safeNavigation.next"
-            @click="navigateContent(safeNavigation.next.id)"
-            variant="outline"
-            :disabled="!safeNavigation.next.is_unlocked"
-            class="w-full sm:max-w-xs flex items-center gap-3 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-colors sm:ml-auto"
-            :class="{ 'opacity-60 cursor-not-allowed': !safeNavigation.next.is_unlocked }"
-        >
-            <div class="text-left">
-                <div class="font-medium text-sm">{{ safeNavigation.next.title }}</div>
-                <div class="text-xs text-muted-foreground">
-                    {{ safeNavigation.next.content_type.toUpperCase() }}
-                    <span v-if="!safeNavigation.next.is_unlocked" class="ml-2 text-amber-600">🔒 Locked</span>
+                <div class="w-full sm:flex-1 sm:text-right">
+                    <Button v-if="safeNavigation.next" @click="navigateContent(safeNavigation.next.id)"
+                        variant="outline" :disabled="!safeNavigation.next.is_unlocked"
+                        class="w-full sm:max-w-xs flex items-center gap-3 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-colors sm:ml-auto"
+                        :class="{ 'opacity-60 cursor-not-allowed': !safeNavigation.next.is_unlocked }">
+                        <div class="text-left">
+                            <div class="font-medium text-sm">{{ safeNavigation.next.title }}</div>
+                            <div class="text-xs text-muted-foreground">
+                                {{ safeNavigation.next.content_type.toUpperCase() }}
+                                <span v-if="!safeNavigation.next.is_unlocked" class="ml-2 text-amber-600">🔒
+                                    Locked</span>
+                            </div>
+                        </div>
+                        <SkipForward class="h-4 w-4" />
+                    </Button>
                 </div>
             </div>
-            <SkipForward class="h-4 w-4" />
-        </Button>
-    </div>
-</div>
 
             <!-- Enhanced Completion Alert -->
             <Alert v-if="isCompleted" class="border-green-200 bg-green-50 dark:bg-green-950">
@@ -1549,7 +1577,8 @@ watch(currentPage, (newPage) => {
             </Alert>
 
             <!-- PDF Reading Tips -->
-            <Alert v-if="content.content_type === 'pdf' && !isCompleted && totalPages > 0" class="border-blue-200 bg-blue-50 dark:bg-blue-950">
+            <Alert v-if="content.content_type === 'pdf' && !isCompleted && totalPages > 0"
+                class="border-blue-200 bg-blue-50 dark:bg-blue-950">
                 <Eye class="h-4 w-4 text-blue-600" />
                 <AlertDescription>
                     <strong class="text-blue-800 dark:text-blue-200">Reading Progress:</strong>

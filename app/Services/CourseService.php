@@ -7,7 +7,6 @@ use App\Models\CourseRegistration;
 use App\Models\User;
 use App\Models\CourseCompletion; // Changed from App\Services\CourseCompletion
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 class CourseService

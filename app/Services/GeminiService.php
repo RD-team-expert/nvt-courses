@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use GuzzleHttp\Client;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 
 class GeminiService

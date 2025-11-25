@@ -12,6 +12,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use App\Models\VideoCategory;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class VideoController extends Controller
 {
@@ -72,10 +75,12 @@ class VideoController extends Controller
         // ✅ NEW: Storage statistics
         $storageStats = $this->videoStorageService->getStorageStats();
 
+        $localStorageStats = $this->getLocalVideoStorageStats();
+
         return Inertia::render('Admin/Video/Index', [
             'videos' => $videos,
             'categories' => $categories,
-            'storageStats' => $storageStats, // ✅ NEW
+            'storageStats' => $localStorageStats, // ✅ NEW
         ]);
     }
 
@@ -110,113 +115,102 @@ class VideoController extends Controller
      * ✅ UPDATED: Handle both Google Drive and local storage
      */
     public function store(Request $request)
-    {
+{
+    $validated = $request->validate([
+        'name' => 'required|string|max:255',
+        'description' => 'nullable|string|max:2000',
+        'duration' => 'nullable|integer|min:1|max:86400',
+        'content_category_id' => 'nullable|exists:content_categories,id',
+        'is_active' => 'boolean',
+        'storage_type' => 'required|in:google_drive,local',
+        'google_drive_url' => 'required_if:storage_type,google_drive|nullable|url|max:500',
+        
+        // ✅ CHANGED: Accept video_data as string (JSON from ChunkUploader)
+        'video_data' => 'required_if:storage_type,local|nullable|string',
+    ]);
 
+    DB::beginTransaction();
 
-        // ✅ UPDATED: Validate based on storage_type
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string|max:2000',
-            'duration' => 'nullable|integer|min:1|max:86400',
-            'content_category_id' => 'nullable|exists:content_categories,id',
-            'is_active' => 'boolean',
+    try {
+        $videoData = [
+            'name' => $validated['name'],
+            'description' => $validated['description'],
+            'duration' => $validated['duration'],
+            'content_category_id' => $validated['content_category_id'],
+            'is_active' => $validated['is_active'] ?? true,
+            'created_by' => auth()->id(),
+            'storage_type' => $validated['storage_type'],
+        ];
 
-            // ✅ NEW: Storage type selection
-            'storage_type' => 'required|in:google_drive,local',
+        // Google Drive route (unchanged)
+        if ($validated['storage_type'] === 'google_drive') {
+            if (!$validated['google_drive_url']) {
+                throw new \Exception('Google Drive URL is required');
+            }
 
-            // ✅ NEW: Conditional validation
-            'google_drive_url' => 'required_if:storage_type,google_drive|nullable|url|max:500',
-            'video_file' => [
-                'required_if:storage_type,local',
-                'nullable',
-                'file',
-                'mimetypes:video/*,application/octet-stream', // Accept any video type
-                'max:524288', // 512MB (adjust if needed)
-            ],
-        ], [
-            'video_file.mimetypes' => 'The file must be a valid video file.',
-            'video_file.max' => 'The video file must not be larger than 512MB.',
+            $streamingUrl = $this->googleDriveService->processUrl($validated['google_drive_url']);
+
+            if (!$streamingUrl) {
+                throw new \Exception('Could not process Google Drive URL.');
+            }
+
+            $videoData['google_drive_url'] = $validated['google_drive_url'];
+            $videoData['streaming_url'] = $streamingUrl;
+        }
+
+        // ✅ LOCAL STORAGE: Handle chunked upload response
+        elseif ($validated['storage_type'] === 'local') {
+            if (empty($validated['video_data'])) {
+                throw new \Exception('Video file data is required for local storage');
+            }
+
+            Log::info('=== VIDEO UPLOAD DEBUG ===');
+    Log::info('Raw video_data:', ['video_data' => $validated['video_data'] ?? 'NULL']);
+            // ✅ Parse the JSON response from ChunkUploader
+            $uploadedFileData = json_decode($validated['video_data'], true);
+            
+            if (!$uploadedFileData || !isset($uploadedFileData['path'])) {
+                throw new \Exception('Invalid video upload data');
+            }
+   Log::info('=== END DEBUG ===');
+            // ✅ The file is already uploaded by ChunkUploadController
+            // We just need to save the metadata
+            $videoData['file_path'] = $uploadedFileData['path'];
+            $videoData['file_size'] = $uploadedFileData['size'] ?? null;
+            $videoData['mime_type'] = $uploadedFileData['mime_type'] ?? 'video/mp4';
+            
+            // ✅ Optional: Extract duration if you implement it
+            // For now, use the duration from form or set to null
+            if (!$videoData['duration']) {
+                // You can implement FFmpeg duration extraction here
+                $videoData['duration'] = null;
+            }
+
+           
+        }
+
+        // Create video record
+        $video = Video::create($videoData);
+
+        DB::commit();
+
+        return redirect()->route('admin.videos.index')
+            ->with('success', 'Video created successfully.');
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        
+        Log::error('Video creation failed:', [
+            'message' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
         ]);
 
-        DB::beginTransaction();
-
-        try {
-            $videoData = [
-                'name' => $validated['name'],
-                'description' => $validated['description'],
-                'duration' => $validated['duration'],
-                'content_category_id' => $validated['content_category_id'],
-                'is_active' => $validated['is_active'] ?? true,
-                'created_by' => auth()->id(),
-                'storage_type' => $validated['storage_type'], // ✅ NEW
-            ];
-
-            // ============================================
-            // ✅ ROUTE 1: Google Drive (existing logic)
-            // ============================================
-            if ($validated['storage_type'] === 'google_drive') {
-                if (!$validated['google_drive_url']) {
-                    throw new \Exception('Google Drive URL is required');
-                }
-
-                $streamingUrl = $this->googleDriveService->processUrl($validated['google_drive_url']);
-
-                if (!$streamingUrl) {
-                    throw new \Exception('Could not process Google Drive URL.');
-                }
-
-                $videoData['google_drive_url'] = $validated['google_drive_url'];
-                $videoData['streaming_url'] = $streamingUrl;
-            }
-
-            // ============================================
-            // ✅ ROUTE 2: Local Storage (new logic)
-            // ============================================
-            elseif ($validated['storage_type'] === 'local') {
-                if (!$request->hasFile('video_file')) {
-                    throw new \Exception('Video file is required for local storage');
-                }
-
-                $file = $request->file('video_file');
-
-                // Upload video and get metadata
-                $uploadData = $this->videoStorageService->uploadVideo(
-                    $file,
-                    $validated['content_category_id']
-                );
-
-                $videoData['file_path'] = $uploadData['file_path'];
-                $videoData['file_size'] = $uploadData['file_size'];
-                $videoData['mime_type'] = $uploadData['mime_type'];
-                $videoData['duration_seconds'] = $uploadData['duration_seconds'];
-
-                // Use extracted duration if not provided
-                if (!$videoData['duration'] && $uploadData['duration_seconds']) {
-                    $videoData['duration'] = $uploadData['duration_seconds'];
-                }
-
-
-            }
-
-            // Create video record
-            $video = Video::create($videoData);
-
-            DB::commit();
-
-
-
-            return redirect()->route('admin.videos.index')
-                ->with('success', 'Video created successfully.');
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-
-
-            return redirect()->back()
-                ->withInput()
-                ->with('error', $e->getMessage());
-        }
+        return redirect()->back()
+            ->withInput()
+            ->with('error', $e->getMessage());
     }
+}
+
 
     /**
      * Display the specified video
@@ -372,34 +366,31 @@ class VideoController extends Controller
      * ✅ UPDATED: Delete physical file for local storage
      */
     public function destroy(Video $video)
-    {
-        try {
-            $videoName = $video->name;
-            $storageType = $video->storage_type;
+{
+    try {
+        $videoName = $video->name;
+        $storageType = $video->storage_type;
 
-            // ✅ NEW: Delete physical file if local storage
-            if ($video->isLocal()) {
-                $deleted = $video->deleteStoredFile();
-                if (!$deleted) {
-
-                }
+        // ✅ Delete physical file if local storage
+        if ($video->isLocal()) {
+            $deleted = $video->deleteStoredFile();
+            if (!$deleted) {
+                // you can log here if you want
+                // Log::warning("Could not delete file for video ID {$video->id}");
             }
-
-            // Delete database record
-            $video->delete();
-
-
-
-            return redirect()->route('admin.videos.index')
-                ->with('success', 'Video deleted successfully.');
-
-        } catch (\Exception $e) {
-
-
-            return redirect()->back()
-                ->with('error', 'Failed to delete video. Please try again.');
         }
+
+        // Delete database record
+        $video->delete();
+
+        return redirect()->route('admin.videos.index')
+            ->with('success', 'Video deleted successfully.');
+
+    } catch (\Exception $e) {
+        return redirect()->back()
+            ->with('error', 'Failed to delete video. Please try again.');
     }
+}
 
     /**
      * Toggle active status
@@ -454,4 +445,48 @@ class VideoController extends Controller
             ], 500);
         }
     }
+
+      protected function getLocalVideoStorageStats(): array
+{
+    $disk = 'public';
+    $basePath = 'videos'; // where ChunkUploadController saves final files
+
+    // If the folder doesn't exist yet, return zeros
+    if (!Storage::disk($disk)->exists($basePath)) {
+        return [
+            'total_files'      => 0,
+            'total_size_bytes' => 0,
+            'total_size_mb'    => 0,
+            'total_size_gb'    => 0,
+            'disk'             => $disk,
+        ];
+    }
+
+    // Get all files under /videos (recursively)
+    $files = Storage::disk($disk)->allFiles($basePath);
+
+    // (Optional) filter only video extensions if you want to be strict:
+    $videoExtensions = ['mp4', 'mov', 'mkv', 'avi', 'webm'];
+    $files = array_filter($files, function ($file) use ($videoExtensions) {
+        $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+        return in_array($ext, $videoExtensions);
+    });
+
+    $totalBytes = 0;
+
+    foreach ($files as $file) {
+        $totalBytes += Storage::disk($disk)->size($file);
+    }
+
+    $totalMb = round($totalBytes / 1024 / 1024, 2);
+    $totalGb = round($totalBytes / 1024 / 1024 / 1024, 2);
+
+    return [
+        'total_files'      => count($files),
+        'total_size_bytes' => $totalBytes,
+        'total_size_mb'    => $totalMb,
+        'total_size_gb'    => $totalGb,
+        'disk'             => $disk,
+    ];
+}
 }

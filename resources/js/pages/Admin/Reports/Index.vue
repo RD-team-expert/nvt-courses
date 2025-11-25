@@ -33,7 +33,7 @@
                     <DropdownMenuTrigger as-child>
                         <Button variant="outline" class="w-full sm:w-auto">
                             <Monitor class="mr-2 h-4 w-4" />
-                            Course Online
+                           Online Courses
                             <ChevronDown class="ml-2 h-4 w-4" />
                         </Button>
                     </DropdownMenuTrigger>
@@ -54,6 +54,12 @@
                             <Link :href="route('admin.reports.course-online.user-performance')" class="flex items-center">
                                 <Users class="mr-2 h-4 w-4" />
                                 User Performance
+                            </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem as-child>
+                            <Link :href="route('admin.reports.course-online.department-performance')" class="flex items-center">
+                                <Trophy class="mr-2 h-4 w-4" />
+                                Department Performance
                             </Link>
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
@@ -556,6 +562,15 @@
                                         <div>
                                             <div class="font-medium">User Performance</div>
                                             <div class="text-xs text-muted-foreground">Comprehensive analysis</div>
+                                        </div>
+                                    </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem as-child>
+                                    <Link :href="route('admin.reports.course-online.department-performance')" class="flex items-center">
+                                        <Trophy class="mr-2 h-4 w-4" />
+                                        <div>
+                                            <div class="font-medium">Department Performance</div>
+                                            <div class="text-xs text-muted-foreground">Top & bottom performers</div>
                                         </div>
                                     </Link>
                                 </DropdownMenuItem>

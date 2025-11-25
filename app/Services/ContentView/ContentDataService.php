@@ -5,6 +5,8 @@ namespace App\Services\ContentView;
 use App\Models\ModuleContent;
 use App\Models\UserContentProgress;
 use App\Models\Video;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 
 class ContentDataService
 {
@@ -66,18 +68,27 @@ class ContentDataService
      * Prepare PDF data
      */
     public function preparePdfData(ModuleContent $content): ?array
-    {
-        if ($content->content_type !== 'pdf') {
-            return null;
-        }
-
-        return [
-            'file_path' => $content->file_path,
-            'google_drive_url' => $content->google_drive_pdf_url,
-            'page_count' => $content->pdf_page_count,
-            'has_page_count' => !is_null($content->pdf_page_count),
-        ];
+{
+    if ($content->content_type !== 'pdf') {
+        return null;
     }
+
+    // ✅ Generate proper URL for file_path
+    $fileUrl = null;
+    if ($content->file_path) {
+        $fileUrl = Storage::url($content->file_path);
+    }
+  Log::info('Unauthorized video access attempt', [
+                'google_drive_url' => $content->google_drive_pdf_url,
+            ]);
+    return [
+        'file_url' => $fileUrl,  // ✅ Changed from file_path to file_url with proper URL
+        'google_drive_url' => $content->google_drive_pdf_url,
+        'page_count' => $content->pdf_page_count,
+        'has_page_count' => !is_null($content->pdf_page_count),
+    ];
+}
+
 
     /**
      * Prepare progress data
@@ -165,11 +176,13 @@ class ContentDataService
     if ($content->content_type === 'video' && $video) {
         $response['video'] = $this->prepareVideoData($video, $streamingData);
     }
+    Log::info('Content type:', ['type' => $content->content_type]);
 
     // Add PDF data if it's a PDF content
     if ($content->content_type === 'pdf') {
         $response['pdf'] = $this->preparePdfData($content);
     }
+    Log::info('Final response keys:', ['keys' => array_keys($response)]);
 
     return $response;
 }

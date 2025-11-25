@@ -7,7 +7,6 @@ use App\Models\QuizAttempt;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 class QuizAttemptController extends Controller
 {

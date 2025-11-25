@@ -57,6 +57,7 @@ const props = defineProps({
     users: Object,
     courses: Array,
     allUsers: Array,
+    departments: Array,
     filters: Object,
 })
 
@@ -70,6 +71,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
 // Filter state
 const filters = ref({
     user_id: props.filters?.user_id || '',
+    department_id: props.filters?.department_id || '',
     course_id: props.filters?.course_id || '',
     date_from: props.filters?.date_from || '',
     date_to: props.filters?.date_to || '',
@@ -158,6 +160,7 @@ watch(filters, () => {
 const resetFilters = () => {
     filters.value = {
         user_id: '',
+        department_id: '',
         course_id: '',
         date_from: '',
         date_to: '',
@@ -288,7 +291,7 @@ if (typeof window !== 'undefined') {
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                         <div class="space-y-2">
                             <Label for="user_filter">User</Label>
                             <Select
@@ -302,6 +305,24 @@ if (typeof window !== 'undefined') {
                                     <SelectItem value="all">All Users</SelectItem>
                                     <SelectItem v-for="user in allUsers" :key="user.id" :value="user.id.toString()">
                                         {{ user.name }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div class="space-y-2">
+                            <Label for="department_filter">Department</Label>
+                            <Select
+                                :model-value="filters.department_id || 'all'"
+                                @update:model-value="(value) => filters.department_id = value === 'all' ? '' : value"
+                            >
+                                <SelectTrigger id="department_filter">
+                                    <SelectValue placeholder="All Departments" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Departments</SelectItem>
+                                    <SelectItem v-for="dept in departments" :key="dept.id" :value="dept.id.toString()">
+                                        {{ dept.name }}
                                     </SelectItem>
                                 </SelectContent>
                             </Select>

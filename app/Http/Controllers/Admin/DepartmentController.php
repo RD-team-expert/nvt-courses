@@ -230,7 +230,6 @@ class DepartmentController extends Controller
     }
     public function getEmployees(Department $department)
     {
-        Log::info('Getting employees for department: ' . $department->name . ' (ID: ' . $department->id . ')');
 
         // Get all L1 users in this department
         $employees = User::where('department_id', $department->id)

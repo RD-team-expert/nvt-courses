@@ -71,6 +71,11 @@ interface User {
     email: string
 }
 
+interface Department {
+    id: number
+    name: string
+}
+
 interface Stats {
     total_assignments: number
     completed_assignments: number
@@ -83,6 +88,7 @@ interface Filters {
     course_id?: string
     status?: string
     user_id?: string
+    department_id?: string
     date_from?: string
     date_to?: string
 }
@@ -108,12 +114,14 @@ const props = withDefaults(defineProps<{
     assignments: PaginationData
     courses: Course[]
     users: User[]
+    departments: Department[]
     filters: Filters
     stats: Stats
 }>(), {
     assignments: () => ({ data: [], links: [], meta: { current_page: 1, from: 0, last_page: 1, to: 0, total: 0 } }),
     courses: () => [],
     users: () => [],
+    departments: () => [],
     filters: () => ({}),
     stats: () => ({ total_assignments: 0, completed_assignments: 0, in_progress_assignments: 0, average_completion_rate: 0, total_learning_hours: 0 })
 })
@@ -129,6 +137,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
 const courseFilter = ref(props.filters?.course_id || '')
 const statusFilter = ref(props.filters?.status || '')
 const userFilter = ref(props.filters?.user_id || '')
+const departmentFilter = ref(props.filters?.department_id || '')
 const dateFromFilter = ref(props.filters?.date_from || '')
 const dateToFilter = ref(props.filters?.date_to || '')
 const isRefreshing = ref(false)
@@ -144,6 +153,7 @@ const applyFilters = debounce(() => {
     if (courseFilter.value && courseFilter.value !== 'all') params.course_id = courseFilter.value
     if (statusFilter.value && statusFilter.value !== 'all') params.status = statusFilter.value
     if (userFilter.value && userFilter.value !== 'all') params.user_id = userFilter.value
+    if (departmentFilter.value && departmentFilter.value !== 'all') params.department_id = departmentFilter.value
     if (dateFromFilter.value) params.date_from = dateFromFilter.value
     if (dateToFilter.value) params.date_to = dateToFilter.value
 
@@ -159,6 +169,7 @@ const clearFilters = () => {
     courseFilter.value = ''
     statusFilter.value = ''
     userFilter.value = ''
+    departmentFilter.value = ''
     dateFromFilter.value = ''
     dateToFilter.value = ''
 
@@ -175,6 +186,7 @@ const exportReport = () => {
     if (courseFilter.value && courseFilter.value !== 'all') params.append('course_id', courseFilter.value)
     if (statusFilter.value && statusFilter.value !== 'all') params.append('status', statusFilter.value)
     if (userFilter.value && userFilter.value !== 'all') params.append('user_id', userFilter.value)
+    if (departmentFilter.value && departmentFilter.value !== 'all') params.append('department_id', departmentFilter.value)
     if (dateFromFilter.value) params.append('date_from', dateFromFilter.value)
     if (dateToFilter.value) params.append('date_to', dateToFilter.value)
 
@@ -190,6 +202,7 @@ const refreshData = () => {
     if (courseFilter.value && courseFilter.value !== 'all') params.course_id = courseFilter.value
     if (statusFilter.value && statusFilter.value !== 'all') params.status = statusFilter.value
     if (userFilter.value && userFilter.value !== 'all') params.user_id = userFilter.value
+    if (departmentFilter.value && departmentFilter.value !== 'all') params.department_id = departmentFilter.value
     if (dateFromFilter.value) params.date_from = dateFromFilter.value
     if (dateToFilter.value) params.date_to = dateToFilter.value
 
@@ -291,7 +304,7 @@ const getPerformanceColor = (attentionScore: number | null, suspiciousCount: num
 
 // ✅ WATCHERS
 const stopWatching = watch(
-    [courseFilter, statusFilter, userFilter, dateFromFilter, dateToFilter],
+    [courseFilter, statusFilter, userFilter, departmentFilter, dateFromFilter, dateToFilter],
     applyFilters
 )
 
@@ -393,7 +406,7 @@ onBeforeUnmount(() => {
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4">
                         <!-- Course Filter -->
                         <div class="space-y-2">
                             <Label for="course_filter">Course</Label>
@@ -454,6 +467,29 @@ onBeforeUnmount(() => {
                                         :value="user.id.toString()"
                                     >
                                         {{ user.name }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <!-- Department Filter -->
+                        <div class="space-y-2">
+                            <Label for="department_filter">Department</Label>
+                            <Select
+                                :model-value="departmentFilter || 'all'"
+                                @update:model-value="(value) => departmentFilter = value === 'all' ? '' : value"
+                            >
+                                <SelectTrigger id="department_filter">
+                                    <SelectValue placeholder="All Departments" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Departments</SelectItem>
+                                    <SelectItem
+                                        v-for="department in departments"
+                                        :key="department.id"
+                                        :value="department.id.toString()"
+                                    >
+                                        {{ department.name }}
                                     </SelectItem>
                                 </SelectContent>
                             </Select>

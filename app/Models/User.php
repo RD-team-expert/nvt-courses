@@ -419,5 +419,12 @@ class User extends Authenticatable
      * Get the user level through the tier
      */
 
+    /**
+     * Quiz assignments for this user
+     */
+    public function quizAssignments()
+    {
+        return $this->hasMany(QuizAssignment::class);
+    }
 
 }

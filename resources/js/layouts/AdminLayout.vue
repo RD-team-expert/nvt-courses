@@ -3,14 +3,17 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { Link } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import { usePage } from '@inertiajs/vue3';
+import { type BreadcrumbItemType } from '@/types';
 
 const page = usePage();
 const currentUrl = computed(() => page.url);
 
-// Define breadcrumbs for admin section
-const breadcrumbs = [
-  { name: 'Admin', href: '/admin' }
-];
+// Accept breadcrumbs from child components
+const props = withDefaults(defineProps<{
+  breadcrumbs?: BreadcrumbItemType[]
+}>(), {
+  breadcrumbs: () => [{ name: 'Admin', href: '/admin' }]
+});
 </script>
 
 <template>
