@@ -31,19 +31,70 @@ import {
     TrendingUp
 } from 'lucide-vue-next'
 
+// Define interfaces for better type safety
+interface Course {
+    id: number;
+    name: string;
+    status: string;
+    completion?: number;
+}
+
+interface Evaluation {
+    id: number;
+    course_name: string;
+    total_score: number;
+    incentive_amount?: number;
+    performance_level?: number;
+    created_at: string;
+}
+
+interface ManagerRole {
+    id: number;
+    role_type: 'direct_manager' | 'project_manager' | 'department_head' | 'senior_manager' | 'team_lead';
+    role_display: string;
+    is_primary: boolean;
+    department: string;
+    authority_level: number;
+}
+
+interface DirectReport {
+    id: number;
+    name: string;
+    level?: string;
+    department?: string;
+}
+
 const props = defineProps({
     user: Object,
-    managerRoles: Array,
-    directReports: Array,
-    managers: Array,
-    evaluations: Array,
-    courses: Array,
-    recentActivity: Array
+    managerRoles: {
+        type: Array as () => ManagerRole[],
+        default: () => []
+    },
+    directReports: {
+        type: Array as () => DirectReport[],
+        default: () => []
+    },
+    managers: {
+        type: Array as () => any[],
+        default: () => []
+    },
+    evaluations: {
+        type: Array as () => Evaluation[],
+        default: () => []
+    },
+    courses: {
+        type: Array as () => Course[],
+        default: () => []
+    },
+    recentActivity: {
+        type: Array as () => any[],
+        default: () => []
+    }
 })
 
 // Get level badge variant
-const getLevelVariant = (levelCode: string) => {
-    const variants = {
+const getLevelVariant = (levelCode: string): 'destructive' | 'outline' | 'default' | 'secondary' => {
+    const variants: Record<string, 'destructive' | 'outline' | 'default' | 'secondary'> = {
         'L1': 'secondary',
         'L2': 'default',
         'L3': 'secondary',
@@ -53,8 +104,8 @@ const getLevelVariant = (levelCode: string) => {
 }
 
 // Get role badge variant
-const getRoleVariant = (roleType: string) => {
-    const variants = {
+const getRoleVariant = (roleType: string): 'destructive' | 'outline' | 'default' | 'secondary' => {
+    const variants: Record<string, 'destructive' | 'outline' | 'default' | 'secondary'> = {
         'direct_manager': 'secondary',
         'project_manager': 'default',
         'department_head': 'default',
@@ -66,11 +117,20 @@ const getRoleVariant = (roleType: string) => {
 
 // Get evaluation performance level
 const getPerformanceLevel = (score: number) => {
-    if (score >= 20) return { label: 'Exceptional', variant: 'default' as const }
-    if (score >= 15) return { label: 'Excellent', variant: 'default' as const }
-    if (score >= 10) return { label: 'Good', variant: 'secondary' as const }
-    if (score >= 5) return { label: 'Average', variant: 'secondary' as const }
-    return { label: 'Needs Improvement', variant: 'destructive' as const }
+    if (score >= 13) return { label: 'Outstanding', variant: 'default' as const, color: 'text-green-600' }
+    if (score >= 10) return { label: 'Reliable', variant: 'secondary' as const, color: 'text-blue-600' }
+    if (score >= 7) return { label: 'Developing', variant: 'outline' as const, color: 'text-yellow-600' }
+    if (score >= 0) return { label: 'Underperforming', variant: 'destructive' as const, color: 'text-red-600' }
+    return { label: 'Not Rated', variant: 'outline' as const, color: 'text-gray-600' }
+}
+
+// Get performance level badge class
+const getPerformanceLevelBadgeClass = (score: number) => {
+    if (score >= 13) return 'bg-green-100 text-green-800 border-green-200'
+    if (score >= 10) return 'bg-blue-100 text-blue-800 border-blue-200'
+    if (score >= 7) return 'bg-yellow-100 text-yellow-800 border-yellow-200'
+    if (score >= 0) return 'bg-red-100 text-red-800 border-red-200'
+    return 'bg-gray-100 text-gray-800 border-gray-200'
 }
 
 // Get status variant
@@ -104,7 +164,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
 ]
 
 // Latest evaluation
-const latestEvaluation = computed(() => {
+const latestEvaluation = computed<Evaluation | null>(() => {
     if (!props.evaluations || props.evaluations.length === 0) return null
     return props.evaluations[0] // Assuming they're ordered by date
 })
@@ -112,7 +172,7 @@ const latestEvaluation = computed(() => {
 // Course completion rate
 const courseCompletionRate = computed(() => {
     if (!props.courses || props.courses.length === 0) return 0
-    const completed = props.courses.filter(course => course.status === 'completed').length
+    const completed = props.courses.filter((course: Course) => course.status === 'completed').length
     return Math.round((completed / props.courses.length) * 100)
 })
 
@@ -268,8 +328,7 @@ const truncateText = (text: string, maxLength: number = 20) => {
                         <div>
                             <dt class="text-sm font-medium text-muted-foreground mb-1">Direct Manager</dt>
                             <dd>
-                                <div v-if="user.direct_manager" class="text-sm font-medium">
-
+                                <div v-if="user && user.direct_manager" class="text-sm font-medium">
                                     {{ user.direct_manager.name }}
                                 </div>
                                 <div v-else class="text-sm text-muted-foreground italic">No direct manager assigned</div>
@@ -315,8 +374,10 @@ const truncateText = (text: string, maxLength: number = 20) => {
                             <div class="space-y-3">
                                 <div class="flex items-center justify-between">
                                     <h3 class="font-medium truncate pr-2">{{ truncateText(latestEvaluation.course_name || 'GHFHG', 15) }}</h3>
-                                    <Badge variant="default" class="shrink-0 bg-gray-900 text-white text-xs px-2 py-1">
-                                        Excellent
+                                    <Badge
+                                        :class="getPerformanceLevelBadgeClass(latestEvaluation.total_score || 0)"
+                                        class="shrink-0 text-xs px-2 py-1">
+                                        {{ getPerformanceLevel(latestEvaluation.total_score || 0).label }}
                                     </Badge>
                                 </div>
                                 <div class="flex items-center justify-between">
@@ -325,8 +386,10 @@ const truncateText = (text: string, maxLength: number = 20) => {
                                         <p class="text-sm text-muted-foreground">Total Score</p>
                                     </div>
                                     <div class="text-right">
-                                        <p class="text-lg font-semibold text-green-600">$5.00</p>
-                                        <p class="text-sm text-muted-foreground">Incentive</p>
+                                        <p class="text-lg font-semibold" :class="getPerformanceLevel(latestEvaluation.total_score || 0).color">
+                                            {{ getPerformanceLevel(latestEvaluation.total_score || 0).label }}
+                                        </p>
+                                        <p class="text-sm text-muted-foreground">Performance Level</p>
                                     </div>
                                 </div>
                                 <div class="text-xs text-muted-foreground flex items-center gap-1">

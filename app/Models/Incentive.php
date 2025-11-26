@@ -11,7 +11,8 @@ class Incentive extends Model
         'user_level_tier_id',   // NEW
         'min_score',
         'max_score',
-        'incentive_amount',
+        'incentive_amount',     // Being phased out in favor of performance_level
+        'performance_level',    // Reference to PerformanceLevel enum
         'evaluation_config_id', // Optional foreign key for linking to evaluation_configs
     ];
 
@@ -20,6 +21,7 @@ class Incentive extends Model
      'incentive_amount' => 'decimal:2', // Fixed: Only specify scale (decimal places)
      'min_score' => 'integer',
      'max_score' => 'integer',
+     'performance_level' => 'integer',
  ];
 
     // Optional: Define the relationship if using evaluation_config_id
