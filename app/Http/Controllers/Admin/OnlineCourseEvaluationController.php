@@ -13,6 +13,7 @@ use App\Models\Incentive;
 use App\Models\EvaluationHistory;
 use App\Models\UserLevel;
 use App\Models\UserLevelTier;
+use App\Enums\PerformanceLevel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Exception;
@@ -260,9 +261,16 @@ class OnlineCourseEvaluationController extends Controller
 
 
 
+            // Map score to performance level
+            $performanceLevel = PerformanceLevel::getLevelByScore($totalScore);
+            $levelMeta = PerformanceLevel::getById($performanceLevel);
+
             $evaluation->update([
                 'total_score' => $totalScore,
-                'incentive_amount' => $incentiveAmount
+                'performance_level' => $performanceLevel,
+                'performance_points_min' => $levelMeta['min_score'] ?? null,
+                'performance_points_max' => $levelMeta['max_score'] ?? null,
+                'incentive_amount' => $incentiveAmount // Kept for backward compatibility
             ]);
 
             DB::commit();
@@ -273,8 +281,15 @@ class OnlineCourseEvaluationController extends Controller
                 $levelTierInfo = ' (' . $user->userLevel->name . ' - ' . $user->userLevelTier->tier_name . ')';
             }
 
+            // Get performance level data for feedback message
+            $performanceLevelLabel = PerformanceLevel::getLabelByLevel($performanceLevel);
+            $performanceRange = PerformanceLevel::getRangeByLevel($performanceLevel);
+            
             return redirect()->route('admin.evaluations.online.index')
-                ->with('success', 'Online course evaluation ' . $message . ' successfully!' . $levelTierInfo . ' Total Score: ' . $totalScore . ', Incentive: $' . number_format($incentiveAmount, 2));
+                ->with('success', 'Online course evaluation ' . $message . ' successfully!' . $levelTierInfo .
+                       ' Total Score: ' . $totalScore .
+                       ', Performance Level: ' . $performanceLevelLabel . ' (' . $performanceRange . ')' .
+                       ', Incentive: $' . number_format($incentiveAmount, 2));
 
         } catch (Exception $e) {
             DB::rollBack();
@@ -351,14 +366,28 @@ class OnlineCourseEvaluationController extends Controller
 
     /**
      * Calculate incentive amount based on user level, tier, and score
+     * Uses performance_level if available
      */
     private function calculateLevelTierIncentiveAmount($user, $totalScore)
     {
         if (!$user->user_level_id || !$user->user_level_tier_id) {
-
             return 0;
         }
-
+        
+        // Get performance level from score
+        $performanceLevel = PerformanceLevel::getLevelByScore($totalScore);
+        
+        // First, try to find an incentive by performance level and user level/tier
+        $incentive = Incentive::where('user_level_id', $user->user_level_id)
+            ->where('user_level_tier_id', $user->user_level_tier_id)
+            ->where('performance_level', $performanceLevel)
+            ->first();
+            
+        if ($incentive) {
+            return $incentive->incentive_amount;
+        }
+        
+        // Fall back to score-based incentive if no performance level match was found
         $incentive = Incentive::where('user_level_id', $user->user_level_id)
             ->where('user_level_tier_id', $user->user_level_tier_id)
             ->where('min_score', '<=', $totalScore)
@@ -369,11 +398,8 @@ class OnlineCourseEvaluationController extends Controller
             ->first();
 
         if ($incentive) {
-
             return $incentive->incentive_amount;
         }
-
-
 
         return 0;
     }
@@ -384,18 +410,7 @@ class OnlineCourseEvaluationController extends Controller
     public function getUsersByDepartment(Request $request)
     {
         $departmentId = $request->input('department_id');
-
-                            // After processing all categories, update evaluation record
-                            $evaluation->total_score = $totalScore;
-                            // Map score to performance level
-                            $performanceLevel = \App\Enums\PerformanceLevel::getLevelByScore($totalScore);
-                            $levelMeta = \App\Enums\PerformanceLevel::getById($performanceLevel);
-                            $evaluation->performance_level = $performanceLevel;
-                            $evaluation->performance_points_min = $levelMeta['min_score'] ?? null;
-                            $evaluation->performance_points_max = $levelMeta['max_score'] ?? null;
-                            $evaluation->save();
-  
-                            $users = User::where('department_id', $departmentId)
+        $users = User::where('department_id', $departmentId)
 
             ->select(['id', 'name', 'email', 'department_id', 'user_level_id', 'user_level_tier_id'])
             ->get()

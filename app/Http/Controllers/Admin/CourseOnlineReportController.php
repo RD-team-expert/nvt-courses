@@ -882,7 +882,7 @@ class CourseOnlineReportController extends Controller
 
 
         try {
-            $filters = $request->only(['course_id', 'user_id', 'date_from', 'date_to', 'suspicious_only']);
+            $filters = $request->only(['course_id', 'user_id', 'date_from', 'date_to', 'suspicious_only', 'department_id']);
 
             $query = LearningSession::query()
                 ->join('users', 'learning_sessions.user_id', '=', 'users.id')
@@ -902,6 +902,9 @@ class CourseOnlineReportController extends Controller
             }
             if (!empty($filters['date_to'])) {
                 $query->whereDate('learning_sessions.session_start', '<=', $filters['date_to']);
+            }
+            if (!empty($filters['department_id'])) {
+                $query->where('users.department_id', $filters['department_id']);
             }
 
             $sessions = $query->select([
@@ -992,7 +995,7 @@ class CourseOnlineReportController extends Controller
 
 
         try {
-            $filters = $request->only(['user_id', 'course_id', 'date_from', 'date_to']);
+            $filters = $request->only(['user_id', 'course_id', 'date_from', 'date_to', 'department_id']);
 
             $query = User::query()
                 ->where('role', '!=', 'admin')
@@ -1000,6 +1003,10 @@ class CourseOnlineReportController extends Controller
 
             if (!empty($filters['user_id'])) {
                 $query->where('id', $filters['user_id']);
+            }
+            
+            if (!empty($filters['department_id'])) {
+                $query->where('department_id', $filters['department_id']);
             }
 
             $users = $query->get();
@@ -1119,7 +1126,7 @@ class CourseOnlineReportController extends Controller
 
 
         try {
-            $filters = $request->only(['course_id', 'status', 'date_from', 'date_to', 'user_id']);
+            $filters = $request->only(['course_id', 'status', 'date_from', 'date_to', 'user_id', 'department_id']);
 
             // Get basic assignments
             $query = CourseOnlineAssignment::query()
@@ -1143,6 +1150,9 @@ class CourseOnlineReportController extends Controller
             }
             if (!empty($filters['date_to'])) {
                 $query->whereDate('course_online_assignments.assigned_at', '<=', $filters['date_to']);
+            }
+            if (!empty($filters['department_id'])) {
+                $query->where('users.department_id', $filters['department_id']);
             }
 
             $query->select([

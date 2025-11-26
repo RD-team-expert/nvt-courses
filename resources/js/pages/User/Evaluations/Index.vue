@@ -29,10 +29,46 @@ import {
     User
 } from 'lucide-vue-next'
 
+// Define interfaces for better type safety
+interface Evaluation {
+    id: number;
+    total_score: number;
+    incentive_amount?: number;
+    performance_level?: number;
+    course: {
+        name: string;
+    };
+    evaluation_date: string;
+    evaluated_by?: {
+        name: string;
+    };
+    notes?: string;
+    categories?: any[];
+}
+
+interface Stats {
+    total_evaluations: number;
+    average_score: number;
+    total_incentives: number;
+    best_score: number;
+}
+
 const props = defineProps({
     user: Object,
-    evaluations: Object,
-    stats: Object,
+    evaluations: {
+        type: Object as () => {
+            data: Evaluation[];
+            links: any[];
+            from: number;
+            to: number;
+            total: number;
+        },
+        default: () => ({ data: [], links: [], from: 0, to: 0, total: 0 })
+    },
+    stats: {
+        type: Object as () => Stats,
+        default: () => ({ total_evaluations: 0, average_score: 0, total_incentives: 0, best_score: 0 })
+    }
 })
 
 const breadcrumbs: BreadcrumbItemType[] = [
@@ -48,7 +84,7 @@ const maxPossibleScore = computed(() => {
     }
 
     // ✅ FIXED: Changed 'eval' to 'evaluation'
-    const allScores = props.evaluations.data.map(evaluation => evaluation.total_score || 0);
+    const allScores = props.evaluations.data.map((evaluation: Evaluation) => evaluation.total_score || 0);
     const highestScore = Math.max(...allScores);
 
     // Smart detection based on score patterns
@@ -63,35 +99,48 @@ const maxPossibleScore = computed(() => {
     return Math.ceil(highestScore / 10) * 10;
 });
 
-// 🎯 DYNAMIC: Performance level based on flexible max score
+// Standardized performance levels based on absolute score ranges
 const getPerformanceLevel = (score: number) => {
-    const percentage = (score / maxPossibleScore.value) * 100;
-
-    if (percentage >= 80) return {
-        label: 'Exceptional',
+    // Using standardized performance level thresholds
+    if (score >= 13) return {
+        label: 'Outstanding',
         variant: 'default' as const,
-        icon: '🏆'
+        icon: '🏆',
+        color: 'text-green-600'
     }
-    if (percentage >= 60) return {
-        label: 'Excellent',
-        variant: 'default' as const,
-        icon: '⭐'
-    }
-    if (percentage >= 40) return {
-        label: 'Good',
+    if (score >= 10) return {
+        label: 'Reliable',
         variant: 'secondary' as const,
-        icon: '👍'
+        icon: '⭐',
+        color: 'text-blue-600'
     }
-    if (percentage >= 20) return {
-        label: 'Average',
-        variant: 'secondary' as const,
-        icon: '📊'
+    if (score >= 7) return {
+        label: 'Developing',
+        variant: 'outline' as const,
+        icon: '👍',
+        color: 'text-yellow-600'
+    }
+    if (score >= 0) return {
+        label: 'Underperforming',
+        variant: 'destructive' as const,
+        icon: '📈',
+        color: 'text-red-600'
     }
     return {
-        label: 'Needs Improvement',
-        variant: 'destructive' as const,
-        icon: '📈'
+        label: 'Not Rated',
+        variant: 'outline' as const,
+        icon: '❓',
+        color: 'text-gray-600'
     }
+}
+
+// Get performance level badge class
+const getPerformanceLevelBadgeClass = (score: number) => {
+    if (score >= 13) return 'bg-green-100 text-green-800 border-green-200'
+    if (score >= 10) return 'bg-blue-100 text-blue-800 border-blue-200'
+    if (score >= 7) return 'bg-yellow-100 text-yellow-800 border-yellow-200'
+    if (score >= 0) return 'bg-red-100 text-red-800 border-red-200'
+    return 'bg-gray-100 text-gray-800 border-gray-200'
 }
 
 // 🎯 DYNAMIC: Score color based on flexible max score
@@ -197,13 +246,16 @@ const calculateTrend = computed(() => {
                     <CardContent class="p-6">
                         <div class="flex items-center">
                             <div class="shrink-0">
-                                <div class="w-10 h-10 bg-yellow-500 rounded-lg flex items-center justify-center">
-                                    <DollarSign class="h-6 w-6 text-white" />
+                                <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                                    <Award class="h-6 w-6 text-white" />
                                 </div>
                             </div>
                             <div class="ml-4">
-                                <p class="text-sm font-medium text-muted-foreground">Total Incentives</p>
-                                <p class="text-2xl font-bold text-green-600">{{ formatCurrency(stats?.total_incentives || 0) }}</p>
+                                <p class="text-sm font-medium text-muted-foreground">Performance Level</p>
+                                <p v-if="stats?.average_score" class="text-2xl font-bold" :class="getPerformanceLevel(stats?.average_score || 0).color">
+                                    {{ getPerformanceLevel(stats?.average_score || 0).label }}
+                                </p>
+                                <p v-else class="text-2xl font-bold text-gray-600">Not Rated</p>
                             </div>
                         </div>
                     </CardContent>
@@ -258,7 +310,9 @@ const calculateTrend = computed(() => {
                                 <div class="flex-1">
                                     <div class="flex items-center space-x-3 mb-2">
                                         <h3 class="text-lg font-medium">{{ evaluation.course.name }}</h3>
-                                        <Badge :variant="getPerformanceLevel(evaluation.total_score).variant">
+                                        <Badge
+                                            :class="getPerformanceLevelBadgeClass(evaluation.total_score)"
+                                            class="px-2 py-1">
                                             {{ getPerformanceLevel(evaluation.total_score).icon }} {{ getPerformanceLevel(evaluation.total_score).label }}
                                         </Badge>
                                         <Badge v-if="index === 0" variant="secondary">
@@ -274,8 +328,10 @@ const calculateTrend = computed(() => {
                                             <p class="text-xs text-muted-foreground">Total Score</p>
                                         </div>
                                         <div>
-                                            <p class="text-xl font-semibold text-green-600">{{ formatCurrency(evaluation.incentive_amount) }}</p>
-                                            <p class="text-xs text-muted-foreground">Incentive Earned</p>
+                                            <p class="text-xl font-semibold" :class="getPerformanceLevel(evaluation.total_score).color">
+                                                {{ getPerformanceLevel(evaluation.total_score).label }}
+                                            </p>
+                                            <p class="text-xs text-muted-foreground">Performance Level</p>
                                         </div>
                                         <div>
                                             <p class="text-sm font-medium flex items-center gap-1">

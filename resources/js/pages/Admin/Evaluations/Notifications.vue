@@ -19,6 +19,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select'
+import type { AcceptableValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -28,7 +29,6 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    DialogOverlay,
 } from '@/components/ui/dialog'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Separator } from '@/components/ui/separator'
@@ -67,6 +67,7 @@ const props = defineProps<{
         start_date?: string
         end_date?: string
         search?: string
+        performance_level?: string
     }
     recentNotifications?: Array<{
         id: number
@@ -110,7 +111,7 @@ const filterForm = useForm({
     start_date: props.filters?.start_date || '',
     end_date: props.filters?.end_date || '',
     search: props.filters?.search || '',
-    performance_level: ''
+    performance_level: props.filters?.performance_level || ''
 })
 
 const previewForm = useForm({
@@ -135,7 +136,8 @@ const safeRecentNotifications = computed(() => props.recentNotifications || [])
 // Computed values
 const hasActiveFilters = computed(() => {
     return filterForm.department_id || filterForm.course_id ||
-        filterForm.start_date || filterForm.end_date || filterForm.search
+        filterForm.start_date || filterForm.end_date || filterForm.search ||
+        filterForm.performance_level
 })
 
 const allSelected = computed(() => {
@@ -153,7 +155,7 @@ const canPreview = computed(() => {
 })
 
 const activeFilterCount = computed(() => {
-    return [filterForm.department_id, filterForm.course_id, filterForm.start_date, filterForm.end_date, filterForm.search].filter(Boolean).length
+    return [filterForm.department_id, filterForm.course_id, filterForm.start_date, filterForm.end_date, filterForm.search, filterForm.performance_level].filter(Boolean).length
 })
 
 // Watch for showPreview prop change
@@ -187,7 +189,7 @@ function applyFilters() {
     }
 
     // Remove empty/null values to avoid Axios serialization issues
-    const cleanedData = {}
+    const cleanedData: Record<string, any> = {}
     for (const [key, value] of Object.entries(filterData)) {
         if (value !== null && value !== '' && value !== undefined) {
             cleanedData[key] = value
@@ -322,11 +324,11 @@ function generateEmailSubject(): string {
 }
 
 function getPerformanceLevel(score: number) {
-    if (score >= 20) return { label: 'Exceptional', variant: 'default' }
-    if (score >= 15) return { label: 'Excellent', variant: 'secondary' }
-    if (score >= 10) return { label: 'Good', variant: 'outline' }
-    if (score >= 5) return { label: 'Average', variant: 'secondary' }
-    return { label: 'Needs Improvement', variant: 'destructive' }
+    if (score >= 13) return { label: 'Outstanding', variant: 'success', color: 'bg-green-100 text-green-800' }
+    if (score >= 10) return { label: 'Reliable', variant: 'primary', color: 'bg-blue-100 text-blue-800' }
+    if (score >= 7) return { label: 'Developing', variant: 'warning', color: 'bg-yellow-100 text-yellow-800' }
+    if (score >= 0) return { label: 'Underperforming', variant: 'destructive', color: 'bg-red-100 text-red-800' }
+    return { label: 'Not Rated', variant: 'outline', color: 'bg-gray-100 text-gray-800' }
 }
 
 function formatCurrency(amount: number | string): string {
@@ -363,15 +365,15 @@ function closePreviewModal() {
 }
 
 // Handle department filter change
-const handleDepartmentChange = (value: string) => {
+const handleDepartmentChange = (value: AcceptableValue) => {
     if (!isMounted.value) return
-    filterForm.department_id = value === 'none' ? null : parseInt(value)
+    filterForm.department_id = value === 'none' ? null : parseInt(value as string)
 }
 
 // Handle course filter change
-const handleCourseChange = (value: string) => {
+const handleCourseChange = (value: AcceptableValue) => {
     if (!isMounted.value) return
-    filterForm.course_id = value === 'none' ? null : parseInt(value)
+    filterForm.course_id = value === 'none' ? null : parseInt(value as string)
 }
 
 // Handle target level changes
@@ -404,7 +406,7 @@ const handleEmployeeSelection = (employeeId: number, checked: boolean) => {
 const breadcrumbs: BreadcrumbItemType[] = [
     { name: 'Dashboard', href: route('dashboard') },
     { name: 'Evaluations', href: route('admin.evaluations.index') },
-    { name: 'Notifications', href: null }
+    { name: 'Notifications', href: route('admin.evaluations.notifications') }
 ]
 
 // Cleanup on unmount
@@ -462,7 +464,7 @@ onUnmounted(() => {
                             </div>
                         </CardHeader>
                         <CardContent>
-                            <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                            <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
                                 <!-- Department Filter -->
                                 <div class="space-y-2">
                                     <Label>Department</Label>
@@ -521,6 +523,23 @@ onUnmounted(() => {
                                         v-model="filterForm.search"
                                         placeholder="Search by name or email"
                                     />
+                                </div>
+
+                                <!-- Performance Level Filter -->
+                                <div class="space-y-2">
+                                    <Label>Performance Level</Label>
+                                    <Select v-model="filterForm.performance_level">
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="All Levels" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="">All Levels</SelectItem>
+                                            <SelectItem value="outstanding">Outstanding</SelectItem>
+                                            <SelectItem value="reliable">Reliable</SelectItem>
+                                            <SelectItem value="developing">Developing</SelectItem>
+                                            <SelectItem value="underperforming">Underperforming</SelectItem>
+                                        </SelectContent>
+                                    </Select>
                                 </div>
                             </div>
 
@@ -691,7 +710,7 @@ onUnmounted(() => {
                                                         <p class="text-sm font-medium text-foreground">
                                                             {{ employee.latest_evaluation.course_name }}
                                                         </p>
-                                                        <!-- NEW: Course Type Badge -->
+                                                        <!-- Course Type Badge -->
                                                         <Badge
                                                             :variant="employee.latest_evaluation.course_type === 'Online' ? 'default' : 'secondary'"
                                                             class="text-xs"
@@ -701,7 +720,20 @@ onUnmounted(() => {
                                                     </div>
                                                     <p class="text-xs text-muted-foreground">Latest evaluation</p>
                                                 </div>
-                                                <!-- ... rest of the evaluation details -->
+                                                <div class="flex items-center gap-2">
+                                                    <!-- Performance Level Badge -->
+                                                    <Badge
+                                                        :class="getPerformanceLevel(employee.latest_evaluation.total_score).color"
+                                                        class="px-2 py-1 rounded-full text-xs font-medium"
+                                                    >
+                                                        {{ getPerformanceLevel(employee.latest_evaluation.total_score).label }}
+                                                    </Badge>
+                                                    
+                                                    <!-- Score Display -->
+                                                    <span class="text-sm font-medium">
+                                                        {{ employee.latest_evaluation.total_score }} points
+                                                    </span>
+                                                </div>
                                             </div>
                                         </CardContent>
                                     </Card>

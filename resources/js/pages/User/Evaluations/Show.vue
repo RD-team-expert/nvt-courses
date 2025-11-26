@@ -60,40 +60,50 @@ const maxPossibleScore = computed(() => {
     return Math.ceil(currentScore / 10) * 10;
 });
 
-// 🎯 DYNAMIC: Performance level based on flexible max score
+// Standardized performance level based on absolute score ranges
 const performance = computed(() => {
     const score = props.evaluation?.total_score || 0;
-    const percentage = (score / maxPossibleScore.value) * 100;
-
-    if (percentage >= 80) return {
-        label: 'Exceptional',
+    
+    // Using our standardized performance level thresholds
+    if (score >= 13) return {
+        label: 'Outstanding',
         variant: 'default' as const,
         icon: Trophy,
-        description: 'Outstanding performance that exceeds expectations'
+        color: 'text-green-600',
+        bgColor: 'bg-green-50 border-green-200',
+        description: 'Exceptional performance that consistently exceeds expectations'
     }
-    if (percentage >= 60) return {
-        label: 'Excellent',
-        variant: 'default' as const,
+    if (score >= 10) return {
+        label: 'Reliable',
+        variant: 'secondary' as const,
         icon: Star,
-        description: 'Consistently high performance'
+        color: 'text-blue-600',
+        bgColor: 'bg-blue-50 border-blue-200',
+        description: 'Consistently dependable performance that meets all expectations'
     }
-    if (percentage >= 40) return {
-        label: 'Good',
-        variant: 'secondary' as const,
+    if (score >= 7) return {
+        label: 'Developing',
+        variant: 'outline' as const,
         icon: ThumbsUp,
-        description: 'Solid performance meeting expectations'
+        color: 'text-yellow-600',
+        bgColor: 'bg-yellow-50 border-yellow-200',
+        description: 'Progressing performance that meets most expectations'
     }
-    if (percentage >= 20) return {
-        label: 'Average',
-        variant: 'secondary' as const,
-        icon: BarChart3,
-        description: 'Performance meets basic requirements'
-    }
-    return {
-        label: 'Needs Improvement',
+    if (score >= 0) return {
+        label: 'Underperforming',
         variant: 'destructive' as const,
         icon: TrendingUp,
-        description: 'Performance requires development'
+        color: 'text-red-600',
+        bgColor: 'bg-red-50 border-red-200',
+        description: 'Performance that requires significant improvement'
+    }
+    return {
+        label: 'Not Rated',
+        variant: 'outline' as const,
+        icon: BarChart3,
+        color: 'text-gray-600',
+        bgColor: 'bg-gray-50 border-gray-200',
+        description: 'No evaluation score provided'
     }
 });
 
@@ -153,6 +163,12 @@ const formatDate = (dateString: string) => {
                                 <Award class="h-6 w-6" />
                                 Overall Performance
                             </CardTitle>
+                            <div class="mt-2">
+                                <Badge :class="performance.color">
+                                    <component :is="performance.icon" class="h-4 w-4 mr-1" />
+                                    {{ performance.label }}
+                                </Badge>
+                            </div>
                         </CardHeader>
                         <CardContent>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -169,12 +185,14 @@ const formatDate = (dateString: string) => {
                                     </CardContent>
                                 </Card>
 
-                                <Card class="bg-green-50 border-green-200">
+                                <Card :class="performance.bgColor">
                                     <CardContent class="text-center p-6">
-                                        <div class="text-4xl font-bold text-green-600">{{ formatCurrency(evaluation?.incentive_amount || 0) }}</div>
-                                        <div class="text-sm text-muted-foreground mt-1">Incentive Earned</div>
-                                        <div class="mt-2 text-xs text-green-700">
-                                            Based on your performance score
+                                        <div class="text-4xl font-bold" :class="performance.color">
+                                            {{ performance.label }}
+                                        </div>
+                                        <div class="text-sm text-muted-foreground mt-1">Performance Level</div>
+                                        <div class="mt-2 text-xs" :class="performance.color">
+                                            Based on standardized evaluation criteria
                                         </div>
                                     </CardContent>
                                 </Card>
@@ -315,8 +333,8 @@ const formatDate = (dateString: string) => {
                                 </div>
 
                                 <div>
-                                    <dt class="text-sm font-medium text-muted-foreground">Incentive Earned</dt>
-                                    <dd class="text-lg font-bold text-green-600">{{ formatCurrency(evaluation?.incentive_amount || 0) }}</dd>
+                                    <dt class="text-sm font-medium text-muted-foreground">Performance Level</dt>
+                                    <dd class="text-lg font-bold" :class="performance.color">{{ performance.label }}</dd>
                                 </div>
                             </dl>
                         </CardContent>
@@ -344,14 +362,14 @@ const formatDate = (dateString: string) => {
                                     </CardContent>
                                 </Card>
 
-                                <Card class="bg-green-50 border-green-200">
+                                <Card :class="performance.bgColor">
                                     <CardContent class="flex items-center p-3">
                                         <div class="shrink-0">
-                                            <DollarSign class="h-5 w-5 text-green-600" />
+                                            <component :is="performance.icon" :class="performance.color" class="h-5 w-5" />
                                         </div>
                                         <div class="ml-3">
-                                            <p class="text-sm font-medium text-green-900">Incentive Rate</p>
-                                            <p class="text-xs text-green-700">{{ formatCurrency((evaluation?.incentive_amount || 0) / (evaluation?.total_score || 1)) }} per point</p>
+                                            <p class="text-sm font-medium" :class="performance.color">Performance Level</p>
+                                            <p class="text-xs" :class="performance.color">{{ performance.description }}</p>
                                         </div>
                                     </CardContent>
                                 </Card>

@@ -29,11 +29,15 @@ class EvaluationController extends Controller
         $userLevels = UserLevel::with(['tiers' => function($query) {
             $query->orderBy('tier_order');
         }])->orderBy('hierarchy_level')->get();
+        
+        // Get performance levels for dropdowns and badges
+        $performanceLevels = \App\Enums\PerformanceLevel::getForFrontend();
 
         return inertia('Admin/Evaluations/Index', [
             'configs' => $configs,
             'incentives' => $incentives,
             'userLevels' => $userLevels,
+            'performanceLevels' => $performanceLevels,
         ]);
     }
 
@@ -107,38 +111,50 @@ class EvaluationController extends Controller
     /**
      * NEW: Enhanced setIncentives method for Level + Tier based system
      */
+    /**
+     * NEW: Enhanced setIncentives method for Level + Tier based system
+     * Tier is now OPTIONAL - allows "All Tiers" selection
+     */
     public function setIncentives(Request $request)
     {
         $validated = $request->validate([
             'incentives' => 'required|array',
             'incentives.*.user_level_id' => 'required|exists:user_levels,id',
-            'incentives.*.user_level_tier_id' => 'required|exists:user_level_tiers,id',
-            'incentives.*.performance_level' => 'required|integer|between:1,4',
+            'incentives.*.user_level_tier_id' => 'nullable|exists:user_level_tiers,id', // CHANGED: Made optional
+            'incentives.*.min_score' => 'required|numeric|min:0',
+            'incentives.*.max_score' => 'required|numeric|min:0',
+            'incentives.*.incentive_amount' => 'required|numeric|min:0',
+            'incentives.*.performance_level' => 'nullable|integer|between:1,4', // CHANGED: Made optional
         ]);
 
+        // Validate tier belongs to level (only if tier is specified)
         foreach ($validated['incentives'] as $incentive) {
-            $tier = UserLevelTier::find($incentive['user_level_tier_id']);
-            if ($tier->user_level_id != $incentive['user_level_id']) {
-                return redirect()->back()->withErrors([
-                    'error' => 'Tier must belong to the selected level.'
-                ]);
+            if (!empty($incentive['user_level_tier_id'])) {
+                $tier = UserLevelTier::find($incentive['user_level_tier_id']);
+                if ($tier && $tier->user_level_id != $incentive['user_level_id']) {
+                    return redirect()->back()->withErrors([
+                        'error' => 'Tier must belong to the selected level.'
+                    ]);
+                }
             }
         }
 
-        // Save new incentives (now using performance_level)
+        // Clear existing incentives and save new ones
+        Incentive::truncate();
+
+        // Save new incentives
         foreach ($validated['incentives'] as $incentive) {
-            $levelMeta = \App\Enums\PerformanceLevel::getById($incentive['performance_level']);
-            Incentive::updateOrCreate([
+            Incentive::create([
                 'user_level_id' => $incentive['user_level_id'],
-                'user_level_tier_id' => $incentive['user_level_tier_id'],
-                'min_score' => $levelMeta['min_score'],
-                'max_score' => $levelMeta['max_score'],
-            ], [
-                'performance_level' => $incentive['performance_level'],
+                'user_level_tier_id' => $incentive['user_level_tier_id'] ?? null, // Allow null for "All Tiers"
+                'min_score' => $incentive['min_score'],
+                'max_score' => $incentive['max_score'],
+                'incentive_amount' => $incentive['incentive_amount'],
+                'performance_level' => $incentive['performance_level'] ?? null,
             ]);
         }
 
-        return redirect()->back()->with('success', 'Performance level incentives saved successfully.');
+        return redirect()->back()->with('success', 'Incentives saved successfully. Tier-specific incentives will override general level incentives.');
     }
 
     /**
@@ -151,22 +167,37 @@ class EvaluationController extends Controller
 
     /**
      * NEW: Get incentive for specific user based on their level, tier, and score
+     * Now supports tier-specific incentives with fallback to level-wide incentives
      */
     public function getIncentiveForUser($userId, $evaluationScore)
     {
         $user = \App\Models\User::with(['userLevel', 'userLevelTier'])->find($userId);
 
-        if (!$user || !$user->userLevel || !$user->userLevelTier) {
+        if (!$user || !$user->userLevel) {
             return null;
         }
 
-        $incentive = Incentive::where('user_level_id', $user->userLevel->id)
-            ->where('user_level_tier_id', $user->userLevelTier->id)
+        // First, try to find a tier-specific incentive (if user has a tier)
+        if ($user->userLevelTier) {
+            $tierIncentive = Incentive::where('user_level_id', $user->userLevel->id)
+                ->where('user_level_tier_id', $user->userLevelTier->id)
+                ->where('min_score', '<=', $evaluationScore)
+                ->where('max_score', '>=', $evaluationScore)
+                ->first();
+
+            if ($tierIncentive) {
+                return $tierIncentive->incentive_amount;
+            }
+        }
+
+        // Fallback to level-wide incentive (where tier is null - "All Tiers")
+        $levelIncentive = Incentive::where('user_level_id', $user->userLevel->id)
+            ->whereNull('user_level_tier_id')
             ->where('min_score', '<=', $evaluationScore)
             ->where('max_score', '>=', $evaluationScore)
             ->first();
 
-        return $incentive ? $incentive->incentive_amount : 0;
+        return $levelIncentive ? $levelIncentive->incentive_amount : 0;
     }
 
     /**

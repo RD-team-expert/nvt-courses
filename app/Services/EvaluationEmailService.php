@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
+use App\Enums\PerformanceLevel;
 
 class EvaluationEmailService
 {
@@ -44,11 +45,28 @@ class EvaluationEmailService
         // ✅ NEW: Prepare detailed evaluation data with overall average
         $detailedEvaluations = $employees->map(function ($employee) {
             $evaluations = $employee->evaluations->map(function ($evaluation) {
+                // Get performance level data if available
+                $performanceLevel = $evaluation->performance_level;
+                $performanceData = null;
+                
+                if ($performanceLevel) {
+                    $performanceData = [
+                        'level' => $performanceLevel,
+                        'label' => PerformanceLevel::getLabelByLevel($performanceLevel),
+                        'color' => PerformanceLevel::getColorByLevel($performanceLevel),
+                        'range' => PerformanceLevel::getRangeByLevel($performanceLevel),
+                        'badge_class' => PerformanceLevel::getBadgeClassByLevel($performanceLevel),
+                        'description' => PerformanceLevel::getDescriptionByLevel($performanceLevel),
+                    ];
+                }
+                
                 return [
                     'id' => $evaluation->id,
                     'course' => $evaluation->course ? $evaluation->course->name : 'Unknown Course',
                     'total_score' => $evaluation->total_score,
                     'incentive_amount' => $evaluation->incentive_amount,
+                    'performance_level' => $performanceLevel,
+                    'performance_data' => $performanceData,
                     'created_at' => $evaluation->created_at->format('M d, Y'),
                     'detailed_scores' => $evaluation->history->map(function ($history) {
                         return [
@@ -102,7 +120,8 @@ class EvaluationEmailService
                     'subject' => $subject,
                     'customMessage' => $customMessage,
                     'evaluations' => $employees->flatMap->evaluations,
-                    'detailedEvaluations' => $detailedEvaluations  // ✅ Now includes overall_average
+                    'detailedEvaluations' => $detailedEvaluations,  // ✅ Now includes overall_average
+                    'performanceLevels' => PerformanceLevel::getForFrontend() // ✅ Include all performance levels for reference
                 ], function ($message) use ($manager, $subject) {
                     $message->to($manager['email'], $manager['name'])
                         ->subject($subject);

@@ -3,7 +3,7 @@
   Comprehensive reporting interface for tracking learning sessions and engagement metrics
 -->
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { router } from '@inertiajs/vue3'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import { type BreadcrumbItemType } from '@/types'
@@ -64,6 +64,9 @@ const props = defineProps({
     filters: Object,
     stats: Object,
 })
+
+// Computed value for checking if pagination is needed
+const lastPage = computed(() => props.sessions?.meta?.last_page || 1)
 
 // Define breadcrumbs
 const breadcrumbs: BreadcrumbItemType[] = [
@@ -608,6 +611,29 @@ if (typeof window !== 'undefined') {
                         </TableBody>
                     </Table>
                 </div>
+
+                <!-- Pagination -->
+                <div v-if="users.data && users.data.length > 0 && users.last_page > 1" class="px-4 sm:px-6 py-3 border-t border-gray-200">
+                    <div class="flex items-center justify-between">
+                        <div class="text-sm text-muted-foreground">
+                            Showing {{ users.from }} to {{ users.to }} of {{ users.total }} results
+                        </div>
+                        <div class="flex space-x-2">
+                            <a v-for="link in users.links"
+                               :key="link.label"
+                               :href="link.url"
+                               :class="{
+           'bg-primary text-primary-foreground': link.active,
+           'hover:bg-muted': !link.active && link.url,
+           'text-muted-foreground cursor-not-allowed': !link.url
+         }"
+                               class="px-3 py-2 text-sm font-medium border rounded-md transition-colors"
+                               v-html="link.label">
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
             </Card>
         </div>
 
