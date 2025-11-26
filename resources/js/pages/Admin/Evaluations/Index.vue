@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useForm, router } from '@inertiajs/vue3'
-import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AdminLayout from '@/layouts/AdminLayout.vue'
 import type { BreadcrumbItemType } from '@/types'
 
 // shadcn-vue components
@@ -78,6 +78,7 @@ const props = defineProps<{
         min_score: number
         max_score: number
         incentive_amount: number
+        performance_level?: number
         user_level_id?: number
         user_level_tier_id?: number
         user_level?: {
@@ -90,6 +91,15 @@ const props = defineProps<{
             tier_name: string
             tier_order: number
         }
+    }>
+    performanceLevels?: Array<{
+        level: number
+        label: string
+        description: string
+        min_score: number
+        max_score: number
+        color: string
+        badge_class: string
     }>
     userLevels?: Array<{
         id: number
@@ -117,6 +127,9 @@ const categoryToDelete = ref<any>(null)
 const typeToDelete = ref<any>(null)
 const incentiveIndexToRemove = ref<number | null>(null)
 
+// Track which incentive rows have had tier selection interacted with
+const tierSelectionMade = ref<Record<number, boolean>>({})
+
 // Fixed breadcrumbs - changed 'admin.dashboard' to 'dashboard'
 const breadcrumbs: BreadcrumbItemType[] = [
     { name: 'Dashboard', href: route('dashboard') },
@@ -143,7 +156,10 @@ const totalScoreForm = useForm({
     config_scores: {} as Record<number, number>,
 })
 
-// Enhanced incentive form with Level + Tier support
+// Get default performance levels
+const safePerformanceLevels = computed(() => props.performanceLevels || []);
+
+// Enhanced incentive form with Level + Tier + Performance Level support
 const incentiveForm = useForm({
     incentives: props.incentives && props.incentives.length > 0
         ? props.incentives.map(incentive => ({
@@ -151,14 +167,16 @@ const incentiveForm = useForm({
             user_level_tier_id: incentive.user_level_tier_id || null,
             min_score: incentive.min_score || 0,
             max_score: incentive.max_score || 0,
-            incentive_amount: parseFloat(incentive.incentive_amount.toString()) || 0
+            incentive_amount: parseFloat(incentive.incentive_amount.toString()) || 0,
+            performance_level: incentive.performance_level || null
         }))
         : [{
             user_level_id: null,
             user_level_tier_id: null,
             min_score: 0,
             max_score: 0,
-            incentive_amount: 0
+            incentive_amount: 0,
+            performance_level: null
         }],
 })
 
@@ -190,8 +208,51 @@ const getAvailableTiers = (levelId: number | null) => {
     return level ? level.tiers : []
 }
 
+/**
+ * Get the count of tiers for a level
+ */
+const getTierCount = (levelId: number | null) => {
+    if (!levelId) return 0
+    return getAvailableTiers(levelId).length
+}
+
+/**
+ * Handle level change and reset tier selection
+ */
 const onLevelChange = (index: number) => {
+    // Reset tier selection when level changes
     incentiveForm.incentives[index].user_level_tier_id = null
+    // Reset the tier selection tracking for this row
+    tierSelectionMade.value[index] = false
+    
+    // Check if the new level has tiers
+    const hasTiers = getTierCount(incentiveForm.incentives[index].user_level_id) > 0
+    
+    // Show a console message for debugging
+    if (!hasTiers) {
+        console.log(`Level ${getLevelName(incentiveForm.incentives[index].user_level_id)} has no tiers.`)
+    }
+}
+
+/**
+ * Handle tier selection change
+ */
+const onTierChange = (index: number) => {
+    tierSelectionMade.value[index] = true
+}
+
+/**
+ * Check if tier selection has been made for an incentive row
+ */
+const hasTierSelectionBeenMade = (index: number) => {
+    return tierSelectionMade.value[index] === true
+}
+
+/**
+ * Check if a level has tiers available
+ */
+const hasTiersForLevel = (levelId: number | null) => {
+    return getTierCount(levelId) > 0
 }
 
 const getLevelName = (levelId: number | null) => {
@@ -207,6 +268,48 @@ const getTierName = (tierId: number | null) => {
         if (tier) return `${tier.tier_name} (T${tier.tier_order})`
     }
     return 'Unknown Tier'
+}
+
+/**
+ * Get performance level details by ID
+ */
+const getPerformanceLevel = (levelId: number | null) => {
+    if (!levelId || !safePerformanceLevels.value) return null
+    return safePerformanceLevels.value.find(level => level.level === levelId)
+}
+
+/**
+ * Get performance level badge variant
+ */
+const getPerformanceLevelBadge = (levelId: number | null): 'destructive' | 'outline' | 'default' | 'secondary' | null | undefined => {
+    const level = getPerformanceLevel(levelId)
+    if (!level) return 'secondary'
+    
+    switch (level.color) {
+        case 'green': return 'default'  // Use default instead of success
+        case 'blue': return 'secondary' // Use secondary instead of info
+        case 'yellow': return 'outline' // Use outline instead of warning
+        case 'red': return 'destructive'
+        default: return 'secondary'
+    }
+}
+
+/**
+ * Auto-select performance level based on score range
+ */
+const autoSelectPerformanceLevel = (index: number) => {
+    const incentive = incentiveForm.incentives[index]
+    const minScore = incentive.min_score
+    const maxScore = incentive.max_score
+    
+    // Find a performance level that matches this score range
+    const matchingLevel = safePerformanceLevels.value.find(level =>
+        level.min_score >= minScore && level.max_score <= maxScore
+    )
+    
+    if (matchingLevel) {
+        incentiveForm.incentives[index].performance_level = matchingLevel.level
+    }
 }
 
 // Get badge variant based on score
@@ -348,8 +451,17 @@ const addIncentive = () => {
         user_level_tier_id: null,
         min_score: 0,
         max_score: 0,
-        incentive_amount: 0
+        incentive_amount: 0,
+        performance_level: null
     })
+}
+
+/**
+ * Get display class based on tier
+ */
+const getTierClass = (tierId: number | null) => {
+    if (!tierId) return ''
+    return 'border-l-4 border-l-blue-500'
 }
 
 const confirmRemoveIncentive = (index: number) => {
@@ -624,7 +736,16 @@ const removeIncentive = () => {
                             <Card
                                 v-for="incentive in props.incentives"
                                 :key="incentive.id"
-                                class="border-l-4 border-l-green-500 hover:shadow-md transition-shadow"
+                                class="border-l-4 hover:shadow-md transition-shadow"
+                                :class="[
+                                    {
+                                        'border-l-green-500': !incentive.performance_level || incentive.performance_level === 1,
+                                        'border-l-blue-500': incentive.performance_level === 2,
+                                        'border-l-yellow-500': incentive.performance_level === 3,
+                                        'border-l-red-500': incentive.performance_level === 4,
+                                    },
+                                    incentive.user_level_tier_id ? 'border-t-4 border-t-blue-500' : ''
+                                ]"
                             >
                                 <CardContent class="p-4">
                                     <div class="space-y-3">
@@ -632,13 +753,33 @@ const removeIncentive = () => {
                                             <Badge variant="secondary" class="text-xs">
                                                 {{ incentive.user_level?.name || 'Unknown Level' }}
                                             </Badge>
-                                            <Badge variant="outline" class="text-xs">
-                                                {{ incentive.user_level_tier?.tier_name || 'Unknown Tier' }}
-                                            </Badge>
+                                            <div class="flex items-center gap-1">
+                                                <Badge
+                                                    v-if="incentive.user_level_tier_id"
+                                                    variant="default"
+                                                    class="text-xs bg-blue-500 hover:bg-blue-600"
+                                                >
+                                                    <Layers class="mr-1 h-3 w-3" />
+                                                    {{ incentive.user_level_tier?.tier_name || 'Unknown Tier' }}
+                                                </Badge>
+                                                <Badge v-else variant="outline" class="text-xs">
+                                                    <Layers class="mr-1 h-3 w-3 opacity-70" />
+                                                    All Tiers
+                                                </Badge>
+                                            </div>
                                         </div>
                                         <div class="space-y-1">
-                                            <div class="text-sm text-muted-foreground">
-                                                Score Range: {{ incentive.min_score }}-{{ incentive.max_score }}
+                                            <div class="flex items-center justify-between">
+                                                <div class="text-sm text-muted-foreground">
+                                                    Score Range: {{ incentive.min_score }}-{{ incentive.max_score }}
+                                                </div>
+                                                <Badge
+                                                    :variant="getPerformanceLevelBadge(incentive.performance_level)"
+                                                    v-if="incentive.performance_level"
+                                                    class="text-xs"
+                                                >
+                                                    {{ getPerformanceLevel(incentive.performance_level)?.label }}
+                                                </Badge>
                                             </div>
                                             <div class="text-lg font-bold text-green-600">
                                                 ${{ Number(incentive.incentive_amount).toFixed(2) }}
@@ -677,49 +818,99 @@ const removeIncentive = () => {
                                 v-for="(incentive, index) in incentiveForm.incentives"
                                 :key="index"
                                 class="relative hover:shadow-sm transition-all duration-200"
+                                :class="[
+                                    {
+                                        'border-l-4 border-l-green-500': incentive.performance_level === 1,
+                                        'border-l-4 border-l-blue-500': incentive.performance_level === 2,
+                                        'border-l-4 border-l-yellow-500': incentive.performance_level === 3,
+                                        'border-l-4 border-l-red-500': incentive.performance_level === 4,
+                                    },
+                                    incentive.user_level_tier_id ? 'border-t-4 border-t-blue-500' : ''
+                                ]"
                             >
                                 <CardContent class="p-6">
-                                    <div class="grid grid-cols-1 lg:grid-cols-6 gap-4 items-end">
+                                    <div class="grid grid-cols-1 lg:grid-cols-7 gap-4 items-end">
                                         <!-- Level Selection -->
                                         <div class="lg:col-span-1">
                                             <Label :for="`level_${index}`" class="text-sm font-medium">User Level</Label>
-                                            <select
-                                                :id="`level_${index}`"
+                                            <Select
                                                 v-model="incentive.user_level_id"
-                                                @change="onLevelChange(index)"
-                                                class="mt-1 block w-full border-input bg-background px-3 py-2 text-sm ring-offset-background border rounded-md focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                                                required
+                                                @update:modelValue="onLevelChange(index)"
                                             >
-                                                <option value="">Select Level</option>
-                                                <option
-                                                    v-for="level in props.userLevels"
-                                                    :key="level.id"
-                                                    :value="level.id"
-                                                >
-                                                    {{ level.name }} ({{ level.code }})
-                                                </option>
-                                            </select>
+                                                <SelectTrigger :id="`level_${index}`">
+                                                    <SelectValue placeholder="Select level..." />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem
+                                                        v-for="level in props.userLevels"
+                                                        :key="level.id"
+                                                        :value="level.id"
+                                                    >
+                                                        <div class="flex items-center gap-2">
+                                                            <span>{{ level.name }}</span>
+                                                            <Badge variant="outline" class="h-5 px-1.5 text-xs">{{ level.code }}</Badge>
+                                                        </div>
+                                                    </SelectItem>
+                                                </SelectContent>
+                                            </Select>
                                         </div>
 
-                                        <!-- Tier Selection -->
+                                        <!-- Tier Selection - Enhanced -->
                                         <div class="lg:col-span-1">
-                                            <Label :for="`tier_${index}`" class="text-sm font-medium">Tier</Label>
-                                            <select
-                                                :id="`tier_${index}`"
-                                                v-model="incentive.user_level_tier_id"
-                                                class="mt-1 block w-full border-input bg-background px-3 py-2 text-sm ring-offset-background border rounded-md focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50"
+                                            <Label :for="`tier_${index}`" class="text-sm font-medium flex items-center gap-1">
+                                                Tier Selection
+                                                <template v-if="!hasTierSelectionBeenMade(index)">
+                                                    <Badge variant="outline" class="ml-1 h-5 px-1.5 text-xs">
+                                                        Key Selection
+                                                    </Badge>
+                                                    <Badge
+                                                        v-if="hasTiersForLevel(incentive.user_level_id)"
+                                                        variant="default"
+                                                        class="ml-auto text-xs bg-blue-500 hover:bg-blue-600"
+                                                    >
+                                                        {{ getTierCount(incentive.user_level_id) }} tiers available
+                                                    </Badge>
+                                                </template>
+                                            </Label>
+                                            <Select
                                                 :disabled="!incentive.user_level_id"
-                                                required
+                                                v-model="incentive.user_level_tier_id"
+                                                @update:modelValue="onTierChange(index)"
                                             >
-                                                <option value="">Select Tier</option>
-                                                <option
-                                                    v-for="tier in getAvailableTiers(incentive.user_level_id)"
-                                                    :key="tier.id"
-                                                    :value="tier.id"
+                                                <SelectTrigger
+                                                    :id="`tier_${index}`"
+                                                    :class="[
+                                                        'border-primary/20',
+                                                        incentive.user_level_tier_id ? 'border-blue-500 ring-1 ring-blue-500' : ''
+                                                    ]"
                                                 >
-                                                    {{ tier.tier_name }} (T{{ tier.tier_order }})
-                                                </option>
-                                            </select>
+                                                    <SelectValue placeholder="Select tier..." />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <div v-if="!hasTiersForLevel(incentive.user_level_id) && incentive.user_level_id" class="px-2 py-1.5 text-sm text-muted-foreground">
+                                                        No tiers available for this level
+                                                    </div>
+                                                    <SelectItem :value="null">
+                                                        <div class="flex items-center gap-2">
+                                                            <Layers class="h-4 w-4 opacity-70" />
+                                                            <span>All Tiers</span>
+                                                        </div>
+                                                    </SelectItem>
+                                                    <SelectItem
+                                                        v-for="tier in getAvailableTiers(incentive.user_level_id)"
+                                                        :key="tier.id"
+                                                        :value="tier.id"
+                                                    >
+                                                        <div class="flex items-center gap-2">
+                                                            <Badge variant="outline" class="h-5 px-1.5 text-xs">T{{ tier.tier_order }}</Badge>
+                                                            <span>{{ tier.tier_name }}</span>
+                                                        </div>
+                                                    </SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                            <p v-if="!hasTierSelectionBeenMade(index)" class="text-xs text-muted-foreground mt-1">
+                                                Tier-specific incentives override general level incentives
+                                            </p>
                                         </div>
 
                                         <!-- Min Score -->
@@ -748,6 +939,26 @@ const removeIncentive = () => {
                                                 required
                                                 class="mt-1"
                                             />
+                                        </div>
+
+                                        <!-- Performance Level -->
+                                        <div class="lg:col-span-1">
+                                            <Label :for="`performance_level_${index}`" class="text-sm font-medium">Performance Level</Label>
+                                            <select
+                                                :id="`performance_level_${index}`"
+                                                v-model="incentive.performance_level"
+                                                class="mt-1 block w-full border-input bg-background px-3 py-2 text-sm ring-offset-background border rounded-md focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                                                @change="autoSelectPerformanceLevel(index)"
+                                            >
+                                                <option value="">Select Level</option>
+                                                <option
+                                                    v-for="level in safePerformanceLevels"
+                                                    :key="level.level"
+                                                    :value="level.level"
+                                                >
+                                                    {{ level.label }} ({{ level.min_score }}-{{ level.max_score }})
+                                                </option>
+                                            </select>
                                         </div>
 
                                         <!-- Incentive Amount -->
@@ -781,12 +992,45 @@ const removeIncentive = () => {
                                     </div>
 
                                     <!-- Preview -->
-                                    <div v-if="incentive.user_level_id && incentive.user_level_tier_id" class="mt-4 p-3 bg-muted/50 rounded-md">
+                                    <div v-if="incentive.user_level_id" class="mt-4 p-3 bg-muted/50 rounded-md">
+                                        <div class="flex items-center justify-between mb-2">
+                                            <div class="text-xs text-muted-foreground">
+                                                <span class="font-medium">{{ getLevelName(incentive.user_level_id) }}</span>
+                                                <template v-if="incentive.user_level_tier_id">
+                                                    + <span class="font-medium">{{ getTierName(incentive.user_level_tier_id) }}</span>
+                                                </template>
+                                                <template v-else>
+                                                    <span class="text-muted-foreground">(All tiers)</span>
+                                                </template>
+                                            </div>
+                                            
+                                            <Badge
+                                                v-if="incentive.performance_level"
+                                                :variant="getPerformanceLevelBadge(incentive.performance_level)"
+                                                class="text-xs"
+                                            >
+                                                {{ getPerformanceLevel(incentive.performance_level)?.label }}
+                                            </Badge>
+                                        </div>
                                         <div class="text-xs text-muted-foreground">
                                             Preview: Users in <span class="font-medium">{{ getLevelName(incentive.user_level_id) }}</span>
-                                            at <span class="font-medium">{{ getTierName(incentive.user_level_tier_id) }}</span>
+                                            <template v-if="incentive.user_level_tier_id">
+                                                at <span class="font-semibold text-blue-600">{{ getTierName(incentive.user_level_tier_id) }}</span>
+                                            </template>
+                                            <template v-else>
+                                                (all tiers)
+                                            </template>
                                             with scores {{ incentive.min_score }}-{{ incentive.max_score }}
                                             will receive <span class="font-semibold text-green-600">${{ incentive.incentive_amount || 0 }}</span>
+                                            and be rated as
+                                            <span class="font-medium" :class="{
+                                                'text-green-600': incentive.performance_level === 1,
+                                                'text-blue-600': incentive.performance_level === 2,
+                                                'text-yellow-600': incentive.performance_level === 3,
+                                                'text-red-600': incentive.performance_level === 4,
+                                            }">
+                                                {{ getPerformanceLevel(incentive.performance_level)?.label || 'Not specified' }}
+                                            </span>
                                         </div>
                                     </div>
                                 </CardContent>
@@ -802,16 +1046,24 @@ const removeIncentive = () => {
                                 variant="outline"
                             >
                                 <Plus class="mr-2 h-4 w-4" />
-                                Add Level+Tier Incentive
+                                Add Level Incentive
                             </Button>
-                            <Button
-                                type="submit"
-                                :disabled="incentiveForm.processing"
-                            >
-                                <Loader2 v-if="incentiveForm.processing" class="mr-2 h-4 w-4 animate-spin" />
-                                <CheckCircle v-else class="mr-2 h-4 w-4" />
-                                {{ incentiveForm.processing ? 'Saving...' : 'Save Incentives' }}
-                            </Button>
+                            <div>
+                                <Button
+                                    type="submit"
+                                    :disabled="incentiveForm.processing"
+                                >
+                                    <Loader2 v-if="incentiveForm.processing" class="mr-2 h-4 w-4 animate-spin" />
+                                    <CheckCircle v-else class="mr-2 h-4 w-4" />
+                                    {{ incentiveForm.processing ? 'Saving...' : 'Save Incentives' }}
+                                </Button>
+                                <div class="mt-2 text-xs text-muted-foreground">
+                                    <span v-if="incentiveForm.incentives.some(i => i.user_level_tier_id)" class="flex items-center text-blue-600">
+                                        <CheckCircle class="h-3 w-3 mr-1" />
+                                        Tier-specific incentives included
+                                    </span>
+                                </div>
+                            </div>
                         </div>
                     </form>
                 </CardContent>

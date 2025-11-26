@@ -165,6 +165,35 @@
             font-weight: bold;
             color: #667eea;
         }
+        /* Performance level badges */
+        .performance-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 12px;
+            text-align: center;
+        }
+        .outstanding-badge {
+            background-color: #d1fae5;
+            color: #047857;
+            border: 1px solid #10b981;
+        }
+        .reliable-badge {
+            background-color: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #3b82f6;
+        }
+        .developing-badge {
+            background-color: #fef3c7;
+            color: #92400e;
+            border: 1px solid #f59e0b;
+        }
+        .underperforming-badge {
+            background-color: #fee2e2;
+            color: #b91c1c;
+            border: 1px solid #ef4444;
+        }
         .signature {
             margin-top: 30px;
             padding: 20px;
@@ -222,7 +251,7 @@
                     <th>Department</th>
                     <th>Course</th>
                     <th>Score</th>
-                    <th>Incentive Amount</th>
+                    <th>Performance Level</th>
                     <th>Date</th>
                 </tr>
                 </thead>
@@ -234,7 +263,31 @@
                             <td>{{ $employee->department?->name ?? 'N/A' }}</td>
                             <td>{{ $evaluation->course?->name ?? 'N/A' }}</td>
                             <td class="score-highlight">{{ $evaluation->total_score }}</td>
-                            <td>${{ number_format($evaluation->incentive_amount, 2) }}</td>
+                            <td>
+                                @php
+                                    $score = $evaluation->total_score;
+                                    $performanceClass = '';
+                                    $performanceLabel = '';
+                                    
+                                    if ($score >= 13) {
+                                        $performanceClass = 'outstanding-badge';
+                                        $performanceLabel = 'Outstanding';
+                                    } elseif ($score >= 10) {
+                                        $performanceClass = 'reliable-badge';
+                                        $performanceLabel = 'Reliable';
+                                    } elseif ($score >= 7) {
+                                        $performanceClass = 'developing-badge';
+                                        $performanceLabel = 'Developing';
+                                    } elseif ($score >= 0) {
+                                        $performanceClass = 'underperforming-badge';
+                                        $performanceLabel = 'Underperforming';
+                                    } else {
+                                        $performanceClass = '';
+                                        $performanceLabel = 'Not Rated';
+                                    }
+                                @endphp
+                                <span class="performance-badge {{ $performanceClass }}">{{ $performanceLabel }}</span>
+                            </td>
                             <td>{{ $evaluation->created_at->format('M d, Y') }}</td>
                         </tr>
                     @endforeach
@@ -286,7 +339,32 @@
                                     <div style="display: flex; justify-content: space-between; flex-wrap: wrap;">
                                         <div><strong>Course Average:</strong> <span class="score-highlight">{{ $employeeData['course_averages'][$index] ?? 'N/A' }}%</span></div>
                                         <div><strong>Total Score:</strong> <span class="score-highlight">{{ $evaluation['total_score'] }}</span></div>
-                                        <div><strong>Incentive:</strong> ${{ $evaluation['incentive_amount'] }}</div>
+                                        <div>
+                                            <strong>Performance Level:</strong>
+                                            @php
+                                                $score = $evaluation['total_score'];
+                                                $performanceClass = '';
+                                                $performanceLabel = '';
+                                                
+                                                if ($score >= 13) {
+                                                    $performanceClass = 'outstanding-badge';
+                                                    $performanceLabel = 'Outstanding';
+                                                } elseif ($score >= 10) {
+                                                    $performanceClass = 'reliable-badge';
+                                                    $performanceLabel = 'Reliable';
+                                                } elseif ($score >= 7) {
+                                                    $performanceClass = 'developing-badge';
+                                                    $performanceLabel = 'Developing';
+                                                } elseif ($score >= 0) {
+                                                    $performanceClass = 'underperforming-badge';
+                                                    $performanceLabel = 'Underperforming';
+                                                } else {
+                                                    $performanceClass = '';
+                                                    $performanceLabel = 'Not Rated';
+                                                }
+                                            @endphp
+                                            <span class="performance-badge {{ $performanceClass }}">{{ $performanceLabel }}</span>
+                                        </div>
                                         <div><strong>Date:</strong> {{ $evaluation['created_at'] }}</div>
                                     </div>
                                 </div>

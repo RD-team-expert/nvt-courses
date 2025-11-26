@@ -81,7 +81,7 @@ const props = defineProps<{
         title: string
         description: string
     }>
-    // NEW: Enhanced incentives with Level + Tier data
+    // Enhanced incentives with Level + Tier data and performance levels
     incentives?: Array<{
         id: number
         user_level_id?: number
@@ -89,6 +89,7 @@ const props = defineProps<{
         min_score: number
         max_score: number
         incentive_amount: number
+        performance_level: number
         user_level?: {
             id: number
             name: string
@@ -99,6 +100,16 @@ const props = defineProps<{
             tier_name: string
             tier_order: number
         }
+    }>
+    // Performance Level definitions
+    performanceLevels?: Array<{
+        level: number
+        label: string
+        description: string
+        min_score: number
+        max_score: number
+        color: string
+        badge_class: string
     }>
     // NEW: User levels with tiers for reference
     userLevels?: Array<{
@@ -122,6 +133,7 @@ const safeDepartments = computed(() => props.departments || [])
 const safeCourses = computed(() => props.courses || [])
 const safeIncentives = computed(() => props.incentives || [])
 const safeUserLevels = computed(() => props.userLevels || [])
+const safePerformanceLevels = computed(() => props.performanceLevels || [])
 
 // State management
 const showSubmitModal = ref(false)
@@ -266,7 +278,76 @@ const totalScore = computed(() => {
     }, 0)
 })
 
-// NEW: Enhanced incentive calculation based on user's level and tier
+// Calculate performance level - directly from score
+const performanceLevel = computed(() => {
+    // Skip if no score
+    if (!totalScore.value || totalScore.value === 0) return null;
+
+    // Always use direct mapping first - this is the most reliable way
+    const levelId = getPerformanceLevelByScore(totalScore.value);
+    
+    // If we have the performance level data, use it
+    if (safePerformanceLevels.value.length > 0) {
+        const levelData = safePerformanceLevels.value.find(level => level.level === levelId);
+        if (levelData) return levelData;
+    }
+    
+    // If we don't have the level data but have a valid level ID, create a synthetic one
+    // This ensures we always have a performance level for a valid score
+    if (levelId) {
+        // Create a fallback performance level using the ID and hardcoded values
+        let label, color, badge_class, min_score, max_score, description;
+        
+        switch(levelId) {
+            case 1: // Outstanding
+                label = 'Outstanding';
+                color = 'green';
+                badge_class = 'badge-success';
+                min_score = 13;
+                max_score = 15;
+                description = 'Consistently exceeds expectations';
+                break;
+            case 2: // Reliable
+                label = 'Reliable';
+                color = 'blue';
+                badge_class = 'badge-info';
+                min_score = 10;
+                max_score = 12;
+                description = 'Meets expectations consistently';
+                break;
+            case 3: // Developing
+                label = 'Developing';
+                color = 'yellow';
+                badge_class = 'badge-warning';
+                min_score = 7;
+                max_score = 9;
+                description = 'Meets some expectations, needs improvement';
+                break;
+            case 4: // Underperforming
+                label = 'Underperforming';
+                color = 'red';
+                badge_class = 'badge-danger';
+                min_score = 0;
+                max_score = 6;
+                description = 'Does not meet expectations';
+                break;
+        }
+        
+        return {
+            level: levelId,
+            label,
+            color,
+            badge_class,
+            min_score,
+            max_score,
+            description
+        };
+    }
+    
+    return null;
+})
+
+// For backward compatibility during transition
 const totalIncentiveAmount = computed(() => {
     if (totalScore.value === 0 || !selectedUser.value) return 0
 
@@ -282,7 +363,6 @@ const totalIncentiveAmount = computed(() => {
         )
 
         if (levelTierIncentive) {
-            console.log('Found Level+Tier specific incentive:', levelTierIncentive.incentive_amount)
             return parseFloat(levelTierIncentive.incentive_amount.toString())
         }
     }
@@ -297,7 +377,6 @@ const totalIncentiveAmount = computed(() => {
         )
 
         if (levelIncentive) {
-            console.log('Found Level-only incentive:', levelIncentive.incentive_amount)
             return parseFloat(levelIncentive.incentive_amount.toString())
         }
     }
@@ -390,14 +469,35 @@ const getTierName = (incentive: any, user: any) => {
     return tierIndex < tierNames.length ? tierNames[tierIndex] : `Tier ${tierIndex + 1}`
 }
 
-// Get performance level based on score
+// Get performance level by score
+const getPerformanceLevelByScore = (score: number) => {
+    if (score >= 13 && score <= 15) return 1; // Outstanding
+    if (score >= 10 && score <= 12) return 2; // Reliable
+    if (score >= 7 && score <= 9) return 3;   // Developing
+    if (score < 7) return 4;                  // Underperforming
+    return null;
+}
+
+// Get performance level data with fallback
 const getPerformanceLevel = (score: number) => {
-    if (score >= 13) return { label: 'Excellent', variant: 'default' }
-    if (score >= 10) return { label: 'Good', variant: 'secondary' }
-    if (score >= 7) return { label: 'Average', variant: 'outline' }
-    if (score >= 4) return { label: 'Below Average', variant: 'secondary' }
-    if (score >= 1) return { label: 'Poor', variant: 'destructive' }
-    return { label: 'No Score', variant: 'secondary' }
+    // First try to find the exact level in our performance levels data
+    const levelId = getPerformanceLevelByScore(score);
+    const levelData = safePerformanceLevels.value.find(level => level.level === levelId);
+    
+    if (levelData) {
+        return {
+            label: levelData.label,
+            variant: levelData.badge_class.replace('badge-', '') || 'default',
+            color: levelData.color
+        };
+    }
+    
+    // Fallback to hardcoded values if performance levels data is not available
+    if (score >= 13) return { label: 'Outstanding', variant: 'success', color: 'green' }
+    if (score >= 10) return { label: 'Reliable', variant: 'info', color: 'blue' }
+    if (score >= 7) return { label: 'Developing', variant: 'warning', color: 'yellow' }
+    if (score < 7) return { label: 'Underperforming', variant: 'destructive', color: 'red' }
+    return { label: 'No Score', variant: 'secondary', color: 'gray' }
 }
 
 // Get type color based on score value
@@ -674,7 +774,7 @@ onUnmounted(() => {
                                                 {{ !selectedUser.user_level ? 'level assignment' : '' }}
                                                 {{ !selectedUser.user_level && !selectedUser.user_level_tier ? ' and ' : '' }}
                                                 {{ !selectedUser.user_level_tier ? 'tier assignment' : '' }}.
-                                                Incentive calculation may fall back to global rates.
+                                                Performance level calculation may fall back to default values.
                                             </p>
                                         </div>
                                     </div>
@@ -826,7 +926,7 @@ onUnmounted(() => {
                     </CardHeader>
                     <CardContent>
                         <!-- Score Summary Cards -->
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                             <Card class="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
                                 <CardContent class="p-4">
                                     <div class="flex items-center">
@@ -851,53 +951,39 @@ onUnmounted(() => {
                             <Card class="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
                                 <CardContent class="p-4">
                                     <div class="flex items-center">
-                                        <DollarSign class="h-8 w-8 text-green-600 mr-4" />
+                                        <Award class="h-8 w-8 text-green-600 mr-4" />
                                         <div>
-                                            <p class="text-sm font-medium text-green-900">Incentive Amount</p>
-                                            <p class="text-2xl font-bold text-green-600">
-                                                ${{ totalIncentiveAmount.toFixed(2) }}
+                                            <p class="text-sm font-medium text-green-900">Performance Level</p>
+                                            <p v-if="performanceLevel" class="text-xl font-bold" :class="`text-${performanceLevel.color}-600`">
+                                                {{ performanceLevel.label }}
+                                            </p>
+                                            <p v-else class="text-xl font-bold text-gray-600">
+                                                Not Rated
                                             </p>
                                         </div>
                                     </div>
                                 </CardContent>
                             </Card>
 
-                            <Card class="bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200">
-                                <CardContent class="p-4">
-                                    <div class="flex items-center">
-                                        <Award class="h-8 w-8 text-purple-600 mr-4" />
-                                        <div>
-                                            <p class="text-sm font-medium text-purple-900">Performance Rating</p>
-                                            <p class="text-lg font-bold text-purple-600">
-                                                {{ getPerformanceLevel(totalScore).label }}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
                         </div>
 
-                        <!-- NEW: Enhanced Incentive Tier Info with Level + Tier Context -->
-                        <Alert v-if="getIncentiveTierInfo" class="mb-6 bg-gradient-to-r from-yellow-50 to-amber-50 border-yellow-200">
-                            <Layers class="h-4 w-4" />
+                        <!-- Performance Level Details -->
+                        <Alert v-if="performanceLevel" class="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+                            <Award class="h-4 w-4" />
                             <AlertDescription>
-                                <h4 class="font-semibold text-yellow-900 mb-2">{{ getIncentiveTierInfo.tier }}</h4>
-                                <div class="grid grid-cols-2 gap-4 text-sm text-yellow-700">
+                                <h4 class="font-semibold text-blue-900 mb-2">Performance Level Details</h4>
+                                <div class="grid grid-cols-2 gap-4 text-sm text-blue-700">
                                     <div>
-                                        <span class="font-medium">Incentive Level:</span>
-                                        <p>{{ getIncentiveTierInfo.level_info }}</p>
-                                    </div>
-                                    <div v-if="getIncentiveTierInfo.tier_info">
-                                        <span class="font-medium">Performance Tier:</span>
-                                        <p>{{ getIncentiveTierInfo.tier_info }}</p>
+                                        <span class="font-medium">Level:</span>
+                                        <p class="font-bold" :class="`text-${performanceLevel.color}-600`">{{ performanceLevel.label }}</p>
                                     </div>
                                     <div>
                                         <span class="font-medium">Score Range:</span>
-                                        <p>{{ getIncentiveTierInfo.range }} points</p>
+                                        <p>{{ performanceLevel.min_score }}-{{ performanceLevel.max_score }} points</p>
                                     </div>
-                                    <div>
-                                        <span class="font-medium">Reward Amount:</span>
-                                        <p class="font-bold">${{ getIncentiveTierInfo.amount.toFixed(2) }}</p>
+                                    <div class="col-span-2">
+                                        <span class="font-medium">Description:</span>
+                                        <p>{{ performanceLevel.description }}</p>
                                     </div>
                                 </div>
                             </AlertDescription>
@@ -984,8 +1070,15 @@ onUnmounted(() => {
                                 <p class="font-medium">{{ totalScore }}</p>
                             </div>
                             <div>
-                                <span class="text-muted-foreground">Incentive Amount:</span>
-                                <p class="font-medium">${{ totalIncentiveAmount.toFixed(2) }}</p>
+                                <span class="text-muted-foreground">Performance Level:</span>
+                                <p class="font-medium">
+                                    <Badge v-if="performanceLevel" :class="`bg-${performanceLevel.color}-100 text-${performanceLevel.color}-800 border-${performanceLevel.color}-200`">
+                                        {{ performanceLevel.label }}
+                                    </Badge>
+                                    <Badge v-else variant="secondary">
+                                        Not Rated
+                                    </Badge>
+                                </p>
                             </div>
                             <!-- NEW: Level + Tier info in confirmation -->
                             <div v-if="selectedUser?.user_level && selectedUser?.user_level_tier">
