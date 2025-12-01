@@ -85,9 +85,9 @@ class ContentProgressService
             'playback_position' => $currentPosition,
             'completion_percentage' => min(100, max(0, $completionPercentage)),
             'watch_time' => $adjustedWatchTime ?? $progress->watch_time,
-            'is_completed' => $completionPercentage >= 95,
+            'is_completed' => $completionPercentage >= 100,
             'last_accessed_at' => now(),
-            'completed_at' => $completionPercentage >= 95 ? now() : $progress->completed_at,
+            'completed_at' => $completionPercentage >= 100 ? now() : $progress->completed_at,
         ]);
 
       

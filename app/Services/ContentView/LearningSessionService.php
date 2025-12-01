@@ -109,8 +109,9 @@ class LearningSessionService
         throw new \Exception('Cannot update ended session');
     }
 
-    // Calculate total duration
-    $currentDuration = max(0, now()->diffInMinutes($session->session_start));
+    // ✅ FIXED: Calculate total duration in seconds, then convert to minutes (rounded up)
+    $currentDurationSeconds = max(0, now()->diffInSeconds($session->session_start));
+    $currentDuration = (int) ceil($currentDurationSeconds / 60);
 
     // Accumulate incremental data
     $session->update([
@@ -165,8 +166,9 @@ class LearningSessionService
 
     }
 
-    // Calculate total duration
-    $totalDuration = max(0, now()->diffInMinutes($session->session_start));
+    // ✅ FIXED: Calculate total duration in seconds, then convert to minutes (rounded up)
+    $totalDurationSeconds = max(0, now()->diffInSeconds($session->session_start));
+    $totalDuration = (int) ceil($totalDurationSeconds / 60);
 
     // Add final increments to cumulative totals
     $totalWatchTime = ($session->video_watch_time ?? 0) + $finalWatchTimeIncrement;
@@ -354,7 +356,9 @@ class LearningSessionService
             ->get();
 
         foreach ($existingSessions as $session) {
-            $realDuration = max(0, now()->diffInMinutes($session->session_start));
+            // ✅ FIXED: Calculate duration in seconds, then convert to minutes (rounded up)
+            $realDurationSeconds = max(0, now()->diffInSeconds($session->session_start));
+            $realDuration = (int) ceil($realDurationSeconds / 60);
 
             $session->update([
                 'session_end' => now(),
@@ -390,7 +394,9 @@ class LearningSessionService
             ->get();
 
         foreach ($abandoned as $session) {
-            $duration = max(0, $session->session_start->diffInMinutes($cutoff));
+            // ✅ FIXED: Calculate duration in seconds, then convert to minutes (rounded up)
+            $durationSeconds = max(0, $session->session_start->diffInSeconds($cutoff));
+            $duration = (int) ceil($durationSeconds / 60);
 
             $session->update([
                 'session_end' => $session->session_start->addMinutes($duration),
