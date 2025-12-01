@@ -924,7 +924,7 @@ const onPause = () => {
 const onEnded = () => {
     isPlaying.value = false
     updateProgress()
-    if (progressPercentage.value >= 95) {
+    if (progressPercentage.value >= 100) {
         markCompleted()
     }
 }
@@ -1507,7 +1507,7 @@ watch(currentPage, (newPage) => {
                     </Card>
 
                     <!-- Complete Button Card -->
-                    <Card v-if="!isCompleted && (progressPercentage >= 90 || completionPercentage >= 90)">
+                    <Card v-if="!isCompleted && (progressPercentage >= 100 || completionPercentage >= 100)">
                         <CardContent class="p-4">
                             <Button @click="markCompleted" :disabled="isLoading" variant="default"
                                 class="w-full bg-green-600 hover:bg-green-700">

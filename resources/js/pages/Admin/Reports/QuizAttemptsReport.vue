@@ -44,9 +44,15 @@ import {
     Trophy
 } from 'lucide-vue-next'
 
+interface Department {
+    id: number
+    name: string
+}
+
 const props = defineProps({
     attempts: Object,
     quizzes: Array,
+    departments: Array,
     filters: Object,
 })
 
@@ -60,6 +66,7 @@ const breadcrumbs: BreadcrumbItemType[] = [
 // Filter state
 const filters = ref({
     quiz_id: props.filters?.quiz_id || '',
+    department_id: props.filters?.department_id || '',
     status: props.filters?.status || '',
     date_from: props.filters?.date_from || '',
     date_to: props.filters?.date_to || '',
@@ -68,6 +75,10 @@ const filters = ref({
 // Handle select changes
 const handleQuizChange = (value: string) => {
     filters.value.quiz_id = value === 'all' ? '' : value
+}
+
+const handleDepartmentChange = (value: string) => {
+    filters.value.department_id = value === 'all' ? '' : value
 }
 
 const handleStatusChange = (value: string) => {
@@ -91,6 +102,7 @@ watch(filters, () => {
 const resetFilters = () => {
     filters.value = {
         quiz_id: '',
+        department_id: '',
         status: '',
         date_from: '',
         date_to: '',
@@ -184,7 +196,7 @@ const getScoreColor = (percentage) => {
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                         <div class="space-y-2">
                             <Label for="quiz_filter">Quiz</Label>
                             <Select
@@ -198,6 +210,24 @@ const getScoreColor = (percentage) => {
                                     <SelectItem value="all">All Quizzes</SelectItem>
                                     <SelectItem v-for="quiz in quizzes" :key="quiz.id" :value="quiz.id.toString()">
                                         {{ quiz.title }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div class="space-y-2">
+                            <Label for="department_filter">Department</Label>
+                            <Select
+                                :model-value="filters.department_id || 'all'"
+                                @update:model-value="handleDepartmentChange"
+                            >
+                                <SelectTrigger id="department_filter">
+                                    <SelectValue placeholder="All Departments" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Departments</SelectItem>
+                                    <SelectItem v-for="dept in departments" :key="dept.id" :value="dept.id.toString()">
+                                        {{ dept.name }}
                                     </SelectItem>
                                 </SelectContent>
                             </Select>

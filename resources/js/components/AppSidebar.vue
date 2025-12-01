@@ -270,7 +270,7 @@ console.log('Is admin:', isAdmin.value);
         <SidebarHeader class="bg-background" >
             <SidebarMenu>
                 <SidebarMenuItem>
-                    <SidebarMenuButton size="lg" as-child>
+                    <SidebarMenuButton size="lg" as-child class="hover:bg-sidebar-accent/10 active:bg-sidebar-accent/20">
                         <Link href="/dashboard">
                             <AppLogo />
                         </Link>
