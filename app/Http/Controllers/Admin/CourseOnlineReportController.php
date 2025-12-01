@@ -245,15 +245,25 @@ class CourseOnlineReportController extends Controller
                 $calculatedDuration = $this->getActualSessionDuration($session->session_start, $session->session_end);
                 $storedDuration = $session->total_duration_minutes ?? 0;
 
-                // ✅ Generate simulated attention for this session
-                $simulatedAttention = $this->calculateSimulatedAttentionScore(
+                // ✅ Get full session data for skip/seek tracking
+                $fullSessionData = DB::table('learning_sessions')
+                    ->where('id', $session->id)
+                    ->select('video_skip_count', 'seek_count', 'pause_count', 'video_replay_count', 'video_completion_percentage', 'content_id')
+                    ->first();
+                
+                $contentId = $fullSessionData->content_id ?? null;
+
+                // ✅ Generate simulated attention with video duration and skip/seek data
+                $attentionResult = $this->calculateSimulatedAttentionScore(
                     $session->session_start,
                     $session->session_end,
-                    $calculatedDuration
+                    $calculatedDuration,
+                    $contentId,
+                    $fullSessionData
                 );
-
-                // Determine if suspicious based on simulated attention and duration
-                $isSuspicious = $simulatedAttention < 40 || $calculatedDuration < 1 || $calculatedDuration > 60;
+                
+                $simulatedAttention = $attentionResult['score'];
+                $isSuspicious = $attentionResult['is_suspicious'];
 
                 return [
                     'id' => $session->id,
@@ -268,15 +278,16 @@ class CourseOnlineReportController extends Controller
                     'session_end' => $session->session_end ? Carbon::parse($session->session_end)->format('H:i') : 'Active',
                     'stored_duration' => $this->formatDuration($storedDuration),
                     'calculated_duration' => $this->formatDuration($calculatedDuration),
-                    'duration' => $this->formatDuration($calculatedDuration), // Use real duration
+                    'duration' => $this->formatDuration($calculatedDuration),
                     'duration_minutes' => $calculatedDuration,
                     'stored_attention' => $session->attention_score ?? 0,
-                    'simulated_attention' => $simulatedAttention, // ✅ FIXED!
-                    'attention_score' => $simulatedAttention, // ✅ Use simulated
-                    'engagement_level' => $this->calculateEngagementLevel($simulatedAttention), // ✅ FIXED!
-                    'is_suspicious' => $isSuspicious, // ✅ Based on simulated data
+                    'simulated_attention' => $simulatedAttention,
+                    'attention_score' => $simulatedAttention,
+                    'engagement_level' => $this->calculateEngagementLevel($simulatedAttention),
+                    'is_suspicious' => $isSuspicious,
                     'session_status' => $session->session_end ? 'Completed' : 'Active',
                     'performance_rating' => $this->calculateSessionPerformance($calculatedDuration, $simulatedAttention, $isSuspicious),
+                    'score_details' => $attentionResult['details'] ?? [],
                 ];
             });
 
@@ -365,7 +376,11 @@ class CourseOnlineReportController extends Controller
                     $sessionQuery->where('course_online_id', $filters['course_id']);
                 }
 
-                $rawSessions = $sessionQuery->select('session_start', 'session_end', 'attention_score', 'is_suspicious_activity')->get();
+                $rawSessions = $sessionQuery->select(
+                    'id', 'session_start', 'session_end', 'attention_score', 'is_suspicious_activity',
+                    'video_skip_count', 'seek_count', 'pause_count', 'video_replay_count',
+                    'video_completion_percentage', 'content_id'
+                )->get();
 
                 $totalSessions = $rawSessions->count();
                 $totalRealMinutes = 0;
@@ -376,16 +391,18 @@ class CourseOnlineReportController extends Controller
                     $duration = $this->getActualSessionDuration($session->session_start, $session->session_end);
                     $totalRealMinutes += $duration;
 
-                    // ✅ Generate simulated attention for each session
-                    $simulatedAttention = $this->calculateSimulatedAttentionScore(
+                    // ✅ Generate simulated attention with video duration and skip/seek data
+                    $attentionResult = $this->calculateSimulatedAttentionScore(
                         $session->session_start,
                         $session->session_end,
-                        $duration
+                        $duration,
+                        $session->content_id,
+                        $session
                     );
-                    $simulatedAttentionScores[] = $simulatedAttention;
+                    $simulatedAttentionScores[] = $attentionResult['score'];
 
-                    // Count as suspicious based on simulated data
-                    if ($simulatedAttention < 40 || $duration < 1 || $duration > 60) {
+                    // Count as suspicious based on new calculation
+                    if ($attentionResult['is_suspicious']) {
                         $suspiciousSessions++;
                     }
                 }
@@ -398,6 +415,15 @@ class CourseOnlineReportController extends Controller
                     ? round(($assignmentStats->completed_assignments / $assignmentStats->total_assignments) * 100, 1)
                     : 0;
 
+                // ✅ Get quiz performance for this user
+                $quizData = $this->getUserQuizPerformance($user->id, $filters['course_id'] ?? null);
+                
+                // ✅ Calculate performance score with quiz integration
+                $performanceScore = $avgSimulatedAttention;
+                if ($quizData && $quizData->highest_score) {
+                    $performanceScore += $quizData->highest_score * 0.3; // 30% weight for quiz
+                }
+
                 $performanceData = [
                     'id' => $user->id,
                     'name' => $user->name,
@@ -409,18 +435,20 @@ class CourseOnlineReportController extends Controller
                     'completion_rate' => $completionRate,
                     'avg_progress' => round($assignmentStats->avg_progress ?? 0, 1),
                     'total_sessions' => $totalSessions,
-                    'total_learning_hours' => round($totalRealMinutes / 60, 1), // ✅ REAL hours
-                    'avg_attention_score' => round($avgSimulatedAttention, 1), // ✅ SIMULATED attention
+                    'total_learning_hours' => round($totalRealMinutes / 60, 1),
+                    'avg_attention_score' => round($avgSimulatedAttention, 1),
                     'suspicious_sessions' => $suspiciousSessions,
-                    'engagement_level' => $this->calculateEngagementLevel($avgSimulatedAttention), // ✅ FIXED!
+                    'engagement_level' => $this->calculateEngagementLevel($avgSimulatedAttention),
                     'performance_rating' => $this->calculateUserPerformanceRating(
                         $completionRate,
                         $assignmentStats->avg_progress ?? 0,
-                        $avgSimulatedAttention, // ✅ Use simulated attention
+                        $performanceScore, // ✅ Use quiz-boosted score
                         $suspiciousSessions,
                         $totalSessions
-                    ), // ✅ FIXED!
+                    ),
                     'risk_level' => $this->calculateRiskLevel($suspiciousSessions, $totalSessions),
+                    'quiz_highest_score' => $quizData->highest_score ?? null,
+                    'quiz_attempts' => $quizData->attempts ?? 0,
                 ];
 
 
@@ -451,64 +479,179 @@ class CourseOnlineReportController extends Controller
     // =====================================
 
     /**
-     * 🔧 NEW: Calculate realistic attention score based on session behavior
+     * 🔧 UPDATED: Calculate attention score based on session behavior
+     * Score starts at 0 and is completely earned through proper behavior
+     *
+     * @param string|null $sessionStart Session start time
+     * @param string|null $sessionEnd Session end time
+     * @param float $calculatedDuration Calculated duration in minutes
+     * @param int|null $contentId Content ID for video duration lookup
+     * @param object|null $sessionData Session data with skip/seek counts
+     * @return array ['score' => int, 'is_suspicious' => bool, 'details' => array]
      */
-    private function calculateSimulatedAttentionScore($sessionStart, $sessionEnd, $calculatedDuration, $contentType = null)
+    private function calculateSimulatedAttentionScore($sessionStart, $sessionEnd, $calculatedDuration, $contentId = null, $sessionData = null)
     {
+        $details = [];
+        $isSuspicious = false;
+        
         if ($calculatedDuration <= 0) {
-            return 0;
+            return ['score' => 0, 'is_suspicious' => true, 'details' => ['No duration recorded']];
         }
 
         try {
-            $start = Carbon::parse($sessionStart);
-            $end = Carbon::parse($sessionEnd);
-
-            // Base score starts at 70 (good baseline)
-            $score = 70;
-
-            // ✅ Duration-based scoring (optimal learning patterns)
-            if ($calculatedDuration >= 10 && $calculatedDuration <= 45) {
-                // Ideal learning duration (10-45 minutes)
-                $score += 20;
-            } elseif ($calculatedDuration >= 5 && $calculatedDuration < 10) {
-                // Short but focused sessions
-                $score += 10;
-            } elseif ($calculatedDuration > 45 && $calculatedDuration <= 60) {
-                // Long sessions might indicate some distraction
-                $score -= 5;
-            } elseif ($calculatedDuration > 60) {
-                // Very long sessions - likely distracted
-                $score -= 15;
+            // ✅ Base score starts at 0 (completely earned)
+            $score = 0;
+            
+            // ✅ Get video duration for this content
+            $videoDurationMinutes = null;
+            if ($contentId) {
+                $videoDurationSeconds = DB::table('module_content')
+                    ->where('id', $contentId)
+                    ->value('duration');
+                
+                if ($videoDurationSeconds) {
+                    $videoDurationMinutes = $videoDurationSeconds / 60;
+                }
+            }
+            
+            // ✅ Video duration matching (up to 30 points)
+            if ($videoDurationMinutes && $videoDurationMinutes > 0) {
+                $durationDiff = abs($calculatedDuration - $videoDurationMinutes);
+                
+                if ($durationDiff <= 2) {
+                    // Perfect match (within 2 minutes)
+                    $score += 30;
+                    $details[] = 'Perfect duration match (+30)';
+                } elseif ($calculatedDuration >= $videoDurationMinutes * 0.8 && $calculatedDuration <= $videoDurationMinutes * 1.5) {
+                    // Good match (80%-150% of video duration)
+                    $score += 20;
+                    $details[] = 'Good duration match (+20)';
+                } elseif ($calculatedDuration >= $videoDurationMinutes * 0.5) {
+                    // Acceptable (at least 50% of video)
+                    $score += 10;
+                    $details[] = 'Acceptable duration (+10)';
+                } else {
+                    $details[] = 'Duration too short (no bonus)';
+                }
+                
+                // ✅ Suspicious activity detection based on video duration
+                if ($calculatedDuration < ($videoDurationMinutes * 0.3)) {
+                    $isSuspicious = true;
+                    $details[] = 'SUSPICIOUS: Duration less than 30% of video';
+                }
+                if ($calculatedDuration > ($videoDurationMinutes * 3)) {
+                    $isSuspicious = true;
+                    $details[] = 'SUSPICIOUS: Duration more than 3x video length';
+                }
             } else {
-                // Very short sessions (< 5 minutes) - not focused
-                $score -= 25;
+                // Fallback: Duration-based scoring without video reference (up to 20 points)
+                if ($calculatedDuration >= 10 && $calculatedDuration <= 45) {
+                    $score += 20;
+                    $details[] = 'Good session duration (+20)';
+                } elseif ($calculatedDuration >= 5 && $calculatedDuration < 10) {
+                    $score += 15;
+                    $details[] = 'Short focused session (+15)';
+                } elseif ($calculatedDuration > 45 && $calculatedDuration <= 60) {
+                    $score += 10;
+                    $details[] = 'Long session (+10)';
+                } elseif ($calculatedDuration > 60) {
+                    $score += 5;
+                    $details[] = 'Very long session (+5)';
+                } else {
+                    $details[] = 'Very short session (no duration bonus)';
+                }
             }
-
-            // ✅ Time of day factor (learning effectiveness patterns)
-
-            // ✅ Session continuity bonus (if session completed properly)
+            
+            // ✅ Session completion bonus (5 points)
             if ($sessionEnd) {
-                $score += 5; // Bonus for completing session
+                $score += 5;
+                $details[] = 'Session completed (+5)';
+            }
+            
+            // ✅ Engagement bonuses (up to 20 points)
+            if ($sessionData) {
+                // Pause count indicates engagement
+                $pauseCount = $sessionData->pause_count ?? 0;
+                if ($pauseCount > 0 && $pauseCount <= 10) {
+                    $score += 10;
+                    $details[] = 'Good pause behavior (+10)';
+                } elseif ($pauseCount > 10) {
+                    $score += 5;
+                    $details[] = 'Excessive pausing (+5)';
+                }
+                
+                // Replay count indicates attention to detail
+                $replayCount = $sessionData->video_replay_count ?? 0;
+                if ($replayCount > 0 && $replayCount <= 5) {
+                    $score += 10;
+                    $details[] = 'Replay behavior (+10)';
+                } elseif ($replayCount > 5) {
+                    $score += 5;
+                    $details[] = 'Excessive replays (+5)';
+                }
+            }
+            
+            // ✅ STRICT Skip/Seek penalties
+            if ($sessionData) {
+                $skipCount = $sessionData->video_skip_count ?? 0;
+                $seekCount = $sessionData->seek_count ?? 0;
+                
+                // ONE skip forward = immediate major penalty
+                if ($skipCount >= 1) {
+                    $score -= 50;
+                    $isSuspicious = true;
+                    $details[] = "PENALTY: Skip detected (-50, suspicious)";
+                }
+                
+                // 3+ seeks = attention penalty
+                if ($seekCount >= 3) {
+                    $score -= 20;
+                    $details[] = "PENALTY: Excessive seeking (-20)";
+                }
+                
+                // Very high seek count = suspicious
+                if ($seekCount >= 10) {
+                    $isSuspicious = true;
+                    $details[] = "SUSPICIOUS: Very high seek count";
+                }
+            }
+            
+            // ✅ Video completion percentage bonus (up to 35 points)
+            if ($sessionData && isset($sessionData->video_completion_percentage)) {
+                $completionPct = $sessionData->video_completion_percentage;
+                if ($completionPct >= 95) {
+                    $score += 35;
+                    $details[] = 'Full video completion (+35)';
+                } elseif ($completionPct >= 80) {
+                    $score += 25;
+                    $details[] = 'High video completion (+25)';
+                } elseif ($completionPct >= 60) {
+                    $score += 15;
+                    $details[] = 'Moderate video completion (+15)';
+                } elseif ($completionPct >= 40) {
+                    $score += 5;
+                    $details[] = 'Low video completion (+5)';
+                }
+            }
+            
+            // ✅ Final suspicious check based on score
+            if ($score < 30) {
+                $isSuspicious = true;
             }
 
-            // ✅ Add realistic randomization for natural variation (±8 points)
-            $randomFactor = rand(-8, 8);
-            $score += $randomFactor;
+            // Ensure score is in valid range (0-100)
+            $score = max(0, min(100, $score));
 
-            // Ensure score is in realistic range (25-100)
-            $score = max(25, min(100, $score));
-
-
-            return $score;
+            return ['score' => $score, 'is_suspicious' => $isSuspicious, 'details' => $details];
 
         } catch (\Exception $e) {
-
-            return 65; // Default decent score
+            return ['score' => 0, 'is_suspicious' => true, 'details' => ['Error calculating score: ' . $e->getMessage()]];
         }
     }
 
     /**
-     * 🔧 NEW: Process sessions with simulated attention scores
+     * 🔧 UPDATED: Process sessions with simulated attention scores
+     * Now includes video duration matching and skip/seek penalties
      */
     private function processSessionsWithSimulatedAttention($sessions, $assignmentId)
     {
@@ -522,20 +665,34 @@ class CourseOnlineReportController extends Controller
             // Calculate real duration
             $calculatedDuration = $this->getActualSessionDuration($session->session_start, $session->session_end);
 
-            // ✅ Generate realistic attention score
-            $simulatedAttention = $this->calculateSimulatedAttentionScore(
+            // ✅ Get full session data for skip/seek tracking
+            $fullSessionData = null;
+            if (isset($session->id)) {
+                $fullSessionData = DB::table('learning_sessions')
+                    ->where('id', $session->id)
+                    ->select('video_skip_count', 'seek_count', 'pause_count', 'video_replay_count', 'video_completion_percentage', 'content_id')
+                    ->first();
+            }
+            
+            $contentId = $fullSessionData->content_id ?? ($session->content_id ?? null);
+
+            // ✅ Generate attention score with video duration and skip/seek data
+            $attentionResult = $this->calculateSimulatedAttentionScore(
                 $session->session_start,
                 $session->session_end,
-                $calculatedDuration
+                $calculatedDuration,
+                $contentId,
+                $fullSessionData
             );
+            
+            $simulatedAttention = $attentionResult['score'];
+            $isSuspicious = $attentionResult['is_suspicious'];
 
             if ($calculatedDuration > 0) {
                 $totalCalculatedMinutes += $calculatedDuration;
                 $simulatedAttentionScores[] = $simulatedAttention;
             }
 
-            // ✅ Mark as suspicious based on simulated attention and duration patterns
-            $isSuspicious = $simulatedAttention < 40 || $calculatedDuration < 1 || $calculatedDuration > 90;
             if ($isSuspicious) {
                 $suspiciousSessions++;
             }
@@ -550,14 +707,13 @@ class CourseOnlineReportController extends Controller
                 'simulated_attention' => $simulatedAttention,
                 'is_suspicious' => $isSuspicious,
                 'engagement_level' => $this->calculateEngagementLevel($simulatedAttention),
+                'score_details' => $attentionResult['details'] ?? [],
             ];
         }
 
         $averageSimulatedAttention = count($simulatedAttentionScores) > 0
             ? array_sum($simulatedAttentionScores) / count($simulatedAttentionScores)
             : 0;
-
-
 
         return [
             'total_sessions' => $totalSessions,
@@ -590,19 +746,23 @@ class CourseOnlineReportController extends Controller
     }
 
     /**
-     * 🔧 NEW: Calculate real statistics with simulated attention
+     * 🔧 UPDATED: Calculate real statistics with simulated attention
+     * Now includes video duration matching and skip/seek penalties
      */
     private function calculateRealStatsWithSimulatedAttention()
     {
-
         try {
             // Calculate REAL total learning time and SIMULATED attention
             $totalRealMinutes = 0;
             $totalStoredMinutes = 0;
             $simulatedAttentionScores = [];
+            $suspiciousCount = 0;
 
             $allSessions = DB::table('learning_sessions')
-                ->select('session_start', 'session_end', 'total_duration_minutes')
+                ->select(
+                    'id', 'session_start', 'session_end', 'total_duration_minutes', 'content_id',
+                    'video_skip_count', 'seek_count', 'pause_count', 'video_replay_count', 'video_completion_percentage'
+                )
                 ->get();
 
             foreach ($allSessions as $session) {
@@ -612,14 +772,20 @@ class CourseOnlineReportController extends Controller
                 $totalRealMinutes += $realDuration;
                 $totalStoredMinutes += $storedDuration;
 
-                // Generate simulated attention for overall average
+                // Generate simulated attention with video duration and skip/seek data
                 if ($realDuration > 0) {
-                    $simulatedAttention = $this->calculateSimulatedAttentionScore(
+                    $attentionResult = $this->calculateSimulatedAttentionScore(
                         $session->session_start,
                         $session->session_end,
-                        $realDuration
+                        $realDuration,
+                        $session->content_id,
+                        $session
                     );
-                    $simulatedAttentionScores[] = $simulatedAttention;
+                    $simulatedAttentionScores[] = $attentionResult['score'];
+                    
+                    if ($attentionResult['is_suspicious']) {
+                        $suspiciousCount++;
+                    }
                 }
             }
 
@@ -633,11 +799,12 @@ class CourseOnlineReportController extends Controller
                 'in_progress_assignments' => CourseOnlineAssignment::where('status', 'in_progress')->count(),
                 'average_completion_rate' => round(CourseOnlineAssignment::avg('progress_percentage') ?? 0, 1),
                 'stored_learning_hours' => round($totalStoredMinutes / 60, 1),
-                'total_learning_hours' => round($totalRealMinutes / 60, 1), // ✅ REAL hours
+                'total_learning_hours' => round($totalRealMinutes / 60, 1),
                 'total_users' => User::where('role', '!=', 'admin')->count(),
-                'stored_average_attention_score' => 0, // Original (always 0)
-                'average_attention_score' => round($avgSimulatedAttention, 1), // ✅ SIMULATED attention
+                'stored_average_attention_score' => 0,
+                'average_attention_score' => round($avgSimulatedAttention, 1),
                 'total_sessions' => LearningSession::count(),
+                'suspicious_sessions' => $suspiciousCount,
                 'engagement_distribution' => [
                     'high_engagement' => count(array_filter($simulatedAttentionScores, fn($score) => $score >= 80)),
                     'medium_engagement' => count(array_filter($simulatedAttentionScores, fn($score) => $score >= 60 && $score < 80)),
@@ -646,12 +813,9 @@ class CourseOnlineReportController extends Controller
                 ],
             ];
 
-
             return $stats;
 
         } catch (\Exception $e) {
-
-
             return [
                 'total_assignments' => 0,
                 'completed_assignments' => 0,
@@ -659,13 +823,15 @@ class CourseOnlineReportController extends Controller
                 'average_completion_rate' => 0,
                 'total_learning_hours' => 0,
                 'total_users' => 0,
-                'average_attention_score' => 65, // Default decent score
+                'average_attention_score' => 0,
+                'suspicious_sessions' => 0,
             ];
         }
     }
 
     /**
-     * 🔧 NEW: Calculate session statistics with simulated attention
+     * 🔧 UPDATED: Calculate session statistics with simulated attention
+     * Now includes video duration matching and skip/seek penalties
      */
     private function calculateSessionStatsWithSimulatedAttention()
     {
@@ -675,7 +841,10 @@ class CourseOnlineReportController extends Controller
             $suspiciousCount = 0;
 
             $allSessions = DB::table('learning_sessions')
-                ->select('session_start', 'session_end', 'total_duration_minutes')
+                ->select(
+                    'id', 'session_start', 'session_end', 'total_duration_minutes', 'content_id',
+                    'video_skip_count', 'seek_count', 'pause_count', 'video_replay_count', 'video_completion_percentage'
+                )
                 ->get();
 
             foreach ($allSessions as $session) {
@@ -683,15 +852,16 @@ class CourseOnlineReportController extends Controller
                 $totalRealMinutes += $duration;
 
                 if ($duration > 0) {
-                    $simulatedAttention = $this->calculateSimulatedAttentionScore(
+                    $attentionResult = $this->calculateSimulatedAttentionScore(
                         $session->session_start,
                         $session->session_end,
-                        $duration
+                        $duration,
+                        $session->content_id,
+                        $session
                     );
-                    $simulatedAttentionScores[] = $simulatedAttention;
+                    $simulatedAttentionScores[] = $attentionResult['score'];
 
-                    // Count suspicious based on simulated data
-                    if ($simulatedAttention < 40 || $duration < 1 || $duration > 90) {
+                    if ($attentionResult['is_suspicious']) {
                         $suspiciousCount++;
                     }
                 }
@@ -707,19 +877,41 @@ class CourseOnlineReportController extends Controller
                 'completed_sessions' => LearningSession::whereNotNull('session_end')->count(),
                 'active_sessions' => LearningSession::whereNull('session_end')->count(),
                 'stored_suspicious_sessions' => LearningSession::where('is_suspicious_activity', true)->count(),
-                'simulated_suspicious_sessions' => $suspiciousCount, // ✅ Based on simulated data
-                'suspicious_sessions' => $suspiciousCount, // Use simulated
+                'simulated_suspicious_sessions' => $suspiciousCount,
+                'suspicious_sessions' => $suspiciousCount,
                 'stored_average_duration' => round(LearningSession::avg('total_duration_minutes') ?? 0, 1),
-                'real_average_duration' => round($avgRealDuration, 1), // ✅ REAL average
+                'real_average_duration' => round($avgRealDuration, 1),
                 'total_real_learning_hours' => round($totalRealMinutes / 60, 1),
-                'stored_average_attention' => 0, // Original (always 0)
-                'simulated_average_attention' => round($avgSimulatedAttention, 1), // ✅ SIMULATED
-                'average_attention_score' => round($avgSimulatedAttention, 1), // Use simulated
+                'stored_average_attention' => 0,
+                'simulated_average_attention' => round($avgSimulatedAttention, 1),
+                'average_attention_score' => round($avgSimulatedAttention, 1),
             ];
         } catch (\Exception $e) {
-
             return [];
         }
+    }
+    
+    /**
+     * 🔧 NEW: Get user quiz performance data
+     */
+    private function getUserQuizPerformance($userId, $courseId = null)
+    {
+        $query = DB::table('quiz_attempts')
+            ->where('user_id', $userId);
+        
+        if ($courseId) {
+            // Get quizzes associated with this course
+            $quizIds = DB::table('quizzes')
+                ->where('course_online_id', $courseId)
+                ->pluck('id');
+            
+            if ($quizIds->isNotEmpty()) {
+                $query->whereIn('quiz_id', $quizIds);
+            }
+        }
+        
+        return $query->selectRaw('MAX(total_score) as highest_score, COUNT(*) as attempts')
+            ->first();
     }
 
     /**
@@ -937,13 +1129,25 @@ class CourseOnlineReportController extends Controller
             $exportData = [];
             foreach ($sessions as $session) {
                 $calculatedDuration = $this->getActualSessionDuration($session->session_start, $session->session_end);
-                $simulatedAttention = $this->calculateSimulatedAttentionScore(
+                
+                // Get full session data for skip/seek tracking
+                $fullSessionData = DB::table('learning_sessions')
+                    ->where('id', $session->id)
+                    ->select('video_skip_count', 'seek_count', 'pause_count', 'video_replay_count', 'video_completion_percentage', 'content_id')
+                    ->first();
+                
+                $contentId = $fullSessionData->content_id ?? null;
+                
+                $attentionResult = $this->calculateSimulatedAttentionScore(
                     $session->session_start,
                     $session->session_end,
-                    $calculatedDuration
+                    $calculatedDuration,
+                    $contentId,
+                    $fullSessionData
                 );
-
-                $isSuspicious = $simulatedAttention < 40 || $calculatedDuration < 1 || $calculatedDuration > 60;
+                
+                $simulatedAttention = $attentionResult['score'];
+                $isSuspicious = $attentionResult['is_suspicious'];
 
                 // Apply suspicious filter if needed
                 if (!empty($filters['suspicious_only']) && $filters['suspicious_only'] === '1' && !$isSuspicious) {
@@ -1048,7 +1252,11 @@ class CourseOnlineReportController extends Controller
                     $sessionQuery->where('course_online_id', $filters['course_id']);
                 }
 
-                $rawSessions = $sessionQuery->select('session_start', 'session_end', 'attention_score', 'is_suspicious_activity')->get();
+                $rawSessions = $sessionQuery->select(
+                    'id', 'session_start', 'session_end', 'attention_score', 'is_suspicious_activity',
+                    'video_skip_count', 'seek_count', 'pause_count', 'video_replay_count',
+                    'video_completion_percentage', 'content_id'
+                )->get();
 
                 $totalSessions = $rawSessions->count();
                 $totalRealMinutes = 0;
@@ -1059,14 +1267,16 @@ class CourseOnlineReportController extends Controller
                     $duration = $this->getActualSessionDuration($session->session_start, $session->session_end);
                     $totalRealMinutes += $duration;
 
-                    $simulatedAttention = $this->calculateSimulatedAttentionScore(
+                    $attentionResult = $this->calculateSimulatedAttentionScore(
                         $session->session_start,
                         $session->session_end,
-                        $duration
+                        $duration,
+                        $session->content_id,
+                        $session
                     );
-                    $simulatedAttentionScores[] = $simulatedAttention;
+                    $simulatedAttentionScores[] = $attentionResult['score'];
 
-                    if ($simulatedAttention < 40 || $duration < 1 || $duration > 60) {
+                    if ($attentionResult['is_suspicious']) {
                         $suspiciousSessions++;
                     }
                 }

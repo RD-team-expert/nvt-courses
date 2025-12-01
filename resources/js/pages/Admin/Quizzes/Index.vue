@@ -430,20 +430,46 @@ export default {
 
         // Show delete confirmation modal
         const confirmDelete = (quizId) => {
+            console.log('confirmDelete called with quizId:', quizId);
             quizToDelete.value = quizId;
             showDeleteModal.value = true;
         };
 
         // Delete quiz
         const deleteQuiz = () => {
-            if (isLoading.value) return;
+            console.log('deleteQuiz called');
+            console.log('quizToDelete.value:', quizToDelete.value);
+            console.log('isLoading.value:', isLoading.value);
+            
+            if (isLoading.value) {
+                console.log('Already loading, returning early');
+                return;
+            }
+            
             isLoading.value = true;
-            router.delete(route('admin.quizzes.destroy', quizToDelete.value), {
-                onSuccess: () => {
+            
+            const deleteUrl = route('admin.quizzes.destroy', quizToDelete.value);
+            console.log('Delete URL:', deleteUrl);
+            
+            router.delete(deleteUrl, {
+                preserveScroll: true,
+                onBefore: () => {
+                    console.log('onBefore: Request is about to be made');
+                },
+                onStart: () => {
+                    console.log('onStart: Request has started');
+                },
+                onSuccess: (page) => {
+                    console.log('onSuccess: Delete successful', page);
                     showDeleteModal.value = false;
                     quizToDelete.value = null;
                 },
+                onError: (errors) => {
+                    console.error('onError: Delete error:', errors);
+                    showDeleteModal.value = false;
+                },
                 onFinish: () => {
+                    console.log('onFinish: Request finished');
                     isLoading.value = false;
                 },
             });

@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Course;
+use App\Models\CourseOnline;
+use App\Models\CourseOnlineAssignment;
 use App\Models\User;
 use App\Models\Clocking; // Changed from Attendance to Clocking
 use App\Models\CourseSession;
@@ -24,6 +26,7 @@ class DashboardController extends Controller
         $stats = [];
         $recentActivity = [];
         $userCourses = [];
+        $userOnlineCourses = [];
         $userAttendance = [];
 
         if ($isAdmin) {
@@ -68,6 +71,9 @@ class DashboardController extends Controller
             // User's courses
             $userCourses = $this->getUserCourses($user->id);
 
+            // User's online courses
+            $userOnlineCourses = $this->getUserOnlineCourses($user->id);
+
             // User's attendance records
             $userAttendance = $this->getUserAttendance($user->id);
         }
@@ -76,6 +82,7 @@ class DashboardController extends Controller
             'stats' => $stats,
             'recentActivity' => $recentActivity,
             'userCourses' => $userCourses,
+            'userOnlineCourses' => $userOnlineCourses,
             'userAttendance' => $userAttendance,
         ]);
     }
@@ -249,5 +256,38 @@ class DashboardController extends Controller
 
                 return $data;
             });
+    }
+
+    private function getUserOnlineCourses($userId)
+    {
+        // Get online courses assigned to the user
+        $onlineCourses = CourseOnlineAssignment::where('user_id', $userId)
+            ->with(['courseOnline' => function($query) {
+                $query->select('id', 'name', 'image_path', 'estimated_duration', 'difficulty_level', 'is_active');
+            }])
+            ->orderBy('assigned_at', 'desc')
+            ->limit(3)
+            ->get();
+
+        return $onlineCourses->map(function ($assignment) {
+            $course = $assignment->courseOnline;
+            if (!$course) {
+                return null;
+            }
+
+            return [
+                'id' => $course->id,
+                'name' => $course->name,
+                'image_path' => $course->image_path,
+                'estimated_duration' => $course->estimated_duration,
+                'difficulty_level' => $course->difficulty_level,
+                'status' => $assignment->status ?? 'assigned',
+                'progress_percentage' => $assignment->progress_percentage ?? 0,
+                'assigned_at' => $assignment->assigned_at,
+                'started_at' => $assignment->started_at,
+                'completed_at' => $assignment->completed_at,
+                'is_active' => $course->is_active,
+            ];
+        })->filter();
     }
 }

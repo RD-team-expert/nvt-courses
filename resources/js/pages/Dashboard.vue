@@ -56,6 +56,10 @@ const props = defineProps({
         type: Array,
         default: () => []
     },
+    userOnlineCourses: {
+        type: Array,
+        default: () => []
+    },
     userAttendance: {
         type: Array,
         default: () => []
@@ -348,6 +352,77 @@ const getActivityVariant = (action: string) => {
                                         </Badge>
                                         <Button asChild variant="ghost" size="sm">
                                             <Link :href="`/courses/${course.id}`">
+                                                Continue
+                                                <ArrowRight class="h-3 w-3 ml-1" />
+                                            </Link>
+                                        </Button>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <!-- My Online Courses -->
+                <Card>
+                    <CardHeader>
+                        <div class="flex justify-between items-center">
+                            <CardTitle class="flex items-center gap-2">
+                                <BookOpenCheck class="h-5 w-5" />
+                                My Online Courses
+                            </CardTitle>
+                            <Button asChild variant="ghost" size="sm">
+                                <Link href="/course-online">
+                                    <ExternalLink class="h-4 w-4 mr-1" />
+                                    View all
+                                </Link>
+                            </Button>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div v-if="userOnlineCourses.length === 0" class="col-span-full text-center py-8">
+                                <BookOpenCheck class="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+                                <CardTitle class="text-base mb-2">No online courses yet</CardTitle>
+                                <CardDescription>You are not assigned to any online courses yet</CardDescription>
+                            </div>
+                            <Card
+                                v-for="(course, index) in userOnlineCourses"
+                                :key="course.id || index"
+                                class="overflow-hidden hover:shadow-md transition-shadow"
+                            >
+                                <div class="h-32 bg-muted">
+                                    <img
+                                        v-if="course.image_path"
+                                        :src="`/storage/${course.image_path}`"
+                                        :alt="course.name"
+                                        class="w-full h-full object-contain"
+                                        @error="$event.target.src = '/images/course-placeholder.jpg'"
+                                    />
+                                    <div v-else class="w-full h-full flex items-center justify-center">
+                                        <BookOpenCheck class="h-10 w-10 text-muted-foreground" />
+                                    </div>
+                                </div>
+                                <CardContent class="p-3">
+                                    <CardTitle class="text-base mb-2">{{ course.name || 'Course Name' }}</CardTitle>
+                                    <div class="mb-2">
+                                        <div class="flex justify-between text-xs text-muted-foreground mb-1">
+                                            <span>Progress</span>
+                                            <span>{{ Math.round(course.progress_percentage || 0) }}%</span>
+                                        </div>
+                                        <div class="w-full bg-muted rounded-full h-1.5">
+                                            <div 
+                                                class="bg-blue-600 h-1.5 rounded-full transition-all" 
+                                                :style="{ width: `${course.progress_percentage || 0}%` }"
+                                            ></div>
+                                        </div>
+                                    </div>
+                                    <div class="flex justify-between items-center">
+                                        <Badge :variant="getStatusVariant(course.status)">
+                                            {{ course.status ? (course.status.charAt(0).toUpperCase() + course.status.slice(1)).replace('_', ' ') : 'Assigned' }}
+                                        </Badge>
+                                        <Button asChild variant="ghost" size="sm">
+                                            <Link :href="`/course-online/${course.id}`">
                                                 Continue
                                                 <ArrowRight class="h-3 w-3 ml-1" />
                                             </Link>

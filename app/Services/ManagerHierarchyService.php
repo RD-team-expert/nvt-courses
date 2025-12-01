@@ -33,6 +33,7 @@ class ManagerHierarchyService
 
             foreach ($managers as $managerData) {
                 $level = $managerData['level'];
+                
                 if (in_array($level, $targetLevels) || in_array('all', $targetLevels)) {
                     $manager = $managerData['manager'];
                     // Avoid duplicates using manager ID as key
@@ -80,20 +81,33 @@ class ManagerHierarchyService
 
     /**
      * Get managers from UserDepartmentRole relationships
+     * Now also searches parent departments for higher-level managers (L3, L4)
      */
     private function getManagersFromDepartmentRoles(User $user, array $targetLevels): array
     {
         $managers = [];
+        $roleTypes = $this->mapLevelsToRoleTypes($targetLevels);
+        $addedManagerIds = []; // Track added managers to avoid duplicates
 
-        // Get active manager roles in the user's department
+        // Get all department IDs to search (current + parent hierarchy)
+        $departmentIds = $this->getDepartmentHierarchyIds($user->department_id);
+
+        // Get active manager roles in the user's department and parent departments
         $managerRoles = UserDepartmentRole::with(['manager.userLevel', 'manager.department'])
-            ->where('department_id', $user->department_id)
-            ->active() // Uses the scope you already have
-            ->whereIn('role_type', $this->mapLevelsToRoleTypes($targetLevels))
+            ->whereIn('department_id', $departmentIds)
+            ->active()
+            ->whereIn('role_type', $roleTypes)
             ->get();
 
         foreach ($managerRoles as $role) {
-            if (!$role->manager) continue;
+            if (!$role->manager) {
+                continue;
+            }
+
+            // Skip if we already added this manager
+            if (in_array($role->manager->id, $addedManagerIds)) {
+                continue;
+            }
 
             $managerLevel = $this->getUserLevelCode($role->manager);
 
@@ -105,10 +119,28 @@ class ManagerHierarchyService
                     'role_type' => $role->role_type,
                     'is_primary' => $role->is_primary
                 ];
+                $addedManagerIds[] = $role->manager->id;
             }
         }
 
         return $managers;
+    }
+
+    /**
+     * Get all department IDs in the hierarchy (current + all parents)
+     */
+    private function getDepartmentHierarchyIds(int $departmentId): array
+    {
+        $ids = [$departmentId];
+        
+        $department = Department::find($departmentId);
+        
+        while ($department && $department->parent_id) {
+            $ids[] = $department->parent_id;
+            $department = Department::find($department->parent_id);
+        }
+        
+        return $ids;
     }
 
     /**
@@ -152,14 +184,16 @@ class ManagerHierarchyService
                 case 'L2':
                     $roleTypes[] = 'direct_manager';
                     $roleTypes[] = 'project_manager';
+                    $roleTypes[] = 'supervisor';
                     break;
                 case 'L3':
                     $roleTypes[] = 'senior_manager';
                     $roleTypes[] = 'department_head';
                     break;
                 case 'L4':
-                    $roleTypes[] = 'executive';
                     $roleTypes[] = 'director';
+                    $roleTypes[] = 'president';
+                    $roleTypes[] = 'business_owner';
                     break;
             }
         }
@@ -306,14 +340,12 @@ public function getDirectManagersForUser(int $userId): array
     }
 
     /**
-     * Validate that employees are L1 level
-     */
-    /**
-     * Validate that employees are L1 or L2 level
+     * Validate employees for evaluation notifications
+     * Now allows all employees with evaluations (not just L1/L2)
      */
     public function validateL1Employees(array $employeeIds): array
     {
-        $employees = User::with('userLevel')
+        $employees = User::with(['userLevel', 'evaluations'])
             ->whereIn('id', $employeeIds)
             ->get();
 
@@ -321,13 +353,16 @@ public function getDirectManagersForUser(int $userId): array
         $invalid = [];
 
         foreach ($employees as $employee) {
-            if (in_array($employee->user_level_id, [1, 2])) { // Allow L1 and L2
+            // Allow any employee that has evaluations
+            // Previously restricted to L1/L2 only, but managers can also have evaluations
+            if ($employee->evaluations->count() > 0) {
                 $valid[] = $employee->id;
             } else {
                 $invalid[] = [
                     'id' => $employee->id,
                     'name' => $employee->name,
-                    'level' => $employee->userLevel?->name ?? 'Unknown'
+                    'level' => $employee->userLevel?->name ?? 'Unknown',
+                    'reason' => 'No evaluations found'
                 ];
             }
         }

@@ -924,14 +924,20 @@ class ReportController extends Controller
      */
     public function quizAttempts(Request $request)
     {
-        $filters = $request->only(['quiz_id', 'status', 'date_from', 'date_to']);
+        $filters = $request->only(['quiz_id', 'status', 'date_from', 'date_to', 'department_id']);
 
         $quizId = $filters['quiz_id'] ?? null;
         $status = $filters['status'] ?? null;
         $dateFrom = $filters['date_from'] ?? null;
         $dateTo = $filters['date_to'] ?? null;
+        $departmentId = $filters['department_id'] ?? null;
 
         $attempts = QuizAttempt::with(['user', 'quiz'])
+            ->when($departmentId, function($q) use ($departmentId) {
+                $q->whereHas('user', function($query) use ($departmentId) {
+                    $query->where('department_id', $departmentId);
+                });
+            })
             ->when($quizId, fn($q) => $q->where('quiz_id', $quizId))
             ->when($status, fn($q) => $q->where('passed', $status === 'passed'))
             ->when($dateFrom, fn($q) => $q->where('completed_at', '>=', $dateFrom))
@@ -954,10 +960,12 @@ class ReportController extends Controller
         });
 
         $quizzes = Quiz::where('status', 'published')->get(['id', 'title']);
+        $departments = Department::select('id', 'name')->orderBy('name')->get();
 
         return Inertia::render('Admin/Reports/QuizAttemptsReport', [
             'attempts' => $attempts,
             'quizzes' => $quizzes,
+            'departments' => $departments,
             'filters' => $filters,
         ]);
     }
@@ -967,14 +975,20 @@ class ReportController extends Controller
      */
     public function exportQuizAttempts(Request $request)
     {
-        $filters = $request->only(['quiz_id', 'status', 'date_from', 'date_to']);
+        $filters = $request->only(['quiz_id', 'status', 'date_from', 'date_to', 'department_id']);
 
         $quizId = $filters['quiz_id'] ?? null;
         $status = $filters['status'] ?? null;
         $dateFrom = $filters['date_from'] ?? null;
         $dateTo = $filters['date_to'] ?? null;
+        $departmentId = $filters['department_id'] ?? null;
 
         $attempts = QuizAttempt::with(['user', 'quiz'])
+            ->when($departmentId, function($q) use ($departmentId) {
+                $q->whereHas('user', function($query) use ($departmentId) {
+                    $query->where('department_id', $departmentId);
+                });
+            })
             ->when($quizId, fn($q) => $q->where('quiz_id', $quizId))
             ->when($status, fn($q) => $q->where('passed', $status === 'passed'))
             ->when($dateFrom, fn($q) => $q->where('completed_at', '>=', $dateFrom))

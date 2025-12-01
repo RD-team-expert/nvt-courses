@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 
 class QuizController extends Controller
@@ -488,21 +489,76 @@ class QuizController extends Controller
      */
     public function destroy(Quiz $quiz)
     {
-        if ($quiz->attempts()->exists()) {
+        Log::info('Starting quiz deletion process', [
+            'quiz_id' => $quiz->id,
+            'quiz_title' => $quiz->title
+        ]);
+
+        // Check if quiz has any attempts
+        $attemptsCount = $quiz->attempts()->count();
+        Log::info('Checking quiz attempts', [
+            'quiz_id' => $quiz->id,
+            'attempts_count' => $attemptsCount
+        ]);
+
+        if ($attemptsCount > 0) {
+            Log::warning('Cannot delete quiz - has existing attempts', [
+                'quiz_id' => $quiz->id,
+                'attempts_count' => $attemptsCount
+            ]);
             return back()->withErrors(['error' => 'Cannot delete quiz with existing attempts.']);
         }
 
         DB::beginTransaction();
         try {
-            $quiz->questions()->delete();
-            $quiz->delete();
+            // Get all question IDs for this quiz
+            $questionIds = $quiz->questions()->pluck('id')->toArray();
+            Log::info('Found quiz questions', [
+                'quiz_id' => $quiz->id,
+                'question_ids' => $questionIds,
+                'question_count' => count($questionIds)
+            ]);
+
+            // First, delete all answers associated with the quiz questions
+            if (!empty($questionIds)) {
+                $answersDeleted = \App\Models\QuizAnswer::whereIn('quiz_question_id', $questionIds)->delete();
+                Log::info('Deleted quiz answers', [
+                    'quiz_id' => $quiz->id,
+                    'answers_deleted' => $answersDeleted
+                ]);
+            }
+            
+            // Then delete all questions
+            $questionsDeleted = $quiz->questions()->delete();
+            Log::info('Deleted quiz questions', [
+                'quiz_id' => $quiz->id,
+                'questions_deleted' => $questionsDeleted
+            ]);
+            
+            // Finally delete the quiz
+            $quizId = $quiz->id;
+            $deleted = $quiz->delete();
+            Log::info('Deleted quiz', [
+                'quiz_id' => $quizId,
+                'delete_result' => $deleted
+            ]);
 
             DB::commit();
+            Log::info('Quiz deletion completed successfully', ['quiz_id' => $quizId]);
+            
             return redirect()->route('admin.quizzes.index')
                 ->with('success', 'Quiz deleted successfully.');
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->withErrors(['error' => 'Failed to delete quiz.']);
+            Log::error('Failed to delete quiz: ' . $e->getMessage(), [
+                'quiz_id' => $quiz->id,
+                'exception_class' => get_class($e),
+                'exception_message' => $e->getMessage(),
+                'exception_file' => $e->getFile(),
+                'exception_line' => $e->getLine(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return back()->withErrors(['error' => 'Failed to delete quiz: ' . $e->getMessage()]);
         }
     }
 
