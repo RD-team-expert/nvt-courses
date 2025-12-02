@@ -180,6 +180,9 @@ class CourseOnlineController extends Controller
 
 
 
+                // Get quiz status for this module
+                $quizStatus = $module->getQuizStatus($user->id);
+
                 // ✅ FIXED: Added missing array return structure
                 return [
                     'id' => $module->id,
@@ -190,6 +193,17 @@ class CourseOnlineController extends Controller
                     'estimated_duration' => $module->estimated_duration,
                     'is_unlocked' => $this->isModuleUnlocked($module, $user->id),
                     'progress' => $progress,
+                    'quiz_status' => [
+                        'has_quiz' => $quizStatus['has_quiz'],
+                        'quiz_required' => $quizStatus['quiz_required'] ?? false,
+                        'quiz_id' => $quizStatus['quiz_id'] ?? null,
+                        'quiz_title' => $quizStatus['quiz_title'] ?? null,
+                        'passed' => $quizStatus['passed'] ?? false,
+                        'status' => $quizStatus['status'] ?? 'no_quiz',
+                        'attempts_used' => $quizStatus['attempts_used'] ?? 0,
+                        'max_attempts' => $quizStatus['max_attempts'] ?? 0,
+                        'can_attempt' => $quizStatus['can_attempt'] ?? false,
+                    ],
                     'content' => $module->content->map(function ($content) use ($user) {
                         $contentProgress = $this->getContentProgress($content, $user->id);
 
@@ -524,33 +538,34 @@ class CourseOnlineController extends Controller
 
     private function isModuleCompleted(CourseModule $module, int $userId): bool
     {
+        // Check content completion
         $requiredContent = $module->content()->where('is_required', true)->count();
         $completedContent = UserContentProgress::where('user_id', $userId)
             ->where('module_id', $module->id)
             ->where('is_completed', true)
             ->count();
 
-        return $requiredContent > 0 && $completedContent >= $requiredContent;
+        $contentCompleted = $requiredContent > 0 && $completedContent >= $requiredContent;
+        
+        // If content is not completed, module is not completed
+        if (!$contentCompleted) {
+            return false;
+        }
+
+        // Check if module has a required quiz
+        if ($module->has_quiz && $module->quiz_required) {
+            // User must pass the quiz for module to be considered completed
+            return $module->hasUserPassedQuiz($userId);
+        }
+
+        // No required quiz, just content completion is enough
+        return true;
     }
 
     private function isModuleUnlocked(CourseModule $module, int $userId): bool
     {
-        if ($module->order_number === 1) {
-            return true;
-        }
-
-        $previousModules = $module->courseOnline->modules()
-            ->where('order_number', '<', $module->order_number)
-            ->where('is_required', true)
-            ->get();
-
-        foreach ($previousModules as $prevModule) {
-            if (!$this->isModuleCompleted($prevModule, $userId)) {
-                return false;
-            }
-        }
-
-        return true;
+        // Use the model's method which includes quiz completion check
+        return $module->isUnlockedForUser($userId);
     }
 
     private function isContentUnlocked(ModuleContent $content, int $userId): bool

@@ -37,6 +37,7 @@ use App\Http\Controllers\GeminiController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\User\ContentViewController;
 use App\Http\Controllers\User\CourseOnlineController;
+use App\Http\Controllers\User\ModuleQuizController as UserModuleQuizController;
 use App\Http\Controllers\UserTeamController;
 use App\Http\Controllers\VideoController;
 use App\Http\Controllers\VideoStreamController;
@@ -181,6 +182,33 @@ Route::middleware(['auth'])->group(function () {
 
             // Mark module as completed
             Route::post('/{courseModule}/complete', [CourseOnlineController::class, 'completeModule'])->name('complete');
+
+            // ===== MODULE QUIZ ROUTES (USER) =====
+            Route::prefix('{courseModule}/quiz')->name('quiz.')->group(function () {
+                // View quiz info before starting
+                Route::get('/', [UserModuleQuizController::class, 'show'])->name('show');
+                
+                // Start a new quiz attempt
+                Route::post('/start', [UserModuleQuizController::class, 'start'])->name('start');
+                
+                // Take the quiz (active attempt)
+                Route::get('/take/{attempt}', [UserModuleQuizController::class, 'take'])->name('take');
+                
+                // Save answer during quiz (auto-save)
+                Route::post('/save-answer/{attempt}', [UserModuleQuizController::class, 'saveAnswer'])->name('save-answer');
+                
+                // Submit quiz for grading
+                Route::post('/submit/{attempt}', [UserModuleQuizController::class, 'submit'])->name('submit');
+                
+                // View quiz result
+                Route::get('/result/{attempt}', [UserModuleQuizController::class, 'result'])->name('result');
+                
+                // View quiz history (all attempts)
+                Route::get('/history', [UserModuleQuizController::class, 'history'])->name('history');
+                
+                // Auto-submit when time expires
+                Route::post('/auto-submit/{attempt}', [UserModuleQuizController::class, 'autoSubmit'])->name('auto-submit');
+            });
         });
     });
 
@@ -465,6 +493,20 @@ Route::post('videos/batch-refresh-urls', [App\Http\Controllers\Admin\VideoContro
     Route::get('quiz-attempts', [\App\Http\Controllers\Admin\QuizAttemptController::class, 'index'])->name('quiz-attempts.index');
     Route::get('quiz-attempts/{attempt}', [\App\Http\Controllers\Admin\QuizAttemptController::class, 'show'])->name('quiz-attempts.show');
     Route::put('quiz-attempts/{attempt}', [\App\Http\Controllers\Admin\QuizAttemptController::class, 'update'])->name('quiz-attempts.update');
+
+    // ===== MODULE QUIZ MANAGEMENT =====
+    Route::prefix('course-online/{courseOnline}/modules/{courseModule}/quiz')->name('module-quiz.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Admin\ModuleQuizController::class, 'index'])->name('index');
+        Route::get('/create', [\App\Http\Controllers\Admin\ModuleQuizController::class, 'create'])->name('create');
+        Route::post('/', [\App\Http\Controllers\Admin\ModuleQuizController::class, 'store'])->name('store');
+        Route::get('/{quiz}', [\App\Http\Controllers\Admin\ModuleQuizController::class, 'show'])->name('show');
+        Route::get('/{quiz}/edit', [\App\Http\Controllers\Admin\ModuleQuizController::class, 'edit'])->name('edit');
+        Route::put('/{quiz}', [\App\Http\Controllers\Admin\ModuleQuizController::class, 'update'])->name('update');
+        Route::delete('/{quiz}', [\App\Http\Controllers\Admin\ModuleQuizController::class, 'destroy'])->name('destroy');
+        Route::get('/{quiz}/attempts', [\App\Http\Controllers\Admin\ModuleQuizController::class, 'attempts'])->name('attempts');
+        Route::get('/{quiz}/statistics', [\App\Http\Controllers\Admin\ModuleQuizController::class, 'statistics'])->name('statistics');
+        Route::patch('/{quiz}/toggle-status', [\App\Http\Controllers\Admin\ModuleQuizController::class, 'toggleStatus'])->name('toggle-status');
+    });
 
     // ===== QUIZ ASSIGNMENT =====
     Route::get('quiz-assignments/create', [\App\Http\Controllers\Admin\QuizAssignmentController::class, 'create'])->name('quiz-assignments.create');

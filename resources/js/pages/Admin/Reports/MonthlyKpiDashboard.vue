@@ -147,7 +147,84 @@
                     </div>
                 </section>
 
-                <!-- 📈 SECTION 3: Learning Outcomes -->
+                <!-- � SECTTION 3: Online Course Analytics Overview -->
+                <section class="kpi-section online-course-analytics">
+                    <h2 class="section-title text-xl font-semibold text-white mb-6">�  Online Course Analytics Overview</h2>
+                    <div class="kpi-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+                        <div class="kpi-card bg-gray-800 border border-blue-700 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow hover:bg-blue-900/20">
+                            <div class="kpi-header flex items-center mb-4">
+                                <span class="kpi-icon text-2xl mr-3">💻</span>
+                                <span class="kpi-title text-sm font-medium text-blue-400">Online Courses</span>
+                            </div>
+                            <div class="kpi-value text-3xl font-bold text-blue-300">{{ kpiData.online_course_analytics?.delivery?.online_courses_delivered || 0 }}</div>
+                        </div>
+                        <div class="kpi-card bg-gray-800 border border-gray-600 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow hover:bg-gray-750">
+                            <div class="kpi-header flex items-center mb-4">
+                                <span class="kpi-icon text-2xl mr-3">📝</span>
+                                <span class="kpi-title text-sm font-medium text-gray-300">Enrollments</span>
+                            </div>
+                            <div class="kpi-value text-3xl font-bold text-white">{{ kpiData.online_course_analytics?.delivery?.online_enrollments || 0 }}</div>
+                        </div>
+                        <div class="kpi-card bg-gray-800 border border-green-700 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow hover:bg-green-900/20">
+                            <div class="kpi-header flex items-center mb-4">
+                                <span class="kpi-icon text-2xl mr-3">✅</span>
+                                <span class="kpi-title text-sm font-medium text-green-400">Completed</span>
+                            </div>
+                            <div class="kpi-value text-3xl font-bold text-green-300">{{ kpiData.online_course_analytics?.delivery?.online_completed || 0 }}</div>
+                        </div>
+                        <div class="kpi-card bg-gray-800 border border-purple-700 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow hover:bg-purple-900/20">
+                            <div class="kpi-header flex items-center mb-4">
+                                <span class="kpi-icon text-2xl mr-3">📊</span>
+                                <span class="kpi-title text-sm font-medium text-purple-400">Completion Rate</span>
+                            </div>
+                            <div class="kpi-value text-3xl font-bold text-purple-300">{{ kpiData.online_course_analytics?.delivery?.online_completion_rate || 0 }}%</div>
+                        </div>
+                        <div class="kpi-card bg-gray-800 border border-gray-600 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow hover:bg-gray-750">
+                            <div class="kpi-header flex items-center mb-4">
+                                <span class="kpi-icon text-2xl mr-3">👥</span>
+                                <span class="kpi-title text-sm font-medium text-gray-300">Active Learners</span>
+                            </div>
+                            <div class="kpi-value text-3xl font-bold text-white">{{ kpiData.online_course_analytics?.delivery?.active_online_learners || 0 }}</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 🎥 SECTION 4: Video Engagement Metrics -->
+                <section class="kpi-section video-engagement">
+                    <h2 class="section-title text-xl font-semibold text-white mb-6">🎥 Video Engagement Metrics</h2>
+                    <div class="kpi-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div class="kpi-card bg-gray-800 border border-blue-700 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow hover:bg-blue-900/20">
+                            <div class="kpi-header flex items-center mb-4">
+                                <span class="kpi-icon text-2xl mr-3">▶️</span>
+                                <span class="kpi-title text-sm font-medium text-blue-400">Videos Watched</span>
+                            </div>
+                            <div class="kpi-value text-3xl font-bold text-blue-300">{{ kpiData.online_course_analytics?.video_engagement?.total_videos_watched || 0 }}</div>
+                        </div>
+                        <div class="kpi-card bg-gray-800 border border-green-700 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow hover:bg-green-900/20">
+                            <div class="kpi-header flex items-center mb-4">
+                                <span class="kpi-icon text-2xl mr-3">✅</span>
+                                <span class="kpi-title text-sm font-medium text-green-400">Avg Completion</span>
+                            </div>
+                            <div class="kpi-value text-3xl font-bold text-green-300">{{ kpiData.online_course_analytics?.video_engagement?.avg_video_completion || 0 }}%</div>
+                        </div>
+                        <div class="kpi-card bg-gray-800 border border-gray-600 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow hover:bg-gray-750">
+                            <div class="kpi-header flex items-center mb-4">
+                                <span class="kpi-icon text-2xl mr-3">⏱️</span>
+                                <span class="kpi-title text-sm font-medium text-gray-300">Watch Time</span>
+                            </div>
+                            <div class="kpi-value text-3xl font-bold text-white">{{ kpiData.online_course_analytics?.video_engagement?.total_watch_time_hours || 0 }}h</div>
+                        </div>
+                        <div class="kpi-card bg-gray-800 border border-gray-600 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow hover:bg-gray-750">
+                            <div class="kpi-header flex items-center mb-4">
+                                <span class="kpi-icon text-2xl mr-3">🔄</span>
+                                <span class="kpi-title text-sm font-medium text-gray-300">Replays</span>
+                            </div>
+                            <div class="kpi-value text-3xl font-bold text-white">{{ kpiData.online_course_analytics?.video_engagement?.video_replay_count || 0 }}</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 📈 SECTION 5: Learning Outcomes -->
                 <section class="kpi-section learning-outcomes">
                     <h2 class="section-title text-xl font-semibold text-white mb-6">📈 Learning Outcomes</h2>
                     <div class="kpi-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -182,7 +259,42 @@
                     </div>
                 </section>
 
-                <!-- ⭐ SECTION 4: Course Quality & Feedback -->
+                <!-- 📚 SECTION 6: Online Module Progress -->
+                <section class="kpi-section module-progress">
+                    <h2 class="section-title text-xl font-semibold text-white mb-6">📚 Online Module Progress</h2>
+                    <div class="kpi-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div class="kpi-card bg-gray-800 border border-gray-600 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow hover:bg-gray-750">
+                            <div class="kpi-header flex items-center mb-4">
+                                <span class="kpi-icon text-2xl mr-3">📚</span>
+                                <span class="kpi-title text-sm font-medium text-gray-300">Total Modules</span>
+                            </div>
+                            <div class="kpi-value text-3xl font-bold text-white">{{ kpiData.online_course_analytics?.module_progress?.total_modules || 0 }}</div>
+                        </div>
+                        <div class="kpi-card bg-gray-800 border border-green-700 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow hover:bg-green-900/20">
+                            <div class="kpi-header flex items-center mb-4">
+                                <span class="kpi-icon text-2xl mr-3">✅</span>
+                                <span class="kpi-title text-sm font-medium text-green-400">Completed</span>
+                            </div>
+                            <div class="kpi-value text-3xl font-bold text-green-300">{{ kpiData.online_course_analytics?.module_progress?.completed_modules || 0 }}</div>
+                        </div>
+                        <div class="kpi-card bg-gray-800 border border-gray-600 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow hover:bg-gray-750">
+                            <div class="kpi-header flex items-center mb-4">
+                                <span class="kpi-icon text-2xl mr-3">👤</span>
+                                <span class="kpi-title text-sm font-medium text-gray-300">Avg Per User</span>
+                            </div>
+                            <div class="kpi-value text-3xl font-bold text-white">{{ kpiData.online_course_analytics?.module_progress?.avg_modules_per_user || 0 }}</div>
+                        </div>
+                        <div class="kpi-card bg-gray-800 border border-purple-700 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow hover:bg-purple-900/20">
+                            <div class="kpi-header flex items-center mb-4">
+                                <span class="kpi-icon text-2xl mr-3">📈</span>
+                                <span class="kpi-title text-sm font-medium text-purple-400">Completion Rate</span>
+                            </div>
+                            <div class="kpi-value text-3xl font-bold text-purple-300">{{ kpiData.online_course_analytics?.module_progress?.module_completion_rate || 0 }}%</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ⭐ SECTION 7: Course Quality & Feedback -->
                 <section class="kpi-section feedback-analysis">
                     <h2 class="section-title text-xl font-semibold text-white mb-6">⭐ Course Quality & Feedback</h2>
                     <div class="feedback-grid grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -222,7 +334,49 @@
                     </div>
                 </section>
 
-                <!-- 🏆 SECTION 5: Course Performance Analysis -->
+                <!-- ⏱️ SECTION 8: Learning Session Analytics -->
+                <section class="kpi-section session-analytics">
+                    <h2 class="section-title text-xl font-semibold text-white mb-6">⏱️ Learning Session Analytics</h2>
+                    <div class="kpi-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+                        <div class="kpi-card bg-gray-800 border border-gray-600 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow hover:bg-gray-750">
+                            <div class="kpi-header flex items-center mb-4">
+                                <span class="kpi-icon text-2xl mr-3">🎯</span>
+                                <span class="kpi-title text-sm font-medium text-gray-300">Total Sessions</span>
+                            </div>
+                            <div class="kpi-value text-3xl font-bold text-white">{{ kpiData.online_course_analytics?.session_analytics?.total_sessions || 0 }}</div>
+                        </div>
+                        <div class="kpi-card bg-gray-800 border border-blue-700 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow hover:bg-blue-900/20">
+                            <div class="kpi-header flex items-center mb-4">
+                                <span class="kpi-icon text-2xl mr-3">⏱️</span>
+                                <span class="kpi-title text-sm font-medium text-blue-400">Avg Duration</span>
+                            </div>
+                            <div class="kpi-value text-3xl font-bold text-blue-300">{{ kpiData.online_course_analytics?.session_analytics?.avg_session_duration_minutes || 0 }}m</div>
+                        </div>
+                        <div class="kpi-card bg-gray-800 border border-green-700 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow hover:bg-green-900/20">
+                            <div class="kpi-header flex items-center mb-4">
+                                <span class="kpi-icon text-2xl mr-3">👁️</span>
+                                <span class="kpi-title text-sm font-medium text-green-400">Attention Score</span>
+                            </div>
+                            <div class="kpi-value text-3xl font-bold text-green-300">{{ kpiData.online_course_analytics?.session_analytics?.avg_attention_score || 0 }}%</div>
+                        </div>
+                        <div class="kpi-card bg-gray-800 border border-gray-600 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow hover:bg-gray-750">
+                            <div class="kpi-header flex items-center mb-4">
+                                <span class="kpi-icon text-2xl mr-3">⏰</span>
+                                <span class="kpi-title text-sm font-medium text-gray-300">Learning Hours</span>
+                            </div>
+                            <div class="kpi-value text-3xl font-bold text-white">{{ kpiData.online_course_analytics?.session_analytics?.total_learning_hours || 0 }}h</div>
+                        </div>
+                        <div class="kpi-card bg-gray-800 border border-red-700 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow hover:bg-red-900/20">
+                            <div class="kpi-header flex items-center mb-4">
+                                <span class="kpi-icon text-2xl mr-3">⚠️</span>
+                                <span class="kpi-title text-sm font-medium text-red-400">Suspicious Activity</span>
+                            </div>
+                            <div class="kpi-value text-3xl font-bold text-red-300">{{ kpiData.online_course_analytics?.session_analytics?.suspicious_activity_count || 0 }}</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 🏆 SECTION 9: Course Performance Analysis -->
                 <section class="kpi-section performance-analysis">
                     <h2 class="section-title text-xl font-semibold text-white mb-6">🏆 Course Performance Analysis</h2>
                     <div class="performance-grid grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -338,7 +492,64 @@
                     </div>
                 </section>
 
-                <!-- 📈 SECTION 7: Monthly Engagement Trend -->
+                <!-- 🏆 SECTION 12: Online Course Top Performers -->
+                <section class="kpi-section online-top-performers">
+                    <h2 class="section-title text-xl font-semibold text-white mb-6">🏆 Online Course Top Performers</h2>
+                    <div class="performance-grid grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div class="performance-table bg-gray-800 border border-gray-600 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow">
+                            <h3 class="text-lg font-semibold text-white mb-2">🥇 Top Online Courses</h3>
+                            <p class="subtitle text-sm text-gray-300 mb-4">Based on completion rate & enrollment</p>
+                            <div class="table-container overflow-x-auto">
+                                <table class="performance-table-content w-full">
+                                    <thead>
+                                    <tr class="bg-gray-700 border-b border-gray-600">
+                                        <th class="px-4 py-3 text-left text-sm font-medium text-white">Course Name</th>
+                                        <th class="px-4 py-3 text-left text-sm font-medium text-white">Completion</th>
+                                        <th class="px-4 py-3 text-left text-sm font-medium text-white">Enrolled</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-600">
+                                    <tr v-for="course in kpiData.online_course_analytics?.top_performers?.top_online_courses || []" :key="course.id" class="table-row hover:bg-gray-700 transition-colors">
+                                        <td class="course-name px-4 py-3 text-sm text-white">{{ course.name }}</td>
+                                        <td class="completion px-4 py-3 text-sm text-green-400 font-semibold">{{ course.completion_rate }}%</td>
+                                        <td class="enrolled px-4 py-3 text-sm text-white">{{ course.total_enrolled }}</td>
+                                    </tr>
+                                    <tr v-if="!kpiData.online_course_analytics?.top_performers?.top_online_courses?.length">
+                                        <td colspan="3" class="no-data px-4 py-8 text-center text-gray-400">No data available</td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="performance-table bg-gray-800 border border-gray-600 rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow">
+                            <h3 class="text-lg font-semibold text-white mb-2">🌟 Top Online Learners</h3>
+                            <p class="subtitle text-sm text-gray-300 mb-4">Based on courses completed & progress</p>
+                            <div class="table-container overflow-x-auto">
+                                <table class="performance-table-content w-full">
+                                    <thead>
+                                    <tr class="bg-gray-700 border-b border-gray-600">
+                                        <th class="px-4 py-3 text-left text-sm font-medium text-white">User Name</th>
+                                        <th class="px-4 py-3 text-left text-sm font-medium text-white">Completed</th>
+                                        <th class="px-4 py-3 text-left text-sm font-medium text-white">Progress</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-600">
+                                    <tr v-for="user in kpiData.online_course_analytics?.top_performers?.top_online_learners || []" :key="user.id" class="table-row top-performer hover:bg-green-900/30 transition-colors">
+                                        <td class="user-name px-4 py-3 text-sm text-white">{{ user.name }}</td>
+                                        <td class="courses px-4 py-3 text-sm text-white">{{ user.courses_completed || 0 }}</td>
+                                        <td class="progress px-4 py-3 text-sm text-green-400 font-semibold">{{ user.avg_progress || 0 }}%</td>
+                                    </tr>
+                                    <tr v-if="!kpiData.online_course_analytics?.top_performers?.top_online_learners?.length">
+                                        <td colspan="3" class="no-data px-4 py-8 text-center text-gray-400">No data available</td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 📈 SECTION 13: Monthly Engagement Trend -->
                 <section class="kpi-section engagement-trends">
                     <h2 class="section-title text-xl font-semibold text-white mb-6">📈 Monthly Engagement Trend</h2>
                     <div class="trends-display">
@@ -405,6 +616,13 @@ export default {
             department_id: props.currentFilters.department_id || '',
             course_id: props.currentFilters.course_id || ''
         })
+
+        // Breadcrumbs for navigation
+        const breadcrumbs = computed(() => [
+            { label: 'Dashboard', href: route('dashboard') },
+            { label: 'Reports', href: route('admin.reports.index') },
+            { label: 'Monthly KPI Dashboard', href: null }
+        ])
 
         // ===============================================
         // 🎯 COMPLETELY FIXED SCREENSHOT METHOD
@@ -1303,7 +1521,7 @@ export default {
         })
 
         return {
-            loading, showFilters, filters, screenshotLoading,
+            loading, showFilters, filters, screenshotLoading, breadcrumbs,
             applyFilters, refreshData, exportCsv, formatDateTime,
             getTrendClass, getTrendArrow, generateDirectScreenshot, hasData
         }

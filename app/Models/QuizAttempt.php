@@ -9,9 +9,10 @@ class QuizAttempt extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['quiz_id', 'user_id', 'attempt_number', 'score', 'manual_score', 'total_score', 'passed', 'completed_at'];
+    protected $fillable = ['quiz_id', 'user_id', 'attempt_number', 'score', 'manual_score', 'total_score', 'passed', 'started_at', 'completed_at'];
 
     protected $casts = [
+        'started_at' => 'datetime',
         'completed_at' => 'datetime',
         'passed' => 'boolean',
         'created_at' => 'datetime',
@@ -37,6 +38,11 @@ class QuizAttempt extends Model
         }
 
         return $query;
+    }
+
+    public function scopeCompleted($query)
+    {
+        return $query->whereNotNull('completed_at');
     }
     public function answers()
     {
