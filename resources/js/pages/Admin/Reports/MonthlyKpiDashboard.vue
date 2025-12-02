@@ -1395,7 +1395,7 @@ export default {
                         <div class="table-row">
                             <div class="table-cell">${index + 1}. ${course.name}</div>
                             <div class="table-cell">${course.completion_rate}%</div>
-                            <div class="table-cell">${course.enrolled}</div>
+                            <div class="table-cell">${course.total_enrolled || 0}</div>
                         </div>
                     `).join('') || '<div class="table-row"><div class="table-cell">No data available</div><div class="table-cell">-</div><div class="table-cell">-</div></div>'}
                 </div>
@@ -1440,13 +1440,6 @@ export default {
         </div>
     </div>
 
-    <div class="report-footer">
-        <div class="footer-content">
-            <div class="footer-line"><strong>Report Period:</strong> ${props.kpiData.period?.period_name || 'Current Period'}</div>
-            <div class="footer-line"><strong>Generated:</strong> ${new Date().toLocaleString()}</div>
-            <div class="footer-line"><strong>System:</strong> Training Management Platform</div>
-        </div>
-    </div>
 </body>
 </html>`
         }

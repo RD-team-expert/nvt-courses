@@ -19,7 +19,7 @@
                         </Button>
                         <Button :as="'a'" :href="backUrl" variant="outline" size="lg">
                             <ArrowLeft class="mr-2 h-4 w-4" />
-                            Back to Dashboard
+                            Back to Dashboar
                         </Button>
                     </div>
                 </div>
@@ -618,6 +618,97 @@
                 </CardContent>
             </Card>
 
+            <!-- ✅ NEW: Online Course Top Performers -->
+            <Card class="mb-8">
+                <CardHeader>
+                    <CardTitle class="flex items-center text-2xl">
+                        <Trophy class="mr-3 h-6 w-6" />
+                        Online Course Top Performers
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <!-- Top Online Courses -->
+                        <Card>
+                            <CardHeader>
+                                <CardTitle class="flex items-center">
+                                    <Trophy class="mr-2 h-5 w-5 text-yellow-500" />
+                                    Top Online Courses
+                                </CardTitle>
+                                <CardDescription>Based on completion rate & enrollment</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Course</TableHead>
+                                            <TableHead>Completion</TableHead>
+                                            <TableHead>Enrolled</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        <TableRow v-if="!kpiData.online_course_analytics?.top_performers?.top_online_courses?.length">
+                                            <TableCell colspan="3" class="text-center text-muted-foreground">No data available</TableCell>
+                                        </TableRow>
+                                        <TableRow v-else v-for="(course, index) in (kpiData.online_course_analytics?.top_performers?.top_online_courses || []).slice(0, 5)" :key="course.id">
+                                            <TableCell>
+                                                <div class="flex items-center gap-2">
+                                                    <Badge variant="outline" class="text-xs">{{ index + 1 }}</Badge>
+                                                    <span class="font-medium">{{ course.name }}</span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Badge variant="default">{{ course.completion_rate }}%</Badge>
+                                            </TableCell>
+                                            <TableCell>{{ course.total_enrolled || 0 }}</TableCell>
+                                        </TableRow>
+                                    </TableBody>
+                                </Table>
+                            </CardContent>
+                        </Card>
+
+                        <!-- Top Online Learners -->
+                        <Card>
+                            <CardHeader>
+                                <CardTitle class="flex items-center">
+                                    <Users class="mr-2 h-5 w-5 text-blue-500" />
+                                    Top Online Learners
+                                </CardTitle>
+                                <CardDescription>Based on courses completed & progress</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>User</TableHead>
+                                            <TableHead>Completed</TableHead>
+                                            <TableHead>Progress</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        <TableRow v-if="!kpiData.online_course_analytics?.top_performers?.top_online_learners?.length">
+                                            <TableCell colspan="3" class="text-center text-muted-foreground">No data available</TableCell>
+                                        </TableRow>
+                                        <TableRow v-else v-for="(user, index) in (kpiData.online_course_analytics?.top_performers?.top_online_learners || []).slice(0, 5)" :key="user.id" class="bg-green-50">
+                                            <TableCell>
+                                                <div class="flex items-center gap-2">
+                                                    <Badge variant="outline" class="text-xs">{{ index + 1 }}</Badge>
+                                                    <span class="font-medium">{{ user.name }}</span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>{{ user.courses_completed || 0 }}</TableCell>
+                                            <TableCell>
+                                                <Badge variant="secondary">{{ user.avg_progress || 0 }}%</Badge>
+                                            </TableCell>
+                                        </TableRow>
+                                    </TableBody>
+                                </Table>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </CardContent>
+            </Card>
+
             <!-- Monthly Trend -->
             <Card class="mb-8">
                 <CardHeader>
@@ -627,29 +718,23 @@
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
                         <Card class="border-primary bg-primary/5">
-                            <CardContent class="p-6 text-center">
-                                <BarChart3 class="h-8 w-8 text-primary mx-auto mb-2" />
-                                <div class="text-sm text-muted-foreground mb-2">Current Month</div>
-                                <div class="text-4xl font-bold text-primary mb-2">{{ kpiData.engagement_trends?.current_month_engagement || 0 }}%</div>
-                                <div class="text-xs text-muted-foreground">{{ kpiData.period?.period_name }}</div>
+                            <CardContent class="p-8 text-center">
+                                <BarChart3 class="h-10 w-10 text-primary mx-auto mb-3" />
+                                <div class="text-sm font-medium text-muted-foreground mb-3">Current Month Engagement</div>
+                                <div class="text-5xl font-bold text-primary mb-3">{{ kpiData.engagement_trends?.current_month_engagement || 0 }}%</div>
+                                <div class="text-sm text-muted-foreground">{{ kpiData.period?.period_name || 'Current Period' }}</div>
                             </CardContent>
                         </Card>
 
-                        <div class="text-center">
-                            <div class="text-4xl mb-2">{{ getTrendArrow(kpiData.engagement_trends?.trend_direction) }}</div>
-                            <div class="text-sm font-medium text-muted-foreground capitalize">{{ kpiData.engagement_trends?.trend_direction || 'stable' }}</div>
+                        <div class="text-center py-8">
+                            <div class="text-6xl mb-4">{{ getTrendArrow(kpiData.engagement_trends?.trend_direction) }}</div>
+                            <div class="text-lg font-semibold text-foreground capitalize mb-2">{{ kpiData.engagement_trends?.trend_direction || 'stable' }}</div>
+                            <div class="text-sm text-muted-foreground">{{ Math.abs(kpiData.engagement_trends?.trend_percentage || 0) }}% change</div>
                         </div>
 
-                        <Card>
-                            <CardContent class="p-6 text-center">
-                                <Activity class="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                                <div class="text-sm text-muted-foreground mb-2">Previous Month</div>
-                                <div class="text-4xl font-bold text-foreground mb-2">{{ kpiData.engagement_trends?.previous_month_engagement || 0 }}%</div>
-                                <div class="text-xs text-muted-foreground">{{ kpiData.engagement_trends?.trend_percentage || 0 }}% change</div>
-                            </CardContent>
-                        </Card>
+                       
                     </div>
                 </CardContent>
             </Card>
@@ -657,15 +742,20 @@
             <!-- Report Footer -->
             <Card>
                 <CardContent class="p-6">
-                    <div class="bg-muted rounded-lg p-4 text-center space-y-2">
-                        <div class="text-sm">
-                            <span class="font-semibold">Report Period:</span> {{ kpiData.period?.period_name || 'Current Period' }}
-                        </div>
-                        <div class="text-sm">
-                            <span class="font-semibold">Generated:</span> {{ formatDateTime(new Date()) }}
-                        </div>
-                        <div class="text-sm">
-                            <span class="font-semibold">System:</span> Training Management Platform
+                    <div class="bg-muted rounded-lg p-6 space-y-3">
+                        <div class="text-center text-sm text-muted-foreground space-y-2">
+                            <div class="flex items-center justify-center gap-2">
+                                <span class="font-semibold text-foreground">Report Period:</span>
+                                <span>{{ kpiData.period?.period_name || 'Current Period' }}</span>
+                            </div>
+                            <div class="flex items-center justify-center gap-2">
+                                <span class="font-semibold text-foreground">Generated:</span>
+                                <span>{{ formatDateTime(new Date()) }}</span>
+                            </div>
+                            <div class="flex items-center justify-center gap-2">
+                                <span class="font-semibold text-foreground">System:</span>
+                                <span>Training Management Platform</span>
+                            </div>
                         </div>
                     </div>
                 </CardContent>
