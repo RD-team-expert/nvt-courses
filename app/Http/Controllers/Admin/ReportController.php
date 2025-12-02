@@ -1057,6 +1057,38 @@ class ReportController extends Controller
     }
 
     /**
+     * 🎯 NEW: Monthly KPI Screenshot Page
+     * Dedicated page for capturing clean screenshots of KPI reports
+     */
+    public function monthlyKpiScreenshot(Request $request)
+    {
+        try {
+            // Get filters from request with defaults
+            $month = $request->get('month', Carbon::now()->month);
+            $year = $request->get('year', Carbon::now()->year);
+            $filters = $request->only(['department_id', 'course_id', 'user_level_id']);
+
+            // Generate complete KPI data (same as dashboard)
+            $kpiData = $this->monthlyKpiService->generateCompleteKpiReport($month, $year, $filters);
+
+            // Get dropdown data for filters
+            $filterData = $this->getFilterDropdownData();
+
+            return Inertia::render('Admin/Reports/MonthlyKpiScreenshot', [
+                'kpiData' => $kpiData,
+                'currentFilters' => array_merge(['month' => $month, 'year' => $year], $filters),
+                'departments' => $filterData['departments'],
+                'courses' => $filterData['courses'],
+                'lastUpdated' => Carbon::now()->toDateTimeString()
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Monthly KPI Screenshot Error: ' . $e->getMessage());
+            return back()->with('error', 'Failed to load KPI screenshot page. Please try again.');
+        }
+    }
+
+    /**
      * 🎯 NEW: AJAX endpoint for real-time KPI data updates
      */
     public function getKpiData(Request $request)
@@ -1670,40 +1702,5 @@ class ReportController extends Controller
         }
 
         return $current ?? $default;
-    }
-    public function monthlyKpiScreenshot(Request $request)
-    {
-        try {
-            $month = $request->get('month', Carbon::now()->month);
-            $year = $request->get('year', Carbon::now()->year);
-            $filters = $request->only(['department_id', 'course_id', 'user_level_id']);
-
-
-
-            // Generate the KPI data using the same service
-            $kpiData = $this->monthlyKpiService->generateCompleteKpiReport($month, $year, $filters);
-
-            // Get filter data for display
-            $departments = Department::select('id', 'name')->orderBy('name')->get();
-            $courses = Course::select('id', 'name')->orderBy('name')->get();
-
-            return Inertia::render('Admin/Reports/MonthlyKpiScreenshot', [
-                'kpiData' => $kpiData,
-                'currentFilters' => [
-                    'month' => $month,
-                    'year' => $year,
-                    'department_id' => $filters['department_id'] ?? null,
-                    'course_id' => $filters['course_id'] ?? null,
-                ],
-                'departments' => $departments,
-                'courses' => $courses,
-                'lastUpdated' => now(),
-            ]);
-
-        } catch (\Exception $e) {
-
-
-            return back()->with('error', 'Failed to load KPI screenshot report. Please try again.');
-        }
     }
 }
