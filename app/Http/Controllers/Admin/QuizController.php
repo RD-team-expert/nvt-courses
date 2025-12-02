@@ -172,8 +172,9 @@ class QuizController extends Controller
                     'question_text' => $questionData['question_text'],
                     'type' => $questionData['type'],
                     'points' => $questionData['type'] !== 'text' ? ($questionData['points'] ?? 0) : 0,
-                    'options' => $questionData['type'] !== 'text' ? json_encode(array_filter($questionData['options'] ?? [], 'strlen')) : null,
-                    'correct_answer' => $questionData['type'] !== 'text' ? json_encode(array_filter($questionData['correct_answer'] ?? [], 'strlen')) : null,
+                    // Don't use json_encode - the model cast handles this automatically
+                    'options' => $questionData['type'] !== 'text' ? array_values(array_filter($questionData['options'] ?? [], 'strlen')) : null,
+                    'correct_answer' => $questionData['type'] !== 'text' ? array_values(array_filter($questionData['correct_answer'] ?? [], 'strlen')) : null,
                     'correct_answer_explanation' => $questionData['correct_answer_explanation'] ?? null,
                     'order' => $index + 1,
                 ]);
@@ -430,10 +431,11 @@ class QuizController extends Controller
                             'question_text' => $questionData['question_text'],
                             'type' => $questionData['type'],
                             'points' => $questionData['type'] !== 'text' ? ($questionData['points'] ?? 0) : 0,
+                            // Don't use json_encode - the model cast handles this automatically
                             'options' => $questionData['type'] !== 'text' ?
-                                json_encode(array_values(array_filter($questionData['options'] ?? [], 'strlen'))) : null,
+                                array_values(array_filter($questionData['options'] ?? [], 'strlen')) : null,
                             'correct_answer' => $questionData['type'] !== 'text' ?
-                                json_encode(array_values(array_filter($questionData['correct_answer'] ?? [], 'strlen'))) : null,
+                                array_values(array_filter($questionData['correct_answer'] ?? [], 'strlen')) : null,
                             'correct_answer_explanation' => $questionData['correct_answer_explanation'] ?? null,
                             'order' => $index + 1,
                         ]);
@@ -445,10 +447,11 @@ class QuizController extends Controller
                         'question_text' => $questionData['question_text'],
                         'type' => $questionData['type'],
                         'points' => $questionData['type'] !== 'text' ? ($questionData['points'] ?? 0) : 0,
+                        // Don't use json_encode - the model cast handles this automatically
                         'options' => $questionData['type'] !== 'text' ?
-                            json_encode(array_values(array_filter($questionData['options'] ?? [], 'strlen'))) : null,
+                            array_values(array_filter($questionData['options'] ?? [], 'strlen')) : null,
                         'correct_answer' => $questionData['type'] !== 'text' ?
-                            json_encode(array_values(array_filter($questionData['correct_answer'] ?? [], 'strlen'))) : null,
+                            array_values(array_filter($questionData['correct_answer'] ?? [], 'strlen')) : null,
                         'correct_answer_explanation' => $questionData['correct_answer_explanation'] ?? null,
                         'order' => $index + 1,
                     ]);

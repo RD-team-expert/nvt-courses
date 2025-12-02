@@ -360,6 +360,7 @@ class CourseOnlineController extends Controller
         $courseOnline->load([
             'creator',
             'modules.content.video',
+            'modules.quiz',
             'assignments.user',
         ]);
 
@@ -400,7 +401,19 @@ class CourseOnlineController extends Controller
                     'name' => $module->name,
                     'description' => $module->description,
                     'order_number' => $module->order_number,
+                    'has_quiz' => $module->has_quiz,
+                    'quiz_required' => $module->quiz_required,
+                    'quiz' => $module->quiz ? [
+                        'id' => $module->quiz->id,
+                        'title' => $module->quiz->title,
+                        'status' => $module->quiz->status,
+                    ] : null,
                     'content' => $module->content->map(function($content) {
+                        $streamingUrl = null;
+                        if ($content->video && $content->video->google_drive_url) {
+                            $streamingUrl = $this->googleDriveService->processUrl($content->video->google_drive_url);
+                        }
+                        
                         return [
                             'id' => $content->id,
                             'title' => $content->title,
@@ -409,7 +422,7 @@ class CourseOnlineController extends Controller
                                 'id' => $content->video->id,
                                 'name' => $content->video->name,
                                 'duration' => $content->video->duration,
-                                'streaming_url' => $this->googleDriveService->processUrl($content->video->google_drive_url),
+                                'streaming_url' => $streamingUrl,
                                 'thumbnail_url' => $content->video->thumbnail_url,
                             ] : null,
                             'pdf_name' => $content->pdf_name ?? 'PDF Document',
@@ -481,7 +494,7 @@ class CourseOnlineController extends Controller
                     'duration' => $video->duration,
                     'formatted_duration' => gmdate('H:i:s', $video->duration),
                     'google_drive_url' => $video->google_drive_url,
-                    'streaming_url' => $this->googleDriveService->processUrl($video->google_drive_url),
+                    'streaming_url' => $video->google_drive_url ? $this->googleDriveService->processUrl($video->google_drive_url) : null,
                     'thumbnail_url' => $video->thumbnail_url,
                 ];
             });

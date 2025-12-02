@@ -680,6 +680,30 @@ export default {
         // Create a reactive reference for server errors
         const serverErrors = ref({});
 
+        // Helper function to safely parse JSON that might be double-encoded
+        const safeParseJson = (value) => {
+            if (!value) return null;
+            if (Array.isArray(value)) return value;
+            if (typeof value === 'object') return Object.values(value);
+            if (typeof value === 'string') {
+                try {
+                    let parsed = JSON.parse(value);
+                    // Check if it's still a string (double-encoded)
+                    while (typeof parsed === 'string') {
+                        try {
+                            parsed = JSON.parse(parsed);
+                        } catch (e) {
+                            break;
+                        }
+                    }
+                    return Array.isArray(parsed) ? parsed : Object.values(parsed);
+                } catch (e) {
+                    return [value];
+                }
+            }
+            return [];
+        };
+
         // Helper function to safely process questions
         const processQuestions = (questions) => {
             if (!questions || !Array.isArray(questions)) {
@@ -719,19 +743,31 @@ export default {
                     };
                 }
 
+                // Process options - handle various formats including double-encoded JSON
                 let options = ['', ''];
-                if (questionItem.options && Array.isArray(questionItem.options)) {
-                    options = questionItem.options.map((option) =>
-                        typeof option === 'string' ? option : option?.option_text || ''
-                    );
-                    if (options.length < 2) options = [...options, '', ''].slice(0, 2);
+                if (questionItem.options) {
+                    const optionsArray = safeParseJson(questionItem.options) || [];
+                    options = optionsArray.map((option) => {
+                        if (typeof option === 'string') return option;
+                        if (option && typeof option === 'object' && option.option_text) return option.option_text;
+                        return '';
+                    });
+                    
+                    // Ensure we have at least 2 options
+                    while (options.length < 2) {
+                        options.push('');
+                    }
                 }
 
+                // Process correct_answer - handle various formats including double-encoded JSON
                 let correctAnswer = [];
-                if (questionItem.correct_answer && Array.isArray(questionItem.correct_answer)) {
-                    correctAnswer = questionItem.correct_answer.map((answer) =>
-                        typeof answer === 'string' ? answer : answer?.option_text || ''
-                    );
+                if (questionItem.correct_answer) {
+                    const correctArray = safeParseJson(questionItem.correct_answer) || [];
+                    correctAnswer = correctArray.map((answer) => {
+                        if (typeof answer === 'string') return answer;
+                        if (answer && typeof answer === 'object' && answer.option_text) return answer.option_text;
+                        return '';
+                    }).filter(ans => ans !== '');
                 }
 
                 return {
