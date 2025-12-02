@@ -4,18 +4,110 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 
 class QuizQuestion extends Model
 {
     use HasFactory;
 
     protected $fillable = ['quiz_id', 'question_text', 'type', 'points', 'options', 'correct_answer', 'order', 'correct_answer_explanation'];
+    
     protected $casts = [
-        'options' => 'array',
-        'correct_answer' => 'array',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
+
+    /**
+     * Get the options attribute - handles double-encoded JSON
+     */
+    protected function options(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value) {
+                return $this->decodeJsonValue($value);
+            },
+            set: function ($value) {
+                // If it's already an array, encode it once
+                if (is_array($value)) {
+                    return json_encode($value);
+                }
+                // If it's null, return null
+                if ($value === null) {
+                    return null;
+                }
+                // If it's a string, assume it's already JSON
+                return $value;
+            }
+        );
+    }
+
+    /**
+     * Get the correct_answer attribute - handles double-encoded JSON
+     */
+    protected function correctAnswer(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value) {
+                return $this->decodeJsonValue($value);
+            },
+            set: function ($value) {
+                // If it's already an array, encode it once
+                if (is_array($value)) {
+                    return json_encode($value);
+                }
+                // If it's null, return null
+                if ($value === null) {
+                    return null;
+                }
+                // If it's a string, assume it's already JSON
+                return $value;
+            }
+        );
+    }
+
+    /**
+     * Helper to decode potentially double-encoded JSON values
+     */
+    private function decodeJsonValue($value)
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        // If it's already an array, return it
+        if (is_array($value)) {
+            return $value;
+        }
+
+        // Try to decode the JSON
+        $decoded = $value;
+        $maxIterations = 5; // Prevent infinite loops
+        $iterations = 0;
+
+        while (is_string($decoded) && $iterations < $maxIterations) {
+            $iterations++;
+            $tryDecode = json_decode($decoded, true);
+            
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $decoded = $tryDecode;
+            } else {
+                // Can't decode further, break
+                break;
+            }
+        }
+
+        // Ensure we return an array or null
+        if (is_array($decoded)) {
+            return $decoded;
+        }
+
+        // If we still have a string, wrap it in an array
+        if (is_string($decoded) && !empty($decoded)) {
+            return [$decoded];
+        }
+
+        return [];
+    }
 
     /**
      * Get the quiz that owns the question.

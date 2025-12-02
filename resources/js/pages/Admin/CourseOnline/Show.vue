@@ -38,7 +38,8 @@ import {
     Brain,
     Timer,
     CalendarDays,
-    AlarmClock
+    AlarmClock,
+    ClipboardList
 } from 'lucide-vue-next'
 
 interface Assignment {
@@ -65,6 +66,13 @@ interface Module {
     video_count: number
     pdf_count: number
     estimated_duration: number
+    has_quiz: boolean
+    quiz_required: boolean
+    quiz?: {
+        id: number
+        title: string
+        status: string
+    }
 }
 
 interface Course {
@@ -501,7 +509,22 @@ const showAnalytics = () => {
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="flex space-x-2">
+                                        <div class="flex items-center space-x-2">
+                                            <!-- Quiz Badge -->
+                                            <Badge v-if="module.has_quiz" :variant="module.quiz?.status === 'published' ? 'default' : 'secondary'" class="mr-2">
+                                                <ClipboardList class="w-3 h-3 mr-1" />
+                                                Quiz
+                                            </Badge>
+                                            
+                                            <!-- Quiz Button -->
+                                            <Link :href="module.has_quiz && module.quiz 
+                                                ? route('admin.module-quiz.show', [course.id, module.id, module.quiz.id])
+                                                : route('admin.module-quiz.create', [course.id, module.id])">
+                                                <Button variant="outline" size="sm" :title="module.has_quiz ? 'Manage Quiz' : 'Add Quiz'">
+                                                    <ClipboardList class="w-4 h-4" />
+                                                </Button>
+                                            </Link>
+                                            
                                             <Link :href="route('admin.course-modules.show', [course.id, module.id])">
                                                 <Button variant="outline" size="sm">
                                                     View

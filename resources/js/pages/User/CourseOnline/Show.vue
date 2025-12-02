@@ -105,6 +105,18 @@ interface ModuleProgress {
     is_completed: boolean
 }
 
+interface QuizStatus {
+    has_quiz: boolean
+    quiz_required: boolean
+    quiz_id?: number
+    quiz_title?: string
+    passed: boolean
+    status: string
+    attempts_used: number
+    max_attempts: number
+    can_attempt: boolean
+}
+
 interface Module {
     id: number
     name: string
@@ -115,6 +127,7 @@ interface Module {
     is_unlocked: boolean
     progress: ModuleProgress
     content: Content[]
+    quiz_status?: QuizStatus
 }
 
 const props = defineProps<{
@@ -606,7 +619,7 @@ onMounted(() => {
                             'border-gray-200 bg-gray-50 dark:bg-gray-900': !module.is_unlocked
                         }"
                     >
-                        <Collapsible>
+                        <Collapsible :open="openModules.has(module.id)">
                             <CollapsibleTrigger
                                 @click="toggleModule(module.id)"
                                 class="w-full p-3 sm:p-4 text-left hover:bg-accent/50 transition-colors"
@@ -712,6 +725,66 @@ onMounted(() => {
 
                                         <!-- Action Arrow -->
                                         <ChevronRight v-if="content.is_unlocked" class="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                    </div>
+                                    
+                                    <!-- Module Quiz Section -->
+
+                                    <div v-if="module.quiz_status && module.quiz_status.has_quiz" class="mt-4 pt-4 border-t">
+                                        <!-- Clickable Quiz Link (when content is completed) -->
+                                        <Link 
+                                            v-if="module.progress.is_completed"
+                                            :href="route('courses-online.modules.quiz.show', { courseOnline: course.id, courseModule: module.id })"
+                                            class="flex items-center gap-3 p-3 rounded-lg transition-colors"
+                                            :class="{
+                                                'bg-green-100 hover:bg-green-200 dark:bg-green-900 dark:hover:bg-green-800': module.quiz_status.passed,
+                                                'bg-orange-100 hover:bg-orange-200 dark:bg-orange-900 dark:hover:bg-orange-800': !module.quiz_status.passed && module.quiz_status.can_attempt,
+                                                'bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700': !module.quiz_status.can_attempt
+                                            }"
+                                        >
+                                            <div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                                                 :class="{
+                                                    'bg-green-200 text-green-700 dark:bg-green-800 dark:text-green-300': module.quiz_status.passed,
+                                                    'bg-orange-200 text-orange-700 dark:bg-orange-800 dark:text-orange-300': !module.quiz_status.passed && module.quiz_status.can_attempt,
+                                                    'bg-gray-300 text-gray-500 dark:bg-gray-600 dark:text-gray-400': !module.quiz_status.can_attempt
+                                                }"
+                                            >
+                                                <CheckCircle v-if="module.quiz_status.passed" class="w-4 h-4" />
+                                                <Target v-else class="w-4 h-4" />
+                                            </div>
+                                            <div class="flex-1 min-w-0">
+                                                <div class="font-medium text-sm sm:text-base">Module Quiz</div>
+                                                <div class="text-xs sm:text-sm text-muted-foreground">
+                                                    <span v-if="module.quiz_status.passed">Passed</span>
+                                                    <span v-else-if="module.quiz_status.attempts_used > 0">
+                                                        {{ module.quiz_status.attempts_used }}/{{ module.quiz_status.max_attempts }} attempts used
+                                                    </span>
+                                                    <span v-else>{{ module.quiz_status.quiz_required ? 'Required to proceed' : 'Optional' }}</span>
+                                                </div>
+                                            </div>
+                                            <Badge v-if="module.quiz_status.quiz_required && !module.quiz_status.passed" variant="destructive" class="text-xs">
+                                                Required
+                                            </Badge>
+                                            <ChevronRight class="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                        </Link>
+
+                                        <!-- Disabled Quiz (when content is not completed) -->
+                                        <div 
+                                            v-else
+                                            class="flex items-center gap-3 p-3 rounded-lg bg-gray-100 dark:bg-gray-800 cursor-not-allowed opacity-60"
+                                        >
+                                            <div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-gray-300 text-gray-500 dark:bg-gray-600 dark:text-gray-400">
+                                                <Lock class="w-4 h-4" />
+                                            </div>
+                                            <div class="flex-1 min-w-0">
+                                                <div class="font-medium text-sm sm:text-base text-gray-600 dark:text-gray-400">Module Quiz</div>
+                                                <div class="text-xs sm:text-sm text-muted-foreground">
+                                                    Complete all content first ({{ module.progress.completed_content }}/{{ module.progress.total_content }})
+                                                </div>
+                                            </div>
+                                            <Badge variant="outline" class="text-xs border-gray-400 text-gray-600 dark:text-gray-400">
+                                                Locked
+                                            </Badge>
+                                        </div>
                                     </div>
                                 </div>
                             </CollapsibleContent>
