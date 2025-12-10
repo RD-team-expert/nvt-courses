@@ -1088,111 +1088,159 @@ class CourseOnlineReportController extends Controller
      */
     private function calculateUserQuizPerformance($userId, $courseId = null)
     {
-        // ===== REGULAR QUIZZES (via quiz_assignments) =====
-        $regularAssignedQuery = DB::table('quiz_assignments')
-            ->join('quizzes', 'quiz_assignments.quiz_id', '=', 'quizzes.id')
-            ->where('quiz_assignments.user_id', $userId)
-            ->where('quizzes.is_module_quiz', false)
-            ->select('quizzes.pass_threshold', 'quizzes.id as quiz_id');
+        $regularAssignedCount = 0;
+        $regularCompletedCount = 0;
+        $regularPassedCount = 0;
+        $regularAvgScore = 0;
+        $regularAssignedData = collect();
         
-        if ($courseId) {
-            $regularAssignedQuery->where('quizzes.course_online_id', $courseId);
-        }
+        $moduleAssignedCount = 0;
+        $moduleCompletedCount = 0;
+        $modulePassedCount = 0;
+        $moduleAvgScore = 0;
+        $moduleResults = collect();
+        $moduleIdsWithQuizzes = collect();
         
-        $regularAssignedData = $regularAssignedQuery->get();
-        $regularAssignedCount = $regularAssignedData->count();
-        
-        // Get completed regular quiz attempts
-        $regularAttemptsQuery = DB::table('quiz_attempts')
-            ->where('user_id', $userId)
-            ->whereNotNull('completed_at');
-        
-        if ($courseId) {
-            $regularQuizIds = DB::table('quizzes')
-                ->where('course_online_id', $courseId)
-                ->where('is_module_quiz', false)
-                ->pluck('id');
-            if ($regularQuizIds->isNotEmpty()) {
-                $regularAttemptsQuery->whereIn('quiz_id', $regularQuizIds);
-            }
-        } else {
-            $regularQuizIds = DB::table('quizzes')
-                ->where('is_module_quiz', false)
-                ->pluck('id');
-            if ($regularQuizIds->isNotEmpty()) {
-                $regularAttemptsQuery->whereIn('quiz_id', $regularQuizIds);
-            }
-        }
-        
-        $regularCompletedAttempts = $regularAttemptsQuery
-            ->join('quizzes', 'quiz_attempts.quiz_id', '=', 'quizzes.id')
-            ->select([
-                'quiz_attempts.quiz_id',
-                DB::raw('MAX(quiz_attempts.total_score) as best_score'),
-                DB::raw('MAX(quizzes.total_points) as total_points'),
-                DB::raw('MAX(quizzes.pass_threshold) as pass_threshold'),
-                DB::raw('MAX(CASE WHEN quiz_attempts.passed = 1 THEN 1 ELSE 0 END) as has_passed'),
-            ])
-            ->groupBy('quiz_attempts.quiz_id')
-            ->get();
-        
-        $regularCompletedCount = $regularCompletedAttempts->count();
-        $regularPassedCount = $regularCompletedAttempts->where('has_passed', 1)->count();
-        
-        // Calculate regular quiz scores
-        $regularScorePercentages = $regularCompletedAttempts->map(function ($attempt) {
-            if ($attempt->total_points > 0) {
-                return ($attempt->best_score / $attempt->total_points) * 100;
-            }
-            return 0;
-        });
-        
-        $regularAvgScore = $regularScorePercentages->count() > 0 
-            ? round($regularScorePercentages->avg(), 1)
-            : 0;
-        
-        // ===== MODULE QUIZZES (via module_quiz_results) =====
-        $moduleResultsQuery = DB::table('module_quiz_results')
-            ->where('user_id', $userId);
-        
-        if ($courseId) {
-            $moduleIds = DB::table('course_modules')
-                ->where('course_online_id', $courseId)
-                ->pluck('id');
-            if ($moduleIds->isNotEmpty()) {
-                $moduleResultsQuery->whereIn('module_id', $moduleIds);
-            }
-        }
-        
-        $moduleResults = $moduleResultsQuery->get();
-        $moduleAssignedCount = DB::table('course_modules')
+        // ===== CHECK IF COURSE HAS REGULAR QUIZZES =====
+        $hasRegularQuizzes = DB::table('quizzes')
+            ->where('is_module_quiz', false)
             ->when($courseId, function ($q) use ($courseId) {
                 return $q->where('course_online_id', $courseId);
             })
-            ->count();
+            ->exists();
         
-        $moduleCompletedCount = $moduleResults->count();
-        $modulePassedCount = $moduleResults->where('passed', true)->count();
+        // ===== CALCULATE REGULAR QUIZZES (only if they exist) =====
+        if ($hasRegularQuizzes) {
+            $regularAssignedQuery = DB::table('quiz_assignments')
+                ->join('quizzes', 'quiz_assignments.quiz_id', '=', 'quizzes.id')
+                ->where('quiz_assignments.user_id', $userId)
+                ->where('quizzes.is_module_quiz', false)
+                ->select('quizzes.pass_threshold', 'quizzes.id as quiz_id');
+            
+            if ($courseId) {
+                $regularAssignedQuery->where('quizzes.course_online_id', $courseId);
+            }
+            
+            $regularAssignedData = $regularAssignedQuery->get();
+            $regularAssignedCount = $regularAssignedData->count();
+            
+            // Get completed regular quiz attempts
+            if ($regularAssignedCount > 0) {
+                $regularAttemptsQuery = DB::table('quiz_attempts')
+                    ->where('user_id', $userId)
+                    ->whereNotNull('completed_at');
+                
+                if ($courseId) {
+                    $regularQuizIds = DB::table('quizzes')
+                        ->where('course_online_id', $courseId)
+                        ->where('is_module_quiz', false)
+                        ->pluck('id');
+                    if ($regularQuizIds->isNotEmpty()) {
+                        $regularAttemptsQuery->whereIn('quiz_id', $regularQuizIds);
+                    }
+                } else {
+                    $regularQuizIds = DB::table('quizzes')
+                        ->where('is_module_quiz', false)
+                        ->pluck('id');
+                    if ($regularQuizIds->isNotEmpty()) {
+                        $regularAttemptsQuery->whereIn('quiz_id', $regularQuizIds);
+                    }
+                }
+                
+                $regularCompletedAttempts = $regularAttemptsQuery
+                    ->join('quizzes', 'quiz_attempts.quiz_id', '=', 'quizzes.id')
+                    ->select([
+                        'quiz_attempts.quiz_id',
+                        DB::raw('MAX(quiz_attempts.total_score) as best_score'),
+                        DB::raw('MAX(quizzes.total_points) as total_points'),
+                        DB::raw('MAX(quizzes.pass_threshold) as pass_threshold'),
+                        DB::raw('MAX(CASE WHEN quiz_attempts.passed = 1 THEN 1 ELSE 0 END) as has_passed'),
+                    ])
+                    ->groupBy('quiz_attempts.quiz_id')
+                    ->get();
+                
+                $regularCompletedCount = $regularCompletedAttempts->count();
+                $regularPassedCount = $regularCompletedAttempts->where('has_passed', 1)->count();
+                
+                // Calculate regular quiz scores
+                $regularScorePercentages = $regularCompletedAttempts->map(function ($attempt) {
+                    if ($attempt->total_points > 0) {
+                        return ($attempt->best_score / $attempt->total_points) * 100;
+                    }
+                    return 0;
+                });
+                
+                $regularAvgScore = $regularScorePercentages->count() > 0 
+                    ? round($regularScorePercentages->avg(), 1)
+                    : 0;
+            }
+        }
         
-        $moduleAvgScore = $moduleResults->count() > 0 
-            ? round($moduleResults->avg('score_percentage'), 1)
-            : 0;
+        // ===== CHECK IF USER IS ASSIGNED TO COURSES WITH MODULE QUIZZES =====
+        // Get course IDs the user is assigned to
+        $userAssignedCourseIds = DB::table('course_online_assignments')
+            ->where('user_id', $userId)
+            ->when($courseId, function ($q) use ($courseId) {
+                return $q->where('course_online_id', $courseId);
+            })
+            ->pluck('course_online_id');
+        
+        // Only count modules that actually have quizzes (has_quiz = true) AND user is assigned to the course
+        $hasModuleQuizzes = false;
+        $moduleIdsWithQuizzes = collect();
+        
+        if ($userAssignedCourseIds->isNotEmpty()) {
+            $moduleIdsWithQuizzes = DB::table('course_modules')
+                ->where('has_quiz', true)
+                ->whereIn('course_online_id', $userAssignedCourseIds)
+                ->pluck('id');
+            
+            $hasModuleQuizzes = $moduleIdsWithQuizzes->isNotEmpty();
+        }
+        
+        // ===== CALCULATE MODULE QUIZZES (only if they exist) =====
+        if ($hasModuleQuizzes) {
+            $moduleResultsQuery = DB::table('module_quiz_results')
+                ->where('user_id', $userId)
+                ->whereIn('module_id', $moduleIdsWithQuizzes);
+            
+            $moduleResults = $moduleResultsQuery->get();
+            
+            // Only count modules that have quizzes AND user is assigned to the course
+            $moduleAssignedCount = $moduleIdsWithQuizzes->count();
+            
+            // Count unique modules completed (user may have multiple attempts per module)
+            $moduleCompletedCount = $moduleResults->unique('module_id')->count();
+            
+            // Count modules where user has passed (at least one passed attempt per module)
+            $modulePassedCount = $moduleResults->where('passed', true)->unique('module_id')->count();
+            
+            // Calculate average score from best attempts per module
+            $bestScoresPerModule = $moduleResults->groupBy('module_id')->map(function ($attempts) {
+                return $attempts->max('score_percentage');
+            });
+            
+            $moduleAvgScore = $bestScoresPerModule->count() > 0 
+                ? round($bestScoresPerModule->avg(), 1)
+                : 0;
+        }
         
         // ===== COMBINED CALCULATIONS =====
         $totalAssignedQuizzes = $regularAssignedCount + $moduleAssignedCount;
         $totalCompletedQuizzes = $regularCompletedCount + $moduleCompletedCount;
         $totalPassedQuizzes = $regularPassedCount + $modulePassedCount;
         
-        // Calculate average pass threshold from both regular and module quizzes
+        // Calculate average pass threshold from both regular and module quizzes (only if they exist)
         $allThresholds = collect();
         if ($regularAssignedData->isNotEmpty()) {
             $allThresholds = $allThresholds->merge($regularAssignedData->pluck('pass_threshold'));
         }
         
-        // Get module quiz thresholds
-        if ($moduleResults->isNotEmpty()) {
+        // Get module quiz thresholds from all assigned module quizzes (not just completed ones)
+        if ($moduleIdsWithQuizzes->isNotEmpty()) {
             $moduleQuizThresholds = DB::table('quizzes')
-                ->whereIn('id', $moduleResults->pluck('quiz_id'))
+                ->where('is_module_quiz', true)
+                ->whereIn('module_id', $moduleIdsWithQuizzes)
                 ->pluck('pass_threshold');
             $allThresholds = $allThresholds->merge($moduleQuizThresholds);
         }
