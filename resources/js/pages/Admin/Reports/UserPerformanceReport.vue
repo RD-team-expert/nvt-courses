@@ -50,7 +50,8 @@ import {
     BookOpen,
     Brain,
     Award,
-    BarChart3
+    BarChart3,
+    ClipboardCheck
 } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -123,6 +124,19 @@ const getCompletionRateColor = (rate) => {
     if (rate >= 40) return 'text-yellow-600'
     if (rate >= 20) return 'text-orange-600'
     return 'text-red-600'
+}
+
+// ✅ Quiz Performance Helper Functions
+const getQuizPerformanceColor = (score) => {
+    if (score >= 85) return 'text-green-600'
+    if (score >= 70) return 'text-yellow-600'
+    return 'text-red-600'
+}
+
+const getQuizPerformanceVariant = (score) => {
+    if (score >= 85) return 'default'
+    if (score >= 70) return 'secondary'
+    return 'destructive'
 }
 
 // Handle select changes
@@ -416,6 +430,12 @@ if (typeof window !== 'undefined') {
                                         Attention
                                     </div>
                                 </TableHead>
+                                <TableHead class="hidden xl:table-cell">
+                                    <div class="flex items-center" title="Measures quiz completion and passing standards across all assigned quizzes">
+                                        <ClipboardCheck class="mr-2 h-4 w-4" />
+                                        Quiz Performance
+                                    </div>
+                                </TableHead>
                                 <TableHead>
                                     <div class="flex items-center">
                                         <Target class="mr-2 h-4 w-4" />
@@ -427,7 +447,7 @@ if (typeof window !== 'undefined') {
                         </TableHeader>
                         <TableBody>
                             <TableRow v-if="users.data.length === 0">
-                                <TableCell colspan="8" class="text-center text-muted-foreground py-8">
+                                <TableCell colspan="9" class="text-center text-muted-foreground py-8">
                                     <div class="flex flex-col items-center">
                                         <Users class="h-12 w-12 text-muted-foreground mb-2" />
                                         No user performance records found
@@ -509,6 +529,24 @@ if (typeof window !== 'undefined') {
                                             {{ user.suspicious_sessions }} suspicious
                                         </div>
                                         <div v-else class="text-xs text-green-600">Clean record</div>
+                                    </div>
+                                </TableCell>
+
+                                <!-- Quiz Performance (Hidden on smaller screens) -->
+                                <TableCell class="hidden xl:table-cell">
+                                    <div v-if="user.quiz_performance?.assigned_quizzes > 0" class="space-y-1">
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-sm font-semibold" :class="getQuizPerformanceColor(user.quiz_performance.quiz_performance_score)">
+                                                {{ user.quiz_performance.quiz_performance_score }}%
+                                            </span>
+                                            <span>{{ user.quiz_performance.meets_standards ? '✅' : '❌' }}</span>
+                                        </div>
+                                        <div class="text-xs text-muted-foreground">
+                                            {{ user.quiz_performance.status_label }}
+                                        </div>
+                                    </div>
+                                    <div v-else class="text-sm text-muted-foreground">
+                                        No quizzes
                                     </div>
                                 </TableCell>
 
@@ -666,6 +704,52 @@ if (typeof window !== 'undefined') {
                                 <div class="p-4 bg-orange-50 dark:bg-orange-950 rounded-lg">
                                     <div class="text-2xl font-bold text-orange-600">{{ selectedUser.total_assignments - selectedUser.completed_assignments - selectedUser.in_progress_assignments }}</div>
                                     <div class="text-sm text-muted-foreground">Not Started</div>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <!-- Quiz Performance Section -->
+                    <Card v-if="selectedUser?.quiz_performance?.assigned_quizzes > 0">
+                        <CardHeader>
+                            <CardTitle class="text-base flex items-center">
+                                <ClipboardCheck class="mr-2 h-4 w-4" />
+                                Quiz Performance
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                                <div class="text-center p-4 bg-blue-50 dark:bg-blue-950 rounded-lg">
+                                    <div class="text-2xl font-bold text-blue-600">
+                                        {{ selectedUser.quiz_performance.completed_quizzes }}/{{ selectedUser.quiz_performance.assigned_quizzes }}
+                                    </div>
+                                    <div class="text-sm text-muted-foreground">Quizzes Completed</div>
+                                </div>
+                                <div class="text-center p-4 bg-green-50 dark:bg-green-950 rounded-lg">
+                                    <div class="text-2xl font-bold text-green-600">
+                                        {{ selectedUser.quiz_performance.passing_rate }}%
+                                    </div>
+                                    <div class="text-sm text-muted-foreground">Passing Rate</div>
+                                </div>
+                                <div class="text-center p-4 bg-purple-50 dark:bg-purple-950 rounded-lg">
+                                    <div class="text-2xl font-bold text-purple-600">
+                                        {{ selectedUser.quiz_performance.avg_quiz_score }}%
+                                    </div>
+                                    <div class="text-sm text-muted-foreground">Avg Score</div>
+                                </div>
+                                <div class="text-center p-4 rounded-lg" :class="{
+                                    'bg-green-50 dark:bg-green-950': selectedUser.quiz_performance.meets_standards,
+                                    'bg-red-50 dark:bg-red-950': !selectedUser.quiz_performance.meets_standards
+                                }">
+                                    <div class="text-2xl font-bold" :class="{
+                                        'text-green-600': selectedUser.quiz_performance.meets_standards,
+                                        'text-red-600': !selectedUser.quiz_performance.meets_standards
+                                    }">
+                                        {{ selectedUser.quiz_performance.quiz_performance_score }}%
+                                    </div>
+                                    <div class="text-sm text-muted-foreground">
+                                        {{ selectedUser.quiz_performance.meets_standards ? '✅ Meets Standard' : '❌ Needs Improvement' }}
+                                    </div>
                                 </div>
                             </div>
                         </CardContent>

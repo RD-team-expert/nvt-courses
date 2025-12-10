@@ -420,7 +420,7 @@
         <div class="help-section">
             <p><strong>Questions about this course? 🤝</strong></p>
             <p>Our team is here to help! If you have any questions about the course content, schedule, or enrollment process, please reach out:</p>
-            <p><a href="mailto:harry@pneunited.com" style="color: #3b82f6; font-weight: 600;">harry@pneunited.com</a></p>
+            <p><a href="mailto:thedevelopmentzone@onepne.com" style="color: #3b82f6; font-weight: 600;">thedevelopmentzone@onepne.com</a></p>
             <p><small>We typically respond within 2 hours during business hours</small></p>
         </div>
 
@@ -430,18 +430,20 @@
 
         <div class="signature">
             <p class="name">Harry Prescott</p>
-            <p class="title">Learning & Development Instructor<br>
-                The Development Zone Department</p>
-            <p style="color: #3b82f6; margin-top: 10px;">📧 harry@pneunited.com</p>
+            <p class="title">Director Of Training And Development<br>
+               The Training And Development Department
+</p>
+            <p style="color: #3b82f6; margin-top: 10px;">📧 thedevelopmentzone@onepne.com</p>
         </div>
     </div>
 
     <div class="footer">
-        <p>© {{ date('Y') }} The Development Zone Department | Empowering Growth Through Learning</p>
+        <p>© {{ date('Y') }} The Training And Development Department
+ | Empowering Growth Through Learning</p>
         <p>This public course announcement was sent to <a href="mailto:{{ $userEmail }}">{{ $userEmail }}</a></p>
         <p style="margin-top: 15px;">
             <a href="{{ config('app.url') }}">Visit our Learning Portal</a> |
-            <a href="mailto:harry@pneunited.com">Contact Support</a>
+            <a href="mailto:thedevelopmentzone@onepne.com">Contact Support</a>
         </p>
     </div>
 </div>

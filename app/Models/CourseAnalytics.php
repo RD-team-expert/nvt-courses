@@ -83,6 +83,7 @@ class CourseAnalytics extends Model
         // Calculate average session duration from learning sessions
         $avgSessionDuration = LearningSession::where('course_online_id', $courseId)
             ->whereNotNull('session_end')
+            ->where('total_duration_minutes', '>', 0)
             ->avg('total_duration_minutes');
         $this->average_session_duration_minutes = $avgSessionDuration ? round($avgSessionDuration) : 0;
 

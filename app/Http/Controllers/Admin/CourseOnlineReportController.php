@@ -415,14 +415,11 @@ class CourseOnlineReportController extends Controller
                     ? round(($assignmentStats->completed_assignments / $assignmentStats->total_assignments) * 100, 1)
                     : 0;
 
-                // ✅ Get quiz performance for this user
-                $quizData = $this->getUserQuizPerformance($user->id, $filters['course_id'] ?? null);
+                // ✅ Get comprehensive quiz performance for this user
+                $quizPerformance = $this->calculateUserQuizPerformance($user->id, $filters['course_id'] ?? null);
                 
-                // ✅ Calculate performance score with quiz integration
-                $performanceScore = $avgSimulatedAttention;
-                if ($quizData && $quizData->highest_score) {
-                    $performanceScore += $quizData->highest_score * 0.3; // 30% weight for quiz
-                }
+                // ✅ Calculate performance score with quiz integration (25% weight for quiz)
+                $quizBoost = $quizPerformance['quiz_performance_score'] * 0.25;
 
                 $performanceData = [
                     'id' => $user->id,
@@ -442,13 +439,13 @@ class CourseOnlineReportController extends Controller
                     'performance_rating' => $this->calculateUserPerformanceRating(
                         $completionRate,
                         $assignmentStats->avg_progress ?? 0,
-                        $performanceScore, // ✅ Use quiz-boosted score
+                        $avgSimulatedAttention + $quizBoost, // ✅ Use quiz-boosted score
                         $suspiciousSessions,
                         $totalSessions
                     ),
                     'risk_level' => $this->calculateRiskLevel($suspiciousSessions, $totalSessions),
-                    'quiz_highest_score' => $quizData->highest_score ?? null,
-                    'quiz_attempts' => $quizData->attempts ?? 0,
+                    // ✅ New comprehensive quiz performance data
+                    'quiz_performance' => $quizPerformance,
                 ];
 
 
@@ -1065,6 +1062,118 @@ class CourseOnlineReportController extends Controller
         return 'No Risk';
     }
 
+    /**
+     * 📊 Calculate comprehensive quiz performance for a user
+     * 
+     * Components (weighted):
+     * - Completion Rate: 40% (completed quizzes / assigned quizzes)
+     * - Passing Rate: 40% (passed quizzes / completed quizzes)  
+     * - Average Score: 20% (average percentage across all completed quizzes)
+     * 
+     * Standards:
+     * - Meets Standards: Completion ≥90%, Passing ≥80%, Avg Score ≥80%
+     */
+    private function calculateUserQuizPerformance($userId, $courseId = null)
+    {
+        // Get assigned quizzes count
+        $assignedQuery = DB::table('quiz_assignments')
+            ->where('user_id', $userId);
+        
+        if ($courseId) {
+            $quizIds = DB::table('quizzes')
+                ->where('course_online_id', $courseId)
+                ->pluck('id');
+            if ($quizIds->isNotEmpty()) {
+                $assignedQuery->whereIn('quiz_id', $quizIds);
+            }
+        }
+        
+        $assignedQuizzes = $assignedQuery->count();
+        
+        // Get completed attempts (one per quiz - best attempt)
+        $attemptsQuery = DB::table('quiz_attempts')
+            ->where('user_id', $userId)
+            ->whereNotNull('completed_at');
+        
+        if ($courseId) {
+            $quizIds = DB::table('quizzes')
+                ->where('course_online_id', $courseId)
+                ->pluck('id');
+            if ($quizIds->isNotEmpty()) {
+                $attemptsQuery->whereIn('quiz_id', $quizIds);
+            }
+        }
+        
+        // Get unique completed quizzes with their best scores
+        $completedAttempts = $attemptsQuery
+            ->join('quizzes', 'quiz_attempts.quiz_id', '=', 'quizzes.id')
+            ->select([
+                'quiz_attempts.quiz_id',
+                DB::raw('MAX(quiz_attempts.total_score) as best_score'),
+                DB::raw('MAX(quizzes.total_points) as total_points'),
+                DB::raw('MAX(quizzes.pass_threshold) as pass_threshold'),
+                DB::raw('MAX(CASE WHEN quiz_attempts.passed = 1 THEN 1 ELSE 0 END) as has_passed'),
+            ])
+            ->groupBy('quiz_attempts.quiz_id')
+            ->get();
+        
+        $completedQuizzes = $completedAttempts->count();
+        $passedQuizzes = $completedAttempts->where('has_passed', 1)->count();
+        
+        // Calculate average score percentage
+        $scorePercentages = $completedAttempts->map(function ($attempt) {
+            if ($attempt->total_points > 0) {
+                return ($attempt->best_score / $attempt->total_points) * 100;
+            }
+            return 0;
+        });
+        
+        $avgQuizScore = $scorePercentages->count() > 0 
+            ? round($scorePercentages->avg(), 1)
+            : 0;
+        
+        // Calculate rates
+        $completionRate = $assignedQuizzes > 0 
+            ? round(($completedQuizzes / $assignedQuizzes) * 100, 1) 
+            : 0;
+        
+        $passingRate = $completedQuizzes > 0 
+            ? round(($passedQuizzes / $completedQuizzes) * 100, 1) 
+            : 0;
+        
+        // Calculate weighted quiz performance score
+        // Completion Rate: 40%, Passing Rate: 40%, Avg Score: 20%
+        $quizPerformanceScore = ($completionRate * 0.4) + ($passingRate * 0.4) + ($avgQuizScore * 0.2);
+        $quizPerformanceScore = round(min(100, max(0, $quizPerformanceScore)), 1);
+        
+        // Determine if meets standards
+        $meetsStandards = $completionRate >= 90 && $passingRate >= 80 && $avgQuizScore >= 80;
+        
+        // Determine status label
+        $statusLabel = $this->getQuizStatusLabel($quizPerformanceScore);
+        
+        return [
+            'assigned_quizzes' => $assignedQuizzes,
+            'completed_quizzes' => $completedQuizzes,
+            'passed_quizzes' => $passedQuizzes,
+            'completion_rate' => $completionRate,
+            'passing_rate' => $passingRate,
+            'avg_quiz_score' => $avgQuizScore,
+            'quiz_performance_score' => $quizPerformanceScore,
+            'meets_standards' => $meetsStandards,
+            'status_label' => $statusLabel,
+        ];
+    }
+
+    /**
+     * Get quiz status label based on performance score
+     */
+    private function getQuizStatusLabel($score)
+    {
+        if ($score >= 85) return 'Strong';
+        if ($score >= 70) return 'Average';
+        return 'Needs Improvement';
+    }
 
     /**
      * 📊 Export Learning Sessions Report
@@ -1215,12 +1324,16 @@ class CourseOnlineReportController extends Controller
 
             $users = $query->get();
 
-            // ✅ FIXED: Headers for your existing service
+            // ✅ FIXED: Headers for your existing service with quiz performance
             $headers = [
                 'User ID', 'User Name', 'Email', 'Employee Code', 'Department',
                 'Total Assignments', 'Completed Assignments', 'Completion Rate %', 'Average Progress %',
                 'Total Sessions', 'Total Learning Hours', 'Average Attention Score', 'Suspicious Sessions',
-                'Engagement Level', 'Performance Rating', 'Risk Level'
+                'Engagement Level', 'Performance Rating', 'Risk Level',
+                // Quiz Performance Columns
+                'Quiz Assigned', 'Quiz Completed', 'Quiz Passed', 
+                'Quiz Completion Rate %', 'Quiz Passing Rate %', 'Avg Quiz Score %',
+                'Quiz Performance Score', 'Quiz Meets Standards'
             ];
 
             // Process user performance data
@@ -1289,6 +1402,9 @@ class CourseOnlineReportController extends Controller
                     ? round(($assignmentStats->completed_assignments / $assignmentStats->total_assignments) * 100, 1)
                     : 0;
 
+                // ✅ Get comprehensive quiz performance for export
+                $quizPerformance = $this->calculateUserQuizPerformance($user->id, $filters['course_id'] ?? null);
+
                 $exportData[] = [
                     $user->id,
                     $user->name,
@@ -1312,6 +1428,15 @@ class CourseOnlineReportController extends Controller
                         $totalSessions
                     ),
                     $this->calculateRiskLevel($suspiciousSessions, $totalSessions),
+                    // Quiz Performance Data
+                    $quizPerformance['assigned_quizzes'],
+                    $quizPerformance['completed_quizzes'],
+                    $quizPerformance['passed_quizzes'],
+                    $quizPerformance['completion_rate'],
+                    $quizPerformance['passing_rate'],
+                    $quizPerformance['avg_quiz_score'],
+                    $quizPerformance['quiz_performance_score'],
+                    $quizPerformance['meets_standards'] ? 'Yes' : 'No',
                 ];
             }
 

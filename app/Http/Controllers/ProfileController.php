@@ -14,12 +14,12 @@ class ProfileController extends Controller
     {
         $user = Auth::user()->load([
             'department',
-            'level',
+            'userLevel',
             'managerRoles.department',
-            'directReports.department',
-            'directReports.level',
+            'directReports.managedUser.department',
+            'directReports.managedUser.userLevel',
             'managers.department',
-            'managers.level'
+            'managers.userLevel'
         ]);
 
         // Get user's evaluations
@@ -72,11 +72,11 @@ class ProfileController extends Controller
                     'name' => $user->department->name,
                     'code' => $user->department->code,
                 ] : null,
-                'level' => $user->level ? [
-                    'id' => $user->level->id,
-                    'code' => $user->level->code,
-                    'name' => $user->level->name,
-                    'hierarchy_level' => $user->level->hierarchy_level,
+                'level' => $user->userLevel ? [
+                    'id' => $user->userLevel->id,
+                    'code' => $user->userLevel->code,
+                    'name' => $user->userLevel->name,
+                    'hierarchy_level' => $user->userLevel->hierarchy_level,
                 ] : null,
                 'direct_manager' => $directManager ? [
                     'id' => $directManager->id,
@@ -97,21 +97,22 @@ class ProfileController extends Controller
                     'start_date' => $role->start_date?->toDateString(),
                 ];
             }),
-            'directReports' => $user->directReports->map(function ($report) {
-                return [
+            'directReports' => $user->directReports->map(function ($role) {
+                $report = $role->managedUser;
+                return $report ? [
                     'id' => $report->id,
                     'name' => $report->name,
                     'email' => $report->email,
-                    'level' => $report->level->code ?? null,
+                    'level' => $report->userLevel->code ?? null,
                     'department' => $report->department->name ?? null,
-                ];
-            }),
+                ] : null;
+            })->filter(),
             'managers' => $user->managers->map(function ($manager) {
                 return [
                     'id' => $manager->id,
                     'name' => $manager->name,
                     'email' => $manager->email,
-                    'level' => $manager->level->code ?? null,
+                    'level' => $manager->userLevel->code ?? null,
                     'department' => $manager->department->name ?? null,
                 ];
             }),

@@ -9,9 +9,8 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Mail;
 
-class SendCourseCreationEmails implements ShouldQueue
+class SendCourseCreationEmails 
 {
-    use Queueable;
     protected $course;
     /**
      * Create a new job instance.

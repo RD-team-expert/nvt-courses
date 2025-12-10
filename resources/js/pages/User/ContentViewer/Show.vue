@@ -27,6 +27,7 @@ import {
     SkipBack,
     SkipForward,
     Volume2,
+    VolumeX,
     Maximize,
     CheckCircle,
     Clock,
@@ -152,12 +153,12 @@ const safeUserProgress = computed(() => props.userProgress || {
 })
 const safeNavigation = computed(() => props.navigation || { previous: null, next: null })
 
-// ✅ Fix breadcrumbs with null safety
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'My Courses', href: '/courses-online' },
-    { title: safeCourse.value.name, href: `/courses-online/${safeCourse.value.id}` },
-    { title: props.content.title, href: '#' }
-]
+// ✅ Fix breadcrumbs with null safety - must be computed for reactivity
+const breadcrumbs = computed(() => [
+    { name: 'My Courses', href: '/courses-online' },
+    { name: safeCourse.value.name, href: `/courses-online/${safeCourse.value.id}` },
+    { name: props.content.title, href: '#' }
+])
 
 // ========== VIDEO STATE ==========
 const videoElement = ref<HTMLVideoElement | null>(null)
@@ -165,6 +166,8 @@ const isPlaying = ref(false)
 const currentTime = ref(0)
 const duration = ref(0)
 const volume = ref(1)
+const previousVolume = ref(1)  // ✅ Store previous volume for mute toggle
+const isMuted = ref(false)     // ✅ Track mute state
 const isFullscreen = ref(false)
 const isVideoLoading = ref(true)
 const isVideoReady = ref(false)
@@ -194,6 +197,7 @@ const completionPercentage = ref(safeUserProgress.value.completion_percentage ||
 const isCompleted = ref(safeUserProgress.value.is_completed || false)
 const timeSpent = ref(safeUserProgress.value.time_spent || 0)
 const isCreatingSession = ref(false)  // ✅ NEW: Prevent duplicate session creation
+const sessionElapsedSeconds = ref(0)  // ✅ NEW: Real-time session elapsed time in seconds
 
 // ✅ NEW: Skip/Seek Tracking Variables
 const totalSkipCount = ref(0)
@@ -211,8 +215,15 @@ const lastCurrentTime = ref(0)
 // ========== COMPUTED PROPERTIES ==========
 const formattedCurrentTime = computed(() => formatTime(currentTime.value))
 const formattedDuration = computed(() => formatTime(duration.value))
-const formattedTimeSpent = computed(() => formatTime(timeSpent.value * 60))
-const formattedPdfReadingTime = computed(() => formatTime(pdfReadingTime.value))
+// ✅ FIXED: Show real-time session elapsed time + saved time from DB
+const formattedTimeSpent = computed(() => {
+    const totalSeconds = (timeSpent.value * 60) + sessionElapsedSeconds.value
+    return formatTime(totalSeconds)
+})
+const formattedPdfReadingTime = computed(() => {
+    const totalSeconds = pdfReadingTime.value + sessionElapsedSeconds.value
+    return formatTime(totalSeconds)
+})
 const formattedEstimatedTime = computed(() => formatTime(estimatedReadingTime.value * 60))
 
 const progressPercentage = computed(() => {
@@ -566,28 +577,13 @@ const togglePlay = async () => {
     }
 }
 
-// ✅ Enhanced with skip/seek tracking
+// ✅ Seek function (tracking is handled by onVideoSeeked event)
 const seek = (seconds: number) => {
     if (!videoElement.value) return
 
-    const oldTime = currentTime.value
     const newTime = Math.max(0, Math.min(duration.value, seconds))
-
     videoElement.value.currentTime = newTime
-
-    // ✅ Track seeking behavior
-    const timeDiff = Math.abs(newTime - oldTime)
-    if (timeDiff > 5) { // Only count significant seeks (>5 seconds)
-        seekCountSinceLastHeartbeat.value++
-        totalSeekCount.value++
-
-        // console.log('🔍 Seek detected:', {
-        //     from: oldTime,
-        //     to: newTime,
-        //     diff: timeDiff,
-        //     totalSeeks: totalSeekCount.value
-        // })
-    }
+    // ✅ REMOVED: Duplicate seek tracking - onVideoSeeked event handles this
 }
 
 // ✅ Enhanced with skip tracking
@@ -610,6 +606,26 @@ const setVolume = (newVolume: number) => {
     volume.value = Math.max(0, Math.min(1, newVolume))
     if (videoElement.value) {
         videoElement.value.volume = volume.value
+    }
+    // ✅ Update mute state based on volume
+    isMuted.value = volume.value === 0
+}
+
+// ✅ NEW: Toggle mute function
+const toggleMute = () => {
+    if (!videoElement.value) return
+    
+    if (isMuted.value) {
+        // Unmute - restore previous volume
+        volume.value = previousVolume.value > 0 ? previousVolume.value : 0.5
+        videoElement.value.volume = volume.value
+        isMuted.value = false
+    } else {
+        // Mute - save current volume and set to 0
+        previousVolume.value = volume.value
+        volume.value = 0
+        videoElement.value.volume = 0
+        isMuted.value = true
     }
 }
 
@@ -976,6 +992,14 @@ onMounted(async () => {
         }
     }, 600000)  // ✅ CHANGED: 10 minutes (was 180000 = 3 minutes) - reduces API calls by 70%
 
+    // ✅ NEW: Real-time session elapsed time tracking (every second)
+    sessionStartTime.value = Date.now()
+    const sessionTimeInterval = setInterval(() => {
+        if (sessionStartTime.value) {
+            sessionElapsedSeconds.value = Math.floor((Date.now() - sessionStartTime.value) / 1000)
+        }
+    }, 1000)  // Update every second for live Time Spent display
+
     // ✅ IMPROVED: Multiple cleanup handlers for reliability
    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
     // console.log('🚨 beforeunload triggered', {
@@ -1062,6 +1086,7 @@ onMounted(async () => {
         // End session before unmounting
         endSession()
         clearInterval(progressInterval)
+        clearInterval(sessionTimeInterval)  // ✅ NEW: Clear session time interval
 
         // Cleanup video event listener
         if (videoElement.value) {
@@ -1177,6 +1202,9 @@ watch(currentPage, (newPage) => {
                                 <!-- Video Element -->
                                 <video ref="videoElement" :src="video?.streaming_url"
                                     :poster="video?.thumbnail_url || ''" class="w-full h-full" preload="metadata"
+                                    controlsList="nodownload nofullscreen noremoteplayback"
+                                    disablePictureInPicture
+                                    @contextmenu.prevent
                                     @loadstart="onLoadStart" @loadeddata="onLoadedData" @canplay="onCanPlay"
                                     @waiting="onWaiting" @playing="onPlaying" @loadedmetadata="onLoadedMetadata"
                                     @timeupdate="onTimeUpdate" @play="onPlay" @pause="onPause" @ended="onEnded"
@@ -1232,7 +1260,12 @@ watch(currentPage, (newPage) => {
 
                                         <div class="flex items-center gap-2 sm:gap-4">
                                             <div class="flex items-center gap-2">
-                                                <Volume2 class="h-4 w-4" />
+                                                <!-- ✅ FIXED: Added clickable mute button -->
+                                                <Button @click="toggleMute" variant="ghost" size="sm"
+                                                    class="text-white hover:bg-white/20 p-1">
+                                                    <VolumeX v-if="isMuted" class="h-4 w-4" />
+                                                    <Volume2 v-else class="h-4 w-4" />
+                                                </Button>
                                                 <input type="range" :value="volume" min="0" max="1" step="0.1"
                                                     @input="setVolume(Number(($event.target as HTMLInputElement).value))"
                                                     class="w-20 h-1 bg-white/30 rounded-lg appearance-none cursor-pointer" />
@@ -1536,10 +1569,10 @@ watch(currentPage, (newPage) => {
                 <div class="w-full sm:flex-1">
                     <Button v-if="safeNavigation.previous" @click="navigateContent(safeNavigation.previous.id)"
                         variant="outline"
-                        class="w-full sm:max-w-xs flex items-center gap-3 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-colors">
-                        <SkipBack class="h-4 w-4" />
-                        <div class="text-left">
-                            <div class="font-medium text-sm">{{ safeNavigation.previous.title }}</div>
+                        class="w-full sm:max-w-xs flex items-center gap-3 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-colors overflow-hidden">
+                        <SkipBack class="h-4 w-4 flex-shrink-0" />
+                        <div class="text-left min-w-0 flex-1">
+                            <div class="font-medium text-sm truncate">{{ safeNavigation.previous.title }}</div>
                             <div class="text-xs text-muted-foreground">{{
                                 safeNavigation.previous.content_type.toUpperCase() }}</div>
                         </div>
@@ -1549,17 +1582,17 @@ watch(currentPage, (newPage) => {
                 <div class="w-full sm:flex-1 sm:text-right">
                     <Button v-if="safeNavigation.next" @click="navigateContent(safeNavigation.next.id)"
                         variant="outline" :disabled="!safeNavigation.next.is_unlocked"
-                        class="w-full sm:max-w-xs flex items-center gap-3 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-colors sm:ml-auto"
+                        class="w-full sm:max-w-xs flex items-center gap-3 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-colors sm:ml-auto overflow-hidden"
                         :class="{ 'opacity-60 cursor-not-allowed': !safeNavigation.next.is_unlocked }">
-                        <div class="text-left">
-                            <div class="font-medium text-sm">{{ safeNavigation.next.title }}</div>
+                        <div class="text-left min-w-0 flex-1">
+                            <div class="font-medium text-sm truncate">{{ safeNavigation.next.title }}</div>
                             <div class="text-xs text-muted-foreground">
                                 {{ safeNavigation.next.content_type.toUpperCase() }}
                                 <span v-if="!safeNavigation.next.is_unlocked" class="ml-2 text-amber-600">🔒
                                     Locked</span>
                             </div>
                         </div>
-                        <SkipForward class="h-4 w-4" />
+                        <SkipForward class="h-4 w-4 flex-shrink-0" />
                     </Button>
                 </div>
             </div>

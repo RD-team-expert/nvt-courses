@@ -365,6 +365,14 @@ class CourseOnlineController extends Controller
         ]);
 
         $analytics = $courseOnline->getAnalytics();
+        // Update analytics to get fresh data
+        $analytics->updateAnalytics();
+
+        // Check if there's actual session data
+        $hasSessionData = \App\Models\LearningSession::where('course_online_id', $courseOnline->id)
+            ->whereNotNull('session_end')
+            ->where('total_duration_minutes', '>', 0)
+            ->exists();
 
         $thumbnails = [];
         if ($courseOnline->image_path) {
@@ -403,6 +411,11 @@ class CourseOnlineController extends Controller
                     'order_number' => $module->order_number,
                     'has_quiz' => $module->has_quiz,
                     'quiz_required' => $module->quiz_required,
+                    'estimated_duration' => $module->estimated_duration,
+                    // Calculate content counts
+                    'content_count' => $module->content->count(),
+                    'video_count' => $module->content->where('content_type', 'video')->count(),
+                    'pdf_count' => $module->content->where('content_type', 'pdf')->count(),
                     'quiz' => $module->quiz ? [
                         'id' => $module->quiz->id,
                         'title' => $module->quiz->title,
@@ -439,6 +452,7 @@ class CourseOnlineController extends Controller
                     ],
                     'status' => $assignment->status,
                     'progress_percentage' => $assignment->progress_percentage,
+                    'created_at' => $assignment->created_at->toDateTimeString(),
                     'assigned_at' => $assignment->assigned_at->toDateTimeString(),
                     'started_at' => $assignment->started_at?->toDateTimeString(),
                     'completed_at' => $assignment->completed_at?->toDateTimeString(),
@@ -453,6 +467,13 @@ class CourseOnlineController extends Controller
                     'average_session_duration' => $analytics->average_session_duration_minutes,
                     'engagement_score' => $analytics->engagement_score,
                 ],
+                // Analytics data for display
+                'avg_engagement' => round($analytics->engagement_score ?? 0, 1),
+                'avg_study_time' => $hasSessionData ? $analytics->average_session_duration_minutes : null,
+                'has_session_data' => $hasSessionData,
+                'success_prediction' => round($analytics->completion_rate ?? 0, 1),
+                'enrollment_count' => $analytics->total_enrollments ?? 0,
+                'completion_rate' => round($analytics->completion_rate ?? 0, 1),
                 'created_at' => $courseOnline->created_at->toDateTimeString(),
             ]
         ]);
