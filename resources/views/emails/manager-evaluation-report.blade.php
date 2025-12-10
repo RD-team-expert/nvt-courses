@@ -412,7 +412,8 @@
             <div class="signature-name">Best regards,</div>
             <div class="signature-name">Harry Prescott</div>
             <div class="signature-title">Instructor</div>
-            <div class="signature-title">The Development Zone Department</div>
+            <div class="signature-title">The Training And Development Department
+</div>
             <div style="margin-top: 10px; font-size: 12px; color: #999;">
                 This report was generated automatically on {{ now()->format('F j, Y') }}
             </div>

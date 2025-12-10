@@ -300,6 +300,7 @@ class VideoController extends Controller
                 'avg_completion' => 0,
             ],
             'categories' => $categories,
+            'maxFileSize' => 512000, // 500 MB in KB for ChunkUploader
         ]);
     }
 
@@ -443,6 +444,72 @@ class VideoController extends Controller
                 'success' => false,
                 'message' => 'Internal server error'
             ], 500);
+        }
+    }
+
+    /**
+     * Migrate a video from Google Drive to Local Storage
+     * ✅ NEW: Production-safe migration with data preservation
+     */
+    public function migrateToLocal(Request $request, Video $video)
+    {
+        // Validate the video is currently on Google Drive
+        if (!$video->isGoogleDrive()) {
+            return back()->with('error', 'Only Google Drive videos can be migrated to local storage.');
+        }
+
+        // Validate request
+        $validated = $request->validate([
+            'video_data' => 'required|string',
+        ]);
+
+        DB::beginTransaction();
+
+        try {
+            // Parse the JSON response from ChunkUploader
+            $uploadedFileData = json_decode($validated['video_data'], true);
+
+            if (!$uploadedFileData || !isset($uploadedFileData['path'])) {
+                throw new \Exception('Invalid video upload data. Please try uploading again.');
+            }
+
+            Log::info('Migrating video to local storage', [
+                'video_id' => $video->id,
+                'video_name' => $video->name,
+                'old_google_drive_url' => $video->google_drive_url,
+                'new_file_path' => $uploadedFileData['path'],
+            ]);
+
+            // Update video record with new local storage data
+            $video->update([
+                'storage_type' => 'local',
+                'file_path' => $uploadedFileData['path'],
+                'file_size' => $uploadedFileData['size'] ?? null,
+                'mime_type' => $uploadedFileData['mime_type'] ?? 'video/mp4',
+                // Clear Google Drive references
+                'google_drive_url' => null,
+                'streaming_url' => null,
+            ]);
+
+            DB::commit();
+
+            Log::info('Video migration successful', [
+                'video_id' => $video->id,
+                'new_storage_type' => 'local',
+            ]);
+
+            return back()->with('success', 'Video migrated to local storage successfully. User progress data has been preserved.');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            Log::error('Video migration failed', [
+                'video_id' => $video->id,
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return back()->with('error', 'Migration failed: ' . $e->getMessage());
         }
     }
 

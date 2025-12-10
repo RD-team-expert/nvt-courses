@@ -192,14 +192,8 @@ class AssignmentController extends Controller
             // Send user notifications (only once per user)
             $this->notifyUsersOnCourseAssignment($course, $allAssignedUsers, auth()->user());
 
-            // Send manager notifications for private courses (only once per user)
-            if ($course->privacy === 'private') {
-
-
-                $this->notifyManagersOnCourseAssignment($course, $allAssignedUsers, auth()->user());
-            } else {
-              
-            }
+            // Send manager notifications for all courses (public and private)
+            $this->notifyManagersOnCourseAssignment($course, $allAssignedUsers, auth()->user());
         } else {
           
         }
@@ -418,10 +412,8 @@ class AssignmentController extends Controller
             // ✅ Send notifications for each course assignment
             $this->notifyUsersOnCourseAssignment($course, $assignedUsers, auth()->user());
 
-            // 🎯 NEW: Notify managers for private courses
-            if ($course->privacy === 'private') {
-                $this->notifyManagersOnCourseAssignment($course, $assignedUsers, auth()->user());
-            }
+            // Notify managers for all courses (public and private)
+            $this->notifyManagersOnCourseAssignment($course, $assignedUsers, auth()->user());
         }
 
         return redirect()->route('admin.assignments.index')

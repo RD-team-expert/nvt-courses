@@ -26,12 +26,12 @@
         }
 
         .course-info { background: #f8fafc; border: 2px solid #e2e8f0; padding: 25px; border-radius: 8px; margin: 25px 0; }
-        .cta-button { display: inline-block; background: linear-gradient(135deg, #059669, #047857); color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2); transition: transform 0.2s; }
-        .cta-button:hover { transform: translateY(-2px); }
+        .cta-button { display: inline-block; background: linear-gradient(135deg, #059669, #047857); color: white !important; padding: 15px 30px; text-decoration: none !important; border-radius: 8px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2); transition: transform 0.2s; }
+        .cta-button:hover { transform: translateY(-2px); color: white !important; }
 
         /* ✅ NEW: Urgent CTA button style */
-        .cta-button-urgent { background: linear-gradient(135deg, #dc2626, #b91c1c); animation: buttonPulse 1.5s infinite; }
-        .cta-button-warning { background: linear-gradient(135deg, #f59e0b, #d97706); }
+        .cta-button-urgent { background: linear-gradient(135deg, #dc2626, #b91c1c); animation: buttonPulse 1.5s infinite; color: white !important; }
+        .cta-button-warning { background: linear-gradient(135deg, #f59e0b, #d97706); color: white !important; }
 
         @keyframes buttonPulse {
             0% { transform: scale(1); }
@@ -249,9 +249,9 @@
             @endphp
 
             @if($loginLink)
-                <a href="{{ $loginLink }}" class="{{ $buttonClass }}">{{ $buttonText }}</a>
+                <a href="{{ $loginLink }}" class="{{ $buttonClass }}" style="color: #ffffff !important; text-decoration: none !important;">{{ $buttonText }}</a>
             @else
-                <a href="{{ route('courses-online.index') }}" class="{{ $buttonClass }}">{{ $buttonText }}</a>
+                <a href="{{ route('courses-online.index') }}" class="{{ $buttonClass }}" style="color: #ffffff !important; text-decoration: none !important;">{{ $buttonText }}</a>
             @endif
 
             @if($hasDeadline && $timeRemaining)

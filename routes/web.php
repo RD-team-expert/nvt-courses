@@ -477,6 +477,7 @@ Route::resource('videos', App\Http\Controllers\Admin\VideoController::class)->ex
 Route::post('videos/{video}/toggle-active', [App\Http\Controllers\Admin\VideoController::class, 'toggleActive'])->name('videos.toggle-active');
 Route::get('videos/{video}/streaming-url', [App\Http\Controllers\Admin\VideoController::class, 'getStreamingUrl'])->name('videos.streaming-url');
 Route::post('videos/batch-refresh-urls', [App\Http\Controllers\Admin\VideoController::class, 'batchRefreshUrls'])->name('videos.batch-refresh-urls');
+Route::post('videos/{video}/migrate-to-local', [App\Http\Controllers\Admin\VideoController::class, 'migrateToLocal'])->name('videos.migrate-to-local');
 
     // ===== ASSIGNMENT MANAGEMENT =====
     Route::get('assignments', [App\Http\Controllers\Admin\AssignmentController::class, 'index'])->name('assignments.index');

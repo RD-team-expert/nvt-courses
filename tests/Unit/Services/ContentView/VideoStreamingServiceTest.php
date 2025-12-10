@@ -58,7 +58,7 @@ class VideoStreamingServiceTest extends TestCase
         $this->googleDriveService
             ->shouldReceive('processUrl')
             ->once()
-            ->with($video->google_drive_url)
+            ->with($video->google_drive_url, false)  // Service now passes increment flag
             ->andReturn($expectedResult);
 
         // Act
@@ -71,8 +71,8 @@ class VideoStreamingServiceTest extends TestCase
         $this->assertEquals('DRIVE_API_KEY_1', $result['key_name']);
         
         // Verify key stored in session
-        $this->assertEquals(1, session('drive_key_id_' . $content->id));
-        $this->assertEquals('DRIVE_API_KEY_1', session('drive_key_name_' . $content->id));
+        $this->assertEquals(1, session('content_' . $content->id . '_key_id'));
+        $this->assertEquals('DRIVE_API_KEY_1', session('content_' . $content->id . '_key_name'));
     }
 
     /**
@@ -140,8 +140,8 @@ class VideoStreamingServiceTest extends TestCase
         // Arrange
         $content = ModuleContent::factory()->create();
         session([
-            'drive_key_id_' . $content->id => 5,
-            'drive_key_name_' . $content->id => 'DRIVE_API_KEY_5',
+            'content_' . $content->id . '_key_id' => 5,
+            'content_' . $content->id . '_key_name' => 'DRIVE_API_KEY_5',
         ]);
 
         $this->googleDriveService
@@ -153,8 +153,8 @@ class VideoStreamingServiceTest extends TestCase
         $this->service->releaseApiKey($content->id);
 
         // Assert
-        $this->assertFalse(session()->has('drive_key_id_' . $content->id));
-        $this->assertFalse(session()->has('drive_key_name_' . $content->id));
+        $this->assertFalse(session()->has('content_' . $content->id . '_key_id'));
+        $this->assertFalse(session()->has('content_' . $content->id . '_key_name'));
     }
 
     /**
@@ -164,7 +164,7 @@ class VideoStreamingServiceTest extends TestCase
     {
         // Arrange
         $content = ModuleContent::factory()->create();
-        session(['drive_key_id_' . $content->id => 3]);
+        session(['content_' . $content->id . '_key_id' => 3]);
 
         // Act
         $result = $this->service->hasAssignedKey($content->id);
@@ -181,8 +181,8 @@ class VideoStreamingServiceTest extends TestCase
         // Arrange
         $content = ModuleContent::factory()->create();
         session([
-            'drive_key_id_' . $content->id => 2,
-            'drive_key_name_' . $content->id => 'DRIVE_API_KEY_2',
+            'content_' . $content->id . '_key_id' => 2,
+            'content_' . $content->id . '_key_name' => 'DRIVE_API_KEY_2',
         ]);
 
         // Act
@@ -193,4 +193,103 @@ class VideoStreamingServiceTest extends TestCase
         $this->assertEquals(2, $status['key_id']);
         $this->assertEquals('DRIVE_API_KEY_2', $status['key_name']);
     }
+
+    // ========================================
+    // LOCAL STORAGE TESTS
+    // ========================================
+
+    /**
+     * Test 8: Local storage video returns correct streaming URL format
+     */
+    public function test_local_storage_video_returns_streaming_url()
+    {
+        // Arrange - Create local storage video
+        $video = Video::factory()->create([
+            'storage_type' => 'local',
+            'file_path' => 'videos/test-video.mp4',
+            'google_drive_url' => null,
+        ]);
+        
+        $content = ModuleContent::factory()->withVideo($video)->create();
+
+        // Act
+        $result = $this->service->getStreamingUrl($video, $content);
+
+        // Assert
+        $this->assertNotNull($result);
+        $this->assertArrayHasKey('streaming_url', $result);
+        $this->assertNull($result['key_id']); // Local videos don't use API keys
+        $this->assertEquals('local_storage', $result['key_name']);
+        $this->assertStringContainsString('/video/stream/', $result['streaming_url']);
+    }
+
+    /**
+     * Test 9: Local storage video with empty file path returns error
+     */
+    public function test_local_storage_with_empty_path_returns_error()
+    {
+        // Arrange - Create local video with no file path
+        $video = Video::factory()->create([
+            'storage_type' => 'local',
+            'file_path' => null,
+            'google_drive_url' => null,
+        ]);
+        
+        $content = ModuleContent::factory()->create();
+
+        // Act
+        $result = $this->service->getStreamingUrl($video, $content);
+
+        // Assert
+        $this->assertNotNull($result);
+        $this->assertNull($result['streaming_url']);
+        $this->assertEquals('local_storage_error', $result['key_name']);
+    }
+
+    /**
+     * Test 10: isLocalStorage returns correct values
+     */
+    public function test_is_local_storage_returns_correct_value()
+    {
+        // Arrange
+        $content = ModuleContent::factory()->create();
+        
+        // Test with local storage session
+        session([
+            'content_' . $content->id . '_key_name' => 'local_storage',
+        ]);
+
+        // Act & Assert
+        $this->assertTrue($this->service->isLocalStorage($content->id));
+        
+        // Test with Google Drive session
+        $content2 = ModuleContent::factory()->create();
+        session([
+            'content_' . $content2->id . '_key_name' => 'DRIVE_API_KEY_1',
+        ]);
+        
+        $this->assertFalse($this->service->isLocalStorage($content2->id));
+    }
+
+    /**
+     * Test 11: getStorageType returns correct type
+     */
+    public function test_get_storage_type_returns_correct_type()
+    {
+        $content = ModuleContent::factory()->create();
+        
+        // Test local
+        session(['content_' . $content->id . '_key_name' => 'local_storage']);
+        $this->assertEquals('local', $this->service->getStorageType($content->id));
+        
+        // Test Google Drive
+        $content2 = ModuleContent::factory()->create();
+        session(['content_' . $content2->id . '_key_name' => 'DRIVE_API_KEY_1']);
+        $this->assertEquals('google_drive', $this->service->getStorageType($content2->id));
+        
+        // Test unknown
+        $content3 = ModuleContent::factory()->create();
+        $this->assertEquals('unknown', $this->service->getStorageType($content3->id));
+    }
 }
+

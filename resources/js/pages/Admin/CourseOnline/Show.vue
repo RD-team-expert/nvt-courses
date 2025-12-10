@@ -91,9 +91,10 @@ interface Course {
     created_at: string
     modules: Module[]
     assignments: Assignment[]
-    avg_engagement?: number
-    avg_study_time?: number
-    success_prediction?: number
+    avg_engagement: number
+    avg_study_time: number | null
+    has_session_data: boolean
+    success_prediction: number
     upcoming_deadlines_count: number
     overdue_assignments_count: number
     default_deadline_days: number | null
@@ -397,24 +398,27 @@ const showAnalytics = () => {
                                     <div class="flex items-center justify-between">
                                         <div>
                                             <p class="text-blue-600 dark:text-blue-400 text-sm font-semibold">Avg Engagement</p>
-                                            <p class="text-3xl font-bold text-blue-900 dark:text-blue-100">{{ course.avg_engagement || 85 }}%</p>
+                                            <p class="text-3xl font-bold text-blue-900 dark:text-blue-100">{{ Math.round(course.avg_engagement || 0) }}%</p>
                                         </div>
                                         <Zap class="w-8 h-8 text-blue-600 dark:text-blue-300" />
                                     </div>
-                                    <Progress :value="course.avg_engagement || 85" class="mt-4" />
+                                    <Progress :value="course.avg_engagement || 0" class="mt-4" />
                                 </div>
 
                                 <div class="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-xl p-6 border border-green-100 dark:border-green-800">
                                     <div class="flex items-center justify-between">
                                         <div>
                                             <p class="text-green-600 dark:text-green-400 text-sm font-semibold">Avg Study Time</p>
-                                            <p class="text-3xl font-bold text-green-900 dark:text-green-100">{{ course.avg_study_time || 42 }}m</p>
+                                            <p class="text-3xl font-bold text-green-900 dark:text-green-100">
+                                                <span v-if="course.has_session_data && course.avg_study_time">{{ Math.round(course.avg_study_time) }}m</span>
+                                                <span v-else class="text-xl">No data</span>
+                                            </p>
                                         </div>
                                         <Clock class="w-8 h-8 text-green-600 dark:text-green-300" />
                                     </div>
-                                    <div class="mt-4 text-sm text-green-600 dark:text-green-400 flex items-center">
-                                        <TrendingUp class="w-4 h-4 mr-1" />
-                                        +12% this month
+                                    <div class="mt-4 text-sm text-green-600 dark:text-green-400">
+                                        <span v-if="course.has_session_data">Based on active sessions</span>
+                                        <span v-else>No session data yet</span>
                                     </div>
                                 </div>
 
@@ -422,12 +426,12 @@ const showAnalytics = () => {
                                     <div class="flex items-center justify-between">
                                         <div>
                                             <p class="text-purple-600 dark:text-purple-400 text-sm font-semibold">Success Rate</p>
-                                            <p class="text-3xl font-bold text-purple-900 dark:text-purple-100">{{ course.success_prediction || 78 }}%</p>
+                                            <p class="text-3xl font-bold text-purple-900 dark:text-purple-100">{{ Math.round(course.success_prediction || 0) }}%</p>
                                         </div>
                                         <Target class="w-8 h-8 text-purple-600 dark:text-purple-300" />
                                     </div>
                                     <div class="mt-4 text-sm text-purple-600 dark:text-purple-400">
-                                        ML prediction
+                                        Completion rate
                                     </div>
                                 </div>
                             </div>

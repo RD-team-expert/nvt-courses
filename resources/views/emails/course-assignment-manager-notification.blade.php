@@ -389,13 +389,14 @@
 
         <div class="signature">
             <p class="name">Best regards,<br>Harry Prescott</p>
-            <p class="title">Learning & Development Instructor<br>The Development Zone Department</p>
-            <p style="color: #3b82f6; margin-top: 8px; font-size: 14px;">📧 harry@pneunited.com</p>
+            <p class="title">Director Of Training And Development<br>The Training And Development Department</p>
+            <p style="color: #3b82f6; margin-top: 8px; font-size: 14px;">📧 thedevelopmentzone@onepne.com</p>
         </div>
     </div>
 
     <div class="footer">
-        <p>© {{ date('Y') }} The Development Zone Department</p>
+        <p>© {{ date('Y') }} The Training And Development Department
+</p>
         <p>This notification was sent regarding course assignment for your team member{{ $userCount > 1 ? 's' : '' }}.</p>
     </div>
 </div>

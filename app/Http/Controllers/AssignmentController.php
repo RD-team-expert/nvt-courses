@@ -283,7 +283,7 @@ class AssignmentController extends Controller
 
             // Loop through each user to send individual emails
             foreach ($assignedUsers as $user) {
-                Mail::to($user->email)->queue(new CourseCreationNotification($course, $user));
+                Mail::to($user->email)->send(new CourseCreationNotification($course, $user));
             }
 
 
