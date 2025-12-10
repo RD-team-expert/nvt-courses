@@ -1,0 +1,92 @@
+================================================================================
+                    PERFORMANCE RATING CALCULATION SUMMARY
+================================================================================
+
+FORMULA:
+--------
+Performance Score = (Completion Rate × 0.3) + (Avg Progress × 0.3) + 
+                    (Attention Score × 0.3) - Suspicious Penalty
+
+Where:
+  • Completion Rate = (Completed Assignments / Total Assignments) × 100
+  • Avg Progress = Average of all assignment progress percentages
+  • Attention Score = Base attention + (Quiz Performance × 0.25)
+  • Suspicious Penalty = (Suspicious Sessions / Total Sessions) × 10
+
+
+COMPONENTS BREAKDOWN:
+---------------------
+
+1. COMPLETION RATE (30% weight)
+   └─ Measures: How many assignments user completed
+   └─ Range: 0-100%
+   └─ Contribution: Up to 30 points
+
+2. AVERAGE PROGRESS (30% weight)
+   └─ Measures: How far user progressed on assignments
+   └─ Range: 0-100%
+   └─ Contribution: Up to 30 points
+
+3. ATTENTION SCORE (30% weight)
+   └─ Measures: User focus during learning sessions
+   └─ Base Score: From learning session data
+   └─ Quiz Boost: +25% of quiz performance added
+   └─ Range: 0-100%
+   └─ Contribution: Up to 30 points
+
+4. SUSPICIOUS PENALTY (Deduction)
+   └─ Measures: Unusual/suspicious behavior
+   └─ Formula: (Suspicious Sessions / Total Sessions) × 10
+   └─ Impact: Deducts from total score
+
+
+RATING LEVELS:
+---------------
+Score ≥ 85  →  EXCELLENT
+Score 70-84 →  GOOD
+Score 60-69 →  AVERAGE
+Score < 60  →  NEEDS IMPROVEMENT
+
+
+EXAMPLE:
+--------
+User Data:
+  • Completed: 8/10 assignments → Completion Rate = 80%
+  • Avg Progress: 75%
+  • Base Attention: 70%
+  • Quiz Performance: 80% → Quiz Boost = 80 × 0.25 = 20
+  • Adjusted Attention: 70 + 20 = 90%
+  • Suspicious Sessions: 2/20 → Penalty = 1 point
+
+Calculation:
+  Score = (80 × 0.3) + (75 × 0.3) + (90 × 0.3) - 1
+  Score = 24 + 22.5 + 27 - 1
+  Score = 72.5
+
+Result: GOOD (72.5 is in 70-84 range)
+
+
+QUIZ INTEGRATION:
+-----------------
+Quiz Performance Score = (Completion Rate × 0.4) + (Passing Rate × 0.4) + 
+                         (Avg Score × 0.2)
+
+Includes:
+  ✓ Regular Quizzes (assigned via quiz_assignments)
+  ✓ Module Quizzes (part of course modules)
+
+Impact on Performance:
+  • 25% of quiz score is added to attention score
+  • Strong quiz performance can boost overall rating
+  • Example: 100% quiz score → +25 points to attention
+
+
+KEY INSIGHTS:
+-------------
+✓ Quiz performance directly impacts overall rating through attention boost
+✓ Completion and progress are equally important (30% each)
+✓ Attention/focus is critical (30%)
+✓ Suspicious behavior is penalized
+✓ All factors combined give holistic view of user performance
+
+================================================================================

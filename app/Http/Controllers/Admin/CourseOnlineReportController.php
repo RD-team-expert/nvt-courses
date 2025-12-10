@@ -1063,49 +1063,60 @@ class CourseOnlineReportController extends Controller
     }
 
     /**
-     * 📊 Calculate comprehensive quiz performance for a user
+     * 📊 Calculate comprehensive quiz performance for a user (BOTH Regular & Module Quizzes)
+     * 
+     * Includes:
+     * - Regular Quizzes: Assigned via quiz_assignments table
+     * - Module Quizzes: Part of course modules, tracked in module_quiz_results table
      * 
      * Components (weighted):
-     * - Completion Rate: 40% (completed quizzes / assigned quizzes)
-     * - Passing Rate: 40% (passed quizzes / completed quizzes)  
-     * - Average Score: 20% (average percentage across all completed quizzes)
+     * - Completion Rate: 40% (total completed / total assigned quizzes)
+     * - Passing Rate: 40% (total passed / total completed quizzes)  
+     * - Average Score: 20% (average of regular quiz avg + module quiz avg)
      * 
-     * Standards:
-     * - Meets Standards: Completion ≥90%, Passing ≥80%, Avg Score ≥80%
+     * Standards (Dynamic):
+     * - Meets Standards: Completion ≥90%, Passing ≥ avgPassThreshold%, Avg Score ≥ avgPassThreshold%
+     * - avgPassThreshold is calculated from the average pass_threshold of ALL assigned quizzes (regular + module)
      */
     private function calculateUserQuizPerformance($userId, $courseId = null)
     {
-        // Get assigned quizzes count
-        $assignedQuery = DB::table('quiz_assignments')
-            ->where('user_id', $userId);
+        // ===== REGULAR QUIZZES (via quiz_assignments) =====
+        $regularAssignedQuery = DB::table('quiz_assignments')
+            ->join('quizzes', 'quiz_assignments.quiz_id', '=', 'quizzes.id')
+            ->where('quiz_assignments.user_id', $userId)
+            ->where('quizzes.is_module_quiz', false)
+            ->select('quizzes.pass_threshold', 'quizzes.id as quiz_id');
         
         if ($courseId) {
-            $quizIds = DB::table('quizzes')
-                ->where('course_online_id', $courseId)
-                ->pluck('id');
-            if ($quizIds->isNotEmpty()) {
-                $assignedQuery->whereIn('quiz_id', $quizIds);
-            }
+            $regularAssignedQuery->where('quizzes.course_online_id', $courseId);
         }
         
-        $assignedQuizzes = $assignedQuery->count();
+        $regularAssignedData = $regularAssignedQuery->get();
+        $regularAssignedCount = $regularAssignedData->count();
         
-        // Get completed attempts (one per quiz - best attempt)
-        $attemptsQuery = DB::table('quiz_attempts')
+        // Get completed regular quiz attempts
+        $regularAttemptsQuery = DB::table('quiz_attempts')
             ->where('user_id', $userId)
             ->whereNotNull('completed_at');
         
         if ($courseId) {
-            $quizIds = DB::table('quizzes')
+            $regularQuizIds = DB::table('quizzes')
                 ->where('course_online_id', $courseId)
+                ->where('is_module_quiz', false)
                 ->pluck('id');
-            if ($quizIds->isNotEmpty()) {
-                $attemptsQuery->whereIn('quiz_id', $quizIds);
+            if ($regularQuizIds->isNotEmpty()) {
+                $regularAttemptsQuery->whereIn('quiz_id', $regularQuizIds);
+            }
+        } else {
+            $regularQuizIds = DB::table('quizzes')
+                ->where('is_module_quiz', false)
+                ->pluck('id');
+            if ($regularQuizIds->isNotEmpty()) {
+                $regularAttemptsQuery->whereIn('quiz_id', $regularQuizIds);
             }
         }
         
-        // Get unique completed quizzes with their best scores
-        $completedAttempts = $attemptsQuery
+        $regularCompletedAttempts = $regularAttemptsQuery
             ->join('quizzes', 'quiz_attempts.quiz_id', '=', 'quizzes.id')
             ->select([
                 'quiz_attempts.quiz_id',
@@ -1117,51 +1128,125 @@ class CourseOnlineReportController extends Controller
             ->groupBy('quiz_attempts.quiz_id')
             ->get();
         
-        $completedQuizzes = $completedAttempts->count();
-        $passedQuizzes = $completedAttempts->where('has_passed', 1)->count();
+        $regularCompletedCount = $regularCompletedAttempts->count();
+        $regularPassedCount = $regularCompletedAttempts->where('has_passed', 1)->count();
         
-        // Calculate average score percentage
-        $scorePercentages = $completedAttempts->map(function ($attempt) {
+        // Calculate regular quiz scores
+        $regularScorePercentages = $regularCompletedAttempts->map(function ($attempt) {
             if ($attempt->total_points > 0) {
                 return ($attempt->best_score / $attempt->total_points) * 100;
             }
             return 0;
         });
         
-        $avgQuizScore = $scorePercentages->count() > 0 
-            ? round($scorePercentages->avg(), 1)
+        $regularAvgScore = $regularScorePercentages->count() > 0 
+            ? round($regularScorePercentages->avg(), 1)
             : 0;
         
-        // Calculate rates
-        $completionRate = $assignedQuizzes > 0 
-            ? round(($completedQuizzes / $assignedQuizzes) * 100, 1) 
+        // ===== MODULE QUIZZES (via module_quiz_results) =====
+        $moduleResultsQuery = DB::table('module_quiz_results')
+            ->where('user_id', $userId);
+        
+        if ($courseId) {
+            $moduleIds = DB::table('course_modules')
+                ->where('course_online_id', $courseId)
+                ->pluck('id');
+            if ($moduleIds->isNotEmpty()) {
+                $moduleResultsQuery->whereIn('module_id', $moduleIds);
+            }
+        }
+        
+        $moduleResults = $moduleResultsQuery->get();
+        $moduleAssignedCount = DB::table('course_modules')
+            ->when($courseId, function ($q) use ($courseId) {
+                return $q->where('course_online_id', $courseId);
+            })
+            ->count();
+        
+        $moduleCompletedCount = $moduleResults->count();
+        $modulePassedCount = $moduleResults->where('passed', true)->count();
+        
+        $moduleAvgScore = $moduleResults->count() > 0 
+            ? round($moduleResults->avg('score_percentage'), 1)
             : 0;
         
-        $passingRate = $completedQuizzes > 0 
-            ? round(($passedQuizzes / $completedQuizzes) * 100, 1) 
+        // ===== COMBINED CALCULATIONS =====
+        $totalAssignedQuizzes = $regularAssignedCount + $moduleAssignedCount;
+        $totalCompletedQuizzes = $regularCompletedCount + $moduleCompletedCount;
+        $totalPassedQuizzes = $regularPassedCount + $modulePassedCount;
+        
+        // Calculate average pass threshold from both regular and module quizzes
+        $allThresholds = collect();
+        if ($regularAssignedData->isNotEmpty()) {
+            $allThresholds = $allThresholds->merge($regularAssignedData->pluck('pass_threshold'));
+        }
+        
+        // Get module quiz thresholds
+        if ($moduleResults->isNotEmpty()) {
+            $moduleQuizThresholds = DB::table('quizzes')
+                ->whereIn('id', $moduleResults->pluck('quiz_id'))
+                ->pluck('pass_threshold');
+            $allThresholds = $allThresholds->merge($moduleQuizThresholds);
+        }
+        
+        $avgPassThreshold = $allThresholds->count() > 0 
+            ? round($allThresholds->avg(), 1)
+            : 80; // Default to 80 if no quizzes
+        
+        // Calculate combined rates
+        $completionRate = $totalAssignedQuizzes > 0 
+            ? round(($totalCompletedQuizzes / $totalAssignedQuizzes) * 100, 1) 
             : 0;
+        
+        $passingRate = $totalCompletedQuizzes > 0 
+            ? round(($totalPassedQuizzes / $totalCompletedQuizzes) * 100, 1) 
+            : 0;
+        
+        // Calculate combined average score (average of regular and module quiz averages)
+        $combinedAvgScore = 0;
+        if ($regularAvgScore > 0 && $moduleAvgScore > 0) {
+            $combinedAvgScore = round(($regularAvgScore + $moduleAvgScore) / 2, 1);
+        } elseif ($regularAvgScore > 0) {
+            $combinedAvgScore = $regularAvgScore;
+        } elseif ($moduleAvgScore > 0) {
+            $combinedAvgScore = $moduleAvgScore;
+        }
         
         // Calculate weighted quiz performance score
         // Completion Rate: 40%, Passing Rate: 40%, Avg Score: 20%
-        $quizPerformanceScore = ($completionRate * 0.4) + ($passingRate * 0.4) + ($avgQuizScore * 0.2);
+        $quizPerformanceScore = ($completionRate * 0.4) + ($passingRate * 0.4) + ($combinedAvgScore * 0.2);
         $quizPerformanceScore = round(min(100, max(0, $quizPerformanceScore)), 1);
         
-        // Determine if meets standards
-        $meetsStandards = $completionRate >= 90 && $passingRate >= 80 && $avgQuizScore >= 80;
+        // Determine if meets standards using average pass threshold
+        $meetsStandards = $completionRate >= 90 && $passingRate >= $avgPassThreshold && $combinedAvgScore >= $avgPassThreshold;
         
         // Determine status label
         $statusLabel = $this->getQuizStatusLabel($quizPerformanceScore);
         
         return [
-            'assigned_quizzes' => $assignedQuizzes,
-            'completed_quizzes' => $completedQuizzes,
-            'passed_quizzes' => $passedQuizzes,
+            'assigned_quizzes' => $totalAssignedQuizzes,
+            'completed_quizzes' => $totalCompletedQuizzes,
+            'passed_quizzes' => $totalPassedQuizzes,
             'completion_rate' => $completionRate,
             'passing_rate' => $passingRate,
-            'avg_quiz_score' => $avgQuizScore,
+            'avg_quiz_score' => $combinedAvgScore,
             'quiz_performance_score' => $quizPerformanceScore,
             'meets_standards' => $meetsStandards,
+            'avg_pass_threshold' => $avgPassThreshold,
             'status_label' => $statusLabel,
+            // Breakdown for transparency
+            'regular_quizzes' => [
+                'assigned' => $regularAssignedCount,
+                'completed' => $regularCompletedCount,
+                'passed' => $regularPassedCount,
+                'avg_score' => $regularAvgScore,
+            ],
+            'module_quizzes' => [
+                'assigned' => $moduleAssignedCount,
+                'completed' => $moduleCompletedCount,
+                'passed' => $modulePassedCount,
+                'avg_score' => $moduleAvgScore,
+            ],
         ];
     }
 
