@@ -140,6 +140,89 @@
                     </CardContent>
                 </Card>
 
+                <!-- ✅ NEW: Migrate to Local Storage (for Google Drive videos only) -->
+                <Card v-if="video.storage_type === 'google_drive'">
+                    <CardHeader>
+                        <CardTitle class="flex items-center gap-2">
+                            <ArrowRightLeft class="h-5 w-5" />
+                            Migrate to Local Storage
+                        </CardTitle>
+                        <CardDescription>
+                            Upload a video file to replace the Google Drive link with local storage
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent class="space-y-4">
+                        <Alert>
+                            <AlertCircle class="h-4 w-4" />
+                            <AlertDescription>
+                                <strong>Important:</strong> This will permanently replace the Google Drive URL with a locally stored video file.
+                                User progress data will be preserved.
+                            </AlertDescription>
+                        </Alert>
+
+                        <!-- ChunkUploader for migration -->
+                        <div class="space-y-2">
+                            <Label>Upload New Video File</Label>
+                            <ChunkUploader
+                                name="migration_file"
+                                accept="video/*"
+                                :maxFileSize="maxFileSizeMB + 'MB'"
+                                @uploaded="handleMigrationUpload"
+                                @error="handleMigrationError"
+                                @progress="handleMigrationProgress"
+                            />
+                            <p class="text-sm text-muted-foreground">
+                                Video will be uploaded in 2MB chunks. Maximum file size: {{ maxFileSizeMB }}MB
+                            </p>
+                        </div>
+
+                        <!-- Migration Status -->
+                        <div v-if="migrationData" class="p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+                            <div class="flex items-center gap-2 text-green-500">
+                                <CheckCircle2 class="h-4 w-4" />
+                                <span class="font-medium">Video file uploaded successfully!</span>
+                            </div>
+                            <p class="text-sm text-green-500/80 mt-1">Ready to migrate. Click the button below to confirm.</p>
+                        </div>
+
+                        <!-- Migration Button with Confirmation -->
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button
+                                    type="button"
+                                    :disabled="!migrationData || isMigrating"
+                                >
+                                    <ArrowRightLeft class="h-4 w-4 mr-2" />
+                                    {{ isMigrating ? 'Migrating...' : 'Migrate to Local Storage' }}
+                                </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>Confirm Migration</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        Are you sure you want to migrate this video from Google Drive to Local Storage?
+                                        <br /><br />
+                                        <strong>This action will:</strong>
+                                        <ul class="list-disc list-inside mt-2 space-y-1">
+                                            <li>Replace the Google Drive URL with the uploaded video file</li>
+                                            <li>Store the video on your server's local storage</li>
+                                            <li>Preserve all user progress data</li>
+                                        </ul>
+                                        <br />
+                                        <strong class="text-destructive">This cannot be undone.</strong>
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction @click="submitMigration" class="bg-amber-600 hover:bg-amber-700">
+                                        Yes, Migrate Video
+                                    </AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                    </CardContent>
+                </Card>
+
                 <!-- Video Source -->
                 <Card>
                     <CardHeader>
@@ -380,8 +463,9 @@
 
 <script setup lang="ts">
 import { Head, Link, useForm, router } from '@inertiajs/vue3'
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import AppLayout from '@/layouts/AppLayout.vue'
+import ChunkUploader from '@/components/ChunkUploader.vue'
 import type { BreadcrumbItem } from '@/types'
 
 // shadcn-vue components
@@ -394,6 +478,17 @@ import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
 
 // Icons
 import {
@@ -407,9 +502,11 @@ import {
     Loader2,
     Trash2,
     BarChart3,
-    Cloud,          // ✅ NEW
-    HardDrive,      // ✅ NEW
-    AlertCircle,    // ✅ NEW
+    Cloud,
+    HardDrive,
+    AlertCircle,
+    ArrowRightLeft,
+    CheckCircle2,
 } from 'lucide-vue-next'
 
 interface Video {
@@ -438,6 +535,7 @@ interface VideoCategory {
 const props = defineProps<{
     video: Video
     categories: VideoCategory[]
+    maxFileSize?: number
 }>()
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -459,6 +557,53 @@ const form = useForm({
 const isSubmitting = ref(false)
 const testingUrl = ref(false)
 const thumbnailPreview = ref<string | null>(null)
+
+// Migration state
+const migrationData = ref<any>(null)
+const isMigrating = ref(false)
+const migrationProgress = ref(0)
+
+// Computed
+const maxFileSizeMB = computed(() => Math.round((props.maxFileSize || 512000) / 1024))
+
+// Migration handlers
+const handleMigrationUpload = (data: any) => {
+    console.log('✅ Migration upload complete:', data)
+    migrationData.value = data
+}
+
+const handleMigrationError = (error: any) => {
+    console.error('❌ Migration upload error:', error)
+    alert('Upload failed. Please try again.')
+    migrationData.value = null
+}
+
+const handleMigrationProgress = (progress: number) => {
+    migrationProgress.value = progress
+}
+
+const submitMigration = () => {
+    if (!migrationData.value) return
+    
+    isMigrating.value = true
+    
+    router.post(`/admin/videos/${props.video.id}/migrate-to-local`, {
+        video_data: JSON.stringify(migrationData.value)
+    }, {
+        preserveScroll: true,
+        onSuccess: () => {
+            console.log('✅ Migration successful')
+            migrationData.value = null
+        },
+        onError: (errors) => {
+            console.error('❌ Migration failed:', errors)
+            alert('Migration failed. Please try again.')
+        },
+        onFinish: () => {
+            isMigrating.value = false
+        }
+    })
+}
 
 const handleThumbnailChange = (event: Event) => {
     const target = event.target as HTMLInputElement

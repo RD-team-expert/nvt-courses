@@ -100,18 +100,24 @@ class ContentDataService
                 'exists' => false,
                 'completion_percentage' => 0,
                 'playback_position' => 0,
+                'current_position' => 0,  // ✅ FIX: Add current_position for frontend compatibility
                 'is_completed' => false,
                 'watch_time' => 0,
+                'time_spent' => 0,  // ✅ FIX: Add time_spent for frontend compatibility
             ];
         }
 
+        $position = $progress->playback_position ?? 0;
+        
         return [
             'exists' => true,
             'id' => $progress->id,
             'completion_percentage' => $progress->completion_percentage,
-            'playback_position' => $progress->playback_position ?? 0,
+            'playback_position' => $position,
+            'current_position' => $position,  // ✅ FIX: Add current_position for frontend compatibility
             'is_completed' => $progress->is_completed,
             'watch_time' => $progress->watch_time,
+            'time_spent' => $progress->watch_time,  // ✅ FIX: Add time_spent for frontend compatibility
             'last_accessed_at' => $progress->last_accessed_at?->toIso8601String(),
             'completed_at' => $progress->completed_at?->toIso8601String(),
         ];
@@ -155,6 +161,7 @@ class ContentDataService
     $response = [
         'content' => $contentData,
         'progress' => $progressData,
+        'userProgress' => $progressData,  // ✅ FIX: Also send as 'userProgress' for frontend compatibility
         'navigation' => $navigationData,
 
         // ✅ ADD THIS: Send course data separately for easier access

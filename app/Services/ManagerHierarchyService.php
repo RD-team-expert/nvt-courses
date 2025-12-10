@@ -251,8 +251,8 @@ public function getDirectManagersForUser(int $userId): array
 
     $managerLevel = $this->getUserLevelCode($managerRole->manager);
 
-    // Only include L2 managers
-    if ($managerLevel !== 'L2') {
+    // Accept L2, L3, and L4 managers (any management level)
+    if (!in_array($managerLevel, ['L2', 'L3', 'L4'])) {
         return [];
     }
 
@@ -288,7 +288,7 @@ public function getDirectManagersForUser(int $userId): array
     /**
      * Assign a manager to a user
      */
-    public function assignManager(int $userId, int $managerId, string $roleType = 'direct_manager', ?int $departmentId = null): UserDepartmentRole
+    public function assignManager(int $userId, int $managerId, string $roleType = 'direct_manager', ?int $departmentId = null, ?int $createdBy = null): UserDepartmentRole
     {
         $user = User::findOrFail($userId);
         $manager = User::findOrFail($managerId);
@@ -300,6 +300,9 @@ public function getDirectManagersForUser(int $userId): array
             throw new \Exception('Department is required for manager assignment');
         }
 
+        // Use provided createdBy, or auth user, or default to manager's ID
+        $createdById = $createdBy ?? auth()->id() ?? $managerId;
+
         return UserDepartmentRole::create([
             'user_id' => $managerId,
             'department_id' => $departmentId,
@@ -307,7 +310,7 @@ public function getDirectManagersForUser(int $userId): array
             'manages_user_id' => $userId,
             'is_primary' => true,
             'start_date' => now(),
-            'created_by' => auth()->id()
+            'created_by' => $createdById
         ]);
     }
 

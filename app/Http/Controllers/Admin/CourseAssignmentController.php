@@ -166,7 +166,9 @@ class CourseAssignmentController extends Controller
      */
     public function store(Request $request)
 {
-
+    Log::info('🎯 CourseAssignmentController@store called', [
+        'request_data' => $request->all(),
+    ]);
 
     $validated = $request->validate([
         'course_id' => 'required|exists:course_online,id',
@@ -241,6 +243,11 @@ class CourseAssignmentController extends Controller
             // ✅ Send notification to USER only (skip manager for now)
             if ($validated['send_notification'] ?? true) {
                 try {
+                    Log::info('🚀 About to dispatch CourseOnlineAssigned event', [
+                        'user' => $user->name,
+                        'course' => $course->name,
+                    ]);
+
                     $loginLink = $this->generateUserLoginLink($user, $course);
 
                     CourseOnlineAssigned::dispatch(
@@ -254,9 +261,13 @@ class CourseAssignmentController extends Controller
                             'total_modules' => $course->modules->count(),
                             'estimated_duration' => $course->estimated_duration,
                             'difficulty_level' => $course->difficulty_level,
-                            'skip_manager_notification' => true, // ✅ Skip manager in listener
+                            'skip_manager_notification' => true, // ✅ Skip - controller handles batch manager notifications below
                         ]
                     );
+
+                    Log::info('✅ Event dispatched successfully', [
+                        'user' => $user->name,
+                    ]);
 
                     $assignment->update(['notification_sent' => true]);
 
@@ -264,6 +275,7 @@ class CourseAssignmentController extends Controller
                     Log::error('❌ User notification failed', [
                         'user_id' => $user->id,
                         'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString(),
                     ]);
                 }
             }
@@ -271,17 +283,39 @@ class CourseAssignmentController extends Controller
 
         // ✅ NEW: Send ONE email per manager with ALL their employees
         if ($validated['send_notification'] ?? true) {
+            Log::info('📧 Starting batch manager notifications', [
+                'manager_count' => count($usersByManager),
+            ]);
+
             foreach ($usersByManager as $managerId => $data) {
                 try {
                     $manager = $data['manager'];
                     $employees = collect($data['users']);
 
+                    // ✅ Filter out self-managed users (where user is their own manager)
+                    $employeesExcludingSelf = $employees->filter(function($employee) use ($manager) {
+                        return $employee->id !== $manager->id;
+                    });
 
+                    // Skip if no employees left after filtering
+                    if ($employeesExcludingSelf->isEmpty()) {
+                        Log::info('⏭️ Skipping manager email - all employees are self-managed', [
+                            'manager' => $manager->name,
+                        ]);
+                        continue;
+                    }
+
+                    Log::info('📤 Sending batch email to manager', [
+                        'manager' => $manager->name,
+                        'manager_email' => $manager->email,
+                        'employee_count' => $employeesExcludingSelf->count(),
+                        'employees' => $employeesExcludingSelf->pluck('name')->toArray(),
+                    ]);
 
                     Mail::to($manager->email)->send(
                         new \App\Mail\CourseOnlineAssignmentManagerNotification(
                             $course,
-                            $employees, // ✅ ALL employees at once
+                            $employeesExcludingSelf, // ✅ Employees excluding self
                             auth()->user(),
                             $manager,
                             [
@@ -291,13 +325,16 @@ class CourseAssignmentController extends Controller
                         )
                     );
 
-                    
-                    
+                    Log::info('✅ Batch manager email sent successfully', [
+                        'manager_email' => $manager->email,
+                    ]);
 
                 } catch (\Exception $e) {
                     Log::error('❌ Manager notification failed', [
                         'manager_id' => $managerId,
+                        'manager_email' => $data['manager']->email ?? 'unknown',
                         'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString(),
                     ]);
                 }
             }
