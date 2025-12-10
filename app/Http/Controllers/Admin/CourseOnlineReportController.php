@@ -417,9 +417,6 @@ class CourseOnlineReportController extends Controller
 
                 // ✅ Get comprehensive quiz performance for this user
                 $quizPerformance = $this->calculateUserQuizPerformance($user->id, $filters['course_id'] ?? null);
-                
-                // ✅ Calculate performance score with quiz integration (25% weight for quiz)
-                $quizBoost = $quizPerformance['quiz_performance_score'] * 0.25;
 
                 $performanceData = [
                     'id' => $user->id,
@@ -439,7 +436,8 @@ class CourseOnlineReportController extends Controller
                     'performance_rating' => $this->calculateUserPerformanceRating(
                         $completionRate,
                         $assignmentStats->avg_progress ?? 0,
-                        $avgSimulatedAttention + $quizBoost, // ✅ Use quiz-boosted score
+                        $avgSimulatedAttention,
+                        $quizPerformance['avg_quiz_score'], // ✅ Pass quiz score as separate 25% component
                         $suspiciousSessions,
                         $totalSessions
                     ),
@@ -1025,25 +1023,35 @@ class CourseOnlineReportController extends Controller
     }
 
     /**
-     * Calculate user performance rating
+     * Calculate user performance rating (UPDATED: Equal 25% weights)
+     * 
+     * Formula:
+     * final_score = (completion_rate × 0.25) + (progress_rate × 0.25) + 
+     *               (attention_score × 0.25) + (quiz_score × 0.25) - suspicious_penalty
      */
-    private function calculateUserPerformanceRating($completionRate, $avgProgress, $attentionScore, $suspiciousActivities, $totalSessions)
+    private function calculateUserPerformanceRating($completionRate, $avgProgress, $attentionScore, $quizScore, $suspiciousActivities, $totalSessions)
     {
-        $score = 0;
-        $score += ($completionRate * 0.3);
-        $score += ($avgProgress * 0.3);
-        $score += ($attentionScore * 0.3);
+        // Calculate weighted components (25% each)
+        $completionWeighted = $completionRate * 0.25;
+        $progressWeighted = $avgProgress * 0.25;
+        $attentionWeighted = $attentionScore * 0.25;
+        $quizWeighted = $quizScore * 0.25;
 
+        // Calculate suspicious penalty
+        $suspiciousPenalty = 0;
         if ($totalSessions > 0) {
             $suspiciousRatio = $suspiciousActivities / $totalSessions;
-            $score -= ($suspiciousRatio * 10);
+            $suspiciousPenalty = $suspiciousRatio * 10;
         }
 
-        $score = max(0, min(100, $score));
+        // Calculate final score
+        $finalScore = $completionWeighted + $progressWeighted + $attentionWeighted + $quizWeighted - $suspiciousPenalty;
+        $finalScore = max(0, min(100, $finalScore));
 
-        if ($score >= 85) return 'Excellent';
-        if ($score >= 70) return 'Good';
-        if ($score >= 60) return 'Average';
+        // Determine rating level
+        if ($finalScore >= 85) return 'Excellent';
+        if ($finalScore >= 70) return 'Good';
+        if ($finalScore >= 60) return 'Average';
         return 'Needs Improvement';
     }
 
@@ -1509,6 +1517,7 @@ class CourseOnlineReportController extends Controller
                         $completionRate,
                         $assignmentStats->avg_progress ?? 0,
                         $avgSimulatedAttention,
+                        $quizPerformance['avg_quiz_score'],
                         $suspiciousSessions,
                         $totalSessions
                     ),
