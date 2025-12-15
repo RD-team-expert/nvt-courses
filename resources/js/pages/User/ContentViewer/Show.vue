@@ -192,12 +192,10 @@ const errorMessage = ref('')
 const sessionId = ref<number | null>(null)
 const lastProgressUpdate = ref(0)
 const isLoading = ref(false)
-const sessionStartTime = ref<number | null>(null)
 const completionPercentage = ref(safeUserProgress.value.completion_percentage || 0)
 const isCompleted = ref(safeUserProgress.value.is_completed || false)
 const timeSpent = ref(safeUserProgress.value.time_spent || 0)
 const isCreatingSession = ref(false)  // ✅ NEW: Prevent duplicate session creation
-const sessionElapsedSeconds = ref(0)  // ✅ NEW: Real-time session elapsed time in seconds
 
 // ✅ NEW: Skip/Seek Tracking Variables
 const totalSkipCount = ref(0)
@@ -212,16 +210,34 @@ const pauseCountSinceLastHeartbeat = ref(0)
 const watchTimeSinceLastHeartbeat = ref(0)
 const lastCurrentTime = ref(0)
 
+// ✅ NEW: Active Playback Time Tracking (Task 6.1)
+// Only tracks NEW playback in THIS session (not including saved time from DB)
+const activePlaybackTime = ref(0)           // Accumulated active playback seconds THIS SESSION
+const isActivelyPlaying = ref(false)        // True only when video is actually playing
+const isBuffering = ref(false)              // True during buffering
+const lastActiveTimeUpdate = ref(0)         // Timestamp of last active time update
+
+// ✅ NEW: Video Event Logging (Task 6.4)
+interface VideoEvent {
+    type: 'pause' | 'resume' | 'rewind'
+    timestamp: number
+    position: number
+    startPosition?: number
+    endPosition?: number
+}
+const videoEvents = ref<VideoEvent[]>([])
+
 // ========== COMPUTED PROPERTIES ==========
 const formattedCurrentTime = computed(() => formatTime(currentTime.value))
 const formattedDuration = computed(() => formatTime(duration.value))
-// ✅ FIXED: Show real-time session elapsed time + saved time from DB
+// ✅ FIXED: Show ONLY current session active playback time (not previous sessions)
 const formattedTimeSpent = computed(() => {
-    const totalSeconds = (timeSpent.value * 60) + sessionElapsedSeconds.value
-    return formatTime(totalSeconds)
+    // Only show time from THIS session (activePlaybackTime is in seconds)
+    return formatTime(activePlaybackTime.value)
 })
 const formattedPdfReadingTime = computed(() => {
-    const totalSeconds = pdfReadingTime.value + sessionElapsedSeconds.value
+    // For PDFs, we still use wall-clock time since there's no "playing" state
+    const totalSeconds = pdfReadingTime.value
     return formatTime(totalSeconds)
 })
 const formattedEstimatedTime = computed(() => formatTime(estimatedReadingTime.value * 60))
@@ -236,6 +252,23 @@ const progressPercentage = computed(() => {
 })
 
 const contentIcon = computed(() => props.content.content_type === 'video' ? Video : FileText)
+
+// ✅ NEW: Allowed time window (Task 6.1) - Video Duration × 2
+const allowedTimeMinutes = computed(() => {
+    if (props.content.content_type === 'video' && duration.value > 0) {
+        return (duration.value / 60) * 2  // Duration × 2 in minutes
+    }
+    return 0
+})
+
+// ✅ NEW: Allowed time display text (Task 6.3)
+const allowedTimeDisplay = computed(() => {
+    if (props.content.content_type === 'video' && allowedTimeMinutes.value > 0) {
+        const minutes = Math.ceil(allowedTimeMinutes.value)
+        return `You are expected to complete this video within ${minutes} minutes`
+    }
+    return ''
+})
 
 // ========== PDF SOURCE DETECTION ==========
 const detectPdfSource = (url: string) => {
@@ -362,8 +395,48 @@ const resetIncrementalCounters = () => {
     watchTimeSinceLastHeartbeat.value = 0
 }
 
+// ✅ NEW: Update active playback time (Task 6.2)
+// Only increments when video is playing AND not buffering/loading
+// ✅ Task 8.1: Skip tracking for completed videos
+const updateActivePlaybackTime = () => {
+    // Skip tracking if video is already completed (Task 8.1)
+    if (isCompleted.value) {
+        return
+    }
+    
+    if (isActivelyPlaying.value && !isBuffering.value && !isVideoLoading.value) {
+        const now = Date.now()
+        const elapsed = (now - lastActiveTimeUpdate.value) / 1000
+        
+        // Only add reasonable increments (between 0 and 2 seconds)
+        if (elapsed > 0 && elapsed < 2) {
+            activePlaybackTime.value += elapsed
+        }
+        
+        lastActiveTimeUpdate.value = now
+    }
+}
+
+// ✅ NEW: Log video events (Task 6.4)
+const logVideoEvent = (type: 'pause' | 'resume' | 'rewind', data?: any) => {
+    const event: VideoEvent = {
+        type,
+        timestamp: Date.now(),
+        position: currentTime.value,
+        ...data
+    }
+    videoEvents.value.push(event)
+    // console.log('📹 Video event logged:', event)
+}
+
 // ========== SESSION MANAGEMENT ==========
 const startSession = async () => {
+    // ✅ Task 8.1: Skip session creation for completed videos
+    if (isCompleted.value && props.content.content_type === 'video') {
+        // console.log('⏭️ Skipping session creation - video already completed')
+        return
+    }
+    
     // ✅ FIXED: Prevent duplicate session creation with lock
     if (sessionId.value || isCreatingSession.value) return
 
@@ -393,6 +466,11 @@ const startSession = async () => {
 
 
 const updateProgress = async () => {
+    // ✅ Task 8.1: Skip progress updates for completed videos
+    if (isCompleted.value && props.content.content_type === 'video') {
+        return
+    }
+    
     if (!sessionId.value) return
 
     const now = Date.now()
@@ -405,9 +483,10 @@ const updateProgress = async () => {
             ? currentTime.value
             : currentPage.value
 
-        const sessionTimeMinutes = sessionStartTime.value
-            ? Math.floor((now - sessionStartTime.value) / 60000)
-            : 0
+        // For videos, use active playback time; for PDFs, use reading time
+        const sessionTimeMinutes = props.content.content_type === 'video'
+            ? Math.floor(activePlaybackTime.value / 60)
+            : Math.floor(pdfReadingTime.value / 60)
 
         const payload = {
             current_position: currentPosition,
@@ -443,6 +522,11 @@ const updateProgress = async () => {
 
 // ✅ NEW: Heartbeat function with skip/seek tracking
 const sendHeartbeat = async () => {
+    // ✅ Task 8.1: Skip heartbeat for completed videos
+    if (isCompleted.value && props.content.content_type === 'video') {
+        return
+    }
+    
     if (!sessionId.value) return
 
     try {
@@ -468,6 +552,8 @@ const sendHeartbeat = async () => {
             seek_count: seekCountSinceLastHeartbeat.value,
             pause_count: pauseCountSinceLastHeartbeat.value,
             watch_time: Math.floor(watchTimeSinceLastHeartbeat.value),
+            // ✅ NEW: Send active playback time (Task 6.5)
+            active_playback_time: Math.floor(activePlaybackTime.value),
         }
 
         // console.log('💓 Sending heartbeat with skip/seek data:', payload)
@@ -501,6 +587,9 @@ const endSession = async () => {
             seek_count: seekCountSinceLastHeartbeat.value,
             pause_count: pauseCountSinceLastHeartbeat.value,
             watch_time: Math.floor(watchTimeSinceLastHeartbeat.value),
+            // ✅ NEW: Send active playback time and video events (Task 6.5)
+            active_playback_time: Math.floor(activePlaybackTime.value),
+            video_events: videoEvents.value,
         }
 
         await axios.post(`/content/${props.content.id}/session`, payload, {
@@ -861,18 +950,25 @@ const onLoadStart = () => {
     // console.log('📹 Video loading started')
     isVideoLoading.value = true
     isVideoReady.value = false
+    
+    // ✅ Task 6.2: Pause active playback during loading
+    isActivelyPlaying.value = false
 }
 
 const onLoadedData = () => {
     // console.log('📹 Video data loaded')
     isVideoLoading.value = false
     isVideoReady.value = true
+    
+    // ✅ Task 6.2: Video is ready, but don't start tracking until play event
 }
 
 const onCanPlay = async () => {
     // console.log('✅ Video can start playing');
     isVideoLoading.value = false;
     isVideoReady.value = true;
+
+    // ✅ Task 6.2: Video is ready to play, but don't start active tracking until play event
 
     // 🔥 NEW: Start session and increment API key usage when video is ready to play
     if (props.video?.key_id && !sessionId.value) {
@@ -889,11 +985,24 @@ const onCanPlay = async () => {
 const onWaiting = () => {
     // console.log('📹 Video waiting for more data')
     isVideoLoading.value = true
+    
+    // ✅ Task 6.2: Set buffering state and pause active playback tracking
+    isBuffering.value = true
+    isActivelyPlaying.value = false  // Pause counter during buffering
 }
 
 const onPlaying = () => {
     // console.log('📹 Video started playing')
     isVideoLoading.value = false
+    
+    // ✅ Task 6.2: Clear buffering state and resume active playback tracking
+    isBuffering.value = false
+    
+    // Resume active playback tracking when video is actually playing
+    if (isPlaying.value && isVideoReady.value) {
+        isActivelyPlaying.value = true
+        lastActiveTimeUpdate.value = Date.now()
+    }
 }
 
 const onLoadedMetadata = () => {
@@ -910,6 +1019,7 @@ const onTimeUpdate = () => {
         const now = Date.now()
         if (now - lastTimeUpdate >= 1000) {  // Throttle to 1 second
             currentTime.value = videoElement.value.currentTime
+            previousSeekPosition = currentTime.value  // ✅ NEW: Track position for rewind detection (Task 6.4)
             lastTimeUpdate = now
         }
     }
@@ -919,8 +1029,21 @@ const onPlay = () => {
     isPlaying.value = true
     lastCurrentTime.value = currentTime.value
 
-    if (!sessionId.value) {
-        startSession()
+    // ✅ Task 8.1: Skip tracking for completed videos
+    if (!isCompleted.value) {
+        // ✅ Task 6.2: Start active playback tracking
+        // Only start if video is ready and not buffering
+        if (isVideoReady.value && !isBuffering.value && !isVideoLoading.value) {
+            isActivelyPlaying.value = true
+            lastActiveTimeUpdate.value = Date.now()
+        }
+
+        // ✅ NEW: Log resume event (Task 6.4)
+        logVideoEvent('resume')
+
+        if (!sessionId.value) {
+            startSession()
+        }
     }
 }
 
@@ -928,17 +1051,33 @@ const onPlay = () => {
 const onPause = () => {
     isPlaying.value = false
 
-    // Track pause count
-    pauseCountSinceLastHeartbeat.value++
-    totalPauseCount.value++
+    // ✅ Task 8.1: Skip tracking for completed videos
+    if (!isCompleted.value) {
+        // ✅ NEW: Stop active playback tracking (Task 6.2)
+        isActivelyPlaying.value = false
 
-    // console.log('⏸️ Pause detected, total pauses:', totalPauseCount.value)
+        // ✅ NEW: Log pause event (Task 6.4)
+        logVideoEvent('pause')
 
-    updateProgress()
+        // Track pause count
+        pauseCountSinceLastHeartbeat.value++
+        totalPauseCount.value++
+
+        // console.log('⏸️ Pause detected, total pauses:', totalPauseCount.value)
+
+        updateProgress()
+    } else {
+        // Still stop playback tracking even for completed videos
+        isActivelyPlaying.value = false
+    }
 }
 
 const onEnded = () => {
     isPlaying.value = false
+    
+    // ✅ Task 6.2: Stop active playback tracking when video ends
+    isActivelyPlaying.value = false
+    
     updateProgress()
     if (progressPercentage.value >= 100) {
         markCompleted()
@@ -957,10 +1096,23 @@ const onFullscreenChange = () => {
 }
 
 // ✅ Video seek event handler (will be added in onMounted)
+// ✅ Track previous position for rewind detection (Task 6.4)
+let previousSeekPosition = 0
 const onVideoSeeked = () => {
     // console.log('🔍 Manual seek detected via timeline')
     seekCountSinceLastHeartbeat.value++
     totalSeekCount.value++
+    
+    // ✅ NEW: Log rewind events (Task 6.4)
+    const currentPosition = currentTime.value
+    if (currentPosition < previousSeekPosition) {
+        // User rewound the video
+        logVideoEvent('rewind', {
+            startPosition: previousSeekPosition,
+            endPosition: currentPosition
+        })
+    }
+    previousSeekPosition = currentPosition
 }
 
 
@@ -973,7 +1125,17 @@ onMounted(async () => {
 
     // Initialize based on content type
     if (props.content.content_type === 'pdf') {
-        // ... your existing PDF initialization code ...
+        // Track PDF reading time (simple wall-clock time for PDFs)
+        const pdfTimeInterval = setInterval(() => {
+            if (isPdfLoaded.value && !isCompleted.value) {
+                pdfReadingTime.value++
+            }
+        }, 1000)
+        
+        // Store interval for cleanup
+        onUnmounted(() => {
+            clearInterval(pdfTimeInterval)
+        })
     } else if (props.content.content_type === 'video') {
         await nextTick()
         if (videoElement.value) {
@@ -992,13 +1154,13 @@ onMounted(async () => {
         }
     }, 600000)  // ✅ CHANGED: 10 minutes (was 180000 = 3 minutes) - reduces API calls by 70%
 
-    // ✅ NEW: Real-time session elapsed time tracking (every second)
-    sessionStartTime.value = Date.now()
-    const sessionTimeInterval = setInterval(() => {
-        if (sessionStartTime.value) {
-            sessionElapsedSeconds.value = Math.floor((Date.now() - sessionStartTime.value) / 1000)
+    // ✅ NEW: Active playback time tracking interval (Task 6.2)
+    // This is the ONLY timer we need - it tracks actual playback time
+    const activePlaybackInterval = setInterval(() => {
+        if (props.content.content_type === 'video' && !isCompleted.value) {
+            updateActivePlaybackTime()
         }
-    }, 1000)  // Update every second for live Time Spent display
+    }, 1000)  // Update every second
 
     // ✅ IMPROVED: Multiple cleanup handlers for reliability
    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -1016,6 +1178,9 @@ onMounted(async () => {
         formData.append('final_skip', skipCountSinceLastHeartbeat.value.toString())
         formData.append('final_seek', seekCountSinceLastHeartbeat.value.toString())
         formData.append('final_pause', pauseCountSinceLastHeartbeat.value.toString())
+        // ✅ NEW: Send active playback time and video events (Task 6.5)
+        formData.append('active_playback_time', Math.floor(activePlaybackTime.value).toString())
+        formData.append('video_events', JSON.stringify(videoEvents.value))
 
         const url = `/content/${props.content.id}/session`
 
@@ -1056,6 +1221,9 @@ onMounted(async () => {
         formData.append('final_skip', skipCountSinceLastHeartbeat.value.toString())
         formData.append('final_seek', seekCountSinceLastHeartbeat.value.toString())
         formData.append('final_pause', pauseCountSinceLastHeartbeat.value.toString())
+        // ✅ NEW: Send active playback time and video events (Task 6.5)
+        formData.append('active_playback_time', Math.floor(activePlaybackTime.value).toString())
+        formData.append('video_events', JSON.stringify(videoEvents.value))
 
         // ✅ Add CSRF token
         if (csrfToken) {
@@ -1086,7 +1254,7 @@ onMounted(async () => {
         // End session before unmounting
         endSession()
         clearInterval(progressInterval)
-        clearInterval(sessionTimeInterval)  // ✅ NEW: Clear session time interval
+        clearInterval(activePlaybackInterval)  // ✅ Clear active playback interval (Task 6.2)
 
         // Cleanup video event listener
         if (videoElement.value) {
@@ -1197,6 +1365,15 @@ watch(currentPage, (newPage) => {
                 <div class="lg:col-span-3">
                     <!-- Enhanced Video Player with Loading State -->
                     <Card v-if="content.content_type === 'video'" class="overflow-hidden">
+                        <!-- ✅ Task 8.2: Completed Video Indicator -->
+                        <div v-if="isCompleted" class="px-4 py-3 bg-green-50 border-b border-green-200">
+                            <div class="flex items-center gap-2 text-sm text-green-700">
+                                <CheckCircle class="h-4 w-4" />
+                                <span class="font-medium">Video Completed</span>
+                                <span class="text-green-600">• Re-watching is optional and untracked</span>
+                            </div>
+                        </div>
+                        
                         <CardContent class="p-0">
                             <div class="relative bg-black aspect-video">
                                 <!-- Video Element -->
@@ -1238,42 +1415,63 @@ watch(currentPage, (newPage) => {
                                     </div>
 
                                     <div class="flex items-center justify-between text-white">
-                                        <div class="flex items-center gap-2 sm:gap-4">
+                                        <div class="flex items-center gap-2 sm:gap-3">
+                                            <!-- Play/Pause Button - Larger and more prominent -->
                                             <Button @click="togglePlay" variant="ghost" size="sm"
-                                                class="text-white hover:bg-white/20">
-                                                <Play v-if="!isPlaying" class="h-5 w-5" />
-                                                <Pause v-else class="h-5 w-5" />
+                                                class="text-white hover:bg-white/20 hover:scale-110 transition-transform p-2">
+                                                <Play v-if="!isPlaying" class="h-6 w-6" />
+                                                <Pause v-else class="h-6 w-6" />
                                             </Button>
 
-                                            <Button @click="seekRelative(-10)" variant="ghost" size="sm"
-                                                class="text-white hover:bg-white/20">
-                                                <RotateCcw class="h-4 w-4" />
-                                            </Button>
-                                            <Button @click="seekRelative(10)" variant="ghost" size="sm"
-                                                class="text-white hover:bg-white/20">
-                                                <SkipForward class="h-4 w-4" />
-                                            </Button>
+                                            <!-- Rewind Button -->
+                                            <TooltipProvider>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <Button @click="seekRelative(-5)" variant="ghost" size="sm"
+                                                            class="text-white hover:bg-white/30 bg-white/10 transition-all hover:scale-105 px-3 py-1.5 rounded-lg">
+                                                            <RotateCcw class="h-4 w-4 mr-1.5" />
+                                                            <span class="text-sm font-semibold">5s</span>
+                                                        </Button>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>
+                                                        <p>Rewind 5 seconds</p>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
 
-                                            <span class="text-xs sm:text-sm whitespace-nowrap">{{ formattedCurrentTime
-                                                }} / {{ formattedDuration }}</span>
+                                            <!-- Time Display with better visibility -->
+                                            <div class="hidden sm:flex items-center bg-black/40 rounded-lg px-3 py-1.5">
+                                                <Clock class="h-3.5 w-3.5 mr-1.5 text-white/70" />
+                                                <span class="text-sm font-medium whitespace-nowrap">
+                                                    {{ formattedCurrentTime }} <span class="text-white/50">/</span> {{ formattedDuration }}
+                                                </span>
+                                            </div>
                                         </div>
 
-                                        <div class="flex items-center gap-2 sm:gap-4">
-                                            <div class="flex items-center gap-2">
-                                                <!-- ✅ FIXED: Added clickable mute button -->
+                                        <div class="flex items-center gap-2 sm:gap-3">
+                                            <!-- Volume Control Group -->
+                                            <div class="hidden sm:flex items-center gap-2 bg-white/10 rounded-lg px-2 py-1">
                                                 <Button @click="toggleMute" variant="ghost" size="sm"
-                                                    class="text-white hover:bg-white/20 p-1">
+                                                    class="text-white hover:bg-white/20 p-1.5 transition-all hover:scale-105">
                                                     <VolumeX v-if="isMuted" class="h-4 w-4" />
                                                     <Volume2 v-else class="h-4 w-4" />
                                                 </Button>
                                                 <input type="range" :value="volume" min="0" max="1" step="0.1"
                                                     @input="setVolume(Number(($event.target as HTMLInputElement).value))"
-                                                    class="w-20 h-1 bg-white/30 rounded-lg appearance-none cursor-pointer" />
+                                                    class="w-20 h-1 bg-white/30 rounded-lg appearance-none cursor-pointer volume-slider" />
                                             </div>
 
+                                            <!-- Mobile: Mute button only -->
+                                            <Button @click="toggleMute" variant="ghost" size="sm"
+                                                class="sm:hidden text-white hover:bg-white/20 p-2">
+                                                <VolumeX v-if="isMuted" class="h-5 w-5" />
+                                                <Volume2 v-else class="h-5 w-5" />
+                                            </Button>
+
+                                            <!-- Fullscreen Button -->
                                             <Button @click="toggleFullscreen" variant="ghost" size="sm"
-                                                class="text-white hover:bg-white/20">
-                                                <Maximize class="h-4 w-4" />
+                                                class="text-white hover:bg-white/20 p-2 transition-all hover:scale-105">
+                                                <Maximize class="h-5 w-5" />
                                             </Button>
                                         </div>
                                     </div>
@@ -1502,20 +1700,38 @@ watch(currentPage, (newPage) => {
                         </CardContent>
                     </Card>
 
-                    <!-- Time Spent Card -->
-                    <Card>
+                    <!-- Time Spent Card (Hidden for completed videos) -->
+                    <Card v-if="!isCompleted">
                         <CardContent class="p-4">
                             <div class="flex items-center justify-between mb-2">
                                 <span class="text-sm font-medium flex items-center gap-2">
                                     <Timer class="h-4 w-4 text-green-500" />
-                                    Time Spent
+                                    Active Time
                                 </span>
                             </div>
                             <div class="text-lg font-bold text-green-600">
                                 {{ content.content_type === 'pdf' ? formattedPdfReadingTime : formattedTimeSpent }}
                             </div>
                             <div class="text-xs text-muted-foreground">
-                                Learning session
+                                Only counts when playing
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <!-- Expected Time Card (Video only, not completed) -->
+                    <Card v-if="content.content_type === 'video' && allowedTimeDisplay && !isCompleted">
+                        <CardContent class="p-4">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-sm font-medium flex items-center gap-2">
+                                    <Clock class="h-4 w-4 text-amber-500" />
+                                    Expected Time
+                                </span>
+                            </div>
+                            <div class="text-sm text-muted-foreground">
+                                {{ allowedTimeDisplay }}
+                            </div>
+                            <div class="text-xs text-muted-foreground mt-1">
+                                Video Duration × 2
                             </div>
                         </CardContent>
                     </Card>
@@ -1640,10 +1856,38 @@ watch(currentPage, (newPage) => {
     cursor: pointer;
     border: 2px solid #000;
     box-shadow: 0 0 2px rgba(0,0,0,0.5);
+    transition: transform 0.2s;
+}
+
+.slider::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
 }
 
 .slider::-webkit-slider-track {
     height: 4px;
+    cursor: pointer;
+    background: rgba(255,255,255,0.3);
+    border-radius: 2px;
+}
+
+/* Volume slider styles */
+.volume-slider::-webkit-slider-thumb {
+    appearance: none;
+    height: 12px;
+    width: 12px;
+    border-radius: 50%;
+    background: white;
+    cursor: pointer;
+    box-shadow: 0 0 4px rgba(0,0,0,0.3);
+    transition: transform 0.2s;
+}
+
+.volume-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.3);
+}
+
+.volume-slider::-webkit-slider-track {
+    height: 3px;
     cursor: pointer;
     background: rgba(255,255,255,0.3);
     border-radius: 2px;

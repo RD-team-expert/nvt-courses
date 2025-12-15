@@ -92,6 +92,54 @@ class LearningSessionService
 
 
     /**
+     * Update session with active playback time
+     * 
+     * @param int $sessionId
+     * @param int $activePlaybackSeconds Active playback time in seconds
+     * @param array $videoEvents Array of video events (pause, resume, rewind)
+     * @return LearningSession
+     */
+    public function updateActivePlaybackTime(
+        int $sessionId,
+        int $activePlaybackSeconds,
+        array $videoEvents = []
+    ): LearningSession {
+        $session = LearningSession::findOrFail($sessionId);
+
+        if ($session->session_end) {
+            throw new \Exception('Cannot update ended session');
+        }
+
+        $session->update([
+            'active_playback_time' => $activePlaybackSeconds,
+            'video_events' => $videoEvents,
+        ]);
+
+        return $session->fresh();
+    }
+
+    /**
+     * Check if session is within allowed time window
+     * Allowed time = Video Duration × 2
+     * 
+     * @param LearningSession $session
+     * @return bool
+     */
+    public function isWithinAllowedTime(LearningSession $session): bool
+    {
+        $content = $session->content;
+        $videoDurationMinutes = $this->getExpectedDuration($content);
+        
+        // Calculate allowed time as Duration × 2
+        $allowedTimeMinutes = $videoDurationMinutes * 2;
+        
+        // Convert active playback time from seconds to minutes
+        $activePlaybackMinutes = ($session->active_playback_time ?? 0) / 60;
+        
+        return $activePlaybackMinutes <= $allowedTimeMinutes;
+    }
+
+    /**
      * Update session with heartbeat data (called every ~10 seconds)
      * Uses cumulative/incremental tracking
      */
@@ -176,22 +224,32 @@ class LearningSessionService
     $totalSeeks = ($session->seek_count ?? 0) + $finalSeekIncrement;
     $totalPauses = ($session->pause_count ?? 0) + $finalPauseIncrement;
 
-    // Calculate scores
-    $attentionScore = $this->calculateAttentionScore(
-        $totalDuration,
+    // Calculate if within allowed time (Duration × 2)
+    $isWithinAllowedTime = $this->isWithinAllowedTime($session);
+
+    // Calculate scores using active playback time if available
+    $durationForScore = $totalDuration;
+    if ($session->active_playback_time) {
+        // Use active playback time (convert from seconds to minutes)
+        $durationForScore = (int) ceil($session->active_playback_time / 60);
+    }
+
+    $attentionScore = $this->calculateAttentionScoreWithActiveTime(
+        $durationForScore,
         $content,
-        $completionPercentage
+        $completionPercentage,
+        $isWithinAllowedTime
     );
 
     $cheatingScore = $this->calculateCheatingScore(
-        $totalDuration,
+        $durationForScore,
         $content,
         $totalSkips,
         $completionPercentage
     );
 
     $isSuspicious = $this->detectSuspiciousBehavior(
-        $totalDuration,
+        $durationForScore,
         $content,
         $totalSkips,
         $completionPercentage
@@ -210,6 +268,7 @@ class LearningSessionService
         'attention_score' => $attentionScore,
         'cheating_score' => $cheatingScore,
         'is_suspicious_activity' => $isSuspicious,
+        'is_within_allowed_time' => $isWithinAllowedTime,
     ]);
 
 
@@ -247,6 +306,58 @@ class LearningSessionService
         // Completion scoring
         if ($completionPercentage >= 90) {
             $score += 20;
+        } elseif ($completionPercentage < 20) {
+            $score -= 25;
+        }
+
+        return max(0, min(100, $score));
+    }
+
+    /**
+     * Calculate attention score using active playback time
+     * No penalties for pauses/rewinds within allowed time (Duration × 2)
+     * 
+     * @param int $activePlaybackMinutes Active playback time in minutes
+     * @param ModuleContent $content
+     * @param float $completionPercentage
+     * @param bool $isWithinAllowedTime Whether session is within allowed time window
+     * @return int Score from 0-100
+     */
+    public function calculateAttentionScoreWithActiveTime(
+        int $activePlaybackMinutes,
+        ModuleContent $content,
+        float $completionPercentage,
+        bool $isWithinAllowedTime
+    ): int {
+        $score = 50; // Base score
+
+        // Get expected duration
+        $expectedDuration = $this->getExpectedDuration($content);
+
+        if ($expectedDuration > 0) {
+            $timeRatio = $activePlaybackMinutes / $expectedDuration;
+
+            // Within allowed time window - no "too long" penalty
+            if ($isWithinAllowedTime) {
+                // Good active playback time
+                if ($timeRatio >= 0.8 && $timeRatio <= 2.0) {
+                    $score += 25; // Good pace, within allowed window
+                } elseif ($timeRatio >= 0.5) {
+                    $score += 15; // Acceptable pace
+                } elseif ($timeRatio < 0.3) {
+                    $score -= 30; // Too fast (suspicious)
+                }
+            } else {
+                // Exceeded allowed time window - apply penalty
+                $score -= 20; // Penalty for exceeding allowed time
+            }
+        }
+
+        // Completion scoring
+        if ($completionPercentage >= 90) {
+            $score += 20;
+        } elseif ($completionPercentage >= 70) {
+            $score += 10;
         } elseif ($completionPercentage < 20) {
             $score -= 25;
         }

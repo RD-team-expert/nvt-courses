@@ -287,4 +287,180 @@ class LearningSessionServiceTest extends TestCase
         $abandoned->refresh();
         $this->assertNotNull($abandoned->session_end);
     }
+
+    /**
+     * Test 11: Update active playback time updates session correctly
+     */
+    public function test_update_active_playback_time_updates_session()
+    {
+        // Arrange
+        $session = LearningSession::factory()->create([
+            'active_playback_time' => 0,
+            'video_events' => [],
+        ]);
+
+        $videoEvents = [
+            ['type' => 'pause', 'timestamp' => 1234567890, 'position' => 30],
+            ['type' => 'resume', 'timestamp' => 1234567900, 'position' => 30],
+        ];
+
+        // Act
+        $updated = $this->service->updateActivePlaybackTime(
+            $session->id,
+            120, // 2 minutes of active playback
+            $videoEvents
+        );
+
+        // Assert
+        $this->assertEquals(120, $updated->active_playback_time);
+        $this->assertCount(2, $updated->video_events);
+        $this->assertEquals('pause', $updated->video_events[0]['type']);
+    }
+
+    /**
+     * Test 12: Is within allowed time returns true when within limit
+     */
+    public function test_is_within_allowed_time_returns_true_when_within_limit()
+    {
+        // Arrange
+        $course = CourseOnline::factory()->create();
+        $module = CourseModule::factory()->create(['course_online_id' => $course->id]);
+        $video = Video::factory()->create(['duration' => 600]); // 10 minutes
+        $content = ModuleContent::factory()->withVideo($video)->create([
+            'module_id' => $module->id,
+        ]);
+
+        $session = LearningSession::factory()->create([
+            'content_id' => $content->id,
+            'active_playback_time' => 900, // 15 minutes (within 10 * 2 = 20 minutes)
+        ]);
+
+        // Act
+        $isWithin = $this->service->isWithinAllowedTime($session);
+
+        // Assert
+        $this->assertTrue($isWithin);
+    }
+
+    /**
+     * Test 13: Is within allowed time returns false when exceeding limit
+     */
+    public function test_is_within_allowed_time_returns_false_when_exceeding_limit()
+    {
+        // Arrange
+        $course = CourseOnline::factory()->create();
+        $module = CourseModule::factory()->create(['course_online_id' => $course->id]);
+        $video = Video::factory()->create(['duration' => 600]); // 10 minutes
+        $content = ModuleContent::factory()->withVideo($video)->create([
+            'module_id' => $module->id,
+        ]);
+
+        $session = LearningSession::factory()->create([
+            'content_id' => $content->id,
+            'active_playback_time' => 1500, // 25 minutes (exceeds 10 * 2 = 20 minutes)
+        ]);
+
+        // Act
+        $isWithin = $this->service->isWithinAllowedTime($session);
+
+        // Assert
+        $this->assertFalse($isWithin);
+    }
+
+    /**
+     * Test 14: End session sets is_within_allowed_time flag correctly
+     */
+    public function test_end_session_sets_is_within_allowed_time_flag()
+    {
+        // Arrange
+        $user = User::factory()->create();
+        $course = CourseOnline::factory()->create();
+        $module = CourseModule::factory()->create(['course_online_id' => $course->id]);
+        $video = Video::factory()->create(['duration' => 600]); // 10 minutes
+        $content = ModuleContent::factory()->withVideo($video)->create([
+            'module_id' => $module->id,
+        ]);
+        
+        $session = LearningSession::factory()->create([
+            'user_id' => $user->id,
+            'content_id' => $content->id,
+            'course_online_id' => $course->id,
+            'session_start' => now()->subMinutes(15),
+            'active_playback_time' => 900, // 15 minutes (within 20 minute limit)
+        ]);
+
+        // Act
+        $ended = $this->service->endSession(
+            $session->id,
+            600,
+            95,
+            0,
+            0,
+            0,
+            0
+        );
+
+        // Assert
+        $this->assertNotNull($ended->is_within_allowed_time);
+        $this->assertTrue($ended->is_within_allowed_time);
+    }
+
+    /**
+     * Test 15: Calculate attention score with active time gives bonus for within allowed time
+     */
+    public function test_calculate_attention_score_with_active_time_within_allowed()
+    {
+        // Arrange
+        $course = CourseOnline::factory()->create();
+        $module = CourseModule::factory()->create(['course_online_id' => $course->id]);
+        $video = Video::factory()->create(['duration' => 600]); // 10 minutes
+        $content = ModuleContent::factory()->withVideo($video)->create([
+            'module_id' => $module->id,
+        ]);
+
+        // Act - 12 minutes active playback for 10-minute video, within allowed time
+        $score = $this->service->calculateAttentionScoreWithActiveTime(
+            12,
+            $content,
+            95,
+            true // within allowed time
+        );
+
+        // Assert - Should have high score (no penalty)
+        $this->assertGreaterThan(70, $score);
+        $this->assertLessThanOrEqual(100, $score);
+    }
+
+    /**
+     * Test 16: Calculate attention score with active time applies penalty for exceeding allowed time
+     */
+    public function test_calculate_attention_score_with_active_time_exceeds_allowed()
+    {
+        // Arrange
+        $course = CourseOnline::factory()->create();
+        $module = CourseModule::factory()->create(['course_online_id' => $course->id]);
+        $video = Video::factory()->create(['duration' => 600]); // 10 minutes
+        $content = ModuleContent::factory()->withVideo($video)->create([
+            'module_id' => $module->id,
+        ]);
+
+        // Act - 25 minutes active playback for 10-minute video, exceeds allowed time
+        $scoreExceeded = $this->service->calculateAttentionScoreWithActiveTime(
+            25,
+            $content,
+            95,
+            false // exceeded allowed time
+        );
+
+        // Compare with within allowed time
+        $scoreWithin = $this->service->calculateAttentionScoreWithActiveTime(
+            12,
+            $content,
+            95,
+            true
+        );
+
+        // Assert - Exceeded score should be lower due to penalty
+        $this->assertLessThan($scoreWithin, $scoreExceeded);
+    }
 }

@@ -105,6 +105,9 @@
                                 <th scope="col" class="hidden lg:table-cell px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider sm:px-6">
                                     Total Points
                                 </th>
+                                <th scope="col" class="hidden xl:table-cell px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider sm:px-6">
+                                    Time Limit
+                                </th>
                                 <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider sm:px-6">
                                     Actions
                                 </th>
@@ -146,6 +149,15 @@
                                 </td>
                                 <td class="hidden lg:table-cell px-4 py-4 text-sm text-muted-foreground sm:px-6">
                                     {{ quiz.total_points }}
+                                </td>
+                                <td class="hidden xl:table-cell px-4 py-4 text-sm text-muted-foreground sm:px-6">
+                                    <span v-if="quiz.time_limit_minutes" class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400">
+                                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        {{ quiz.time_limit_minutes }} min
+                                    </span>
+                                    <span v-else class="text-muted-foreground text-xs">No limit</span>
                                 </td>
                                 <td class="px-4 py-4 text-sm font-medium sm:px-6">
                                     <div class="flex items-center gap-1 sm:gap-2">
