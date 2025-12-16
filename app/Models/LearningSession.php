@@ -39,6 +39,11 @@ class LearningSession extends Model
         'is_suspicious_activity',
         'cheating_score',
         'attention_score',
+
+        // Active playback tracking (NEW)
+        'active_playback_time',
+        'is_within_allowed_time',
+        'video_events',
     ];
 
     protected $casts = [
@@ -58,6 +63,9 @@ class LearningSession extends Model
         'is_suspicious_activity' => 'boolean',
         'cheating_score' => 'integer',
         'attention_score' => 'integer',
+        'active_playback_time' => 'integer',
+        'is_within_allowed_time' => 'boolean',
+        'video_events' => 'array',
     ];
 
     // Relationships

@@ -128,13 +128,22 @@ class ContentViewController extends Controller
                         return response()->json(['success' => false, 'message' => 'No active session'], 404);
                     }
 
+                    // ✅ NEW: Update active playback time if provided (Task 6.5)
+                    if ($request->has('active_playback_time')) {
+                        $this->sessionService->updateActivePlaybackTime(
+                            $session->id,
+                            $request->input('active_playback_time', 0),
+                            [] // Video events are only sent on session end
+                        );
+                    }
+
                     $updated = $this->sessionService->updateHeartbeat(
                         $session->id,
                         $request->input('current_position', 0),
-                        $request->input('watch_time_increment', 0),
-                        $request->input('skip_count_increment', 0),
-                        $request->input('seek_count_increment', 0),
-                        $request->input('pause_count_increment', 0)
+                        $request->input('watch_time', 0), // ✅ FIXED: Changed from watch_time_increment to watch_time
+                        $request->input('skip_count', 0), // ✅ FIXED: Changed from skip_count_increment to skip_count
+                        $request->input('seek_count', 0), // ✅ FIXED: Changed from seek_count_increment to seek_count
+                        $request->input('pause_count', 0) // ✅ FIXED: Changed from pause_count_increment to pause_count
                     );
 
 
@@ -152,17 +161,46 @@ class ContentViewController extends Controller
                         return response()->json(['success' => false, 'message' => 'No active session'], 404);
                     }
 
+                    // ✅ NEW: Update active playback time and video events before ending (Task 6.5)
+                    if ($request->has('active_playback_time')) {
+                        $videoEvents = $request->input('video_events', []);
+                        
+                        // Handle video_events as JSON string (from FormData) or array
+                        if (is_string($videoEvents)) {
+                            $videoEvents = json_decode($videoEvents, true) ?? [];
+                        }
+                        
+                        $this->sessionService->updateActivePlaybackTime(
+                            $session->id,
+                            $request->input('active_playback_time', 0),
+                            $videoEvents
+                        );
+                    }
+
                     $ended = $this->sessionService->endSession(
                         $session->id,
-                        $request->input('final_position', 0),
+                        $request->input('final_position', $request->input('current_position', 0)),
                         $request->input('completion_percentage', 0),
-                        $request->input('final_watch_time', 0),
-                        $request->input('final_skip', 0),
-                        $request->input('final_seek', 0),
-                        $request->input('final_pause', 0)
+                        $request->input('final_watch_time', $request->input('watch_time', 0)),
+                        $request->input('final_skip', $request->input('skip_count', 0)),
+                        $request->input('final_seek', $request->input('seek_count', 0)),
+                        $request->input('final_pause', $request->input('pause_count', 0))
                     );
 
-
+                    // ✅ NEW: Update user progress with active playback time from this session
+                    $progress = $this->progressService->getOrCreateProgress($user, $content);
+                    
+                    // Calculate total watch time: previous sessions + this session's active playback
+                    $activePlaybackMinutes = ($ended->active_playback_time ?? 0) / 60;
+                    $totalWatchTime = ($progress->watch_time ?? 0) + $activePlaybackMinutes;
+                    
+                    // Update progress with new watch time
+                    $this->progressService->updateProgress(
+                        $progress->id,
+                        $request->input('final_position', 0),
+                        $request->input('completion_percentage', 0),
+                        (int) $totalWatchTime
+                    );
 
                     return response()->json([
                         'success' => true,
