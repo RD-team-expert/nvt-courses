@@ -39,4 +39,10 @@ return [
         'api_key' => env('GEMINI_API_KEY'),
     ],
 
+    'transcoding' => [
+        'url' => env('TRANSCODING_URL', 'http://your-vps-ip:2680'),
+        'api_key' => env('TRANSCODING_API_KEY'),
+        'project_key' => env('TRANSCODING_PROJECT_KEY', 'school_project'),
+    ],
+
 ];

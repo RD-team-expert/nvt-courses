@@ -29,6 +29,9 @@ class Video extends Model
         'file_size',
         'mime_type',
         'duration_seconds',
+        
+        // VPS TRANSCODING
+        'transcode_status',
     ];
 
     protected $casts = [
@@ -156,6 +159,19 @@ class Video extends Model
     {
         return $this->hasMany(UserContentProgress::class, 'video_id');
     }
+
+    // ============================================
+    // VPS TRANSCODING RELATIONSHIPS
+    // ============================================
+
+    /**
+     * Get all quality variants for this video
+     */
+    public function qualities(): HasMany
+    {
+        return $this->hasMany(VideoQuality::class);
+    }
+
     // ============================================
     // NEW METHODS FOR DUAL STORAGE SUPPORT
     // ============================================
@@ -214,6 +230,64 @@ class Video extends Model
         };
     }
 
+    // ============================================
+    // VPS TRANSCODING HELPER METHODS
+    // ============================================
+
+    /**
+     * Check if video has multiple quality variants
+     */
+    public function hasMultipleQualities(): bool
+    {
+        return $this->qualities()->count() > 0;
+    }
+
+    /**
+     * Get available quality options including original
+     */
+    public function getAvailableQualities(): array
+    {
+        $qualities = $this->qualities()->pluck('quality')->toArray();
+        // Always include 'original' as an option
+        return array_merge(['original'], $qualities);
+    }
+
+    /**
+     * Get file path for specific quality
+     */
+    public function getQualityPath(string $quality): ?string
+    {
+        if ($quality === 'original') {
+            return $this->file_path;
+        }
+        $qualityRecord = $this->qualities()->where('quality', $quality)->first();
+        return $qualityRecord?->file_path;
+    }
+
+    /**
+     * Check if video is currently being transcoded
+     */
+    public function isTranscoding(): bool
+    {
+        return $this->transcode_status === 'processing';
+    }
+
+    /**
+     * Check if transcoding is complete
+     */
+    public function isTranscodeComplete(): bool
+    {
+        return $this->transcode_status === 'completed';
+    }
+
+    /**
+     * Check if transcoding failed
+     */
+    public function isTranscodeFailed(): bool
+    {
+        return $this->transcode_status === 'failed';
+    }
+
    
     /**
      * Delete the stored file(s) for local videos
@@ -222,6 +296,7 @@ class Video extends Model
     {
         $deletedMain = true;
         $deletedThumb = true;
+        $deletedQualities = true;
 
         // 🧹 Delete main video file (only for local storage)
         if ($this->isLocal() && $this->file_path) {
@@ -237,7 +312,20 @@ class Video extends Model
             }
         }
 
-        return $deletedMain && $deletedThumb;
+        // 🧹 Delete all quality variants
+        foreach ($this->qualities as $quality) {
+            if (!$quality->deleteFile()) {
+                $deletedQualities = false;
+            }
+        }
+        
+        // Delete quality directory
+        $qualityDir = "videos/transcoded/{$this->id}";
+        if (Storage::disk('public')->exists($qualityDir)) {
+            Storage::disk('public')->deleteDirectory($qualityDir);
+        }
+
+        return $deletedMain && $deletedThumb && $deletedQualities;
     }
 }
 

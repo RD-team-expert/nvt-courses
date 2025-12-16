@@ -60,6 +60,10 @@ class ContentDataService
         'streaming_url' => $streamingData['streaming_url'] ?? null,  // ✅ This is correct
         'key_id' => $streamingData['key_id'] ?? null,
         'key_name' => $streamingData['key_name'] ?? null,
+        // VPS Transcoding data
+        'transcode_status' => $video->transcode_status,
+        'available_qualities' => $video->getAvailableQualities(),
+        'has_multiple_qualities' => $video->hasMultipleQualities(),
     ];
 }
 
