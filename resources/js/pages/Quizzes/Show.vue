@@ -52,7 +52,7 @@ const form = ref({
 })
 const submitting = ref(false)
 const savingDraft = ref(false)
-const timeRemaining = ref(props.quiz.time_limit ? props.quiz.time_limit * 60 : 0)
+const timeRemaining = ref(props.quiz.time_limit_minutes ? props.quiz.time_limit_minutes * 60 : 0)
 const timerInterval = ref(null)
 
 // Initialize form answers based on question types
@@ -66,7 +66,7 @@ onMounted(() => {
     })
 
     // Start timer if time limit exists
-    if (props.quiz.time_limit && timeRemaining.value > 0) {
+    if (props.quiz.time_limit_minutes && timeRemaining.value > 0) {
         timerInterval.value = setInterval(() => {
             timeRemaining.value--
             if (timeRemaining.value <= 0) {
@@ -214,7 +214,7 @@ const handleCheckboxChange = (questionId, option, checked) => {
                                                 <Timer class="h-4 w-4 text-orange-600" />
                                                 <p class="text-muted-foreground">Time Limit</p>
                                             </div>
-                                            <p class="font-semibold">{{ quiz.time_limit ? `${quiz.time_limit} min` : 'No limit' }}</p>
+                                            <p class="font-semibold">{{ quiz.time_limit_minutes ? `${quiz.time_limit_minutes} min` : 'No limit' }}</p>
                                         </CardContent>
                                     </Card>
                                 </div>
@@ -231,7 +231,7 @@ const handleCheckboxChange = (questionId, option, checked) => {
                 </Card>
 
                 <!-- Timer (if time limit exists) -->
-                <Card v-if="quiz.time_limit && timeRemaining > 0" class="mb-6">
+                <Card v-if="quiz.time_limit_minutes && timeRemaining > 0" class="mb-6">
                     <CardContent class="p-4">
                         <div class="flex items-center justify-between">
                             <div class="flex items-center">
@@ -249,7 +249,7 @@ const handleCheckboxChange = (questionId, option, checked) => {
                         </div>
                         <div class="mt-2">
                             <Progress
-                                :value="(timeRemaining / (quiz.time_limit * 60)) * 100"
+                                :value="(timeRemaining / (quiz.time_limit_minutes * 60)) * 100"
                                 :class="timeRemaining < 300 ? 'text-destructive' : 'text-primary'"
                             />
                         </div>

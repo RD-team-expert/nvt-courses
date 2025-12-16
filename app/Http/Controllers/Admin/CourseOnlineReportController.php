@@ -245,10 +245,10 @@ class CourseOnlineReportController extends Controller
                 $calculatedDuration = $this->getActualSessionDuration($session->session_start, $session->session_end);
                 $storedDuration = $session->total_duration_minutes ?? 0;
 
-                // ✅ Get full session data for skip/seek tracking
+                // ✅ Get full session data for skip/seek tracking AND active playback time
                 $fullSessionData = DB::table('learning_sessions')
                     ->where('id', $session->id)
-                    ->select('video_skip_count', 'seek_count', 'pause_count', 'video_replay_count', 'video_completion_percentage', 'content_id')
+                    ->select('video_skip_count', 'seek_count', 'pause_count', 'video_replay_count', 'video_completion_percentage', 'content_id', 'active_playback_time', 'is_within_allowed_time')
                     ->first();
                 
                 $contentId = $fullSessionData->content_id ?? null;
@@ -264,6 +264,11 @@ class CourseOnlineReportController extends Controller
                 
                 $simulatedAttention = $attentionResult['score'];
                 $isSuspicious = $attentionResult['is_suspicious'];
+                
+                // ✅ Extract active playback time and allowed time info
+                $activePlaybackMinutes = $attentionResult['active_playback_minutes'] ?? 0;
+                $isWithinAllowedTime = $attentionResult['is_within_allowed_time'] ?? true;
+                $allowedTimeMinutes = $attentionResult['allowed_time_minutes'] ?? 0;
 
                 return [
                     'id' => $session->id,
@@ -280,6 +285,13 @@ class CourseOnlineReportController extends Controller
                     'calculated_duration' => $this->formatDuration($calculatedDuration),
                     'duration' => $this->formatDuration($calculatedDuration),
                     'duration_minutes' => $calculatedDuration,
+                    // ✅ NEW: Active playback time fields
+                    'active_playback_minutes' => round($activePlaybackMinutes, 1),
+                    'active_playback_formatted' => $this->formatDuration($activePlaybackMinutes),
+                    'is_within_allowed_time' => $isWithinAllowedTime,
+                    'allowed_time_minutes' => round($allowedTimeMinutes, 1),
+                    'allowed_time_formatted' => $this->formatDuration($allowedTimeMinutes),
+                    // Existing fields
                     'stored_attention' => $session->attention_score ?? 0,
                     'simulated_attention' => $simulatedAttention,
                     'attention_score' => $simulatedAttention,
@@ -474,23 +486,37 @@ class CourseOnlineReportController extends Controller
     // =====================================
 
     /**
-     * 🔧 UPDATED: Calculate attention score based on session behavior
+     * 🔧 UPDATED: Calculate attention score using ACTIVE PLAYBACK TIME
      * Score starts at 0 and is completely earned through proper behavior
+     * No penalties for pauses/rewinds within allowed time (Duration × 2)
+     * Only penalizes skip forward behavior
      *
      * @param string|null $sessionStart Session start time
      * @param string|null $sessionEnd Session end time
-     * @param float $calculatedDuration Calculated duration in minutes
+     * @param float $calculatedDuration Calculated duration in minutes (DEPRECATED - use active_playback_time)
      * @param int|null $contentId Content ID for video duration lookup
-     * @param object|null $sessionData Session data with skip/seek counts
-     * @return array ['score' => int, 'is_suspicious' => bool, 'details' => array]
+     * @param object|null $sessionData Session data with skip/seek counts and active_playback_time
+     * @return array ['score' => int, 'is_suspicious' => bool, 'details' => array, 'is_within_allowed_time' => bool, 'active_playback_minutes' => float, 'allowed_time_minutes' => float]
      */
     private function calculateSimulatedAttentionScore($sessionStart, $sessionEnd, $calculatedDuration, $contentId = null, $sessionData = null)
     {
         $details = [];
         $isSuspicious = false;
         
-        if ($calculatedDuration <= 0) {
-            return ['score' => 0, 'is_suspicious' => true, 'details' => ['No duration recorded']];
+        // ✅ Use ACTIVE playback time if available, otherwise fall back to calculated duration
+        $activePlaybackMinutes = isset($sessionData->active_playback_time) && $sessionData->active_playback_time > 0
+            ? ($sessionData->active_playback_time / 60)
+            : $calculatedDuration;
+        
+        if ($activePlaybackMinutes <= 0) {
+            return [
+                'score' => 0, 
+                'is_suspicious' => true, 
+                'details' => ['No active playback time recorded'],
+                'is_within_allowed_time' => false,
+                'active_playback_minutes' => 0,
+                'allowed_time_minutes' => 0,
+            ];
         }
 
         try {
@@ -509,47 +535,44 @@ class CourseOnlineReportController extends Controller
                 }
             }
             
-            // ✅ Video duration matching (up to 30 points)
+            // ✅ Calculate allowed time window (Duration × 2)
+            $allowedTimeMinutes = $videoDurationMinutes ? ($videoDurationMinutes * 2) : 90; // Default 90 min if no video duration
+            
+            // ✅ Check if within allowed time window
+            $isWithinAllowedTime = $activePlaybackMinutes <= $allowedTimeMinutes;
+            
+            // ✅ Active playback time matching (up to 30 points)
             if ($videoDurationMinutes && $videoDurationMinutes > 0) {
-                $durationDiff = abs($calculatedDuration - $videoDurationMinutes);
-                
-                if ($durationDiff <= 2) {
-                    // Perfect match (within 2 minutes)
-                    $score += 30;
-                    $details[] = 'Perfect duration match (+30)';
-                } elseif ($calculatedDuration >= $videoDurationMinutes * 0.8 && $calculatedDuration <= $videoDurationMinutes * 1.5) {
-                    // Good match (80%-150% of video duration)
-                    $score += 20;
-                    $details[] = 'Good duration match (+20)';
-                } elseif ($calculatedDuration >= $videoDurationMinutes * 0.5) {
-                    // Acceptable (at least 50% of video)
-                    $score += 10;
-                    $details[] = 'Acceptable duration (+10)';
+                if ($isWithinAllowedTime) {
+                    // Within allowed time - good score, no "too long" penalty
+                    if ($activePlaybackMinutes >= $videoDurationMinutes * 0.8) {
+                        $score += 30;
+                        $details[] = 'Good active playback time (+30)';
+                    } elseif ($activePlaybackMinutes >= $videoDurationMinutes * 0.5) {
+                        $score += 20;
+                        $details[] = 'Acceptable active playback time (+20)';
+                    } else {
+                        $score += 10;
+                        $details[] = 'Short active playback time (+10)';
+                    }
                 } else {
-                    $details[] = 'Duration too short (no bonus)';
-                }
-                
-                // ✅ Suspicious activity detection based on video duration
-                if ($calculatedDuration < ($videoDurationMinutes * 0.3)) {
+                    // Exceeded allowed time - apply penalty
+                    $score += 5;
+                    $details[] = 'Exceeded allowed time window (+5)';
                     $isSuspicious = true;
-                    $details[] = 'SUSPICIOUS: Duration less than 30% of video';
-                }
-                if ($calculatedDuration > ($videoDurationMinutes * 3)) {
-                    $isSuspicious = true;
-                    $details[] = 'SUSPICIOUS: Duration more than 3x video length';
                 }
             } else {
                 // Fallback: Duration-based scoring without video reference (up to 20 points)
-                if ($calculatedDuration >= 10 && $calculatedDuration <= 45) {
+                if ($activePlaybackMinutes >= 10 && $activePlaybackMinutes <= 45) {
                     $score += 20;
                     $details[] = 'Good session duration (+20)';
-                } elseif ($calculatedDuration >= 5 && $calculatedDuration < 10) {
+                } elseif ($activePlaybackMinutes >= 5 && $activePlaybackMinutes < 10) {
                     $score += 15;
                     $details[] = 'Short focused session (+15)';
-                } elseif ($calculatedDuration > 45 && $calculatedDuration <= 60) {
+                } elseif ($activePlaybackMinutes > 45 && $activePlaybackMinutes <= 60) {
                     $score += 10;
                     $details[] = 'Long session (+10)';
-                } elseif ($calculatedDuration > 60) {
+                } elseif ($activePlaybackMinutes > 60) {
                     $score += 5;
                     $details[] = 'Very long session (+5)';
                 } else {
@@ -563,55 +586,25 @@ class CourseOnlineReportController extends Controller
                 $details[] = 'Session completed (+5)';
             }
             
-            // ✅ Engagement bonuses (up to 20 points)
-            if ($sessionData) {
-                // Pause count indicates engagement
+            // ✅ Pauses and rewinds do NOT affect score if within allowed time
+            if ($sessionData && $isWithinAllowedTime) {
                 $pauseCount = $sessionData->pause_count ?? 0;
-                if ($pauseCount > 0 && $pauseCount <= 10) {
-                    $score += 10;
-                    $details[] = 'Good pause behavior (+10)';
-                } elseif ($pauseCount > 10) {
-                    $score += 5;
-                    $details[] = 'Excessive pausing (+5)';
-                }
-                
-                // Replay count indicates attention to detail
                 $replayCount = $sessionData->video_replay_count ?? 0;
-                if ($replayCount > 0 && $replayCount <= 5) {
+                
+                // Pauses are normal behavior - give bonus for engagement
+                if ($pauseCount > 0 && $pauseCount <= 20) {
                     $score += 10;
-                    $details[] = 'Replay behavior (+10)';
-                } elseif ($replayCount > 5) {
-                    $score += 5;
-                    $details[] = 'Excessive replays (+5)';
+                    $details[] = 'Normal pause behavior (+10)';
+                }
+                
+                // Replays show attention to detail
+                if ($replayCount > 0 && $replayCount <= 10) {
+                    $score += 10;
+                    $details[] = 'Replay behavior shows engagement (+10)';
                 }
             }
             
-            // ✅ STRICT Skip/Seek penalties
-            if ($sessionData) {
-                $skipCount = $sessionData->video_skip_count ?? 0;
-                $seekCount = $sessionData->seek_count ?? 0;
-                
-                // ONE skip forward = immediate major penalty
-                if ($skipCount >= 1) {
-                    $score -= 50;
-                    $isSuspicious = true;
-                    $details[] = "PENALTY: Skip detected (-50, suspicious)";
-                }
-                
-                // 3+ seeks = attention penalty
-                if ($seekCount >= 3) {
-                    $score -= 20;
-                    $details[] = "PENALTY: Excessive seeking (-20)";
-                }
-                
-                // Very high seek count = suspicious
-                if ($seekCount >= 10) {
-                    $isSuspicious = true;
-                    $details[] = "SUSPICIOUS: Very high seek count";
-                }
-            }
-            
-            // ✅ Video completion percentage bonus (up to 35 points)
+            // ✅ Video completion bonus (up to 35 points)
             if ($sessionData && isset($sessionData->video_completion_percentage)) {
                 $completionPct = $sessionData->video_completion_percentage;
                 if ($completionPct >= 95) {
@@ -629,6 +622,16 @@ class CourseOnlineReportController extends Controller
                 }
             }
             
+            // ✅ Only apply skip penalty (skipping forward is still suspicious)
+            if ($sessionData) {
+                $skipCount = $sessionData->video_skip_count ?? 0;
+                if ($skipCount >= 1) {
+                    $score -= 30;
+                    $isSuspicious = true;
+                    $details[] = "PENALTY: Skip forward detected (-30)";
+                }
+            }
+            
             // ✅ Final suspicious check based on score
             if ($score < 30) {
                 $isSuspicious = true;
@@ -637,10 +640,24 @@ class CourseOnlineReportController extends Controller
             // Ensure score is in valid range (0-100)
             $score = max(0, min(100, $score));
 
-            return ['score' => $score, 'is_suspicious' => $isSuspicious, 'details' => $details];
+            return [
+                'score' => $score, 
+                'is_suspicious' => $isSuspicious, 
+                'details' => $details,
+                'is_within_allowed_time' => $isWithinAllowedTime,
+                'active_playback_minutes' => $activePlaybackMinutes,
+                'allowed_time_minutes' => $allowedTimeMinutes,
+            ];
 
         } catch (\Exception $e) {
-            return ['score' => 0, 'is_suspicious' => true, 'details' => ['Error calculating score: ' . $e->getMessage()]];
+            return [
+                'score' => 0, 
+                'is_suspicious' => true, 
+                'details' => ['Error calculating score: ' . $e->getMessage()],
+                'is_within_allowed_time' => false,
+                'active_playback_minutes' => 0,
+                'allowed_time_minutes' => 0,
+            ];
         }
     }
 
@@ -1372,6 +1389,7 @@ class CourseOnlineReportController extends Controller
                 'Session ID', 'User Name', 'User Email', 'Employee Code', 'Department',
                 'Course Name', 'Content Title', 'Content Type', 'Session Date', 'Session Time',
                 'Session End', 'Stored Duration (min)', 'Calculated Duration (min)', 'Duration',
+                'Active Playback (min)', 'Allowed Time (min)', 'Within Allowed Time',
                 'Stored Attention Score', 'Simulated Attention Score', 'Engagement Level',
                 'Is Suspicious', 'Session Status', 'Performance Rating'
             ];
@@ -1380,10 +1398,10 @@ class CourseOnlineReportController extends Controller
             foreach ($sessions as $session) {
                 $calculatedDuration = $this->getActualSessionDuration($session->session_start, $session->session_end);
                 
-                // Get full session data for skip/seek tracking
+                // Get full session data for skip/seek tracking AND active playback time
                 $fullSessionData = DB::table('learning_sessions')
                     ->where('id', $session->id)
-                    ->select('video_skip_count', 'seek_count', 'pause_count', 'video_replay_count', 'video_completion_percentage', 'content_id')
+                    ->select('video_skip_count', 'seek_count', 'pause_count', 'video_replay_count', 'video_completion_percentage', 'content_id', 'active_playback_time', 'is_within_allowed_time')
                     ->first();
                 
                 $contentId = $fullSessionData->content_id ?? null;
@@ -1398,6 +1416,11 @@ class CourseOnlineReportController extends Controller
                 
                 $simulatedAttention = $attentionResult['score'];
                 $isSuspicious = $attentionResult['is_suspicious'];
+                
+                // ✅ Extract active playback time and allowed time info
+                $activePlaybackMinutes = $attentionResult['active_playback_minutes'] ?? 0;
+                $isWithinAllowedTime = $attentionResult['is_within_allowed_time'] ?? true;
+                $allowedTimeMinutes = $attentionResult['allowed_time_minutes'] ?? 0;
 
                 // Apply suspicious filter if needed
                 if (!empty($filters['suspicious_only']) && $filters['suspicious_only'] === '1' && !$isSuspicious) {
@@ -1419,6 +1442,11 @@ class CourseOnlineReportController extends Controller
                     $session->total_duration_minutes ?? 0,
                     $calculatedDuration,
                     $this->formatDuration($calculatedDuration),
+                    // ✅ NEW: Active playback time fields
+                    round($activePlaybackMinutes, 1),
+                    round($allowedTimeMinutes, 1),
+                    $isWithinAllowedTime ? 'Yes' : 'No',
+                    // Existing fields
                     $session->attention_score ?? 0,
                     $simulatedAttention,
                     $this->calculateEngagementLevel($simulatedAttention),

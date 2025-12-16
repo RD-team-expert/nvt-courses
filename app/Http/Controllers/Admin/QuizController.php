@@ -69,6 +69,7 @@ class QuizController extends Controller
                 'has_deadline' => $quiz->has_deadline,
                 'deadline' => $quiz->deadline?->format('Y-m-d H:i:s'),
                 'deadline_status' => $quiz->has_deadline ? $quiz->getDeadlineStatus() : null,
+                'time_limit_minutes' => $quiz->time_limit_minutes,
             ];
         });
 
@@ -123,6 +124,9 @@ class QuizController extends Controller
             'time_limit_minutes' => 'nullable|integer|min:1|max:1440',
             'allows_extensions' => 'boolean',
 
+            // Attempt settings
+            'max_attempts' => 'nullable|integer|min:1|max:100',
+
             // Questions validation
             'questions' => 'required|array|min:1|max:20',
             'questions.*.question_text' => 'required|string',
@@ -164,6 +168,9 @@ class QuizController extends Controller
                 'enforce_deadline' => $validated['enforce_deadline'] ?? true,
                 'time_limit_minutes' => $validated['time_limit_minutes'] ?? null,
                 'allows_extensions' => $validated['allows_extensions'] ?? false,
+
+                // Attempt settings
+                'max_attempts' => $validated['max_attempts'] ?? null,
             ]);
 
             foreach ($validated['questions'] as $index => $questionData) {
@@ -333,6 +340,7 @@ class QuizController extends Controller
                 'enforce_deadline' => $quiz->enforce_deadline,
                 'time_limit_minutes' => $quiz->time_limit_minutes,
                 'allows_extensions' => $quiz->allows_extensions,
+                'max_attempts' => $quiz->max_attempts,
                 'questions' => $quiz->questions->map(function ($question) {
                     return [
                         'id' => $question->id,
@@ -376,6 +384,9 @@ class QuizController extends Controller
             'time_limit_minutes' => 'nullable|integer|min:1|max:1440',
             'allows_extensions' => 'boolean',
 
+            // Attempt settings
+            'max_attempts' => 'nullable|integer|min:1|max:100',
+
             // Questions
             'questions' => 'required|array|min:1|max:20',
             'questions.*.id' => 'nullable|exists:quiz_questions,id',
@@ -417,6 +428,9 @@ class QuizController extends Controller
                 'enforce_deadline' => $validated['enforce_deadline'] ?? true,
                 'time_limit_minutes' => $validated['time_limit_minutes'] ?? null,
                 'allows_extensions' => $validated['allows_extensions'] ?? false,
+
+                // Attempt settings
+                'max_attempts' => $validated['max_attempts'] ?? null,
             ]);
 
             // Handle questions (existing logic)

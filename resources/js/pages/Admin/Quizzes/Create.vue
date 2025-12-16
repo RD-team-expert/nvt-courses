@@ -212,6 +212,34 @@
                     </CardContent>
                 </Card>
 
+                <!-- Attempt Settings -->
+                <Card class="mt-6">
+                    <CardHeader>
+                        <CardTitle>🎯 Attempt Settings</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                            <!-- Maximum Attempts -->
+                            <div>
+                                <Label for="max_attempts">Maximum Attempts</Label>
+                                <Input
+                                    id="max_attempts"
+                                    v-model.number="form.max_attempts"
+                                    type="number"
+                                    min="1"
+                                    max="100"
+                                    :disabled="form.processing"
+                                    placeholder="Leave empty for unlimited"
+                                />
+                                <p class="text-xs text-muted-foreground mt-1">
+                                    How many times can a user attempt this quiz? Leave empty for unlimited.
+                                </p>
+                                <span v-if="form.errors.max_attempts" class="mt-1 text-xs text-destructive">{{ form.errors.max_attempts }}</span>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
                 <!-- Questions -->
                 <Card class="mt-8">
                     <CardHeader>
@@ -518,6 +546,9 @@ export default {
             time_limit_minutes: null,
             allows_extensions: false,
 
+            // Attempt settings
+            max_attempts: null,
+
             // Questions
             questions: [
                 {
@@ -665,6 +696,9 @@ export default {
                 enforce_deadline: form.has_deadline ? form.enforce_deadline : true,
                 time_limit_minutes: form.time_limit_minutes || null,
                 allows_extensions: form.has_deadline ? form.allows_extensions : false,
+
+                // Attempt settings
+                max_attempts: form.max_attempts || null,
 
                 // Questions
                 questions: form.questions.map((question) => ({
