@@ -32,7 +32,7 @@ class VideoController extends Controller
      */
     public function index()
     {
-        $videos = Video::with(['creator', 'category'])
+        $videos = Video::with(['creator', 'category', 'qualities'])
             ->orderBy('created_at', 'desc')
             ->get()
             ->map(function ($video) {
@@ -51,6 +51,11 @@ class VideoController extends Controller
                     'storage_type_label' => $video->getStorageTypeLabel(),
                     'file_size' => $video->file_size,
                     'formatted_file_size' => $video->formatted_file_size,
+
+                    // ✅ NEW: VPS Transcoding information
+                    'transcode_status' => $video->transcode_status,
+                    'available_qualities' => $video->getAvailableQualities(),
+                    'has_multiple_qualities' => $video->hasMultipleQualities(),
 
                     'category' => $video->category ? [
                         'id' => $video->category->id,
@@ -192,6 +197,11 @@ class VideoController extends Controller
         // Create video record
         $video = Video::create($videoData);
 
+        // ✅ NEW: Trigger transcoding for local videos
+        if ($validated['storage_type'] === 'local') {
+            app(\App\Services\VpsTranscodingService::class)->requestTranscoding($video);
+        }
+
         DB::commit();
 
         return redirect()->route('admin.videos.index')
@@ -218,7 +228,7 @@ class VideoController extends Controller
      */
     public function show(Video $video)
     {
-        $video->load(['creator']);
+        $video->load(['creator', 'qualities']);
 
         // ✅ UPDATED: Only refresh Google Drive streaming URL
         $currentStreamingUrl = null;
@@ -228,6 +238,16 @@ class VideoController extends Controller
                 $video->update(['streaming_url' => $currentStreamingUrl]);
             }
         }
+
+        // ✅ NEW: Prepare quality variants data
+        $qualityVariants = $video->qualities->map(function ($quality) {
+            return [
+                'quality' => $quality->quality,
+                'file_path' => $quality->file_path,
+                'file_size' => $quality->file_size,
+                'formatted_file_size' => $quality->formatted_file_size,
+            ];
+        });
 
         return Inertia::render('Admin/Video/Show', [
             'video' => [
@@ -246,6 +266,12 @@ class VideoController extends Controller
                 'storage_type_label' => $video->getStorageTypeLabel(),
                 'file_size' => $video->file_size,
                 'formatted_file_size' => $video->formatted_file_size,
+
+                // ✅ NEW: VPS Transcoding information
+                'transcode_status' => $video->transcode_status,
+                'available_qualities' => $video->getAvailableQualities(),
+                'has_multiple_qualities' => $video->hasMultipleQualities(),
+                'quality_variants' => $qualityVariants,
 
                 'creator' => [
                     'id' => $video->creator->id,
@@ -270,6 +296,8 @@ class VideoController extends Controller
      */
     public function edit(Video $video)
     {
+        $video->load(['qualities']);
+
         $categories = VideoCategory::active()
             ->ordered()
             ->get()
@@ -295,6 +323,11 @@ class VideoController extends Controller
                 'file_path' => $video->file_path,
                 'file_size' => $video->file_size,
                 'formatted_file_size' => $video->formatted_file_size,
+
+                // ✅ NEW: VPS Transcoding information
+                'transcode_status' => $video->transcode_status,
+                'available_qualities' => $video->getAvailableQualities(),
+                'has_multiple_qualities' => $video->hasMultipleQualities(),
 
                 'total_viewers' => 0,
                 'avg_completion' => 0,
@@ -556,4 +589,22 @@ class VideoController extends Controller
         'disk'             => $disk,
     ];
 }
+
+    /**
+     * Retry transcoding for a failed video
+     * ✅ NEW: VPS Transcoding Integration
+     */
+    public function retryTranscode(Video $video)
+    {
+        if (!$video->isLocal()) {
+            return back()->with('error', 'Only local videos can be transcoded');
+        }
+
+        $success = app(\App\Services\VpsTranscodingService::class)->retryTranscoding($video);
+
+        return back()->with(
+            $success ? 'success' : 'error',
+            $success ? 'Transcoding restarted' : 'Failed to restart transcoding'
+        );
+    }
 }

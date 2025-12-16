@@ -114,6 +114,9 @@ interface Video {
     streaming_url: string
     key_id: number
     key_name: string
+    transcode_status?: string
+    available_qualities?: string[]
+    has_multiple_qualities?: boolean
 }
 
 
@@ -171,6 +174,11 @@ const isMuted = ref(false)     // ✅ Track mute state
 const isFullscreen = ref(false)
 const isVideoLoading = ref(true)
 const isVideoReady = ref(false)
+
+// ========== QUALITY SELECTOR STATE ==========
+const availableQualities = ref<string[]>(['original'])
+const selectedQuality = ref<string>('original')
+const isQualitySwitching = ref(false)
 
 // ========== PDF STATE ==========
 const pdfContainer = ref<HTMLDivElement | null>(null)
@@ -945,6 +953,91 @@ const navigateContent = (contentId: number) => {
     router.visit(route('content.show', contentId))
 }
 
+// ========== QUALITY SELECTOR METHODS ==========
+/**
+ * Change video quality
+ * Maintains playback position and playing state during switch
+ */
+const changeQuality = async (newQuality: string) => {
+    if (!videoElement.value || isQualitySwitching.value || newQuality === selectedQuality.value) {
+        return
+    }
+
+    try {
+        isQualitySwitching.value = true
+        
+        // Save current state
+        const wasPlaying = isPlaying.value
+        const savedTime = currentTime.value
+        
+        // Pause video during switch
+        if (wasPlaying) {
+            await videoElement.value.pause()
+        }
+        
+        // Save quality preference to localStorage
+        localStorage.setItem('preferredVideoQuality', newQuality)
+        
+        // Update selected quality
+        selectedQuality.value = newQuality
+        
+        // Build new streaming URL with quality parameter
+        const baseUrl = `/video/stream/${props.video?.id}`
+        const newUrl = newQuality === 'original' ? baseUrl : `${baseUrl}/${newQuality}`
+        
+        // Switch video source
+        videoElement.value.src = newUrl
+        
+        // Wait for video to load
+        await new Promise<void>((resolve) => {
+            const onLoadedData = () => {
+                videoElement.value?.removeEventListener('loadeddata', onLoadedData)
+                resolve()
+            }
+            videoElement.value?.addEventListener('loadeddata', onLoadedData)
+        })
+        
+        // Restore playback position
+        videoElement.value.currentTime = savedTime
+        
+        // Resume playback if it was playing
+        if (wasPlaying) {
+            await videoElement.value.play()
+        }
+        
+        // console.log(`✅ Quality switched to ${newQuality}`)
+    } catch (error) {
+        console.error('❌ Failed to switch quality:', error)
+    } finally {
+        isQualitySwitching.value = false
+    }
+}
+
+/**
+ * Load quality preferences and available qualities on mount
+ */
+const initializeQualitySelector = () => {
+    // Load available qualities from video props
+    if (props.video?.available_qualities && props.video.available_qualities.length > 0) {
+        availableQualities.value = props.video.available_qualities
+    }
+    
+    // Load saved quality preference from localStorage
+    const savedQuality = localStorage.getItem('preferredVideoQuality')
+    
+    // Apply saved preference if it's available for this video
+    if (savedQuality && availableQualities.value.includes(savedQuality)) {
+        selectedQuality.value = savedQuality
+        
+        // Update video source with preferred quality
+        if (videoElement.value && props.video?.id) {
+            const baseUrl = `/video/stream/${props.video.id}`
+            const newUrl = savedQuality === 'original' ? baseUrl : `${baseUrl}/${savedQuality}`
+            videoElement.value.src = newUrl
+        }
+    }
+}
+
 // ========== VIDEO EVENT HANDLERS ==========
 const onLoadStart = () => {
     // console.log('📹 Video loading started')
@@ -1122,6 +1215,11 @@ const onVideoSeeked = () => {
 // LIFECYCLE
 onMounted(async () => {
     document.addEventListener('fullscreenchange', onFullscreenChange)
+
+    // Initialize quality selector for videos
+    if (props.content.content_type === 'video') {
+        initializeQualitySelector()
+    }
 
     // Initialize based on content type
     if (props.content.content_type === 'pdf') {
@@ -1467,6 +1565,27 @@ watch(currentPage, (newPage) => {
                                                 <VolumeX v-if="isMuted" class="h-5 w-5" />
                                                 <Volume2 v-else class="h-5 w-5" />
                                             </Button>
+
+                                            <!-- Quality Selector (only show if multiple qualities available) -->
+                                            <div v-if="availableQualities.length > 1" 
+                                                class="relative bg-white/10 rounded-lg px-2 py-1">
+                                                <select 
+                                                    v-model="selectedQuality" 
+                                                    @change="changeQuality(selectedQuality)"
+                                                    :disabled="isQualitySwitching"
+                                                    class="bg-transparent text-white text-sm font-medium border-none outline-none cursor-pointer pr-6 appearance-none hover:bg-white/20 rounded px-2 py-1 transition-all"
+                                                    style="background-image: url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27white%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e'); background-repeat: no-repeat; background-position: right 0.25rem center; background-size: 1em;">
+                                                    <option 
+                                                        v-for="quality in availableQualities" 
+                                                        :key="quality" 
+                                                        :value="quality"
+                                                        class="bg-gray-900 text-white">
+                                                        {{ quality === 'original' ? 'Original' : quality.toUpperCase() }}
+                                                    </option>
+                                                </select>
+                                                <Loader2 v-if="isQualitySwitching" 
+                                                    class="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-white" />
+                                            </div>
 
                                             <!-- Fullscreen Button -->
                                             <Button @click="toggleFullscreen" variant="ghost" size="sm"

@@ -80,6 +80,74 @@
                 </CardContent>
             </Card>
 
+            <!-- ✅ NEW: Transcoding Status Card (only for local videos) -->
+            <Card v-if="video.storage_type === 'local'" class="bg-card border-border">
+                <CardHeader>
+                    <CardTitle class="flex items-center gap-2">
+                        <Film class="h-5 w-5" />
+                        Video Transcoding
+                    </CardTitle>
+                    <CardDescription>
+                        Multi-quality transcoding status and available variants
+                    </CardDescription>
+                </CardHeader>
+                <CardContent class="space-y-4">
+                    <!-- Transcoding Status -->
+                    <div class="flex items-center justify-between p-4 rounded-lg border border-border bg-muted/50">
+                        <div class="flex items-center gap-3">
+                            <div :class="getTranscodeStatusIconClass(video.transcode_status)">
+                                <component :is="getTranscodeStatusIcon(video.transcode_status)" class="h-5 w-5" />
+                            </div>
+                            <div>
+                                <div class="font-medium text-foreground">Transcoding Status</div>
+                                <div class="text-sm text-muted-foreground">
+                                    {{ getTranscodeStatusDescription(video.transcode_status) }}
+                                </div>
+                            </div>
+                        </div>
+                        <Badge :variant="getTranscodeStatusVariant(video.transcode_status)" class="gap-1">
+                            {{ getTranscodeStatusLabel(video.transcode_status) }}
+                        </Badge>
+                    </div>
+
+                    <!-- Available Quality Variants (for completed videos) -->
+                    <div v-if="video.transcode_status === 'completed' && video.qualities && video.qualities.length > 0">
+                        <h4 class="text-sm font-medium text-foreground mb-3">Available Quality Variants</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                            <div
+                                v-for="quality in video.qualities"
+                                :key="quality.quality"
+                                class="flex items-center justify-between p-3 rounded-lg border border-border bg-background"
+                            >
+                                <div class="flex items-center gap-2">
+                                    <Video class="h-4 w-4 text-muted-foreground" />
+                                    <span class="font-medium text-foreground">{{ quality.quality }}</span>
+                                </div>
+                                <span class="text-sm text-muted-foreground">{{ quality.formatted_file_size }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Retry Button (for failed status) -->
+                    <div v-if="video.transcode_status === 'failed'" class="pt-2">
+                        <Button
+                            @click="retryTranscoding"
+                            variant="outline"
+                            class="w-full justify-center gap-2"
+                        >
+                            <RefreshCw class="h-4 w-4" />
+                            Retry Transcoding
+                        </Button>
+                    </div>
+
+                    <!-- Processing Indicator -->
+                    <div v-if="video.transcode_status === 'processing'" class="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 class="h-4 w-4 animate-spin" />
+                        <span>Transcoding in progress... This may take several minutes.</span>
+                    </div>
+                </CardContent>
+            </Card>
+
             <!-- Key Analytics -->
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <Card class="border-0 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/50 dark:to-blue-900/50 border border-blue-200/50 dark:border-blue-800/50">
@@ -454,8 +522,21 @@ import {
     Activity,
     Settings,
     Eye,
-    EyeOff
+    EyeOff,
+    Film,           // ✅ NEW - for transcoding card
+    Video,          // ✅ NEW - for quality variants
+    RefreshCw,      // ✅ NEW - for retry button
+    Loader2,        // ✅ NEW - for processing status
+    AlertCircle,    // ✅ NEW - for failed status
+    CheckCircle2,   // ✅ NEW - for completed status
+    Circle,         // ✅ NEW - for pending status
 } from 'lucide-vue-next'
+
+interface VideoQuality {
+    quality: string
+    file_size: number
+    formatted_file_size: string
+}
 
 interface Video {
     id: number
@@ -465,6 +546,9 @@ interface Video {
     duration?: number
     thumbnail_url?: string
     is_active: boolean
+    storage_type?: 'google_drive' | 'local'
+    transcode_status?: 'pending' | 'processing' | 'completed' | 'failed' | 'skipped'
+    qualities?: VideoQuality[]
     category?: {
         id: number
         name: string
@@ -591,6 +675,102 @@ const toggleVideoStatus = () => {
             console.log(`Video ${props.video.is_active ? 'deactivated' : 'activated'} successfully`)
         }
     })
+}
+
+// ✅ NEW: Transcoding status helpers
+const getTranscodeStatusVariant = (status?: string) => {
+    switch (status) {
+        case 'completed':
+            return 'default'
+        case 'processing':
+            return 'secondary'
+        case 'failed':
+            return 'destructive'
+        case 'pending':
+            return 'outline'
+        default:
+            return 'outline'
+    }
+}
+
+const getTranscodeStatusIcon = (status?: string) => {
+    switch (status) {
+        case 'completed':
+            return CheckCircle2
+        case 'processing':
+            return Loader2
+        case 'failed':
+            return AlertCircle
+        case 'pending':
+            return Circle
+        default:
+            return Circle
+    }
+}
+
+const getTranscodeStatusIconClass = (status?: string): string => {
+    const baseClass = 'p-2 rounded-lg'
+    switch (status) {
+        case 'completed':
+            return `${baseClass} bg-green-100 dark:bg-green-950/50 text-green-600 dark:text-green-400`
+        case 'processing':
+            return `${baseClass} bg-blue-100 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400`
+        case 'failed':
+            return `${baseClass} bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400`
+        case 'pending':
+            return `${baseClass} bg-gray-100 dark:bg-gray-950/50 text-gray-600 dark:text-gray-400`
+        default:
+            return `${baseClass} bg-gray-100 dark:bg-gray-950/50 text-gray-600 dark:text-gray-400`
+    }
+}
+
+const getTranscodeStatusLabel = (status?: string): string => {
+    switch (status) {
+        case 'completed':
+            return 'Completed'
+        case 'processing':
+            return 'Processing'
+        case 'failed':
+            return 'Failed'
+        case 'pending':
+            return 'Pending'
+        case 'skipped':
+            return 'Skipped'
+        default:
+            return 'Unknown'
+    }
+}
+
+const getTranscodeStatusDescription = (status?: string): string => {
+    switch (status) {
+        case 'completed':
+            return 'Video has been transcoded to multiple quality levels'
+        case 'processing':
+            return 'Video is currently being transcoded'
+        case 'failed':
+            return 'Transcoding failed - you can retry below'
+        case 'pending':
+            return 'Video is queued for transcoding'
+        case 'skipped':
+            return 'Transcoding was skipped for this video'
+        default:
+            return 'Transcoding status unknown'
+    }
+}
+
+// ✅ NEW: Retry transcoding
+const retryTranscoding = () => {
+    if (confirm('Are you sure you want to retry transcoding this video?')) {
+        router.post(`/admin/videos/${props.video.id}/retry-transcode`, {}, {
+            preserveScroll: true,
+            onSuccess: () => {
+                console.log('Transcoding retry initiated')
+            },
+            onError: (errors) => {
+                console.error('Failed to retry transcoding:', errors)
+            }
+        })
+    }
 }
 </script>
 
