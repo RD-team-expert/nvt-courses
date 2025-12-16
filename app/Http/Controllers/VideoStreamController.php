@@ -13,8 +13,9 @@ class VideoStreamController extends Controller
     /**
      * Stream a local video file to the user
      * Supports byte-range requests (for video seeking)
+     * ✅ NEW: Supports quality parameter for transcoded videos
      */
-    public function stream(Request $request, Video $video)
+    public function stream(Request $request, Video $video, ?string $quality = null)
     {
         // 1. Verify user is authenticated
         if (!auth()->check()) {
@@ -34,8 +35,28 @@ class VideoStreamController extends Controller
             abort(400, 'This video is not stored locally');
         }
 
-        // 3. Verify file path exists in database
-        if (!$video->file_path) {
+        // 3. ✅ NEW: Determine which file to stream based on quality parameter
+        $filePath = $video->file_path; // Default to original
+        
+        if ($quality && $quality !== 'original') {
+            $qualityPath = $video->getQualityPath($quality);
+            if ($qualityPath) {
+                $filePath = $qualityPath;
+                Log::info("Streaming quality variant", [
+                    'video_id' => $video->id,
+                    'quality' => $quality,
+                    'path' => $qualityPath,
+                ]);
+            } else {
+                Log::warning("Quality variant not found, falling back to original", [
+                    'video_id' => $video->id,
+                    'requested_quality' => $quality,
+                ]);
+            }
+        }
+
+        // 4. Verify file path exists
+        if (!$filePath) {
             Log::error('Video file path is empty', [
                 'video_id' => $video->id,
                 'video_name' => $video->name,
@@ -43,19 +64,19 @@ class VideoStreamController extends Controller
             abort(404, 'Video file path not found');
         }
 
-        // 4. ✅ FIX: Check file exists in 'public' disk (not 'videos' disk)
-        if (!Storage::disk('public')->exists($video->file_path)) {
+        // 5. ✅ FIX: Check file exists in 'public' disk
+        if (!Storage::disk('public')->exists($filePath)) {
             Log::error('Video file not found in storage', [
                 'video_id' => $video->id,
-                'file_path' => $video->file_path,
-                'full_path' => Storage::disk('public')->path($video->file_path),
+                'file_path' => $filePath,
+                'full_path' => Storage::disk('public')->path($filePath),
                 'disk' => 'public',
             ]);
             abort(404, 'Video file not found on server');
         }
 
-        // 5. Get file information
-        $path = Storage::disk('public')->path($video->file_path);
+        // 6. Get file information
+        $path = Storage::disk('public')->path($filePath);
         $fileSize = filesize($path);
         $mimeType = $video->mime_type ?? 'video/mp4';
 

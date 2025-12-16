@@ -146,6 +146,7 @@
                             <TableRow class="border-border">
                                 <TableHead class="text-foreground">Video</TableHead>
                                 <TableHead class="text-foreground">Storage</TableHead> <!-- ✅ NEW COLUMN -->
+                                <TableHead class="text-foreground">Transcoding</TableHead> <!-- ✅ NEW COLUMN -->
                                 <TableHead class="text-foreground">Category</TableHead>
                                 <TableHead class="text-foreground">Duration</TableHead>
                                 <TableHead class="text-foreground">Status</TableHead>
@@ -204,6 +205,28 @@
                                     <div v-if="video.storage_type === 'local' && video.formatted_file_size" class="text-xs text-muted-foreground mt-1">
                                         {{ video.formatted_file_size }}
                                     </div>
+                                </TableCell>
+
+                                <!-- ✅ NEW: Transcoding Status Column -->
+                                <TableCell>
+                                    <div v-if="video.storage_type === 'local'" class="space-y-1">
+                                        <Badge :variant="getTranscodeStatusVariant(video.transcode_status)" class="gap-1">
+                                            <component :is="getTranscodeStatusIcon(video.transcode_status)" class="h-3 w-3" />
+                                            {{ getTranscodeStatusLabel(video.transcode_status) }}
+                                        </Badge>
+                                        <!-- Show available qualities for completed videos -->
+                                        <div v-if="video.transcode_status === 'completed' && video.available_qualities && video.available_qualities.length > 0" class="flex flex-wrap gap-1 mt-1">
+                                            <Badge
+                                                v-for="quality in video.available_qualities"
+                                                :key="quality"
+                                                variant="outline"
+                                                class="text-xs bg-background border-border text-foreground"
+                                            >
+                                                {{ quality }}
+                                            </Badge>
+                                        </div>
+                                    </div>
+                                    <span v-else class="text-xs text-muted-foreground">N/A</span>
                                 </TableCell>
 
                                 <!-- Category -->
@@ -298,7 +321,7 @@
 
                             <!-- Empty State -->
                             <TableRow v-if="videos.length === 0" class="border-border">
-                                <TableCell colspan="8" class="text-center py-16 text-muted-foreground">
+                                <TableCell colspan="9" class="text-center py-16 text-muted-foreground">
                                     <PlaySquare class="h-16 w-16 mx-auto text-muted-foreground mb-6" />
                                     <div class="text-lg font-medium mb-2 text-foreground">No video courses found</div>
                                     <p class="text-muted-foreground mb-4">
@@ -358,6 +381,10 @@ import {
     BarChart3,
     Cloud,        // ✅ NEW
     HardDrive,    // ✅ NEW
+    Loader2,      // ✅ NEW - for processing status
+    AlertCircle,  // ✅ NEW - for failed status
+    CheckCircle2, // ✅ NEW - for completed status
+    Circle,       // ✅ NEW - for pending status
 } from 'lucide-vue-next'
 
 interface Video {
@@ -371,6 +398,8 @@ interface Video {
     storage_type: 'google_drive' | 'local'           // ✅ NEW
     storage_type_label?: string                      // ✅ NEW
     formatted_file_size?: string                     // ✅ NEW
+    transcode_status?: 'pending' | 'processing' | 'completed' | 'failed' | 'skipped'  // ✅ NEW
+    available_qualities?: string[]                   // ✅ NEW
     category?: {
         id: number
         name: string
@@ -469,6 +498,54 @@ function handleImageError(event: Event) {
         if (fallback) {
             fallback.style.display = 'flex'
         }
+    }
+}
+
+// ✅ NEW: Transcoding status helpers
+function getTranscodeStatusVariant(status?: string) {
+    switch (status) {
+        case 'completed':
+            return 'default'
+        case 'processing':
+            return 'secondary'
+        case 'failed':
+            return 'destructive'
+        case 'pending':
+            return 'outline'
+        default:
+            return 'outline'
+    }
+}
+
+function getTranscodeStatusIcon(status?: string) {
+    switch (status) {
+        case 'completed':
+            return CheckCircle2
+        case 'processing':
+            return Loader2
+        case 'failed':
+            return AlertCircle
+        case 'pending':
+            return Circle
+        default:
+            return Circle
+    }
+}
+
+function getTranscodeStatusLabel(status?: string): string {
+    switch (status) {
+        case 'completed':
+            return 'Completed'
+        case 'processing':
+            return 'Processing'
+        case 'failed':
+            return 'Failed'
+        case 'pending':
+            return 'Pending'
+        case 'skipped':
+            return 'Skipped'
+        default:
+            return 'Unknown'
     }
 }
 </script>

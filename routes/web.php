@@ -41,8 +41,16 @@ use App\Http\Controllers\User\ModuleQuizController as UserModuleQuizController;
 use App\Http\Controllers\UserTeamController;
 use App\Http\Controllers\VideoController;
 use App\Http\Controllers\VideoStreamController;
+use App\Http\Controllers\TranscodeCallbackController;
 use App\Models\Course;
 use Illuminate\Support\Facades\Route;
+
+// ==========================================
+// VPS TRANSCODING CALLBACK (No auth - VPS calls this)
+// ==========================================
+
+Route::post('/api/transcode/callback', [TranscodeCallbackController::class, 'handle'])
+    ->name('transcode.callback');
 
 // ==========================================
 // ROOT & AUTHENTICATION ROUTES
@@ -85,7 +93,7 @@ Route::middleware(['auth'])->group(function () {
 
 
 
-    Route::get('/video/stream/{video}', [VideoStreamController::class, 'stream'])
+    Route::get('/video/stream/{video}/{quality?}', [VideoStreamController::class, 'stream'])
         ->name('video.stream');
 
     // ===== ATTENDANCE SYSTEM =====
@@ -372,6 +380,12 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         Route::get('/export/progress', [CourseOnlineReportController::class, 'exportProgressReport'])->name('export.progress');
     });
 
+    // User Course Progress Report
+    Route::prefix('reports')->name('reports.')->group(function () {
+        Route::get('/user-course-progress', [\App\Http\Controllers\Admin\UserCourseProgressReportController::class, 'index'])->name('user-course-progress');
+        Route::get('/user-course-progress/export', [\App\Http\Controllers\Admin\UserCourseProgressReportController::class, 'export'])->name('user-course-progress.export');
+    });
+
 
     // ✅ Analytics Routes
     Route::prefix('analytics')->name('analytics.')->group(function () {
@@ -478,6 +492,7 @@ Route::post('videos/{video}/toggle-active', [App\Http\Controllers\Admin\VideoCon
 Route::get('videos/{video}/streaming-url', [App\Http\Controllers\Admin\VideoController::class, 'getStreamingUrl'])->name('videos.streaming-url');
 Route::post('videos/batch-refresh-urls', [App\Http\Controllers\Admin\VideoController::class, 'batchRefreshUrls'])->name('videos.batch-refresh-urls');
 Route::post('videos/{video}/migrate-to-local', [App\Http\Controllers\Admin\VideoController::class, 'migrateToLocal'])->name('videos.migrate-to-local');
+Route::post('videos/{video}/retry-transcode', [App\Http\Controllers\Admin\VideoController::class, 'retryTranscode'])->name('videos.retry-transcode');
 
     // ===== ASSIGNMENT MANAGEMENT =====
     Route::get('assignments', [App\Http\Controllers\Admin\AssignmentController::class, 'index'])->name('assignments.index');
