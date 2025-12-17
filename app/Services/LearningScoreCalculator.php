@@ -7,8 +7,8 @@ class LearningScoreCalculator
     /**
      * Calculate learning score using weighted formula
      * 
-     * Formula: (completion_rate × 0.25) + (progress × 0.25) + 
-     *          (attention × 0.25) + (quiz × 0.25) - suspicious_penalty
+     * Traditional Courses: (completion_rate × 0.33) + (progress × 0.33) + (quiz × 0.33)
+     * Online Courses: (completion_rate × 0.25) + (progress × 0.25) + (attention × 0.25) + (quiz × 0.25) - suspicious_penalty
      * 
      * @param float $completionRate
      * @param float $progressPercentage
@@ -16,6 +16,7 @@ class LearningScoreCalculator
      * @param float $quizScore
      * @param int $suspiciousActivities
      * @param int $totalSessions
+     * @param string $courseType 'traditional' or 'online'
      * @return float Score between 0-100
      */
     public function calculate(
@@ -24,29 +25,39 @@ class LearningScoreCalculator
         float $attentionScore,
         float $quizScore,
         int $suspiciousActivities,
-        int $totalSessions
+        int $totalSessions,
+        string $courseType = 'online'
     ): float {
         // Handle null/missing values with defaults
         $completionRate = $completionRate ?? 0;
         $progressPercentage = $progressPercentage ?? 0;
-        $attentionScore = $attentionScore ?? 65; // Default from design
+        $attentionScore = $attentionScore ?? 0;
         $quizScore = $quizScore ?? 0;
         
-        // Calculate weighted components (25% each)
-        $completionWeighted = $completionRate * 0.25;
-        $progressWeighted = $progressPercentage * 0.25;
-        $attentionWeighted = $attentionScore * 0.25;
-        $quizWeighted = $quizScore * 0.25;
-        
-        // Calculate suspicious penalty
-        $suspiciousPenalty = 0;
-        if ($totalSessions > 0) {
-            $suspiciousRatio = $suspiciousActivities / $totalSessions;
-            $suspiciousPenalty = $suspiciousRatio * 10;
+        // Traditional courses: 3-component formula (no attention score)
+        if ($courseType === 'traditional') {
+            $completionWeighted = $completionRate * 0.3333;
+            $progressWeighted = $progressPercentage * 0.3333;
+            $quizWeighted = $quizScore * 0.3334; // Slightly higher to reach 100%
+            
+            $finalScore = $completionWeighted + $progressWeighted + $quizWeighted;
         }
-        
-        // Calculate final score
-        $finalScore = $completionWeighted + $progressWeighted + $attentionWeighted + $quizWeighted - $suspiciousPenalty;
+        // Online courses: 4-component formula with attention score
+        else {
+            $completionWeighted = $completionRate * 0.25;
+            $progressWeighted = $progressPercentage * 0.25;
+            $attentionWeighted = $attentionScore * 0.25;
+            $quizWeighted = $quizScore * 0.25;
+            
+            // Calculate suspicious penalty for online courses
+            $suspiciousPenalty = 0;
+            if ($totalSessions > 0) {
+                $suspiciousRatio = $suspiciousActivities / $totalSessions;
+                $suspiciousPenalty = $suspiciousRatio * 10;
+            }
+            
+            $finalScore = $completionWeighted + $progressWeighted + $attentionWeighted + $quizWeighted - $suspiciousPenalty;
+        }
         
         // Clamp to 0-100 range
         return max(0, min(100, $finalScore));

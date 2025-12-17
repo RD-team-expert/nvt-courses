@@ -62,6 +62,12 @@
                                 Department Performance
                             </Link>
                         </DropdownMenuItem>
+                        <DropdownMenuItem as-child>
+                            <Link :href="route('admin.reports.user-course-progress')" class="flex items-center">
+                                <BarChart3 class="mr-2 h-4 w-4" />
+                                User Course Progress
+                            </Link>
+                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem as-child>
                             <Link href="/admin/analytics/cheating-detection" class="flex items-center">
@@ -597,6 +603,19 @@
                             <div>
                                 <div class="font-medium">Quiz Attempts</div>
                                 <p class="text-sm text-wrap max-w-11/12 text-muted-foreground">View and export quiz attempt data</p>
+                            </div>
+                        </Button>
+
+                        <Button
+                            :as="'a'"
+                            :href="route('admin.reports.user-course-progress')"
+                            variant="outline"
+                            class="h-auto p-4 flex flex-col items-center text-center space-y-2"
+                        >
+                            <BarChart3 class="h-8 w-8 text-primary" />
+                            <div>
+                                <div class="font-medium">User Course Progress</div>
+                                <p class="text-sm text-wrap max-w-11/12 text-muted-foreground">View detailed user progress and learning scores</p>
                             </div>
                         </Button>
                     </div>

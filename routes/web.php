@@ -386,6 +386,9 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         Route::get('/user-course-progress/export', [\App\Http\Controllers\Admin\UserCourseProgressReportController::class, 'export'])->name('user-course-progress.export');
     });
 
+    // Debug route for course progress data (remove in production)
+    Route::get('/debug-course-progress', [\App\Http\Controllers\Admin\DebugCourseProgressController::class, 'index'])->name('debug-course-progress');
+
 
     // ✅ Analytics Routes
     Route::prefix('analytics')->name('analytics.')->group(function () {

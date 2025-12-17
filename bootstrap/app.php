@@ -29,6 +29,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'content/*/session',  // Allow sendBeacon without CSRF token
         ]);
 
+        // Trust all proxies for ngrok
+        $middleware->trustProxies(at: '*');
+
         $middleware->alias([
             'admin' => \App\Http\Middleware\AdminMiddleware::class,
         ]);
