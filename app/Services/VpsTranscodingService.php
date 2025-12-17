@@ -19,6 +19,11 @@ class VpsTranscodingService
      */
     public function requestTranscoding(Video $video): bool
     {
+        Log::info('=== VpsTranscodingService::requestTranscoding CALLED ===', [
+            'video_id' => $video->id,
+            'storage_type' => $video->storage_type,
+        ]);
+        
         // Only transcode local videos
         if (!$video->isLocal()) {
             Log::info("Skipping transcoding for non-local video {$video->id}");
@@ -26,21 +31,36 @@ class VpsTranscodingService
         }
 
         try {
-            $response = $this->vpsClient->sendTranscodeRequest([
+            $requestData = [
                 'video_id' => (string) $video->id,
-                'video_url' => route('video.stream', $video->id), // Uses existing VideoStreamController
+                'video_url' => route('video.stream', $video->id),
                 'callback_url' => route('transcode.callback'),
                 'qualities' => ['720p', '480p', '360p'],
+            ];
+            
+            Log::info('Preparing transcoding request:', [
+                'video_id' => $video->id,
+                'request_data' => $requestData,
+            ]);
+            
+            $response = $this->vpsClient->sendTranscodeRequest($requestData);
+            
+            Log::info('VPS response received:', [
+                'video_id' => $video->id,
+                'response' => $response,
             ]);
 
             $video->update(['transcode_status' => 'processing']);
             
-            Log::info("Transcoding requested for video {$video->id}");
+            Log::info("Transcoding requested successfully for video {$video->id}");
             return true;
 
         } catch (\Exception $e) {
             $video->update(['transcode_status' => 'failed']);
-            Log::error("Transcoding request failed for video {$video->id}: " . $e->getMessage());
+            Log::error("Transcoding request failed for video {$video->id}:", [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             return false;
         }
     }

@@ -170,14 +170,28 @@ class VideoController extends Controller
             }
 
             Log::info('=== VIDEO UPLOAD DEBUG ===');
-    Log::info('Raw video_data:', ['video_data' => $validated['video_data'] ?? 'NULL']);
+            Log::info('Raw video_data type:', ['type' => gettype($validated['video_data'])]);
+            Log::info('Raw video_data:', ['video_data' => $validated['video_data']]);
+            
             // ✅ Parse the JSON response from ChunkUploader
             $uploadedFileData = json_decode($validated['video_data'], true);
             
+            Log::info('Decoded data:', [
+                'decoded' => $uploadedFileData,
+                'json_error' => json_last_error_msg(),
+            ]);
+            
             if (!$uploadedFileData || !isset($uploadedFileData['path'])) {
-                throw new \Exception('Invalid video upload data');
+                Log::error('Invalid upload data structure:', [
+                    'has_data' => !empty($uploadedFileData),
+                    'has_path' => isset($uploadedFileData['path']),
+                    'keys' => $uploadedFileData ? array_keys($uploadedFileData) : [],
+                ]);
+                throw new \Exception('Invalid video upload data. Please try uploading again.');
             }
-   Log::info('=== END DEBUG ===');
+            
+            Log::info('=== END DEBUG ===');
+            
             // ✅ The file is already uploaded by ChunkUploadController
             // We just need to save the metadata
             $videoData['file_path'] = $uploadedFileData['path'];
@@ -190,16 +204,30 @@ class VideoController extends Controller
                 // You can implement FFmpeg duration extraction here
                 $videoData['duration'] = null;
             }
-
-           
         }
 
         // Create video record
         $video = Video::create($videoData);
+        
+        Log::info('Video record created:', [
+            'video_id' => $video->id,
+            'storage_type' => $video->storage_type,
+            'file_path' => $video->file_path,
+        ]);
 
         // ✅ NEW: Trigger transcoding for local videos
         if ($validated['storage_type'] === 'local') {
-            app(\App\Services\VpsTranscodingService::class)->requestTranscoding($video);
+            Log::info('=== TRIGGERING TRANSCODING ===', [
+                'video_id' => $video->id,
+                'video_name' => $video->name,
+            ]);
+            
+            $transcodingResult = app(\App\Services\VpsTranscodingService::class)->requestTranscoding($video);
+            
+            Log::info('Transcoding trigger result:', [
+                'success' => $transcodingResult,
+                'video_id' => $video->id,
+            ]);
         }
 
         DB::commit();

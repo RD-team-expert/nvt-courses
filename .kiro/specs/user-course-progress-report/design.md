@@ -85,14 +85,23 @@ class CourseProgressService
     public function calculateComplianceStatus(
         ?Carbon $deadline,
         string $status,
-        float $progress
+        float $progress,
+        float $learningScore
     ): string
-    // Determines compliance status based on deadline and progress
+    // Determines compliance status based on deadline, progress, and score band
+    // For completed: "Non-Compliant" if score < 70 (Needs Attention), else "Compliant"
+    // For incomplete: "Non-Compliant" if past deadline, "At Risk" if within 7 days
     // Returns: Compliant/At Risk/Non-Compliant
     
     public function calculateDaysOverdue(?Carbon $deadline, string $status): ?int
     // Calculates days past deadline for incomplete assignments
+    // For traditional: uses CourseAvailability.end_date
+    // For online: uses CourseOnline.deadline or CourseOnlineAssignment.deadline
     // Returns: Number of days or null
+    
+    public function calculateTraditionalProgress(int $userId, int $courseId, int $totalSessions): float
+    // Calculates progress for traditional courses from Clocking records
+    // Returns: (attended_sessions / total_sessions) * 100
 }
 ```
 
@@ -161,22 +170,24 @@ class LearningScoreCalculator
     'course_type' => string,              // 'traditional' or 'online'
     'course_id' => int,
     'course_name' => string,
-    'completion_status' => string,        // 'Completed', 'In Progress', 'Overdue'
+    'completion_status' => string,        // 'Completed', 'In Progress', 'Not Started'
     'days_overdue' => int|null,           // Days past deadline or null
-    'progress_percentage' => float,       // 0-100
-    'completion_date' => string|null,     // 'MM/DD/YYYY' or null
+    'progress_percentage' => float,       // 0-100 (for traditional: attended_sessions/total_sessions * 100)
+    'started_date' => string|null,        // 'MM/DD/YYYY' or null - Start Course date
+    'completion_date' => string|null,     // 'MM/DD/YYYY' or null (only for completed)
     'learning_score' => float,            // 0-100
     'score_band' => string,               // 'Excellent', 'Good', 'Needs Attention'
     'compliance_status' => string,        // 'Compliant', 'At Risk', 'Non-Compliant'
     'assigned_at' => Carbon,
-    'deadline' => Carbon|null,
+    'deadline' => Carbon|null,            // CourseAvailability.end_date for traditional, CourseOnline.deadline for online
     
     // Calculation components (not displayed but used for calculation)
     'completion_rate' => float,
     'attention_score' => float,
     'quiz_score' => float,
     'suspicious_activities' => int,
-    'total_sessions' => int,
+    'total_sessions' => int,              // From CourseAvailability.sessions for traditional
+    'attended_sessions' => int,           // From Clocking count for traditional
 ]
 ```
 
@@ -210,9 +221,17 @@ class LearningScoreCalculator
 *For any* learning score value, the score band should be "Excellent" if score ≥ 85, "Good" if score ≥ 70 and < 85, or "Needs Attention" if score < 70.
 **Validates: Requirements 1.4**
 
-### Property 4: Days overdue calculation
-*For any* incomplete assignment with a deadline, the days overdue should equal the difference in days between the current date and the deadline date.
+### Property 4: Days overdue calculation for traditional courses
+*For any* incomplete traditional course assignment with a deadline, the days overdue should equal the difference in days between the current date and CourseAvailability.end_date.
 **Validates: Requirements 1.5**
+
+### Property 4b: Days overdue calculation for online courses
+*For any* incomplete online course assignment with a deadline, the days overdue should equal the difference in days between the current date and CourseOnline.deadline (or CourseOnlineAssignment.deadline if set).
+**Validates: Requirements 1.6**
+
+### Property 4c: Traditional course progress calculation
+*For any* traditional course assignment, the progress percentage should equal (count of Clocking records with clock_out / CourseAvailability.sessions) × 100.
+**Validates: Requirements 1.7**
 
 ### Property 5: Department filter
 *For any* department filter selection, all returned assignments should belong to users in that department.
@@ -235,20 +254,32 @@ class LearningScoreCalculator
 **Validates: Requirements 2.5**
 
 ### Property 10: Completed sheet segregation
-*For any* export operation, the "Completed Courses (KPI)" sheet should contain only assignments with status "completed".
+*For any* export operation, the "Completed Courses (KPI)" sheet should contain only assignments with status "completed" for both traditional and online courses.
 **Validates: Requirements 3.2**
 
 ### Property 11: Non-completed sheet segregation
-*For any* export operation, the "Non-Completed Courses (KPI)" sheet should contain only assignments with status "in_progress", "assigned", or "overdue".
+*For any* export operation, the "Non-Completed Courses (KPI)" sheet should contain only assignments with status "in_progress", "assigned", or "not_started", and completion status should display "Not Started" instead of "Overdue".
 **Validates: Requirements 3.3**
+
+### Property 11b: Non-completed sheet columns
+*For any* non-completed courses export, the worksheet should NOT include a "Completion Date" column but should include a "Start Course" column.
+**Validates: Requirements 3.5**
+
+### Property 11c: Completed sheet columns
+*For any* completed courses export, the worksheet should include both "Start Course" and "Completion Date" columns.
+**Validates: Requirements 3.4**
 
 ### Property 12: Export filename format
 *For any* export operation, the generated filename should match the pattern "user_course_progress_YYYY-MM-DD_HH-mm-ss.xlsx" where YYYY-MM-DD_HH-mm-ss represents the export timestamp.
 **Validates: Requirements 3.5**
 
-### Property 13: Compliance status for completed assignments
-*For any* assignment with status "completed", the compliance status should be "Compliant" regardless of deadline.
+### Property 13: Compliance status for completed assignments with good scores
+*For any* assignment with status "completed" and score band "Excellent" or "Good", the compliance status should be "Compliant".
 **Validates: Requirements 4.2**
+
+### Property 13b: Compliance status for completed assignments needing attention
+*For any* assignment with status "completed" and score band "Needs Attention", the compliance status should be "Non-Compliant".
+**Validates: Requirements 4.3**
 
 ### Property 14: At Risk compliance status
 *For any* incomplete assignment with a deadline between 1 and 7 days in the future, the compliance status should be "At Risk".
