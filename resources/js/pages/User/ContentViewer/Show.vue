@@ -180,6 +180,14 @@ const availableQualities = ref<string[]>(['original'])
 const selectedQuality = ref<string>('original')
 const isQualitySwitching = ref(false)
 
+// ========== COMPUTED VIDEO SOURCE ==========
+const videoSource = computed(() => {
+    if (!props.video?.id) return props.video?.streaming_url || ''
+    
+    const baseUrl = `/video/stream/${props.video.id}`
+    return selectedQuality.value === 'original' ? baseUrl : `${baseUrl}/${selectedQuality.value}`
+})
+
 // ========== PDF STATE ==========
 const pdfContainer = ref<HTMLDivElement | null>(null)
 const currentPage = ref(1)

@@ -20,19 +20,47 @@ class TranscodeCallbackController extends Controller
      */
     public function handle(Request $request)
     {
-        Log::info('Transcode callback received', $request->all());
+        Log::info('=== TRANSCODE CALLBACK RECEIVED ===', [
+            'timestamp' => now()->toDateTimeString(),
+            'ip' => $request->ip(),
+            'all_data' => $request->all(),
+            'headers' => $request->headers->all(),
+        ]);
 
         // Verify project key matches our configured key
-        if ($request->project_key !== $this->vpsClient->getProjectKey()) {
-            Log::warning('Invalid project key in transcode callback', [
-                'received' => $request->project_key,
-                'expected' => $this->vpsClient->getProjectKey(),
-            ]);
+        $receivedKey = $request->input('project_key');
+        $expectedKey = $this->vpsClient->getProjectKey();
+        
+        Log::info('Project key verification:', [
+            'received' => $receivedKey,
+            'expected' => $expectedKey,
+            'match' => $receivedKey === $expectedKey,
+        ]);
+        
+        if ($receivedKey !== $expectedKey) {
+            Log::warning('Invalid project key in transcode callback');
             return response()->json(['error' => 'Invalid project key'], 403);
         }
 
-        $success = $this->transcodingService->handleCallback($request->all());
-
-        return response()->json(['success' => $success]);
+        Log::info('Calling handleCallback...');
+        
+        try {
+            $success = $this->transcodingService->handleCallback($request->all());
+            
+            Log::info('Callback handled:', ['success' => $success]);
+            
+            return response()->json(['success' => $success]);
+            
+        } catch (\Exception $e) {
+            Log::error('Callback handling failed:', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 }
