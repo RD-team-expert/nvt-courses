@@ -27,6 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->encryptCookies(except: ['appearance']);
          $middleware->validateCsrfTokens(except: [
             'content/*/session',  // Allow sendBeacon without CSRF token
+            'api/transcode/callback',  // VPS webhook callback
         ]);
 
         // Trust all proxies for ngrok
