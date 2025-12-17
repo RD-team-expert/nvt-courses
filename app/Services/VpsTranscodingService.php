@@ -31,15 +31,25 @@ class VpsTranscodingService
         }
 
         try {
+            // Generate direct public URL to the video file
+            $videoUrl = Storage::disk('public')->url($video->file_path);
+            
+            // Ensure it's an absolute URL
+            if (!str_starts_with($videoUrl, 'http')) {
+                $videoUrl = url($videoUrl);
+            }
+            
             $requestData = [
                 'video_id' => (string) $video->id,
-                'video_url' => route('video.stream', $video->id),
+                'video_url' => $videoUrl, // Direct public URL instead of streaming route
                 'callback_url' => route('transcode.callback'),
                 'qualities' => ['720p', '480p', '360p'],
             ];
             
             Log::info('Preparing transcoding request:', [
                 'video_id' => $video->id,
+                'file_path' => $video->file_path,
+                'video_url' => $videoUrl,
                 'request_data' => $requestData,
             ]);
             
