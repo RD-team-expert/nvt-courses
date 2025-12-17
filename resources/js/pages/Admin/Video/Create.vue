@@ -327,7 +327,21 @@ const maxFileSizeMB = computed(() => Math.round((props.maxFileSize || 512000) / 
 // ✅ NEW: Handle chunk upload completion
 const handleUploadComplete = (data: any) => {
     console.log('✅ Chunk upload complete:', data)
+    console.log('✅ Data type:', typeof data)
+    console.log('✅ Data keys:', data ? Object.keys(data) : 'null')
+    
+    // Ensure data is an object before stringifying
+    if (typeof data === 'string') {
+        console.log('⚠️ Data is already a string, parsing first')
+        try {
+            data = JSON.parse(data)
+        } catch (e) {
+            console.error('❌ Failed to parse data string:', e)
+        }
+    }
+    
     form.video_data = JSON.stringify(data) // Store the response data
+    console.log('✅ Stored video_data:', form.video_data)
 }
 
 // ✅ NEW: Handle chunk upload error

@@ -5,6 +5,7 @@ namespace App\Services;
 use Illuminate\Support\Collection;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use App\Services\LearningScoreCalculator;
 
 class CourseProgressService
 {
@@ -26,6 +27,9 @@ class CourseProgressService
     
     /**
      * Get traditional course assignment data
+     * Progress is calculated from Clocking model (attended sessions / total sessions from CourseAvailability)
+     * Deadline is taken from CourseAvailability.end_date or courses.end_date as fallback
+     * Status, Started, and Completed are merged from course_registrations and course_assignments
      * 
      * @param array $filters
      * @return Collection
@@ -36,6 +40,11 @@ class CourseProgressService
             ->join('users', 'course_assignments.user_id', '=', 'users.id')
             ->join('courses', 'course_assignments.course_id', '=', 'courses.id')
             ->leftJoin('departments', 'users.department_id', '=', 'departments.id')
+            // LEFT JOIN course_registrations to get completion data
+            ->leftJoin('course_registrations', function($join) {
+                $join->on('course_assignments.user_id', '=', 'course_registrations.user_id')
+                     ->on('course_assignments.course_id', '=', 'course_registrations.course_id');
+            })
             ->select([
                 'course_assignments.id',
                 'course_assignments.user_id',
@@ -45,18 +54,119 @@ class CourseProgressService
                 DB::raw("'traditional' as course_type"),
                 'courses.id as course_id',
                 'courses.name as course_name',
-                'course_assignments.status',
+                'course_assignments.status as assignment_status',
                 'course_assignments.assigned_at',
-                'course_assignments.responded_at as started_at',
-                'course_assignments.completed_at',
-                DB::raw('0 as progress_percentage'),
-                DB::raw('NULL as deadline'),
+                'course_assignments.responded_at',
+                'course_assignments.completed_at as assignment_completed_at',
+                // Get data from course_registrations (priority source)
+                'course_registrations.status as registration_status',
+                'course_registrations.registered_at',
+                'course_registrations.completed_at as registration_completed_at',
+                // Deadline: use courses.end_date (we'll get the latest availability end_date separately)
+                'courses.end_date as course_end_date',
             ]);
         
         // Apply filters
         $this->applyFilters($query, $filters, 'traditional');
         
         return $query->get()->map(function ($assignment) {
+            // Get clocking data for this user/course
+            $clockingData = DB::table('clockings')
+                ->where('user_id', $assignment->user_id)
+                ->where('course_id', $assignment->course_id)
+                ->whereNotNull('clock_out')
+                ->selectRaw('COUNT(*) as attended_sessions, MIN(clock_in) as first_clock_in, MAX(clock_out) as last_clock_out')
+                ->first();
+            
+            $attendedSessions = $clockingData->attended_sessions ?? 0;
+            $firstClockIn = $clockingData->first_clock_in;
+            $lastClockOut = $clockingData->last_clock_out;
+            
+            // Get total sessions from ALL course availabilities for this course
+            // Since course_assignments don't specify which availability, we sum all sessions
+            $availabilityData = DB::table('course_availabilities')
+                ->where('course_id', $assignment->course_id)
+                ->selectRaw('SUM(sessions) as total_sessions, MAX(end_date) as latest_end_date')
+                ->first();
+            
+            $totalSessions = $availabilityData->total_sessions ?? 0;
+            $latestEndDate = $availabilityData->latest_end_date;
+            
+            // Use the latest availability end_date as deadline, fallback to course end_date
+            $deadline = $latestEndDate ?? $assignment->course_end_date;
+            
+            // STATUS CALCULATION - Priority: course_registrations > course_assignments
+            // This matches CourseCompletion report logic
+            $calculatedStatus = 'pending';
+            $completedAt = null;
+            $startedAt = null;
+            
+            // 1. Check course_registrations first (highest priority)
+            if ($assignment->registration_status) {
+                $calculatedStatus = $assignment->registration_status;
+                if ($assignment->registration_completed_at) {
+                    $calculatedStatus = 'completed';
+                    $completedAt = Carbon::parse($assignment->registration_completed_at);
+                }
+                if ($assignment->registered_at) {
+                    $startedAt = Carbon::parse($assignment->registered_at);
+                }
+            }
+            // 2. Fall back to course_assignments data
+            else {
+                if ($assignment->assignment_completed_at) {
+                    $calculatedStatus = 'completed';
+                    $completedAt = Carbon::parse($assignment->assignment_completed_at);
+                } elseif ($assignment->assignment_status === 'in_progress' || $assignment->assignment_status === 'inprogress') {
+                    $calculatedStatus = 'in_progress';
+                } else {
+                    $calculatedStatus = $assignment->assignment_status;
+                }
+                
+                // Use responded_at as started date
+                if ($assignment->responded_at) {
+                    $startedAt = Carbon::parse($assignment->responded_at);
+                }
+            }
+            
+            // 3. Override with clocking data if available
+            if ($firstClockIn && !$startedAt) {
+                $startedAt = Carbon::parse($firstClockIn);
+            }
+            
+            // Calculate progress percentage based on actual attendance
+            if ($totalSessions > 0) {
+                $progressPercentage = min(round(($attendedSessions / $totalSessions) * 100, 2), 100);
+            } else {
+                // No total sessions defined - can't calculate accurate progress
+                $progressPercentage = 0;
+            }
+            
+            // IMPORTANT: If status is 'completed', override progress to 100%
+            // This ensures consistency - completed courses should always show 100% progress
+            // Admin may mark as completed even if attendance is incomplete (makeup sessions, special cases, etc.)
+            if ($calculatedStatus === 'completed') {
+                $progressPercentage = 100;
+                // Use completion date if no clock out data
+                if (!$completedAt && $lastClockOut) {
+                    $completedAt = Carbon::parse($lastClockOut);
+                }
+            }
+            // If progress is 100% but not marked completed, auto-complete
+            elseif ($progressPercentage >= 100 && $lastClockOut) {
+                $calculatedStatus = 'completed';
+                $completedAt = Carbon::parse($lastClockOut);
+            }
+            
+            // Update assignment object with calculated values
+            $assignment->progress_percentage = $progressPercentage;
+            $assignment->attended_sessions = $attendedSessions;
+            $assignment->total_sessions = $totalSessions;
+            $assignment->status = $calculatedStatus; // Use calculated status
+            $assignment->started_at = $startedAt;
+            $assignment->completed_at = $completedAt;
+            $assignment->deadline = $deadline; // Use calculated deadline
+            
             return $this->formatAssignmentData($assignment, 'traditional');
         });
     }
@@ -87,7 +197,8 @@ class CourseProgressService
                 'course_online_assignments.started_at',
                 'course_online_assignments.completed_at',
                 'course_online_assignments.progress_percentage',
-                'course_online_assignments.deadline',
+                // Use course deadline if assignment deadline is null
+                DB::raw('COALESCE(course_online_assignments.deadline, course_online.deadline) as deadline'),
             ]);
         
         // Apply filters
@@ -173,8 +284,22 @@ class CourseProgressService
             ? Carbon::parse($assignment->started_at) 
             : null;
         
+        $progressPercentage = (float) ($assignment->progress_percentage ?? 0);
+        
+        // Calculate learning score
+        $learningScore = $this->calculateLearningScore(
+            $assignment->user_id, 
+            $assignment->course_id, 
+            $courseType, 
+            $assignment->status,
+            $progressPercentage
+        );
+        
         // Determine completion status
         $completionStatus = $this->determineCompletionStatus($assignment->status, $deadline);
+        
+        // Calculate days overdue
+        $daysOverdue = $this->calculateDaysOverdue($deadline, $assignment->status);
         
         return [
             'id' => $assignment->id,
@@ -187,38 +312,41 @@ class CourseProgressService
             'course_name' => $assignment->course_name,
             'completion_status' => $completionStatus,
             'status' => $assignment->status,
-            'progress_percentage' => (float) ($assignment->progress_percentage ?? 0),
+            'progress_percentage' => $progressPercentage,
             'assigned_at' => Carbon::parse($assignment->assigned_at),
             'started_at' => $startedAt,
             'completed_at' => $completedAt,
             'deadline' => $deadline,
-            'days_overdue' => $this->calculateDaysOverdue($deadline, $assignment->status),
-            'compliance_status' => $this->calculateComplianceStatus($deadline, $assignment->status, $assignment->progress_percentage ?? 0),
+            'days_overdue' => $daysOverdue,
+            'learning_score' => $learningScore,
+            'score_band' => $this->determineScoreBand($learningScore),
+            'compliance_status' => $this->calculateComplianceStatus($deadline, $assignment->status, $progressPercentage, $learningScore),
+            // Additional debug info for traditional courses
+            'total_sessions' => $assignment->total_sessions ?? null,
+            'attended_sessions' => $assignment->attended_sessions ?? null,
         ];
     }
     
     /**
-     * Determine completion status label
+     * Determine completion status label based on calculated status
      * 
-     * @param string $status
+     * @param string $status - The calculated status (completed, in_progress, assigned, pending)
      * @param Carbon|null $deadline
      * @return string
      */
     private function determineCompletionStatus(string $status, ?Carbon $deadline): string
     {
+        // Map status to display labels
         if ($status === 'completed') {
             return 'Completed';
         }
         
-        if ($deadline && $deadline->isPast()) {
-            return 'Overdue';
-        }
-        
-        if ($status === 'in_progress' || $status === 'assigned') {
+        if ($status === 'in_progress') {
             return 'In Progress';
         }
         
-        return 'In Progress';
+        // For assigned/pending status
+        return 'Not Started';
     }
 
     /**
@@ -246,10 +374,14 @@ class CourseProgressService
      * @param float $progress
      * @return string
      */
-    public function calculateComplianceStatus(?Carbon $deadline, string $status, float $progress): string
+    public function calculateComplianceStatus(?Carbon $deadline, string $status, float $progress, float $learningScore = 0): string
     {
-        // Completed assignments are always compliant
+        // For completed assignments, check learning score
         if ($status === 'completed') {
+            // If learning score indicates 'Needs Attention', mark as Non-Compliant
+            if ($learningScore < 70) {
+                return 'Non-Compliant';
+            }
             return 'Compliant';
         }
         
@@ -277,8 +409,10 @@ class CourseProgressService
 
     /**
      * Calculate days overdue for incomplete assignments
+     * For traditional courses: uses CourseAvailability.end_date (passed as $deadline)
+     * For online courses: uses CourseOnline.deadline or CourseOnlineAssignment.deadline (passed as $deadline)
      * 
-     * @param Carbon|null $deadline
+     * @param Carbon|null $deadline - CourseAvailability.end_date for traditional, CourseOnline.deadline for online
      * @param string $status
      * @return int|null
      */
@@ -289,14 +423,98 @@ class CourseProgressService
             return null;
         }
         
-        $now = Carbon::now();
+        $now = Carbon::now()->startOfDay();
+        $deadlineDate = $deadline->copy()->startOfDay();
         
-        // If deadline is in the future, not overdue
-        if ($deadline->isFuture()) {
+        // If deadline is in the future or today, not overdue
+        if ($deadlineDate->gte($now)) {
             return null;
         }
         
-        // Calculate days past deadline
-        return $now->diffInDays($deadline, false);
+        // Calculate days past deadline (positive number = days overdue)
+        // Use absolute value to ensure positive result
+        return (int) abs($now->diffInDays($deadlineDate));
+    }
+
+    /**
+     * Calculate learning score for an assignment
+     * 
+     * Traditional courses: Uses completion rate, progress, and quiz score (3 components)
+     * Online courses: Uses completion rate, progress, attention score, and quiz score (4 components)
+     * 
+     * @param int $userId
+     * @param int $courseId
+     * @param string $courseType
+     * @param string $status
+     * @param float $progress
+     * @return float
+     */
+    public function calculateLearningScore(int $userId, int $courseId, string $courseType, string $status, float $progress): float
+    {
+        $learningScoreCalculator = new LearningScoreCalculator();
+        
+        // Calculate completion rate
+        $completionRate = $status === 'completed' ? 100 : 0;
+        
+        // Get attention score (only for online courses)
+        $attentionScore = 0;
+        if ($courseType === 'online') {
+            $attentionScore = $learningScoreCalculator->getAttentionScore($userId, $courseId, $courseType);
+        }
+        
+        // Get quiz score
+        $quizScore = $this->getQuizScore($userId, $courseId, $courseType);
+        
+        // Get suspicious activities (only for online courses)
+        $suspiciousActivities = 0;
+        $totalSessions = 1; // Default to avoid division by zero
+        
+        if ($courseType === 'online') {
+            // Count suspicious sessions for online courses
+            $suspiciousCount = DB::table('learning_sessions')
+                ->where('user_id', $userId)
+                ->where('course_online_id', $courseId)
+                ->where('is_suspicious_activity', true)
+                ->count();
+            
+            $totalSessionsCount = DB::table('learning_sessions')
+                ->where('user_id', $userId)
+                ->where('course_online_id', $courseId)
+                ->count();
+            
+            $suspiciousActivities = $suspiciousCount;
+            $totalSessions = max(1, $totalSessionsCount);
+        }
+        
+        // Calculate final score with course type
+        return $learningScoreCalculator->calculate(
+            $completionRate,
+            $progress,
+            $attentionScore,
+            $quizScore,
+            $suspiciousActivities,
+            $totalSessions,
+            $courseType
+        );
+    }
+
+    /**
+     * Get quiz score for a user's course
+     * 
+     * @param int $userId
+     * @param int $courseId
+     * @param string $courseType
+     * @return float
+     */
+    private function getQuizScore(int $userId, int $courseId, string $courseType): float
+    {
+        // Delegate to the LearningScoreCalculator to keep quiz scoring logic centralized
+        try {
+            $calculator = new LearningScoreCalculator();
+            return $calculator->getQuizScore($userId, $courseType === 'online' ? $courseId : $courseId);
+        } catch (\Exception $e) {
+            \Log::error('Error fetching quiz score in CourseProgressService: ' . $e->getMessage());
+            return 0;
+        }
     }
 }
