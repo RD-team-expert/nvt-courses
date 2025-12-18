@@ -209,7 +209,7 @@ const deleteAssignment = (assignmentId: number) => {
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-4">
                     <Button asChild variant="ghost" size="sm">
-                        <Link href="/admin/courses-online">
+                        <Link href="/admin/course-online">
                             <ArrowLeft class="mr-2 h-4 w-4" />
                             Back to Courses
                         </Link>

@@ -274,13 +274,19 @@ const startCourse = async () => {
 }
 
 const completeCourse = async () => {
-    if (!canComplete.value) return
+    if (!canComplete.value) {
+        alert('⚠️ You must complete all required modules before finishing the course.')
+        return
+    }
+
+    if (!confirm('🎓 Are you ready to complete this course?')) {
+        return
+    }
 
     try {
         await router.post(route('courses-online.complete', props.course.id))
         router.reload()
     } catch (error) {
-        console.error('Failed to complete course:', error)
         alert('Failed to complete course. Please try again.')
     }
 }
