@@ -19,14 +19,8 @@ class VpsTranscodingService
      */
     public function requestTranscoding(Video $video): bool
     {
-        Log::info('=== VpsTranscodingService::requestTranscoding CALLED ===', [
-            'video_id' => $video->id,
-            'storage_type' => $video->storage_type,
-        ]);
-        
         // Only transcode local videos
         if (!$video->isLocal()) {
-            Log::info("Skipping transcoding for non-local video {$video->id}");
             return false;
         }
 
@@ -41,42 +35,27 @@ class VpsTranscodingService
             
             $requestData = [
                 'video_id' => (string) $video->id,
-                'video_url' => $videoUrl, // Direct public URL instead of streaming route
+                'video_url' => $videoUrl,
                 'callback_url' => route('transcode.callback'),
                 'qualities' => ['720p', '480p', '360p'],
             ];
             
-            Log::info('Preparing transcoding request:', [
-                'video_id' => $video->id,
-                'file_path' => $video->file_path,
-                'video_url' => $videoUrl,
-                'request_data' => $requestData,
-            ]);
-            
-            $response = $this->vpsClient->sendTranscodeRequest($requestData);
-            
-            Log::info('VPS response received:', [
-                'video_id' => $video->id,
-                'response' => $response,
-            ]);
-
+            $this->vpsClient->sendTranscodeRequest($requestData);
             $video->update(['transcode_status' => 'processing']);
             
-            Log::info("Transcoding requested successfully for video {$video->id}");
+            Log::info("Transcoding requested for video {$video->id}");
             return true;
 
         } catch (\Exception $e) {
             $video->update(['transcode_status' => 'failed']);
-            Log::error("Transcoding request failed for video {$video->id}:", [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
+            Log::error("Transcoding request failed for video {$video->id}: {$e->getMessage()}");
             return false;
         }
     }
 
     /**
      * Handle transcoding callback from VPS
+     * Downloads quality variants and updates video status
      */
     public function handleCallback(array $data): bool
     {
@@ -94,13 +73,27 @@ class VpsTranscodingService
         }
 
         // Download each quality variant
+        $successCount = 0;
+        $totalQualities = count($data['download_urls'] ?? []);
+        
         foreach ($data['download_urls'] as $quality => $url) {
-            $this->downloadAndStoreQuality($video, $quality, $url);
+            try {
+                $this->downloadAndStoreQuality($video, $quality, $url);
+                $successCount++;
+            } catch (\Exception $e) {
+                Log::error("Failed to download {$quality} for video {$video->id}: {$e->getMessage()}");
+            }
         }
 
-        $video->update(['transcode_status' => 'completed']);
-        Log::info("Transcoding completed for video {$video->id}");
-        return true;
+        // Mark as completed if at least one quality was downloaded
+        if ($successCount > 0) {
+            $video->update(['transcode_status' => 'completed']);
+            Log::info("Transcoding completed for video {$video->id} ({$successCount}/{$totalQualities} qualities)");
+            return true;
+        }
+        
+        $video->update(['transcode_status' => 'failed']);
+        return false;
     }
 
     /**
