@@ -553,6 +553,7 @@ if (typeof window !== 'undefined') {
                                 <!-- Performance Rating -->
                                 <TableCell>
                                     <div class="space-y-1">
+                                        <div class="font-semibold text-lg text-foreground">{{ user.performance_score }}%</div>
                                         <Badge :variant="getPerformanceRatingVariant(user.performance_rating)" class="flex items-center w-fit">
                                             <component :is="getPerformanceRatingIcon(user.performance_rating)" class="mr-1 h-3 w-3" />
                                             {{ user.performance_rating }}
@@ -636,10 +637,13 @@ if (typeof window !== 'undefined') {
                             </div>
                             <div>
                                 <span class="text-sm text-muted-foreground">Performance:</span>
-                                <Badge :variant="getPerformanceRatingVariant(selectedUser.performance_rating)" class="flex items-center w-fit">
-                                    <component :is="getPerformanceRatingIcon(selectedUser.performance_rating)" class="mr-1 h-3 w-3" />
-                                    {{ selectedUser.performance_rating }}
-                                </Badge>
+                                <div class="space-y-1">
+                                    <div class="font-semibold text-lg">{{ selectedUser.performance_score }}%</div>
+                                    <Badge :variant="getPerformanceRatingVariant(selectedUser.performance_rating)" class="flex items-center w-fit">
+                                        <component :is="getPerformanceRatingIcon(selectedUser.performance_rating)" class="mr-1 h-3 w-3" />
+                                        {{ selectedUser.performance_rating }}
+                                    </Badge>
+                                </div>
                             </div>
                         </div>
                     </div>

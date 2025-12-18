@@ -430,6 +430,16 @@ class CourseOnlineReportController extends Controller
                 // ✅ Get comprehensive quiz performance for this user
                 $quizPerformance = $this->calculateUserQuizPerformance($user->id, $filters['course_id'] ?? null);
 
+                // Calculate performance rating and score
+                $performanceResult = $this->calculateUserPerformanceRating(
+                    $completionRate,
+                    $assignmentStats->avg_progress ?? 0,
+                    $avgSimulatedAttention,
+                    $quizPerformance['avg_quiz_score'], // ✅ Pass quiz score as separate 25% component
+                    $suspiciousSessions,
+                    $totalSessions
+                );
+
                 $performanceData = [
                     'id' => $user->id,
                     'name' => $user->name,
@@ -438,6 +448,7 @@ class CourseOnlineReportController extends Controller
                     'department' => $user->department->name ?? 'N/A',
                     'total_assignments' => $assignmentStats->total_assignments ?? 0,
                     'completed_assignments' => $assignmentStats->completed_assignments ?? 0,
+                    'in_progress_assignments' => ($assignmentStats->total_assignments ?? 0) - ($assignmentStats->completed_assignments ?? 0),
                     'completion_rate' => $completionRate,
                     'avg_progress' => round($assignmentStats->avg_progress ?? 0, 1),
                     'total_sessions' => $totalSessions,
@@ -445,14 +456,8 @@ class CourseOnlineReportController extends Controller
                     'avg_attention_score' => round($avgSimulatedAttention, 1),
                     'suspicious_sessions' => $suspiciousSessions,
                     'engagement_level' => $this->calculateEngagementLevel($avgSimulatedAttention),
-                    'performance_rating' => $this->calculateUserPerformanceRating(
-                        $completionRate,
-                        $assignmentStats->avg_progress ?? 0,
-                        $avgSimulatedAttention,
-                        $quizPerformance['avg_quiz_score'], // ✅ Pass quiz score as separate 25% component
-                        $suspiciousSessions,
-                        $totalSessions
-                    ),
+                    'performance_rating' => $performanceResult['rating'],
+                    'performance_score' => $performanceResult['score'],
                     'risk_level' => $this->calculateRiskLevel($suspiciousSessions, $totalSessions),
                     // ✅ New comprehensive quiz performance data
                     'quiz_performance' => $quizPerformance,
@@ -586,19 +591,19 @@ class CourseOnlineReportController extends Controller
                 $details[] = 'Session completed (+5)';
             }
             
-            // ✅ Pauses and rewinds do NOT affect score if within allowed time
+            // ✅ Pauses and rewinds do NOT affect score if within allowed time (UNLIMITED)
             if ($sessionData && $isWithinAllowedTime) {
                 $pauseCount = $sessionData->pause_count ?? 0;
                 $replayCount = $sessionData->video_replay_count ?? 0;
                 
-                // Pauses are normal behavior - give bonus for engagement
-                if ($pauseCount > 0 && $pauseCount <= 20) {
+                // Pauses are normal behavior - give bonus for engagement (UNLIMITED)
+                if ($pauseCount > 0) {
                     $score += 10;
                     $details[] = 'Normal pause behavior (+10)';
                 }
                 
-                // Replays show attention to detail
-                if ($replayCount > 0 && $replayCount <= 10) {
+                // Replays show attention to detail (UNLIMITED)
+                if ($replayCount > 0) {
                     $score += 10;
                     $details[] = 'Replay behavior shows engagement (+10)';
                 }
@@ -1066,10 +1071,16 @@ class CourseOnlineReportController extends Controller
         $finalScore = max(0, min(100, $finalScore));
 
         // Determine rating level
-        if ($finalScore >= 85) return 'Excellent';
-        if ($finalScore >= 70) return 'Good';
-        if ($finalScore >= 60) return 'Average';
-        return 'Needs Improvement';
+        $rating = 'Needs Improvement';
+        if ($finalScore >= 85) $rating = 'Excellent';
+        elseif ($finalScore >= 70) $rating = 'Good';
+        elseif ($finalScore >= 60) $rating = 'Average';
+        
+        // Return both score and rating
+        return [
+            'score' => round($finalScore, 1),
+            'rating' => $rating
+        ];
     }
 
     /**
