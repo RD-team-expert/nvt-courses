@@ -23,22 +23,7 @@ class VpsApiClient
      */
     public function sendTranscodeRequest(array $data): array
     {
-        Log::info('=== VpsApiClient::sendTranscodeRequest CALLED ===', [
-            'base_url' => $this->baseUrl,
-            'api_key_set' => !empty($this->apiKey),
-            'project_key' => $this->projectKey,
-            'request_data' => $data,
-        ]);
-        
         $url = "{$this->baseUrl}/api/transcode";
-        
-        Log::info('Sending HTTP POST request:', [
-            'url' => $url,
-            'headers' => [
-                'X-API-Key' => substr($this->apiKey, 0, 10) . '...',
-                'Accept' => 'application/json',
-            ],
-        ]);
         
         try {
             $response = Http::timeout(120)
@@ -47,12 +32,6 @@ class VpsApiClient
                     'Accept' => 'application/json',
                 ])
                 ->post($url, $data);
-            
-            Log::info('VPS HTTP response:', [
-                'status' => $response->status(),
-                'successful' => $response->successful(),
-                'body' => $response->body(),
-            ]);
 
             if (!$response->successful()) {
                 throw new \Exception("VPS request failed with status {$response->status()}: " . $response->body());
@@ -61,10 +40,7 @@ class VpsApiClient
             return $response->json();
             
         } catch (\Exception $e) {
-            Log::error('VPS request exception:', [
-                'error' => $e->getMessage(),
-                'url' => $url,
-            ]);
+            Log::error("VPS request failed: {$e->getMessage()}");
             throw $e;
         }
     }
