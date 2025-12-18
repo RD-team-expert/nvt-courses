@@ -168,66 +168,30 @@ class VideoController extends Controller
             if (empty($validated['video_data'])) {
                 throw new \Exception('Video file data is required for local storage');
             }
-
-            Log::info('=== VIDEO UPLOAD DEBUG ===');
-            Log::info('Raw video_data type:', ['type' => gettype($validated['video_data'])]);
-            Log::info('Raw video_data:', ['video_data' => $validated['video_data']]);
             
-            // ✅ Parse the JSON response from ChunkUploader
+            // Parse the JSON response from ChunkUploader
             $uploadedFileData = json_decode($validated['video_data'], true);
             
-            Log::info('Decoded data:', [
-                'decoded' => $uploadedFileData,
-                'json_error' => json_last_error_msg(),
-            ]);
-            
             if (!$uploadedFileData || !isset($uploadedFileData['path'])) {
-                Log::error('Invalid upload data structure:', [
-                    'has_data' => !empty($uploadedFileData),
-                    'has_path' => isset($uploadedFileData['path']),
-                    'keys' => $uploadedFileData ? array_keys($uploadedFileData) : [],
-                ]);
                 throw new \Exception('Invalid video upload data. Please try uploading again.');
             }
             
-            Log::info('=== END DEBUG ===');
-            
-            // ✅ The file is already uploaded by ChunkUploadController
-            // We just need to save the metadata
+            // Save the metadata from chunked upload
             $videoData['file_path'] = $uploadedFileData['path'];
             $videoData['file_size'] = $uploadedFileData['size'] ?? null;
             $videoData['mime_type'] = $uploadedFileData['mime_type'] ?? 'video/mp4';
             
-            // ✅ Optional: Extract duration if you implement it
-            // For now, use the duration from form or set to null
             if (!$videoData['duration']) {
-                // You can implement FFmpeg duration extraction here
                 $videoData['duration'] = null;
             }
         }
 
         // Create video record
         $video = Video::create($videoData);
-        
-        Log::info('Video record created:', [
-            'video_id' => $video->id,
-            'storage_type' => $video->storage_type,
-            'file_path' => $video->file_path,
-        ]);
 
-        // ✅ NEW: Trigger transcoding for local videos
+        // Trigger transcoding for local videos (async - doesn't block response)
         if ($validated['storage_type'] === 'local') {
-            Log::info('=== TRIGGERING TRANSCODING ===', [
-                'video_id' => $video->id,
-                'video_name' => $video->name,
-            ]);
-            
-            $transcodingResult = app(\App\Services\VpsTranscodingService::class)->requestTranscoding($video);
-            
-            Log::info('Transcoding trigger result:', [
-                'success' => $transcodingResult,
-                'video_id' => $video->id,
-            ]);
+            app(\App\Services\VpsTranscodingService::class)->requestTranscoding($video);
         }
 
         DB::commit();

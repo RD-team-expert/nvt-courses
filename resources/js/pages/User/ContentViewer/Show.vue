@@ -967,7 +967,20 @@ const navigateContent = (contentId: number) => {
  * Maintains playback position and playing state during switch
  */
 const changeQuality = async (newQuality: string) => {
-    if (!videoElement.value || isQualitySwitching.value || newQuality === selectedQuality.value) {
+    if (!videoElement.value || isQualitySwitching.value) {
+        return
+    }
+    
+    // Build the new URL
+    const baseUrl = `/video/stream/${props.video?.id}`
+    const newUrl = newQuality === 'original' ? baseUrl : `${baseUrl}/${newQuality}`
+    
+    // Get current URL and normalize it for comparison
+    const currentUrl = videoElement.value.src
+    const currentPath = new URL(currentUrl, window.location.origin).pathname
+    
+    // Check if already playing this quality
+    if (currentPath === newUrl) {
         return
     }
 
@@ -989,16 +1002,18 @@ const changeQuality = async (newQuality: string) => {
         // Update selected quality
         selectedQuality.value = newQuality
         
-        // Build new streaming URL with quality parameter
-        const baseUrl = `/video/stream/${props.video?.id}`
-        const newUrl = newQuality === 'original' ? baseUrl : `${baseUrl}/${newQuality}`
-        
         // Switch video source
         videoElement.value.src = newUrl
         
-        // Wait for video to load
-        await new Promise<void>((resolve) => {
+        // Wait for video to load with timeout
+        await new Promise<void>((resolve, reject) => {
+            const timeout = setTimeout(() => {
+                videoElement.value?.removeEventListener('loadeddata', onLoadedData)
+                reject(new Error('Video load timeout'))
+            }, 10000) // 10 second timeout
+            
             const onLoadedData = () => {
+                clearTimeout(timeout)
                 videoElement.value?.removeEventListener('loadeddata', onLoadedData)
                 resolve()
             }
@@ -1012,10 +1027,10 @@ const changeQuality = async (newQuality: string) => {
         if (wasPlaying) {
             await videoElement.value.play()
         }
-        
-        // console.log(`✅ Quality switched to ${newQuality}`)
     } catch (error) {
-        console.error('❌ Failed to switch quality:', error)
+        console.error('Failed to switch quality:', error)
+        // Revert to original quality on error
+        selectedQuality.value = 'original'
     } finally {
         isQualitySwitching.value = false
     }
@@ -1579,7 +1594,7 @@ watch(currentPage, (newPage) => {
                                                 class="relative bg-white/10 rounded-lg px-2 py-1">
                                                 <select 
                                                     v-model="selectedQuality" 
-                                                    @change="changeQuality(selectedQuality)"
+                                                    @change="(e) => changeQuality((e.target as HTMLSelectElement).value)"
                                                     :disabled="isQualitySwitching"
                                                     class="bg-transparent text-white text-sm font-medium border-none outline-none cursor-pointer pr-6 appearance-none hover:bg-white/20 rounded px-2 py-1 transition-all"
                                                     style="background-image: url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27white%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3e%3cpolyline points=%276 9 12 15 18 9%27%3e%3c/polyline%3e%3c/svg%3e'); background-repeat: no-repeat; background-position: right 0.25rem center; background-size: 1em;">
