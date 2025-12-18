@@ -322,12 +322,12 @@ const getSortedByDeadline = (assignments: Assignment[]) => {
 
                 <Card>
                     <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle class="text-sm font-medium">Minutes Spent</CardTitle> <!-- ✅ Changed title -->
+                        <CardTitle class="text-sm font-medium">Minutes Spent</CardTitle>
                         <Clock class="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div class="text-2xl font-bold">{{ stats.total_minutes_spent }}</div> <!-- ✅ Changed variable, removed Math.round -->
-                        <p class="text-xs text-muted-foreground">Learning time</p>
+                        <div class="text-2xl font-bold">{{ stats.total_minutes_spent || 0 }}</div>
+                        <p class="text-xs text-muted-foreground">Total learning time</p>
                     </CardContent>
                 </Card>
 

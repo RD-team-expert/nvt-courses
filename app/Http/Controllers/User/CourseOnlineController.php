@@ -121,12 +121,14 @@ class CourseOnlineController extends Controller
             'total_assignments' => $assignments->count(),
             'completed_courses' => $assignments->where('status', 'completed')->count(),
             'in_progress_courses' => $assignments->where('status', 'in_progress')->count(),
-            'total_minutes_spent' => $totalMinutes,  // ✅ CORRECT KEY NAME
+            'total_minutes_spent' => (int) $totalMinutes,  // ✅ Ensure integer
             'average_completion_rate' => $assignments->avg('progress_percentage') ?? 0,
             'certificates_earned' => $assignments->where('status', 'completed')->count(),
             // ✅ NEW: Add deadline-related stats
             'overdue_courses' => $assignments->where('deadline_info.status', 'overdue')->count(),
-            'due_soon_courses' => $assignments->where('deadline_info.status', 'due_soon')->count(),
+            'due_soon_courses' => $assignments->filter(function($a) {
+                return in_array($a['deadline_info']['status'], ['due_today', 'due_tomorrow', 'due_soon']);
+            })->count(),
         ];
 
         // ✅ DEBUG: Final dashboard stats
@@ -364,26 +366,42 @@ class CourseOnlineController extends Controller
 
 
     /**
-     * ✅ NEW: Calculate time spent for specific assignment/course
+     * ✅ FIXED: Calculate time spent for specific assignment/course using multiple data sources
      */
     private function calculateAssignmentTimeSpent(int $courseId, int $userId): int
     {
-
-
         // Get all learning sessions for this user and course
         $sessions = LearningSession::where('user_id', $userId)
             ->where('course_online_id', $courseId)
-            ->select(['id', 'total_duration_minutes', 'session_start', 'session_end'])
+            ->select(['id', 'total_duration_minutes', 'active_playback_time', 'session_start', 'session_end'])
             ->get();
 
+        $totalSeconds = 0;
 
-        // ✅ FIXED: Only sum positive durations
-        $totalMinutes = $sessions->where('total_duration_minutes', '>', 0)->sum('total_duration_minutes');
-        $negativeCount = $sessions->where('total_duration_minutes', '<=', 0)->count();
+        foreach ($sessions as $session) {
+            // Priority 1: Use active_playback_time if available (most accurate)
+            if ($session->active_playback_time && $session->active_playback_time > 0) {
+                $totalSeconds += $session->active_playback_time;
+            }
+            // Priority 2: Use total_duration_minutes if available
+            elseif ($session->total_duration_minutes && $session->total_duration_minutes > 0) {
+                $totalSeconds += ($session->total_duration_minutes * 60);
+            }
+            // Priority 3: Calculate from session_start and session_end
+            elseif ($session->session_start && $session->session_end) {
+                $start = \Carbon\Carbon::parse($session->session_start);
+                $end = \Carbon\Carbon::parse($session->session_end);
+                $durationMinutes = $start->diffInMinutes($end);
+                if ($durationMinutes > 0 && $durationMinutes < 1440) { // Max 24 hours
+                    $totalSeconds += ($durationMinutes * 60);
+                }
+            }
+        }
 
+        // Convert seconds to minutes
+        $totalMinutes = (int) round($totalSeconds / 60);
 
-
-        return max(0, intval($totalMinutes));
+        return max(0, $totalMinutes);
     }
 
     /**
@@ -494,15 +512,12 @@ class CourseOnlineController extends Controller
      */
     private function calculateCourseProgress(int $courseId, int $userId): float
     {
-
-
         // Get all required content in the course
         $totalContent = ModuleContent::whereHas('module', function ($query) use ($courseId) {
             $query->where('course_online_id', $courseId)->where('is_required', true);
         })->where('is_required', true)->count();
 
         if ($totalContent === 0) {
-
             return 0.0;
         }
 
@@ -516,12 +531,8 @@ class CourseOnlineController extends Controller
 
         $totalProgressSum = $progressRecords->sum('completion_percentage');
 
-
-
         // ✅ FIXED: Calculate average progress
         $averageProgress = round($totalProgressSum / $totalContent, 2);
-
-
 
         return $averageProgress;
     }
@@ -677,7 +688,7 @@ class CourseOnlineController extends Controller
 
         if ($currentProgress < 85) {
             return redirect()->back()
-                ->with('error', 'You must complete at least 85% of the course content before finishing.');
+                ->with('error', "You must complete at least 85% of the course content before finishing. Current progress: {$currentProgress}%");
         }
 
         try {
@@ -770,24 +781,36 @@ class CourseOnlineController extends Controller
 
     private function calculateTotalMinutes(int $userId): int
     {
-
-
-// Get all learning sessions for this user
+        // Get all learning sessions for this user
         $allSessions = LearningSession::where('user_id', $userId)
-            ->select(['id', 'total_duration_minutes', 'course_online_id', 'session_start'])
+            ->select(['id', 'total_duration_minutes', 'active_playback_time', 'session_start', 'session_end'])
             ->get();
 
+        $totalSeconds = 0;
 
+        foreach ($allSessions as $session) {
+            // Priority 1: Use active_playback_time if available (most accurate)
+            if ($session->active_playback_time && $session->active_playback_time > 0) {
+                $totalSeconds += $session->active_playback_time;
+            }
+            // Priority 2: Use total_duration_minutes if available
+            elseif ($session->total_duration_minutes && $session->total_duration_minutes > 0) {
+                $totalSeconds += ($session->total_duration_minutes * 60);
+            }
+            // Priority 3: Calculate from session_start and session_end
+            elseif ($session->session_start && $session->session_end) {
+                $start = \Carbon\Carbon::parse($session->session_start);
+                $end = \Carbon\Carbon::parse($session->session_end);
+                $durationMinutes = $start->diffInMinutes($end);
+                if ($durationMinutes > 0 && $durationMinutes < 1440) { // Max 24 hours
+                    $totalSeconds += ($durationMinutes * 60);
+                }
+            }
+        }
 
-// Only include positive duration values
-        $positiveSessions = $allSessions->where('total_duration_minutes', '>', 0);
-        $totalMinutes = $positiveSessions->sum('total_duration_minutes');
+        // Convert seconds to minutes
+        $totalMinutes = (int) round($totalSeconds / 60);
 
-// Ensure we never return negative values
-        $totalMinutes = max(0, $totalMinutes);
-
-
-
-        return (int) $totalMinutes;
+        return max(0, $totalMinutes);
     }
 }

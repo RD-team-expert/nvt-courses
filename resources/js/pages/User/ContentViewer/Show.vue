@@ -621,8 +621,6 @@ const endSession = async () => {
 }
 
 const markCompleted = async () => {
-    // console.log('🎯 Marking content as completed:', props.content.id)
-
     try {
         isLoading.value = true
 
@@ -633,7 +631,6 @@ const markCompleted = async () => {
             })
         } catch (error) {
             if (error.response?.status === 404) {
-                // console.log('🔄 /complete route not found, trying /mark-complete')
                 response = await axios.post(`/content/${props.content.id}/mark-complete`, {}, {
                     headers: { 'X-CSRF-TOKEN': csrfToken }
                 })
@@ -646,21 +643,18 @@ const markCompleted = async () => {
             isCompleted.value = true
             completionPercentage.value = 100
 
-            // console.log('✅ Content marked as completed successfully!')
+            // Show success message
+            alert('✅ Content completed! Returning to course...')
 
-            if (safeNavigation.value.next?.is_unlocked) {
-                setTimeout(() => {
-                    router.visit(route('content.show', safeNavigation.value.next.id))
-                }, 2000)
-            } else {
-                setTimeout(() => {
-                    router.visit(route('courses-online.show', safeCourse.value.id))
-                }, 2000)
-            }
+            // Force reload the course page to refresh module/content unlock status
+            setTimeout(() => {
+                router.visit(route('courses-online.show', safeCourse.value.id), {
+                    preserveScroll: false,
+                    preserveState: false,
+                })
+            }, 1000)
         }
     } catch (error) {
-        // console.error('❌ Failed to mark as completed:', error)
-
         if (error.response?.data?.message) {
             alert(`Error: ${error.response.data.message}`)
         } else {
@@ -1188,16 +1182,17 @@ const onPause = () => {
     }
 }
 
-const onEnded = () => {
+const onEnded = async () => {
     isPlaying.value = false
     
     // ✅ Task 6.2: Stop active playback tracking when video ends
     isActivelyPlaying.value = false
     
-    updateProgress()
-    if (progressPercentage.value >= 100) {
-        markCompleted()
-    }
+    // Update progress first
+    await updateProgress()
+    
+    // Always mark as completed when video ends
+    await markCompleted()
 }
 
 const onVolumeChange = () => {
