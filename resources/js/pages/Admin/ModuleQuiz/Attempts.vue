@@ -166,6 +166,7 @@ const stats = {
                                 <TableHead>Score</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead>Completed</TableHead>
+                                <TableHead>Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -194,6 +195,18 @@ const stats = {
                                 </TableCell>
                                 <TableCell>
                                     {{ attempt.completed_at || 'In Progress' }}
+                                </TableCell>
+                                <TableCell>
+                                    <Button as-child variant="outline" size="sm">
+                                        <Link :href="route('admin.module-quiz.attempts.show', { 
+                                            courseOnline: course.id, 
+                                            courseModule: module.id, 
+                                            quiz: quiz.id,
+                                            attempt: attempt.id 
+                                        })">
+                                            View Answers
+                                        </Link>
+                                    </Button>
                                 </TableCell>
                             </TableRow>
                         </TableBody>

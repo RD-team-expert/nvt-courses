@@ -17,6 +17,7 @@ class LearningSession extends Model
         'content_id',
         'session_start',
         'session_end',
+        'last_heartbeat',  // ✅ FIXED: Add last_heartbeat to fillable
         'total_duration_minutes',
         'api_key_id',  // ✅ This MUST be here!
 
@@ -49,6 +50,7 @@ class LearningSession extends Model
     protected $casts = [
         'session_start' => 'datetime',
         'session_end' => 'datetime',
+        'last_heartbeat' => 'datetime',  // ✅ FIXED: Add last_heartbeat to casts
         'total_duration_minutes' => 'integer',
         'video_watch_time' => 'integer',
         'video_total_duration' => 'integer',

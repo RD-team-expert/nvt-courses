@@ -99,7 +99,7 @@ class CourseOnlineReportController extends Controller
                     $sessions = DB::table('learning_sessions')
                         ->where('user_id', $assignment->user_id)
                         ->where('course_online_id', $assignment->course_online_id)
-                        ->select('id', 'session_start', 'session_end', 'total_duration_minutes', 'attention_score', 'is_suspicious_activity')
+                        ->select('id', 'session_start', 'session_end', 'total_duration_minutes', 'attention_score', 'is_suspicious_activity', 'active_playback_time', 'content_id')
                         ->get();
 
 
@@ -242,7 +242,15 @@ class CourseOnlineReportController extends Controller
 
             // ✅ FIXED: Transform data with REAL duration and SIMULATED attention
             $sessions->getCollection()->transform(function ($session) {
-                $calculatedDuration = $this->getActualSessionDuration($session->session_start, $session->session_end);
+                $activePlaybackTime = $session->active_playback_time ?? null;
+                $contentId = $session->content_id ?? null;
+                $calculatedDuration = $this->getActualSessionDuration(
+                    $session->session_start, 
+                    $session->session_end,
+                    $activePlaybackTime,
+                    $session->id,
+                    $contentId
+                );
                 $storedDuration = $session->total_duration_minutes ?? 0;
 
                 // ✅ Get full session data for skip/seek tracking AND active playback time
@@ -391,7 +399,7 @@ class CourseOnlineReportController extends Controller
                 $rawSessions = $sessionQuery->select(
                     'id', 'session_start', 'session_end', 'attention_score', 'is_suspicious_activity',
                     'video_skip_count', 'seek_count', 'pause_count', 'video_replay_count',
-                    'video_completion_percentage', 'content_id'
+                    'video_completion_percentage', 'content_id', 'active_playback_time'
                 )->get();
 
                 $totalSessions = $rawSessions->count();
@@ -400,22 +408,41 @@ class CourseOnlineReportController extends Controller
                 $suspiciousSessions = 0;
 
                 foreach ($rawSessions as $session) {
-                    $duration = $this->getActualSessionDuration($session->session_start, $session->session_end);
+                    // ✅ Use REAL session data instead of simulated calculations
+                    $activePlaybackTime = $session->active_playback_time ?? null;
+                    $contentId = $session->content_id ?? null;
+                    $duration = $this->getActualSessionDuration(
+                        $session->session_start, 
+                        $session->session_end,
+                        $activePlaybackTime,
+                        $session->id,
+                        $contentId
+                    );
                     $totalRealMinutes += $duration;
 
-                    // ✅ Generate simulated attention with video duration and skip/seek data
-                    $attentionResult = $this->calculateSimulatedAttentionScore(
-                        $session->session_start,
-                        $session->session_end,
-                        $duration,
-                        $session->content_id,
-                        $session
-                    );
-                    $simulatedAttentionScores[] = $attentionResult['score'];
+                    // ✅ FIXED: Use real attention score if available, otherwise calculate
+                    if (($session->attention_score ?? 0) > 0) {
+                        // Use the real stored attention score
+                        $simulatedAttentionScores[] = $session->attention_score;
+                        
+                        // Use real suspicious activity flag
+                        if ($session->is_suspicious_activity) {
+                            $suspiciousSessions++;
+                        }
+                    } else {
+                        // Fallback to calculation only if no real data exists
+                        $attentionResult = $this->calculateSimulatedAttentionScore(
+                            $session->session_start,
+                            $session->session_end,
+                            $duration,
+                            $session->content_id,
+                            $session
+                        );
+                        $simulatedAttentionScores[] = $attentionResult['score'];
 
-                    // Count as suspicious based on new calculation
-                    if ($attentionResult['is_suspicious']) {
-                        $suspiciousSessions++;
+                        if ($attentionResult['is_suspicious']) {
+                            $suspiciousSessions++;
+                        }
                     }
                 }
 
@@ -513,11 +540,80 @@ class CourseOnlineReportController extends Controller
             ? ($sessionData->active_playback_time / 60)
             : $calculatedDuration;
         
+        // ✅ IMPROVED FALLBACK: If no active playback time, try to calculate from timestamps
+        if ($activePlaybackMinutes <= 0 && $sessionStart && $sessionEnd) {
+            try {
+                $start = new \DateTime($sessionStart);
+                $end = new \DateTime($sessionEnd);
+                
+                // Calculate total minutes, handling day boundaries correctly
+                $totalMinutes = $start->diff($end)->days * 24 * 60 + 
+                               $start->diff($end)->h * 60 + 
+                               $start->diff($end)->i;
+                
+                // Only use timestamp duration if it's reasonable (between 1 minute and 3 hours)
+                if ($totalMinutes >= 1 && $totalMinutes <= 180) {
+                    $activePlaybackMinutes = $totalMinutes;
+                    $details[] = 'Using timestamp duration as fallback';
+                } else {
+                    // Duration is unreasonable, skip timestamp fallback
+                    $details[] = 'Timestamp duration unreasonable (' . $totalMinutes . ' min)';
+                }
+            } catch (\Exception $e) {
+                // If timestamp parsing fails, continue with 0
+                $details[] = 'Timestamp parsing failed';
+            }
+        }
+        
+        // ✅ FINAL FALLBACK: If still no duration but we have completion data, give base score
         if ($activePlaybackMinutes <= 0) {
+            if ($sessionData && isset($sessionData->video_completion_percentage) && $sessionData->video_completion_percentage > 0) {
+                // Give a base score based on completion percentage only
+                $completionPct = $sessionData->video_completion_percentage;
+                if ($completionPct >= 95) {
+                    return [
+                        'score' => 60, // Good completion, no time data
+                        'is_suspicious' => false,
+                        'details' => ['High completion, no time data (+60)'],
+                        'is_within_allowed_time' => true,
+                        'active_playback_minutes' => 0,
+                        'allowed_time_minutes' => 0,
+                    ];
+                } elseif ($completionPct >= 80) {
+                    return [
+                        'score' => 50,
+                        'is_suspicious' => false,
+                        'details' => ['Good completion, no time data (+50)'],
+                        'is_within_allowed_time' => true,
+                        'active_playback_minutes' => 0,
+                        'allowed_time_minutes' => 0,
+                    ];
+                } elseif ($completionPct >= 60) {
+                    return [
+                        'score' => 40,
+                        'is_suspicious' => false,
+                        'details' => ['Moderate completion, no time data (+40)'],
+                        'is_within_allowed_time' => true,
+                        'active_playback_minutes' => 0,
+                        'allowed_time_minutes' => 0,
+                    ];
+                } else {
+                    return [
+                        'score' => 25,
+                        'is_suspicious' => true,
+                        'details' => ['Low completion, no time data (+25)'],
+                        'is_within_allowed_time' => true,
+                        'active_playback_minutes' => 0,
+                        'allowed_time_minutes' => 0,
+                    ];
+                }
+            }
+            
+            // Absolute last resort - no data at all
             return [
                 'score' => 0, 
                 'is_suspicious' => true, 
-                'details' => ['No active playback time recorded'],
+                'details' => ['No playback time or completion data'],
                 'is_within_allowed_time' => false,
                 'active_playback_minutes' => 0,
                 'allowed_time_minutes' => 0,
@@ -679,19 +775,26 @@ class CourseOnlineReportController extends Controller
         $sessionDetails = [];
 
         foreach ($sessions as $session) {
-            // Calculate real duration
-            $calculatedDuration = $this->getActualSessionDuration($session->session_start, $session->session_end);
-
-            // ✅ Get full session data for skip/seek tracking
+            // ✅ Get full session data for skip/seek tracking AND active_playback_time
             $fullSessionData = null;
             if (isset($session->id)) {
                 $fullSessionData = DB::table('learning_sessions')
                     ->where('id', $session->id)
-                    ->select('video_skip_count', 'seek_count', 'pause_count', 'video_replay_count', 'video_completion_percentage', 'content_id')
+                    ->select('video_skip_count', 'seek_count', 'pause_count', 'video_replay_count', 'video_completion_percentage', 'content_id', 'active_playback_time')
                     ->first();
             }
             
             $contentId = $fullSessionData->content_id ?? ($session->content_id ?? null);
+            $activePlaybackTime = $fullSessionData->active_playback_time ?? ($session->active_playback_time ?? null);
+            
+            // Calculate real duration with active_playback_time priority
+            $calculatedDuration = $this->getActualSessionDuration(
+                $session->session_start, 
+                $session->session_end,
+                $activePlaybackTime,
+                $session->id,
+                $contentId
+            );
 
             // ✅ Generate attention score with video duration and skip/seek data
             $attentionResult = $this->calculateSimulatedAttentionScore(
@@ -742,22 +845,76 @@ class CourseOnlineReportController extends Controller
     }
 
     /**
-     * 🔧 EXISTING: Calculate REAL duration from start/end times
+     * 🔧 UPDATED: Calculate REAL duration from start/end times or active_playback_time
+     * Priority: active_playback_time > calculated duration > 0
+     * For active sessions (no end time), use reasonable estimate based on video duration
      */
-    private function getActualSessionDuration($sessionStart, $sessionEnd)
+    private function getActualSessionDuration($sessionStart, $sessionEnd, $activePlaybackTime = null, $sessionId = null, $contentId = null)
     {
-        if (!$sessionStart || !$sessionEnd) {
+        // Priority 1: Use active_playback_time if available (most accurate)
+        if ($activePlaybackTime && $activePlaybackTime > 0) {
+            return round($activePlaybackTime / 60, 2); // Convert seconds to minutes
+        }
+
+        // Priority 2: Calculate from start/end times
+        if (!$sessionStart) {
             return 0;
         }
 
         try {
             $start = Carbon::parse($sessionStart);
-            $end = Carbon::parse($sessionEnd);
-            $minutes = $start->diffInMinutes($end);
-
-            return max(0, $minutes); // Ensure non-negative
+            
+            // If session has an end time, use it
+            if ($sessionEnd) {
+                $end = Carbon::parse($sessionEnd);
+                $minutes = $start->diffInMinutes($end);
+                return max(0, $minutes);
+            }
+            
+            // Priority 3: For active sessions (no end time), try to use video duration
+            if ($contentId) {
+                $videoDurationSeconds = DB::table('module_content')
+                    ->where('id', $contentId)
+                    ->value('duration');
+                
+                if ($videoDurationSeconds && $videoDurationSeconds > 0) {
+                    // Use video duration as a reasonable estimate
+                    return round($videoDurationSeconds / 60, 2);
+                }
+            }
+            
+            // Priority 4: Use backup calculation from completion timestamps
+            if ($sessionId) {
+                $session = DB::table('learning_sessions')
+                    ->where('id', $sessionId)
+                    ->first();
+                
+                if ($session && $session->user_id && $session->course_online_id) {
+                    // Check if content was completed
+                    $contentProgress = DB::table('user_content_progress')
+                        ->where('user_id', $session->user_id)
+                        ->where('content_id', $session->content_id)
+                        ->where('is_completed', true)
+                        ->whereNotNull('completed_at')
+                        ->first();
+                    
+                    if ($contentProgress && $contentProgress->completed_at) {
+                        // Calculate from session start to content completion
+                        $completedAt = Carbon::parse($contentProgress->completed_at);
+                        $minutes = $start->diffInMinutes($completedAt);
+                        
+                        // Use FULL time without reduction factor
+                        // Cap at reasonable limit to prevent extreme values
+                        return max(0, min($minutes, 180)); // Cap at 3 hours
+                    }
+                }
+            }
+            
+            // Priority 5: For active sessions without any data, return 0 instead of inflated time
+            // This prevents showing 60 minutes for sessions with no tracking data
+            return 0;
+            
         } catch (\Exception $e) {
-
             return 0;
         }
     }
@@ -778,12 +935,20 @@ class CourseOnlineReportController extends Controller
             $allSessions = DB::table('learning_sessions')
                 ->select(
                     'id', 'session_start', 'session_end', 'total_duration_minutes', 'content_id',
-                    'video_skip_count', 'seek_count', 'pause_count', 'video_replay_count', 'video_completion_percentage'
+                    'video_skip_count', 'seek_count', 'pause_count', 'video_replay_count', 'video_completion_percentage', 'active_playback_time'
                 )
                 ->get();
 
             foreach ($allSessions as $session) {
-                $realDuration = $this->getActualSessionDuration($session->session_start, $session->session_end);
+                $activePlaybackTime = $session->active_playback_time ?? null;
+                $contentId = $session->content_id ?? null;
+                $realDuration = $this->getActualSessionDuration(
+                    $session->session_start, 
+                    $session->session_end,
+                    $activePlaybackTime,
+                    $session->id,
+                    $contentId
+                );
                 $storedDuration = $session->total_duration_minutes ?? 0;
 
                 $totalRealMinutes += $realDuration;
@@ -860,12 +1025,20 @@ class CourseOnlineReportController extends Controller
             $allSessions = DB::table('learning_sessions')
                 ->select(
                     'id', 'session_start', 'session_end', 'total_duration_minutes', 'content_id',
-                    'video_skip_count', 'seek_count', 'pause_count', 'video_replay_count', 'video_completion_percentage'
+                    'video_skip_count', 'seek_count', 'pause_count', 'video_replay_count', 'video_completion_percentage', 'active_playback_time'
                 )
                 ->get();
 
             foreach ($allSessions as $session) {
-                $duration = $this->getActualSessionDuration($session->session_start, $session->session_end);
+                $activePlaybackTime = $session->active_playback_time ?? null;
+                $contentId = $session->content_id ?? null;
+                $duration = $this->getActualSessionDuration(
+                    $session->session_start, 
+                    $session->session_end,
+                    $activePlaybackTime,
+                    $session->id,
+                    $contentId
+                );
                 $totalRealMinutes += $duration;
 
                 if ($duration > 0) {
@@ -1407,8 +1580,6 @@ class CourseOnlineReportController extends Controller
 
             $exportData = [];
             foreach ($sessions as $session) {
-                $calculatedDuration = $this->getActualSessionDuration($session->session_start, $session->session_end);
-                
                 // Get full session data for skip/seek tracking AND active playback time
                 $fullSessionData = DB::table('learning_sessions')
                     ->where('id', $session->id)
@@ -1416,6 +1587,16 @@ class CourseOnlineReportController extends Controller
                     ->first();
                 
                 $contentId = $fullSessionData->content_id ?? null;
+                $activePlaybackTime = $fullSessionData->active_playback_time ?? null;
+                
+                // Calculate duration with active_playback_time priority
+                $calculatedDuration = $this->getActualSessionDuration(
+                    $session->session_start,
+                    $session->session_end,
+                    $activePlaybackTime,
+                    $session->id,
+                    $contentId
+                );
                 
                 $attentionResult = $this->calculateSimulatedAttentionScore(
                     $session->session_start,
@@ -1548,7 +1729,7 @@ class CourseOnlineReportController extends Controller
                 $rawSessions = $sessionQuery->select(
                     'id', 'session_start', 'session_end', 'attention_score', 'is_suspicious_activity',
                     'video_skip_count', 'seek_count', 'pause_count', 'video_replay_count',
-                    'video_completion_percentage', 'content_id'
+                    'video_completion_percentage', 'content_id', 'active_playback_time'
                 )->get();
 
                 $totalSessions = $rawSessions->count();
@@ -1557,7 +1738,15 @@ class CourseOnlineReportController extends Controller
                 $suspiciousSessions = 0;
 
                 foreach ($rawSessions as $session) {
-                    $duration = $this->getActualSessionDuration($session->session_start, $session->session_end);
+                    $activePlaybackTime = $session->active_playback_time ?? null;
+                    $contentId = $session->content_id ?? null;
+                    $duration = $this->getActualSessionDuration(
+                        $session->session_start,
+                        $session->session_end,
+                        $activePlaybackTime,
+                        $session->id,
+                        $contentId
+                    );
                     $totalRealMinutes += $duration;
 
                     $attentionResult = $this->calculateSimulatedAttentionScore(

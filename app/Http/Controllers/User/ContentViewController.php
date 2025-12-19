@@ -143,7 +143,8 @@ class ContentViewController extends Controller
                         $request->input('watch_time', 0), // ✅ FIXED: Changed from watch_time_increment to watch_time
                         $request->input('skip_count', 0), // ✅ FIXED: Changed from skip_count_increment to skip_count
                         $request->input('seek_count', 0), // ✅ FIXED: Changed from seek_count_increment to seek_count
-                        $request->input('pause_count', 0) // ✅ FIXED: Changed from pause_count_increment to pause_count
+                        $request->input('pause_count', 0), // ✅ FIXED: Changed from pause_count_increment to pause_count
+                        $request->input('completion_percentage', 0) // ✅ NEW: Pass completion percentage
                     );
 
 
