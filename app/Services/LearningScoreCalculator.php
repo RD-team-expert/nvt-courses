@@ -84,11 +84,19 @@ class LearningScoreCalculator
             ->where('course_online_id', $courseId)
             ->select('id', 'session_start', 'session_end', 'content_id', 
                     'video_skip_count', 'seek_count', 'pause_count', 
-                    'video_replay_count', 'video_completion_percentage', 'active_playback_time')
+                    'video_replay_count', 'video_completion_percentage', 'active_playback_time',
+                    'total_duration_minutes')
             ->get();
         
         if ($sessions->isEmpty()) {
             return 65.0; // Default when no sessions
+        }
+        
+        // Check if we need backup calculation
+        $needsBackup = $this->needsBackupCalculation($sessions);
+        
+        if ($needsBackup) {
+            return $this->getBackupAttentionScore($userId, $courseId, $sessions);
         }
         
         $attentionScores = [];
@@ -112,6 +120,107 @@ class LearningScoreCalculator
         return count($attentionScores) > 0 
             ? round(array_sum($attentionScores) / count($attentionScores), 1)
             : 65.0;
+    }
+    
+    /**
+     * Check if backup calculation is needed
+     * 
+     * @param \Illuminate\Support\Collection $sessions
+     * @return bool
+     */
+    private function needsBackupCalculation($sessions): bool
+    {
+        // Check if all sessions have 0 or null tracking data
+        $hasValidData = false;
+        
+        foreach ($sessions as $session) {
+            if (($session->active_playback_time ?? 0) > 0 || 
+                ($session->total_duration_minutes ?? 0) > 0) {
+                $hasValidData = true;
+                break;
+            }
+        }
+        
+        return !$hasValidData;
+    }
+    
+    /**
+     * Get backup attention score using completion timestamps
+     * 
+     * @param int $userId
+     * @param int $courseId
+     * @param \Illuminate\Support\Collection $sessions
+     * @return float
+     */
+    private function getBackupAttentionScore(int $userId, int $courseId, $sessions): float
+    {
+        $backupCalculator = new BackupLearningTimeCalculator();
+        $backupData = $backupCalculator->calculateBackupTime($userId, $courseId);
+        
+        if ($backupData['total_minutes'] <= 0) {
+            return 65.0; // Default if backup also fails
+        }
+        
+        // Calculate attention score based on backup time
+        // Use a simplified scoring: reasonable time = good score
+        $totalMinutes = $backupData['total_minutes'];
+        
+        // Get expected course duration
+        $expectedDuration = $this->getExpectedCourseDuration($courseId);
+        
+        if ($expectedDuration > 0) {
+            $ratio = $totalMinutes / $expectedDuration;
+            
+            // Score based on time ratio
+            if ($ratio >= 0.8 && $ratio <= 2.0) {
+                // Good: spent 80%-200% of expected time
+                return 75.0;
+            } elseif ($ratio >= 0.5 && $ratio < 0.8) {
+                // Acceptable: spent 50%-80% of expected time
+                return 65.0;
+            } elseif ($ratio > 2.0 && $ratio <= 3.0) {
+                // Took longer but completed
+                return 60.0;
+            } else {
+                // Either too fast or too slow
+                return 50.0;
+            }
+        }
+        
+        // Fallback: score based on absolute time
+        if ($totalMinutes >= 30 && $totalMinutes <= 180) {
+            return 70.0;
+        } elseif ($totalMinutes >= 15 && $totalMinutes < 30) {
+            return 60.0;
+        } else {
+            return 55.0;
+        }
+    }
+    
+    /**
+     * Get expected course duration from content
+     * 
+     * @param int $courseId
+     * @return float Duration in minutes
+     */
+    private function getExpectedCourseDuration(int $courseId): float
+    {
+        $totalSeconds = \DB::table('module_content as mc')
+            ->join('course_modules as cm', 'mc.module_id', '=', 'cm.id')
+            ->where('cm.course_online_id', $courseId)
+            ->where('mc.content_type', 'video')
+            ->sum('mc.duration');
+        
+        // Add estimated time for PDFs
+        $pdfPages = \DB::table('module_content as mc')
+            ->join('course_modules as cm', 'mc.module_id', '=', 'cm.id')
+            ->where('cm.course_online_id', $courseId)
+            ->where('mc.content_type', 'pdf')
+            ->sum('mc.pdf_page_count');
+        
+        $pdfMinutes = $pdfPages * 2; // 2 minutes per page
+        
+        return ($totalSeconds / 60) + $pdfMinutes;
     }
     
     /**

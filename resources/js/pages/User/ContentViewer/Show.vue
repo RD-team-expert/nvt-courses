@@ -193,6 +193,7 @@ const pdfContainer = ref<HTMLDivElement | null>(null)
 const currentPage = ref(1)
 const totalPages = ref(0)
 const pdfZoom = ref(100)
+const pdfScale = ref(2) // Higher scale = better quality (1 = normal, 2 = 2x resolution, 3 = 3x)
 const pdfRotation = ref(0)
 const isPdfLoaded = ref(false)
 const isPdfFullscreen = ref(false)
@@ -427,6 +428,11 @@ const updateActivePlaybackTime = () => {
         // Only add reasonable increments (between 0 and 2 seconds)
         if (elapsed > 0 && elapsed < 2) {
             activePlaybackTime.value += elapsed
+            
+            // Log every 10 seconds
+            if (Math.floor(activePlaybackTime.value) % 10 === 0) {
+                console.log('⏱️ Active playback time updated:', Math.floor(activePlaybackTime.value), 'seconds')
+            }
         }
         
         lastActiveTimeUpdate.value = now
@@ -457,7 +463,7 @@ const startSession = async () => {
     if (sessionId.value || isCreatingSession.value) return
 
     isCreatingSession.value = true
-    // console.log('🚀 Starting session for content:', props.content.id)
+    console.log('🚀 Starting session for content:', props.content.id)
 
     try {
         // ✅ Get the key_id from the video data passed from backend
@@ -471,7 +477,7 @@ const startSession = async () => {
 
         if (response.data.success) {
             sessionId.value = response.data.session_id
-            // console.log('✅ Session started:', sessionId.value)
+            console.log('✅ Session started:', sessionId.value)
         }
     } catch (error) {
         // console.error('❌ Failed to start session:', error)
@@ -563,6 +569,8 @@ const sendHeartbeat = async () => {
         const payload = {
             action: 'heartbeat',
             current_position: currentPosition,
+            // ✅ FIXED: Send completion percentage in heartbeat
+            completion_percentage: progressPercentage.value,
             // Send incremental data since last heartbeat
             skip_count: skipCountSinceLastHeartbeat.value,
             seek_count: seekCountSinceLastHeartbeat.value,
@@ -572,14 +580,14 @@ const sendHeartbeat = async () => {
             active_playback_time: Math.floor(activePlaybackTime.value),
         }
 
-        // console.log('💓 Sending heartbeat with skip/seek data:', payload)
+        console.log('💓 Sending heartbeat with data:', payload)
 
         const response = await axios.post(`/content/${props.content.id}/session`, payload, {
             headers: { 'X-CSRF-TOKEN': csrfToken }
         })
 
         if (response.data.success) {
-            // console.log('✅ Heartbeat sent successfully')
+            console.log('✅ Heartbeat sent successfully')
             // Reset incremental counters after successful heartbeat
             resetIncrementalCounters()
         }
@@ -592,12 +600,19 @@ const sendHeartbeat = async () => {
 const endSession = async () => {
     if (!sessionId.value) return
 
-    // console.log('🛑 Ending session:', sessionId.value)
+    console.log('🛑 Ending session:', sessionId.value, 'with payload:', {
+        completion_percentage: progressPercentage.value,
+        active_playback_time: Math.floor(activePlaybackTime.value),
+        current_time: currentTime.value,
+        duration: duration.value
+    })
 
     try {
         const payload = {
             action: 'end',
             current_position: props.content.content_type === 'video' ? currentTime.value : currentPage.value,
+            // ✅ FIXED: Send completion percentage on session end
+            completion_percentage: progressPercentage.value,
             // Send any remaining incremental data
             skip_count: skipCountSinceLastHeartbeat.value,
             seek_count: seekCountSinceLastHeartbeat.value,
@@ -612,7 +627,7 @@ const endSession = async () => {
             headers: { 'X-CSRF-TOKEN': csrfToken }
         })
 
-        // console.log('✅ Session ended')
+        console.log('✅ Session ended successfully')
         sessionId.value = null
         sessionStartTime.value = null
     } catch (error) {
@@ -623,6 +638,16 @@ const endSession = async () => {
 const markCompleted = async () => {
     try {
         isLoading.value = true
+
+        // ✅ Send final heartbeat before marking as completed to save active_playback_time
+        if (sessionId.value && props.content.content_type === 'video') {
+            await sendHeartbeat()
+        }
+
+        // ✅ FIXED: End session before marking as completed
+        if (sessionId.value) {
+            await endSession()
+        }
 
         let response;
         try {
@@ -933,9 +958,10 @@ const togglePdfFullscreen = async () => {
 }
 
 const downloadPdf = () => {
-    if (props.content.file_url) {
+    const pdfUrl = effectivePdfUrl.value
+    if (pdfUrl) {
         const link = document.createElement('a')
-        link.href = props.content.file_url
+        link.href = pdfUrl
         link.download = props.content.pdf_name || props.content.title + '.pdf'
         link.target = '_blank'
         document.body.appendChild(link)
@@ -1119,6 +1145,7 @@ const onLoadedMetadata = () => {
     if (videoElement.value) {
         duration.value = videoElement.value.duration
         videoElement.value.currentTime = safeUserProgress.value.current_position || 0
+        console.log('📹 Video metadata loaded - Duration:', duration.value, 'seconds')
     }
 }
 
@@ -1131,6 +1158,23 @@ const onTimeUpdate = () => {
             currentTime.value = videoElement.value.currentTime
             previousSeekPosition = currentTime.value  // ✅ NEW: Track position for rewind detection (Task 6.4)
             lastTimeUpdate = now
+            
+            // Log progress every 10 seconds
+            if (Math.floor(currentTime.value) % 10 === 0) {
+                console.log('⏱️ Video progress:', Math.floor(currentTime.value), '/', Math.floor(duration.value), 
+                           'seconds (', Math.round(progressPercentage.value, 1), '%)')
+            }
+            
+            // ✅ PRODUCTION-SAFE: Send heartbeat at key milestones (25%, 50%, 75%, 90%)
+            const completion = Math.round(progressPercentage.value)
+            if (sessionId.value && [25, 50, 75, 90].includes(completion)) {
+                const lastMilestone = parseInt(localStorage.getItem(`milestone_${props.content.id}`) || '0')
+                if (completion > lastMilestone) {
+                    console.log('🎯 Milestone reached:', completion + '% - sending heartbeat')
+                    sendHeartbeat()
+                    localStorage.setItem(`milestone_${props.content.id}`, completion.toString())
+                }
+            }
         }
     }
 }
@@ -1138,6 +1182,7 @@ const onTimeUpdate = () => {
 const onPlay = () => {
     isPlaying.value = true
     lastCurrentTime.value = currentTime.value
+    console.log('▶️ Video play started - isCompleted:', isCompleted.value, 'isVideoReady:', isVideoReady.value)
 
     // ✅ Task 8.1: Skip tracking for completed videos
     if (!isCompleted.value) {
@@ -1146,6 +1191,7 @@ const onPlay = () => {
         if (isVideoReady.value && !isBuffering.value && !isVideoLoading.value) {
             isActivelyPlaying.value = true
             lastActiveTimeUpdate.value = Date.now()
+            console.log('✅ Active playback tracking started')
         }
 
         // ✅ NEW: Log resume event (Task 6.4)
@@ -1173,8 +1219,14 @@ const onPause = () => {
         pauseCountSinceLastHeartbeat.value++
         totalPauseCount.value++
 
-        // console.log('⏸️ Pause detected, total pauses:', totalPauseCount.value)
+        console.log('⏸️ Pause detected, total pauses:', totalPauseCount.value, 'Active playback time:', Math.floor(activePlaybackTime.value), 'seconds')
 
+        // ✅ PRODUCTION-SAFE: Send heartbeat on pause to save progress immediately
+        if (sessionId.value && activePlaybackTime.value > 0) {
+            console.log('💓 Sending heartbeat on pause to save progress')
+            sendHeartbeat()
+        }
+        
         updateProgress()
     } else {
         // Still stop playback tracking even for completed videos
@@ -1184,12 +1236,18 @@ const onPause = () => {
 
 const onEnded = async () => {
     isPlaying.value = false
+    console.log('🏁 Video ended naturally - ending session')
     
     // ✅ Task 6.2: Stop active playback tracking when video ends
     isActivelyPlaying.value = false
     
     // Update progress first
     await updateProgress()
+    
+    // ✅ FIXED: End session before marking as completed
+    if (sessionId.value) {
+        await endSession()
+    }
     
     // Always mark as completed when video ends
     await markCompleted()
@@ -1232,6 +1290,7 @@ const onVideoSeeked = () => {
 // ========== LIFECYCLE ==========
 // LIFECYCLE
 onMounted(async () => {
+    console.log('🚀 ContentViewer mounted for content:', props.content.id, 'type:', props.content.content_type)
     document.addEventListener('fullscreenchange', onFullscreenChange)
 
     // Initialize quality selector for videos
@@ -1270,6 +1329,32 @@ onMounted(async () => {
         }
     }, 600000)  // ✅ CHANGED: 10 minutes (was 180000 = 3 minutes) - reduces API calls by 70%
 
+    // ✅ PRODUCTION-SAFE: Smart heartbeat strategy
+    // - Send heartbeat every 3 minutes (much less server load)
+    // - Only send if there's meaningful data to save
+    // - Rely on event-based updates for immediate data saving
+    let lastHeartbeatData = { activePlayback: 0, completion: 0 }
+    
+    const heartbeatInterval = setInterval(() => {
+        if (props.content.content_type === 'video' && sessionId.value && !isCompleted.value) {
+            // Only send heartbeat if there's meaningful change in data
+            const currentActivePlayback = Math.floor(activePlaybackTime.value)
+            const currentCompletion = Math.round(progressPercentage.value)
+            
+            const hasSignificantChange = 
+                Math.abs(currentActivePlayback - lastHeartbeatData.activePlayback) >= 10 || // 10+ seconds change
+                Math.abs(currentCompletion - lastHeartbeatData.completion) >= 5 // 5%+ completion change
+            
+            if (hasSignificantChange) {
+                console.log('💓 Heartbeat: Significant change detected, sending update')
+                sendHeartbeat()
+                lastHeartbeatData = { activePlayback: currentActivePlayback, completion: currentCompletion }
+            } else {
+                console.log('💓 Heartbeat: No significant change, skipping')
+            }
+        }
+    }, 180000)  // Send heartbeat every 3 minutes (production-safe)
+
     // ✅ NEW: Active playback time tracking interval (Task 6.2)
     // This is the ONLY timer we need - it tracks actual playback time
     const activePlaybackInterval = setInterval(() => {
@@ -1277,13 +1362,17 @@ onMounted(async () => {
             updateActivePlaybackTime()
         }
     }, 1000)  // Update every second
+    
+    console.log('⏰ Intervals set up - Heartbeat: every 30s, Active playback: every 1s')
 
     // ✅ IMPROVED: Multiple cleanup handlers for reliability
    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-    // console.log('🚨 beforeunload triggered', {
-    //     hasSession: !!sessionId.value,
-    //     sessionId: sessionId.value
-    // })
+    console.log('🚨 beforeunload triggered', {
+        hasSession: !!sessionId.value,
+        sessionId: sessionId.value,
+        activePlaybackTime: Math.floor(activePlaybackTime.value),
+        completion: Math.round(progressPercentage.value)
+    })
 
     if (sessionId.value) {
         const formData = new FormData()
@@ -1300,9 +1389,9 @@ onMounted(async () => {
 
         const url = `/content/${props.content.id}/session`
 
-        // console.log('📤 Sending sendBeacon to:', url)
+        console.log('📤 Sending sendBeacon to:', url)
         const success = navigator.sendBeacon(url, formData)
-        // console.log('📬 sendBeacon result:', success ? 'SUCCESS' : 'FAILED')
+        console.log('📬 sendBeacon result:', success ? 'SUCCESS' : 'FAILED')
     }
 }
 
@@ -1311,9 +1400,14 @@ onMounted(async () => {
     // ✅ FIXED: Handle visibility changes (tab switching, minimizing)
     const handleVisibilityChange = async () => {
         if (document.visibilityState === 'hidden') {
-            // User left the tab - save progress only
+            // ✅ PRODUCTION-SAFE: User left the tab - save all progress immediately
+            console.log('👁️ Tab hidden - saving progress and sending heartbeat')
             await updateProgress()
-            // ✅ REMOVED: Don't send separate heartbeat to reduce API calls
+            if (sessionId.value && activePlaybackTime.value > 0) {
+                await sendHeartbeat()
+            }
+        } else {
+            console.log('👁️ Tab visible again')
         }
         // ✅ FIXED: Don't create new sessions when user returns to tab
         // Session should persist across tab switches
@@ -1349,7 +1443,7 @@ onMounted(async () => {
         const url = `/content/${props.content.id}/session`
         navigator.sendBeacon(url, formData)
 
-        // console.log('🏁 Session ended via pagehide')
+        console.log('🏁 Session ended via pagehide')
     }
 }
 
@@ -1370,6 +1464,7 @@ onMounted(async () => {
         // End session before unmounting
         endSession()
         clearInterval(progressInterval)
+        clearInterval(heartbeatInterval)  // ✅ Clear heartbeat interval
         clearInterval(activePlaybackInterval)  // ✅ Clear active playback interval (Task 6.2)
 
         // Cleanup video event listener
@@ -1744,7 +1839,7 @@ watch(currentPage, (newPage) => {
                     transform: `scale(${pdfZoom / 100}) rotate(${pdfRotation}deg)`,
                     transformOrigin: 'center center'
                 }">
-                                        <VuePdfEmbed :source="pdfSource" :page="currentPage" :style="{
+                                        <VuePdfEmbed :source="pdfSource" :page="currentPage" :scale="pdfScale" :style="{
                         height: isPdfFullscreen ? '90vh' : '500px',
                         width: '100%',
                         minWidth: '100%'
@@ -1809,6 +1904,22 @@ watch(currentPage, (newPage) => {
 
                 <!-- Sidebar Cards (1/4 width) -->
                 <div class="lg:col-span-1 space-y-4">
+                    <!-- Debug Card (Temporary for testing) -->
+                    <Card v-if="sessionId" class="border-yellow-200 bg-yellow-50">
+                        <CardContent class="p-4">
+                            <div class="text-sm font-medium text-yellow-800 mb-2">🔧 Debug Info</div>
+                            <div class="text-xs text-yellow-700 space-y-1">
+                                <div>Session: {{ sessionId }}</div>
+                                <div>Active Time: {{ Math.floor(activePlaybackTime) }}s</div>
+                                <div>Completion: {{ Math.round(progressPercentage) }}%</div>
+                                <div>Playing: {{ isPlaying ? 'YES' : 'NO' }}</div>
+                            </div>
+                            <Button @click="endSession" size="sm" variant="outline" class="w-full mt-2 text-xs">
+                                🛑 End Session (Test)
+                            </Button>
+                        </CardContent>
+                    </Card>
+
                     <!-- Progress Card -->
                     <Card>
                         <CardContent class="p-4">

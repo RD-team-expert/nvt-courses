@@ -372,7 +372,7 @@ const getActivityVariant = (action: string) => {
                                 My Online Courses
                             </CardTitle>
                             <Button asChild variant="ghost" size="sm">
-                                <Link href="/course-online">
+                                <Link href="/courses-online">
                                     <ExternalLink class="h-4 w-4 mr-1" />
                                     View all
                                 </Link>
@@ -422,7 +422,7 @@ const getActivityVariant = (action: string) => {
                                             {{ course.status ? (course.status.charAt(0).toUpperCase() + course.status.slice(1)).replace('_', ' ') : 'Assigned' }}
                                         </Badge>
                                         <Button asChild variant="ghost" size="sm">
-                                            <Link :href="`/course-online/${course.id}`">
+                                            <Link :href="`/courses-online/${course.id}`">
                                                 Continue
                                                 <ArrowRight class="h-3 w-3 ml-1" />
                                             </Link>

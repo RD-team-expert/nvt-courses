@@ -523,6 +523,8 @@ Route::post('videos/{video}/retry-transcode', [App\Http\Controllers\Admin\VideoC
         Route::put('/{quiz}', [\App\Http\Controllers\Admin\ModuleQuizController::class, 'update'])->name('update');
         Route::delete('/{quiz}', [\App\Http\Controllers\Admin\ModuleQuizController::class, 'destroy'])->name('destroy');
         Route::get('/{quiz}/attempts', [\App\Http\Controllers\Admin\ModuleQuizController::class, 'attempts'])->name('attempts');
+        Route::get('/{quiz}/attempts/{attempt}', [\App\Http\Controllers\Admin\ModuleQuizController::class, 'showAttempt'])->name('attempts.show');
+        Route::put('/{quiz}/attempts/{attempt}/grade', [\App\Http\Controllers\Admin\ModuleQuizController::class, 'gradeAttempt'])->name('grade-attempt');
         Route::get('/{quiz}/statistics', [\App\Http\Controllers\Admin\ModuleQuizController::class, 'statistics'])->name('statistics');
         Route::patch('/{quiz}/toggle-status', [\App\Http\Controllers\Admin\ModuleQuizController::class, 'toggleStatus'])->name('toggle-status');
     });
