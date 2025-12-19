@@ -140,7 +140,7 @@ class LearningSessionService
     }
 
     /**
-     * Update session with heartbeat data (called every ~10 seconds)
+     * Update session with heartbeat data (called every ~30 seconds)
      * Uses cumulative/incremental tracking
      */
     public function updateHeartbeat(
@@ -149,7 +149,8 @@ class LearningSessionService
     int $watchTimeIncrement = 0,
     int $skipCountIncrement = 0,
     int $seekCountIncrement = 0,
-    int $pauseCountIncrement = 0
+    int $pauseCountIncrement = 0,
+    float $completionPercentage = 0  // ✅ NEW: Track completion percentage in heartbeat
 ): LearningSession {
     $session = LearningSession::findOrFail($sessionId);
 
@@ -164,11 +165,13 @@ class LearningSessionService
     // Accumulate incremental data
     $session->update([
         // ❌ REMOVED: current_position
+        'last_heartbeat' => now(),  // ✅ FIXED: Update last_heartbeat timestamp
         'total_duration_minutes' => $currentDuration,
         'video_watch_time' => ($session->video_watch_time ?? 0) + $watchTimeIncrement,
         'video_skip_count' => ($session->video_skip_count ?? 0) + $skipCountIncrement,
         'seek_count' => ($session->seek_count ?? 0) + $seekCountIncrement,
         'pause_count' => ($session->pause_count ?? 0) + $pauseCountIncrement,
+        'video_completion_percentage' => $completionPercentage,  // ✅ NEW: Save completion percentage
     ]);
 
 

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CourseModule;
 use App\Models\CourseOnline;
 use App\Models\Quiz;
+use App\Models\QuizAttempt;
 use App\Models\QuizQuestion;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -419,13 +420,15 @@ class ModuleQuizController extends Controller
                 }
             }
 
-            // Delete removed questions (only if they have no answers)
+            // Delete removed questions and their answers
             $questionsToDelete = QuizQuestion::where('quiz_id', $quiz->id)
                 ->whereNotIn('id', $processedQuestionIds)
-                ->whereDoesntHave('answers')
                 ->get();
 
             foreach ($questionsToDelete as $questionToDelete) {
+                // Delete all answers for this question first
+                $questionToDelete->answers()->delete();
+                // Then delete the question
                 $questionToDelete->delete();
             }
 
@@ -558,6 +561,161 @@ class ModuleQuizController extends Controller
             ],
             'attempts' => $attempts,
         ]);
+    }
+
+    /**
+     * Display a specific quiz attempt with all answers.
+     */
+    public function showAttempt(CourseOnline $courseOnline, CourseModule $courseModule, Quiz $quiz, QuizAttempt $attempt)
+    {
+        if (!$quiz->isModuleQuiz()) {
+            return redirect()->route('admin.quizzes.attempts', $quiz->id);
+        }
+
+        // Verify the attempt belongs to this quiz
+        if ($attempt->quiz_id !== $quiz->id) {
+            return back()->withErrors(['error' => 'Invalid attempt for this quiz.']);
+        }
+
+        // Load attempt with relationships
+        $attempt->load(['user', 'answers.question']);
+
+        // Organize answers by question
+        $questionsWithAnswers = $quiz->questions()
+            ->orderBy('order')
+            ->get()
+            ->map(function ($question) use ($attempt) {
+                $answer = $attempt->answers->firstWhere('quiz_question_id', $question->id);
+                
+                return [
+                    'id' => $question->id,
+                    'question_text' => $question->question_text,
+                    'type' => $question->type,
+                    'points' => $question->points,
+                    'options' => $question->options ?? [],
+                    'correct_answer' => $question->correct_answer ?? [],
+                    'correct_answer_explanation' => $question->correct_answer_explanation,
+                    'order' => $question->order,
+                    'user_answer' => $answer ? $answer->answer : null,
+                    'is_correct' => $answer ? $answer->is_correct : null,
+                    'points_earned' => $answer ? $answer->points_earned : 0,
+                    'answer_id' => $answer ? $answer->id : null,
+                ];
+            });
+
+        return Inertia::render('Admin/ModuleQuiz/AttemptDetail', [
+            'attempt' => [
+                'id' => $attempt->id,
+                'attempt_number' => $attempt->attempt_number,
+                'score' => $attempt->score,
+                'manual_score' => $attempt->manual_score,
+                'total_score' => $attempt->total_score,
+                'passed' => $attempt->passed,
+                'started_at' => $attempt->started_at?->format('Y-m-d H:i:s'),
+                'completed_at' => $attempt->completed_at?->format('Y-m-d H:i:s'),
+                'created_at' => $attempt->created_at->format('Y-m-d H:i:s'),
+            ],
+            'user' => [
+                'id' => $attempt->user->id,
+                'name' => $attempt->user->name,
+                'email' => $attempt->user->email,
+            ],
+            'quiz' => [
+                'id' => $quiz->id,
+                'title' => $quiz->title,
+                'total_points' => $quiz->total_points,
+                'pass_threshold' => $quiz->pass_threshold,
+            ],
+            'module' => [
+                'id' => $courseModule->id,
+                'name' => $courseModule->name,
+                'order_number' => $courseModule->order_number,
+            ],
+            'course' => [
+                'id' => $courseOnline->id,
+                'name' => $courseOnline->name,
+            ],
+            'questions' => $questionsWithAnswers,
+        ]);
+    }
+
+    /**
+     * Grade text answers manually.
+     */
+    public function gradeAttempt(Request $request, CourseOnline $courseOnline, CourseModule $courseModule, Quiz $quiz, QuizAttempt $attempt)
+    {
+        if (!$quiz->isModuleQuiz()) {
+            return back()->withErrors(['error' => 'Not a module quiz']);
+        }
+
+        // Verify the attempt belongs to this quiz
+        if ($attempt->quiz_id !== $quiz->id) {
+            return back()->withErrors(['error' => 'Invalid attempt for this quiz.']);
+        }
+
+        $validated = $request->validate([
+            'grades' => 'required|array',
+            'grades.*' => 'nullable|numeric|min:0',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            $totalManualScore = 0;
+
+            foreach ($validated['grades'] as $answerId => $points) {
+                $answer = \App\Models\QuizAnswer::find($answerId);
+                
+                if (!$answer || $answer->attempt->id !== $attempt->id) {
+                    continue;
+                }
+
+                // Ensure points don't exceed question's max points
+                $question = $answer->question;
+                $points = min($points, $question->points);
+                $points = max(0, $points); // Ensure non-negative
+
+                // Update the answer
+                $answer->update([
+                    'points_earned' => $points,
+                    'is_correct' => $points > 0,
+                ]);
+
+                $totalManualScore += $points;
+            }
+
+            // Update attempt scores
+            $autoScore = $attempt->answers()
+                ->whereHas('question', function ($query) {
+                    $query->where('type', '!=', 'text');
+                })
+                ->sum('points_earned');
+
+            $totalScore = $autoScore + $totalManualScore;
+
+            $attempt->update([
+                'score' => $autoScore,
+                'manual_score' => $totalManualScore,
+                'total_score' => $totalScore,
+            ]);
+
+            // Recalculate pass status
+            $passingThreshold = ($quiz->pass_threshold / 100) * $quiz->total_points;
+            $passed = $totalScore >= $passingThreshold;
+
+            $attempt->update(['passed' => $passed]);
+
+            DB::commit();
+
+            return back()->with('success', 'Manual grades saved successfully.');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Failed to grade attempt: ' . $e->getMessage(), [
+                'attempt_id' => $attempt->id,
+                'exception' => $e,
+            ]);
+            return back()->withErrors(['error' => 'Failed to save grades: ' . $e->getMessage()]);
+        }
     }
 
     /**

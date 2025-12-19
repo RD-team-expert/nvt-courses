@@ -285,8 +285,8 @@ if (typeof window !== 'undefined') {
                         <div class="flex items-center">
                             <Clock class="h-8 w-8 text-orange-600" />
                             <div class="ml-4">
-                                <p class="text-sm font-medium text-muted-foreground">Avg Learning Hours</p>
-                                <p class="text-2xl font-bold text-foreground">{{ Math.round((users?.data?.reduce((sum, u) => sum + u.total_learning_hours, 0) / (users?.data?.length || 1)) || 0) }}h</p>
+                                <p class="text-sm font-medium text-muted-foreground">Avg Learning Minutes</p>
+                                <p class="text-2xl font-bold text-foreground">{{ Math.round(((users?.data?.reduce((sum, u) => sum + u.total_learning_hours, 0) / (users?.data?.length || 1)) || 0) * 60) }}m</p>
                             </div>
                         </div>
                     </CardContent>
@@ -516,7 +516,7 @@ if (typeof window !== 'undefined') {
                                 <!-- Learning Time (Hidden on mobile) -->
                                 <TableCell class="hidden sm:table-cell">
                                     <div class="space-y-1">
-                                        <div class="text-sm font-medium text-foreground">{{ user.total_learning_hours }}h</div>
+                                        <div class="text-sm font-medium text-foreground">{{ user.total_learning_hours * 60 }}m</div>
                                         <div class="text-xs text-muted-foreground">{{ user.total_sessions }} sessions</div>
                                     </div>
                                 </TableCell>
@@ -560,7 +560,7 @@ if (typeof window !== 'undefined') {
                                         </Badge>
                                         <!-- Mobile learning time -->
                                         <div class="text-xs text-muted-foreground sm:hidden">
-                                            {{ user.total_learning_hours }}h learning
+                                            {{ user.total_learning_hours * 60 }}m learning
                                         </div>
                                     </div>
                                 </TableCell>
@@ -672,8 +672,8 @@ if (typeof window !== 'undefined') {
 
                         <Card>
                             <CardContent class="p-6 text-center">
-                                <div class="text-3xl font-bold text-purple-600 mb-2">{{ selectedUser.total_learning_hours }}h</div>
-                                <div class="text-sm text-muted-foreground">Learning Hours</div>
+                                <div class="text-3xl font-bold text-purple-600 mb-2">{{ selectedUser.total_learning_hours * 60 }}m</div>
+                                <div class="text-sm text-muted-foreground">Learning Minutes</div>
                                 <div class="text-xs text-muted-foreground mt-1">{{ selectedUser.total_sessions }} sessions</div>
                             </CardContent>
                         </Card>
