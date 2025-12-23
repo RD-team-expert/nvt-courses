@@ -35,6 +35,21 @@ class CourseOnlineAssignment extends Model
         'is_overdue' => 'boolean',                   // NEW
         'deadline_notification_sent_at' => 'datetime', // NEW
     ];
+    
+    /**
+     * ✅ Boot method to add model events
+     */
+    protected static function boot()
+    {
+        parent::boot();
+        
+        // ✅ Ensure completed assignments always have 100% progress
+        static::saving(function ($assignment) {
+            if ($assignment->status === 'completed' && $assignment->progress_percentage < 100) {
+                $assignment->progress_percentage = 100;
+            }
+        });
+    }
 
     // Relationships
     public function courseOnline(): BelongsTo
@@ -97,6 +112,7 @@ class CourseOnlineAssignment extends Model
         if ($percentage >= 100) {
             $updateData['status'] = 'completed';
             $updateData['completed_at'] = now();
+            $updateData['progress_percentage'] = 100; // ✅ ENSURE 100% when completed
 
             // ✅ NEW: End all active learning sessions when course is completed
             $this->endAllActiveSessions();
@@ -106,6 +122,20 @@ class CourseOnlineAssignment extends Model
         }
 
         $this->update($updateData);
+    }
+    
+    /**
+     * ✅ NEW: Mark assignment as completed with validation
+     */
+    public function markAsCompleted(): void
+    {
+        $this->update([
+            'status' => 'completed',
+            'completed_at' => now(),
+            'progress_percentage' => 100, // ✅ Always set to 100% when completed
+        ]);
+        
+        $this->endAllActiveSessions();
     }
 
 // ✅ NEW: Add this method to end all active sessions
