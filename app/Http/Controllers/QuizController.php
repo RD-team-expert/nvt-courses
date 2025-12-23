@@ -17,9 +17,13 @@ class QuizController extends Controller
     {
         $user = auth()->user();
 
-        // Get quizzes from both regular and online courses
+        // Get quizzes from both regular and online courses (exclude module quizzes)
         $quizzes = Quiz::with(['course', 'courseOnline'])
             ->where('status', 'published')
+            ->where(function($q) {
+                $q->where('is_module_quiz', false)
+                  ->orWhereNull('is_module_quiz');
+            })
             ->where(function ($query) use ($user) {
                 // Regular courses
                 $query->whereHas('course', function ($q) use ($user) {
@@ -91,6 +95,14 @@ class QuizController extends Controller
     public function show(Quiz $quiz)
     {
         $user = Auth::user();
+
+        // Redirect module quizzes to the correct controller
+        if ($quiz->isModuleQuiz()) {
+            return redirect()->route('courses-online.modules.quiz.show', [
+                'courseOnline' => $quiz->course_online_id,
+                'courseModule' => $quiz->module_id,
+            ]);
+        }
 
         // Check enrollment for both regular and online courses
         $isEnrolled = $this->checkUserEnrollment($user, $quiz);
@@ -195,6 +207,14 @@ class QuizController extends Controller
         ]);
 
         $user = auth()->user();
+
+        // Redirect module quizzes to the correct controller (safety fallback)
+        if ($quiz->isModuleQuiz()) {
+            return redirect()->route('courses-online.modules.quiz.show', [
+                'courseOnline' => $quiz->course_online_id,
+                'courseModule' => $quiz->module_id,
+            ])->with('error', 'Please take module quizzes from the course page.');
+        }
 
         // Check enrollment
         if (!$this->checkUserEnrollment($user, $quiz)) {
