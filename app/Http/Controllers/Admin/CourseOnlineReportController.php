@@ -129,6 +129,12 @@ class CourseOnlineReportController extends Controller
                     $assignment->completed_content = $progressData->completed_content ?? 0;
                     $assignment->total_watch_time = $progressData->total_watch_time ?? 0;
 
+                    // ✅ NEW: If assignment is completed, ensure progress shows 100%
+                    // This handles bad data in database without modifying it
+                    if ($assignment->status === 'completed' && $assignment->progress_percentage < 100) {
+                        $assignment->progress_percentage = 100;
+                    }
+
                     // ✅ FIXED: Calculate metrics with REAL data and SIMULATED attention
                     $assignment->engagement_level = $this->calculateEngagementLevel($assignment->avg_attention_score);
                     $assignment->performance_rating = $this->calculatePerformanceRating(
@@ -364,10 +370,11 @@ class CourseOnlineReportController extends Controller
 
             $users = $query->paginate(15)->withQueryString();
 
-
+            // ✅ NEW: Use smart progress service
+            $progressService = app(\App\Services\ProgressCalculationService::class);
 
             // ✅ FIXED: Transform user data with REAL calculations and SIMULATED attention
-            $users->getCollection()->transform(function ($user) use ($filters) {
+            $users->getCollection()->transform(function ($user) use ($filters, $progressService) {
 
 
                 // Get assignments with filters
@@ -386,7 +393,8 @@ class CourseOnlineReportController extends Controller
                     ->selectRaw('
                         COUNT(*) as total_assignments,
                         COUNT(CASE WHEN status = "completed" THEN 1 END) as completed_assignments,
-                        AVG(COALESCE(progress_percentage, 0)) as avg_progress
+                        AVG(COALESCE(progress_percentage, 0)) as avg_progress,
+                        AVG(CASE WHEN progress_percentage > 0 THEN progress_percentage END) as avg_active_progress
                     ')
                     ->first();
 
@@ -394,6 +402,13 @@ class CourseOnlineReportController extends Controller
                 $sessionQuery = DB::table('learning_sessions')->where('user_id', $user->id);
                 if (!empty($filters['course_id'])) {
                     $sessionQuery->where('course_online_id', $filters['course_id']);
+                }
+                // ✅ FIX: Apply date filters to sessions as well
+                if (!empty($filters['date_from'])) {
+                    $sessionQuery->whereDate('session_start', '>=', $filters['date_from']);
+                }
+                if (!empty($filters['date_to'])) {
+                    $sessionQuery->whereDate('session_start', '<=', $filters['date_to']);
                 }
 
                 $rawSessions = $sessionQuery->select(
@@ -454,8 +469,12 @@ class CourseOnlineReportController extends Controller
                     ? round(($assignmentStats->completed_assignments / $assignmentStats->total_assignments) * 100, 1)
                     : 0;
 
-                // ✅ Get comprehensive quiz performance for this user
-                $quizPerformance = $this->calculateUserQuizPerformance($user->id, $filters['course_id'] ?? null);
+                // ✅ NEW: Use smart progress service for accurate average
+                $progressResult = $progressService->getAccurateAverageProgress($user->id, $filters);
+                $displayProgress = $progressResult['avg_progress'];
+
+                // Get comprehensive quiz performance for this user
+                $quizPerformance = $this->calculateUserQuizPerformance($user->id, $filters['course_id'] ?? null, $filters);
 
                 // Calculate performance rating and score
                 $performanceResult = $this->calculateUserPerformanceRating(
@@ -467,6 +486,17 @@ class CourseOnlineReportController extends Controller
                     $totalSessions
                 );
 
+                // ✅ FIXED: Use smart progress service instead of manual calculation
+                // This ensures we never give users more or less than they deserve
+                // $displayProgress = round($assignmentStats->avg_active_progress ?? $assignmentStats->avg_progress ?? 0, 1);
+                
+                // ✅ NEW: If user has only completed assignments, show 100%
+                // This handles the case where completed assignments have wrong progress in DB
+                // if ($assignmentStats->total_assignments > 0 && 
+                //     $assignmentStats->completed_assignments == $assignmentStats->total_assignments) {
+                //     $displayProgress = 100;
+                // }
+                
                 $performanceData = [
                     'id' => $user->id,
                     'name' => $user->name,
@@ -477,7 +507,7 @@ class CourseOnlineReportController extends Controller
                     'completed_assignments' => $assignmentStats->completed_assignments ?? 0,
                     'in_progress_assignments' => ($assignmentStats->total_assignments ?? 0) - ($assignmentStats->completed_assignments ?? 0),
                     'completion_rate' => $completionRate,
-                    'avg_progress' => round($assignmentStats->avg_progress ?? 0, 1),
+                    'avg_progress' => $displayProgress, // ✅ Now shows average of active assignments only
                     'total_sessions' => $totalSessions,
                     'total_learning_hours' => round($totalRealMinutes / 60, 1),
                     'avg_attention_score' => round($avgSimulatedAttention, 1),
@@ -1287,7 +1317,7 @@ class CourseOnlineReportController extends Controller
      * - Meets Standards: Completion ≥90%, Passing ≥ avgPassThreshold%, Avg Score ≥ avgPassThreshold%
      * - avgPassThreshold is calculated from the average pass_threshold of ALL assigned quizzes (regular + module)
      */
-    private function calculateUserQuizPerformance($userId, $courseId = null)
+    private function calculateUserQuizPerformance($userId, $courseId = null, $filters = [])
     {
         $regularAssignedCount = 0;
         $regularCompletedCount = 0;
@@ -1330,6 +1360,14 @@ class CourseOnlineReportController extends Controller
                 $regularAttemptsQuery = DB::table('quiz_attempts')
                     ->where('user_id', $userId)
                     ->whereNotNull('completed_at');
+                
+                // ✅ FIX: Apply date filters to quiz attempts
+                if (!empty($filters['date_from'])) {
+                    $regularAttemptsQuery->whereDate('completed_at', '>=', $filters['date_from']);
+                }
+                if (!empty($filters['date_to'])) {
+                    $regularAttemptsQuery->whereDate('completed_at', '<=', $filters['date_to']);
+                }
                 
                 if ($courseId) {
                     $regularQuizIds = DB::table('quizzes')
@@ -1401,11 +1439,81 @@ class CourseOnlineReportController extends Controller
         
         // ===== CALCULATE MODULE QUIZZES (only if they exist) =====
         if ($hasModuleQuizzes) {
+            // First, try to get results from module_quiz_results table
             $moduleResultsQuery = DB::table('module_quiz_results')
                 ->where('user_id', $userId)
                 ->whereIn('module_id', $moduleIdsWithQuizzes);
             
+            // ✅ FIX: Apply date filters to module quiz results
+            if (!empty($filters['date_from'])) {
+                $moduleResultsQuery->whereDate('completed_at', '>=', $filters['date_from']);
+            }
+            if (!empty($filters['date_to'])) {
+                $moduleResultsQuery->whereDate('completed_at', '<=', $filters['date_to']);
+            }
+            
             $moduleResults = $moduleResultsQuery->get();
+            
+            // ✅ FIX: Also check quiz_attempts for module quizzes that might be missing from module_quiz_results
+            // This handles the bug where some module quiz submissions didn't save to module_quiz_results
+            $moduleQuizIds = DB::table('quizzes')
+                ->where('is_module_quiz', true)
+                ->whereIn('module_id', $moduleIdsWithQuizzes)
+                ->pluck('id', 'module_id'); // key by module_id for easy lookup
+            
+            if ($moduleQuizIds->isNotEmpty()) {
+                $moduleAttemptsQuery = DB::table('quiz_attempts')
+                    ->where('user_id', $userId)
+                    ->whereIn('quiz_id', $moduleQuizIds->values())
+                    ->whereNotNull('completed_at');
+                
+                if (!empty($filters['date_from'])) {
+                    $moduleAttemptsQuery->whereDate('completed_at', '>=', $filters['date_from']);
+                }
+                if (!empty($filters['date_to'])) {
+                    $moduleAttemptsQuery->whereDate('completed_at', '<=', $filters['date_to']);
+                }
+                
+                $moduleAttempts = $moduleAttemptsQuery
+                    ->join('quizzes', 'quiz_attempts.quiz_id', '=', 'quizzes.id')
+                    ->select([
+                        'quiz_attempts.id as attempt_id',
+                        'quiz_attempts.quiz_id',
+                        'quizzes.module_id',
+                        'quiz_attempts.total_score',
+                        'quizzes.total_points',
+                        'quizzes.pass_threshold',
+                        'quiz_attempts.passed',
+                        'quiz_attempts.completed_at',
+                    ])
+                    ->get();
+                
+                // Find module IDs that have attempts but no results in module_quiz_results
+                $moduleIdsWithResults = $moduleResults->pluck('module_id')->unique();
+                
+                foreach ($moduleAttempts as $attempt) {
+                    // Check if this module already has a result
+                    if (!$moduleIdsWithResults->contains($attempt->module_id)) {
+                        // Calculate score percentage
+                        $scorePercentage = $attempt->total_points > 0 
+                            ? round(($attempt->total_score / $attempt->total_points) * 100, 2)
+                            : 0;
+                        
+                        // Add as a virtual result (from quiz_attempts)
+                        $moduleResults->push((object)[
+                            'module_id' => $attempt->module_id,
+                            'quiz_id' => $attempt->quiz_id,
+                            'score_percentage' => $scorePercentage,
+                            'passed' => $attempt->passed,
+                            'completed_at' => $attempt->completed_at,
+                            'source' => 'quiz_attempts', // Mark source for debugging
+                        ]);
+                        
+                        // Add to the list so we don't add duplicates
+                        $moduleIdsWithResults->push($attempt->module_id);
+                    }
+                }
+            }
             
             // Only count modules that have quizzes AND user is assigned to the course
             $moduleAssignedCount = $moduleIdsWithQuizzes->count();

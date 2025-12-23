@@ -1904,22 +1904,6 @@ watch(currentPage, (newPage) => {
 
                 <!-- Sidebar Cards (1/4 width) -->
                 <div class="lg:col-span-1 space-y-4">
-                    <!-- Debug Card (Temporary for testing) -->
-                    <Card v-if="sessionId" class="border-yellow-200 bg-yellow-50">
-                        <CardContent class="p-4">
-                            <div class="text-sm font-medium text-yellow-800 mb-2">🔧 Debug Info</div>
-                            <div class="text-xs text-yellow-700 space-y-1">
-                                <div>Session: {{ sessionId }}</div>
-                                <div>Active Time: {{ Math.floor(activePlaybackTime) }}s</div>
-                                <div>Completion: {{ Math.round(progressPercentage) }}%</div>
-                                <div>Playing: {{ isPlaying ? 'YES' : 'NO' }}</div>
-                            </div>
-                            <Button @click="endSession" size="sm" variant="outline" class="w-full mt-2 text-xs">
-                                🛑 End Session (Test)
-                            </Button>
-                        </CardContent>
-                    </Card>
-
                     <!-- Progress Card -->
                     <Card>
                         <CardContent class="p-4">

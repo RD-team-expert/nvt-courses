@@ -26,6 +26,16 @@ class LearningSessionService
     float $position = 0,
     ?int $apiKeyId = null
 ): LearningSession {
+    // ✅ NEW: Check if course is already completed
+    $assignment = \App\Models\CourseOnlineAssignment::where('user_id', $user->id)
+        ->where('course_online_id', $content->module->course_online_id)
+        ->first();
+    
+    if ($assignment && $assignment->status === 'completed') {
+        // Course is already completed - don't allow new sessions
+        throw new \Exception('Cannot start session: Course is already completed');
+    }
+    
     // End existing sessions
     // End existing sessions (Bulk Update)
     LearningSession::where('user_id', $user->id)

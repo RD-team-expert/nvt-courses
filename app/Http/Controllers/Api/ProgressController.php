@@ -80,6 +80,7 @@ class ProgressController extends Controller
 
     /**
      * Update overall course progress
+     * ✅ FIXED: Only count REQUIRED content for progress calculation
      */
     private function updateCourseProgress(int $courseOnlineId): void
     {
@@ -91,10 +92,32 @@ class ProgressController extends Controller
             return;
         }
 
-        // Calculate overall progress
-        $totalProgress = UserContentProgress::where('user_id', auth()->id())
+        // ✅ FIXED: Calculate progress based on REQUIRED content only
+        $totalRequiredContent = \App\Models\ModuleContent::whereHas('module', function ($query) use ($courseOnlineId) {
+            $query->where('course_online_id', $courseOnlineId)
+                ->where('is_required', true);
+        })
+        ->where('is_required', true)
+        ->count();
+
+        if ($totalRequiredContent === 0) {
+            // No required content, don't update progress
+            return;
+        }
+
+        $completedRequiredContent = UserContentProgress::where('user_id', auth()->id())
             ->where('course_online_id', $courseOnlineId)
-            ->avg('completion_percentage') ?? 0;
+            ->where('is_completed', true)
+            ->whereHas('content', function ($query) {
+                $query->where('is_required', true)
+                    ->whereHas('module', function ($subQuery) {
+                        $subQuery->where('is_required', true);
+                    });
+            })
+            ->count();
+
+        // ✅ Calculate progress as percentage of completed required content
+        $totalProgress = round(($completedRequiredContent / $totalRequiredContent) * 100, 2);
 
         // Find current module
         $currentModuleId = UserContentProgress::where('user_id', auth()->id())
