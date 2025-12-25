@@ -128,6 +128,9 @@ class UserCourseProgressReportController extends Controller
                         ? $assignment['completed_at']->format('m/d/Y') 
                         : null;
                     $assignment['assigned_date'] = $assignment['assigned_at']->format('m/d/Y');
+                    $assignment['course_beginning_date_formatted'] = $assignment['course_beginning_date'] 
+                        ? $assignment['course_beginning_date']->format('m/d/Y') 
+                        : null;
                     
                     return $assignment;
                     
@@ -143,6 +146,9 @@ class UserCourseProgressReportController extends Controller
                     $assignment['started_date'] = null;
                     $assignment['completion_date'] = null;
                     $assignment['assigned_date'] = $assignment['assigned_at']->format('m/d/Y');
+                    $assignment['course_beginning_date_formatted'] = $assignment['course_beginning_date'] 
+                        ? $assignment['course_beginning_date']->format('m/d/Y') 
+                        : null;
                     
                     return $assignment;
                 }
@@ -299,6 +305,9 @@ class UserCourseProgressReportController extends Controller
                     $assignment['completion_date'] = $assignment['completed_at'] 
                         ? $assignment['completed_at']->format('m/d/Y') 
                         : '';
+                    $assignment['course_beginning_date_formatted'] = $assignment['course_beginning_date'] 
+                        ? $assignment['course_beginning_date']->format('m/d/Y') 
+                        : '';
                     
                     return $assignment;
                     
@@ -309,6 +318,9 @@ class UserCourseProgressReportController extends Controller
                     $assignment['score_band'] = 'Needs Attention';
                     $assignment['started_date'] = '';
                     $assignment['completion_date'] = '';
+                    $assignment['course_beginning_date_formatted'] = $assignment['course_beginning_date'] 
+                        ? $assignment['course_beginning_date']->format('m/d/Y') 
+                        : '';
                     
                     return $assignment;
                 }

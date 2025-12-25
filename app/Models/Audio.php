@@ -17,6 +17,8 @@ class Audio extends Model
         'name',
         'description',
         'google_cloud_url',
+        'storage_type',
+        'local_path',
         'duration',
         'thumbnail_url',
         'thumbnail_path',
@@ -90,5 +92,46 @@ class Audio extends Model
     public function hasThumbnail(): bool
     {
         return !empty($this->thumbnail_path) || !empty($this->attributes['thumbnail_url']);
+    }
+
+    /**
+     * Get all assignments for this audio
+     */
+    public function assignments(): HasMany
+    {
+        return $this->hasMany(AudioAssignment::class);
+    }
+
+    /**
+     * Get the playback URL based on storage type
+     */
+    public function getPlaybackUrl(): ?string
+    {
+        if ($this->storage_type === 'local' && $this->local_path) {
+            try {
+                return route('audio.stream', $this->id);
+            } catch (\Exception $e) {
+                // Route not defined yet, return a placeholder
+                return url("/audio/{$this->id}/stream");
+            }
+        }
+        
+        return $this->google_cloud_url;
+    }
+
+    /**
+     * Check if audio is stored locally
+     */
+    public function isLocalStorage(): bool
+    {
+        return $this->storage_type === 'local';
+    }
+
+    /**
+     * Check if audio is stored in Google Drive
+     */
+    public function isGoogleDriveStorage(): bool
+    {
+        return $this->storage_type === 'google_drive';
     }
 }

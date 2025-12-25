@@ -59,4 +59,55 @@ class AuthVaiEmailController extends Controller
         return redirect()->route('courses-online.show', $courseOnline->id)
             ->with('success', 'Welcome! You have been logged in and redirected to your assigned course.');
     }
+
+    /**
+     * Handle token-based login for audio assignments
+     * 
+     * @param Request $request
+     * @param User $user
+     * @param int $audio - The Audio ID
+     */
+    public function audioTokenLogin(Request $request, User $user, int $audio)
+    {
+        // Check if token exists and hasn't expired
+        if ($user->login_token === null || $user->loginTokenExpired()) {
+            return redirect('/login')
+                ->with('error', 'Login link has expired. Please contact your administrator.');
+        }
+
+        $token = $request->query('token');
+
+        // Verify the token matches (using hash comparison for security)
+        if (!hash_equals($user->login_token, hash('sha256', $token))) {
+            return redirect('/login')
+                ->with('error', 'Invalid login link.');
+        }
+
+        // Find the audio
+        $audioModel = \App\Models\Audio::find($audio);
+        if (!$audioModel) {
+            // Clear the token and log in, but redirect to dashboard
+            $user->update([
+                'login_token' => null,
+                'login_token_expires_at' => null,
+            ]);
+            Auth::login($user);
+            
+            return redirect()->route('dashboard')
+                ->with('warning', 'Audio not found. You have been redirected to the dashboard.');
+        }
+
+        // Clear the token (single-use)
+        $user->update([
+            'login_token' => null,
+            'login_token_expires_at' => null,
+        ]);
+
+        // Log the user in
+        Auth::login($user);
+
+        // Redirect to the audio player
+        return redirect()->route('audio.show', $audioModel->id)
+            ->with('success', 'Welcome! You have been logged in and redirected to your assigned audio.');
+    }
 }

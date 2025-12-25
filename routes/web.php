@@ -46,6 +46,15 @@ use App\Models\Course;
 use Illuminate\Support\Facades\Route;
 
 // ==========================================
+// API ROUTES (JSON responses)
+// ==========================================
+
+Route::middleware(['auth', 'admin'])->prefix('api')->group(function () {
+    Route::get('/audio-assignments/users', [App\Http\Controllers\Admin\AudioAssignmentController::class, 'filterUsers'])
+        ->name('api.audio-assignments.users');
+});
+
+// ==========================================
 // VPS TRANSCODING CALLBACK (No auth - VPS calls this)
 // ==========================================
 
@@ -85,6 +94,11 @@ Route::get('/login/token/{user}/{course}', [AuthVaiEmailController::class, 'toke
     ->name('auth.token-login')
     ->middleware('signed');
 
+// Token-based login for audio assignments
+Route::get('/login/audio-token/{user}/{audio}', [AuthVaiEmailController::class, 'audioTokenLogin'])
+    ->name('auth.audio-token-login')
+    ->middleware('signed');
+
 // ==========================================
 // BASIC AUTHENTICATED USER ROUTES
 // ==========================================
@@ -114,6 +128,7 @@ Route::middleware(['auth'])->group(function () {
     // ===== AUDIO SYSTEM =====
     Route::get('/audio', [AudioController::class, 'index'])->name('audio.index');
     Route::get('/audio/{audio}', [AudioController::class, 'show'])->name('audio.show');
+    Route::get('/audio/{audio}/stream', [AudioController::class, 'stream'])->name('audio.stream');
     Route::post('/audio/{audio}/progress', [AudioController::class, 'updateProgress'])->name('audio.progress');
     Route::post('/audio/{audio}/complete', [AudioController::class, 'markCompleted'])->name('audio.complete');
 });
@@ -483,6 +498,9 @@ Route::patch('videos/upload-chunk', [ChunkUploadController::class, 'uploadChunk'
     Route::post('audio-categories/{audioCategory}/toggle-active', [App\Http\Controllers\Admin\AudioCategoryController::class, 'toggleActive'])->name('audio-categories.toggle-active');
     Route::resource('audio', App\Http\Controllers\Admin\AudioController::class);
     Route::post('/audio/{audio}/toggle-active', [App\Http\Controllers\Admin\AudioController::class, 'toggleActive'])->name('audio.toggle-active');
+
+    // ===== AUDIO ASSIGNMENT MANAGEMENT =====
+    Route::resource('audio-assignments', App\Http\Controllers\Admin\AudioAssignmentController::class)->except(['edit', 'update', 'show']);
 
    // ===== VIDEO MANAGEMENT =====
 Route::resource('video-categories', VideoCategoryController::class);

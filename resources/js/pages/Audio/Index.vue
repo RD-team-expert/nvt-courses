@@ -67,8 +67,8 @@ const props = defineProps<{
 }>()
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Dashboard', href: '/dashboard' },
-    { title: 'Audio Courses', href: '/audio' }
+    { name: 'Home', href: '/dashboard' },
+    { name: 'Audio Courses', href: '/audio' }
 ]
 
 // Filters

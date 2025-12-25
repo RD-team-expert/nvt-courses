@@ -2,10 +2,12 @@
 
 namespace App\Providers;
 
+use App\Events\AudioAssigned;
 use App\Events\CourseAssigned;
 use App\Events\CourseCreated;
 use App\Events\CourseEnrolled;
 use App\Events\CourseCompleted;
+use App\Listeners\SendAudioAssignmentNotifications;
 use App\Listeners\SendCourseCreationEmail;
 use App\Listeners\SendCourseEnrollmentEmail;
 use App\Listeners\SendCourseCompletionEmail;
@@ -32,6 +34,7 @@ class EventServiceProvider extends ServiceProvider
 //        CourseAssigned::class => [
 //            SendCourseNotification::class,
 //        ],
+        // AudioAssigned listener is auto-discovered, no need to register manually
     ];
 
     /**

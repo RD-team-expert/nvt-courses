@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Audio;
+use App\Models\AudioAssignment;
 use App\Models\AudioCategory;
 use App\Models\AudioProgress;
 use App\Services\GoogleDriveService;
@@ -122,7 +123,6 @@ class AudioController extends Controller
     /**
      * Display the specified audio with player
      */
-// In your AudioController show() method:
     public function show(Audio $audio)
     {
         // Check if audio is active
@@ -130,13 +130,19 @@ class AudioController extends Controller
             abort(404);
         }
 
-        // Process Google Drive URL to get streaming URL
-        $streamingUrl = $this->googleDriveService->processUrl($audio->google_cloud_url);
-
-        if (!$streamingUrl) {
-            // Fallback to original URL if processing fails
-            $streamingUrl = $audio->google_cloud_url;
-
+        // Get streaming URL based on storage type
+        $streamingUrl = null;
+        if ($audio->storage_type === 'local' && $audio->local_path) {
+            // For local storage, use the streaming route
+            $streamingUrl = route('audio.stream', $audio->id);
+        } else {
+            // For Google Drive, process the URL
+            $streamingUrl = $this->googleDriveService->processUrl($audio->google_cloud_url);
+            
+            if (!$streamingUrl) {
+                // Fallback to original URL if processing fails
+                $streamingUrl = $audio->google_cloud_url;
+            }
         }
 
         // Get or create user progress
@@ -167,17 +173,16 @@ class AudioController extends Controller
             $thumbnailUrl = $audio->attributes['thumbnail_url'];
         }
 
-
-
         return Inertia::render('Audio/Show', [
             'audio' => [
                 'id' => $audio->id,
                 'name' => $audio->name,
                 'description' => $audio->description,
                 'google_cloud_url' => $streamingUrl,
+                'storage_type' => $audio->storage_type,
                 'duration' => $audio->duration,
                 'formatted_duration' => $audio->formatted_duration,
-                'thumbnail_url' => $thumbnailUrl, // ✅ EXPLICIT HANDLING
+                'thumbnail_url' => $thumbnailUrl,
                 'category' => $audio->category ? [
                     'id' => $audio->category->id,
                     'name' => $audio->category->name,
@@ -222,7 +227,18 @@ class AudioController extends Controller
             ]);
         }
 
+        // Update AudioAssignment progress if user has an assignment
+        $assignment = AudioAssignment::where('audio_id', $audio->id)
+            ->where('user_id', auth()->id())
+            ->first();
 
+        if ($assignment) {
+            $progressPercentage = $audio->duration > 0 
+                ? min(100, ($validated['current_time'] / $audio->duration) * 100)
+                : 0;
+
+            $assignment->updateProgress($progressPercentage);
+        }
 
         return response()->json([
             'success' => true,
@@ -254,8 +270,50 @@ class AudioController extends Controller
             'last_accessed_at' => now(),
         ]);
 
-
-
         return response()->json(['success' => true]);
+    }
+
+    /**
+     * Stream local audio file
+     */
+    public function stream(Audio $audio)
+    {
+        // Check if audio is active
+        if (!$audio->is_active) {
+            abort(404, 'Audio not found');
+        }
+
+        // Check if audio uses local storage
+        if ($audio->storage_type !== 'local' || !$audio->local_path) {
+            abort(404, 'Audio file not found');
+        }
+
+        // Check if file exists
+        if (!Storage::disk('public')->exists($audio->local_path)) {
+            abort(404, 'Audio file not found on server');
+        }
+
+        // Get file path and info
+        $filePath = Storage::disk('public')->path($audio->local_path);
+        $fileSize = Storage::disk('public')->size($audio->local_path);
+        $mimeType = Storage::disk('public')->mimeType($audio->local_path) ?? 'audio/mpeg';
+
+        // Check if user has assignment or is admin
+        $hasAccess = auth()->user()->role === 'admin' || 
+                     AudioAssignment::where('audio_id', $audio->id)
+                         ->where('user_id', auth()->id())
+                         ->exists();
+
+        if (!$hasAccess) {
+            abort(403, 'You do not have access to this audio');
+        }
+
+        // Return streaming response with proper headers
+        return response()->file($filePath, [
+            'Content-Type' => $mimeType,
+            'Content-Length' => $fileSize,
+            'Accept-Ranges' => 'bytes',
+            'Cache-Control' => 'public, max-age=3600',
+        ]);
     }
 }
