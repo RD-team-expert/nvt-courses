@@ -95,8 +95,9 @@ const props = defineProps<{
 }>()
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Audio Management', href: '/admin/audio' },
-    { title: props.audio.name, href: '#' }
+    { name: 'Dashboard', href: '/admin/dashboard' },
+    { name: 'Audio Management', href: '/admin/audio' },
+    { name: props.audio.name, href: `/admin/audio/${props.audio.id}` }
 ]
 
 // Analytics computations

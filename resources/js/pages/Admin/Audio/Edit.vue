@@ -1,7 +1,7 @@
 <!-- Admin Edit Audio - Complete with Image Upload -->
 <script setup lang="ts">
 import { Head, Link, useForm } from '@inertiajs/vue3'
-import { ref, nextTick } from 'vue'
+import { ref, nextTick, computed } from 'vue'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { type BreadcrumbItem } from '@/types'
 
@@ -20,6 +20,7 @@ import {
     ArrowLeft,
     Save,
     Volume2,
+    Clock,
     Link as LinkIcon,
     Tag,
     X,
@@ -58,19 +59,24 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Edit', href: '#' }
 ]
 
-// Convert seconds to MM:SS format
-const formatDurationForEdit = (seconds?: number): string => {
-    if (!seconds) return ''
-    const minutes = Math.floor(seconds / 60)
-    const remainingSeconds = seconds % 60
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
+// Convert seconds to HH:MM:SS components
+const parseDurationFromSeconds = (seconds?: number) => {
+    if (!seconds) return { hours: 0, minutes: 0, seconds: 0 }
+    
+    const hours = Math.floor(seconds / 3600)
+    const minutes = Math.floor((seconds % 3600) / 60)
+    const secs = seconds % 60
+    
+    return { hours, minutes, seconds: secs }
 }
+
+const initialDuration = parseDurationFromSeconds(props.audio.duration)
 
 const form = useForm({
     name: props.audio.name || '',
     description: props.audio.description || '',
     google_cloud_url: props.audio.google_cloud_url || '',
-    duration: formatDurationForEdit(props.audio.duration),
+    duration: '', // Will be set from separate inputs
     thumbnail: null as File | null, // For new file upload
     thumbnail_url: props.audio.thumbnail_url || '',
     remove_thumbnail: false, // Option to remove current thumbnail
@@ -86,22 +92,85 @@ const showRemoveThumbnail = ref(false)
 // Check if current audio has a thumbnail
 const hasCurrentThumbnail = props.audio.thumbnail_url || props.audio.thumbnail_path
 
-// Parse time helpers
-const parseTimeToSeconds = (timeString: string): number => {
-    if (!timeString) return 0
+// Duration state - separate inputs for hours, minutes, seconds
+const durationHours = ref<number>(initialDuration.hours)
+const durationMinutes = ref<number>(initialDuration.minutes)
+const durationSeconds = ref<number>(initialDuration.seconds)
 
+// Update form duration from separate inputs
+const updateFormDuration = () => {
+    const h = durationHours.value.toString().padStart(2, '0')
+    const m = durationMinutes.value.toString().padStart(2, '0')
+    const s = durationSeconds.value.toString().padStart(2, '0')
+    
+    // Only set duration if at least one value is non-zero
+    if (durationHours.value > 0 || durationMinutes.value > 0 || durationSeconds.value > 0) {
+        form.duration = `${h}:${m}:${s}`
+    } else {
+        form.duration = ''
+    }
+}
+
+// Handle duration input changes with validation
+const handleDurationChange = (type: 'hours' | 'minutes' | 'seconds', value: string) => {
+    let numValue = parseInt(value) || 0
+    
+    // Validate ranges
+    if (type === 'hours') {
+        numValue = Math.max(0, Math.min(99, numValue))
+        durationHours.value = numValue
+    } else if (type === 'minutes') {
+        numValue = Math.max(0, Math.min(59, numValue))
+        durationMinutes.value = numValue
+    } else if (type === 'seconds') {
+        numValue = Math.max(0, Math.min(59, numValue))
+        durationSeconds.value = numValue
+    }
+    
+    updateFormDuration()
+}
+
+// Quick preset buttons
+const setDurationPreset = (hours: number, minutes: number, seconds: number) => {
+    durationHours.value = hours
+    durationMinutes.value = minutes
+    durationSeconds.value = seconds
+    updateFormDuration()
+}
+
+// Clear duration
+const clearDuration = () => {
+    durationHours.value = 0
+    durationMinutes.value = 0
+    durationSeconds.value = 0
+    updateFormDuration()
+}
+
+// Computed readable duration
+const readableDuration = computed(() => {
+    const parts = []
+    if (durationHours.value > 0) parts.push(`${durationHours.value}h`)
+    if (durationMinutes.value > 0) parts.push(`${durationMinutes.value}m`)
+    if (durationSeconds.value > 0) parts.push(`${durationSeconds.value}s`)
+    return parts.length > 0 ? parts.join(' ') : 'Not set'
+})
+
+// Convert HH:MM:SS to seconds for backend
+const convertDurationToSeconds = (timeString: string): number => {
+    if (!timeString) return 0
+    
     const parts = timeString.split(':')
-    if (parts.length === 2) {
-        const minutes = parseInt(parts[0]) || 0
-        const seconds = parseInt(parts[1]) || 0
-        return minutes * 60 + seconds
+    if (parts.length === 3) {
+        const hours = parseInt(parts[0]) || 0
+        const minutes = parseInt(parts[1]) || 0
+        const seconds = parseInt(parts[2]) || 0
+        return hours * 3600 + minutes * 60 + seconds
     }
     return 0
 }
 
-const convertMinutesToSeconds = (minutes: number): number => {
-    return Math.round(minutes * 60)
-}
+// Initialize form duration
+updateFormDuration()
 
 // Handle thumbnail file selection
 function handleThumbnailChange(event: Event) {
@@ -176,11 +245,7 @@ const submit = async () => {
     // Convert duration to seconds if it's provided
     let durationInSeconds = null
     if (form.duration) {
-        if (form.duration.includes(':')) {
-            durationInSeconds = parseTimeToSeconds(form.duration)
-        } else {
-            durationInSeconds = convertMinutesToSeconds(parseFloat(form.duration))
-        }
+        durationInSeconds = convertDurationToSeconds(form.duration)
     }
 
     // Wait for next tick to ensure DOM is stable
@@ -321,21 +386,136 @@ const submit = async () => {
                             </div>
                         </div>
 
-                        <!-- Duration -->
-                        <div class="space-y-2">
-                            <Label for="duration">Duration</Label>
-                            <Input
-                                id="duration"
-                                v-model="form.duration"
-                                type="text"
-                                placeholder="30 (minutes) or 30:45 (MM:SS)"
-                                :class="{ 'border-destructive': form.errors.duration }"
-                            />
+                        <!-- User-Friendly Duration Input -->
+                        <div class="space-y-3">
+                            <Label>Duration</Label>
+                            
+                            <!-- Duration Input Grid -->
+                            <div class="grid grid-cols-3 gap-3">
+                                <!-- Hours -->
+                                <div class="space-y-2">
+                                    <Label for="hours" class="text-xs text-muted-foreground">Hours</Label>
+                                    <Input
+                                        id="hours"
+                                        type="number"
+                                        min="0"
+                                        max="99"
+                                        :value="durationHours"
+                                        @input="handleDurationChange('hours', ($event.target as HTMLInputElement).value)"
+                                        placeholder="0"
+                                        class="text-center"
+                                    />
+                                </div>
+                                
+                                <!-- Minutes -->
+                                <div class="space-y-2">
+                                    <Label for="minutes" class="text-xs text-muted-foreground">Minutes</Label>
+                                    <Input
+                                        id="minutes"
+                                        type="number"
+                                        min="0"
+                                        max="59"
+                                        :value="durationMinutes"
+                                        @input="handleDurationChange('minutes', ($event.target as HTMLInputElement).value)"
+                                        placeholder="0"
+                                        class="text-center"
+                                    />
+                                </div>
+                                
+                                <!-- Seconds -->
+                                <div class="space-y-2">
+                                    <Label for="seconds" class="text-xs text-muted-foreground">Seconds</Label>
+                                    <Input
+                                        id="seconds"
+                                        type="number"
+                                        min="0"
+                                        max="59"
+                                        :value="durationSeconds"
+                                        @input="handleDurationChange('seconds', ($event.target as HTMLInputElement).value)"
+                                        placeholder="0"
+                                        class="text-center"
+                                    />
+                                </div>
+                            </div>
+                            
+                            <!-- Duration Display -->
+                            <div class="flex items-center justify-between p-3 rounded-lg bg-muted/50 border">
+                                <div class="flex items-center gap-2">
+                                    <Clock class="h-4 w-4 text-muted-foreground" />
+                                    <span class="text-sm font-medium">Total Duration:</span>
+                                    <span class="text-sm text-muted-foreground">{{ readableDuration }}</span>
+                                </div>
+                                <Button
+                                    v-if="durationHours > 0 || durationMinutes > 0 || durationSeconds > 0"
+                                    @click="clearDuration"
+                                    variant="ghost"
+                                    size="sm"
+                                    type="button"
+                                >
+                                    <X class="h-4 w-4" />
+                                </Button>
+                            </div>
+                            
+                            <!-- Quick Presets -->
+                            <div class="space-y-2">
+                                <Label class="text-xs text-muted-foreground">Quick Presets:</Label>
+                                <div class="flex flex-wrap gap-2">
+                                    <Button
+                                        @click="setDurationPreset(0, 5, 0)"
+                                        variant="outline"
+                                        size="sm"
+                                        type="button"
+                                    >
+                                        5 min
+                                    </Button>
+                                    <Button
+                                        @click="setDurationPreset(0, 10, 0)"
+                                        variant="outline"
+                                        size="sm"
+                                        type="button"
+                                    >
+                                        10 min
+                                    </Button>
+                                    <Button
+                                        @click="setDurationPreset(0, 15, 0)"
+                                        variant="outline"
+                                        size="sm"
+                                        type="button"
+                                    >
+                                        15 min
+                                    </Button>
+                                    <Button
+                                        @click="setDurationPreset(0, 30, 0)"
+                                        variant="outline"
+                                        size="sm"
+                                        type="button"
+                                    >
+                                        30 min
+                                    </Button>
+                                    <Button
+                                        @click="setDurationPreset(1, 0, 0)"
+                                        variant="outline"
+                                        size="sm"
+                                        type="button"
+                                    >
+                                        1 hour
+                                    </Button>
+                                    <Button
+                                        @click="setDurationPreset(2, 0, 0)"
+                                        variant="outline"
+                                        size="sm"
+                                        type="button"
+                                    >
+                                        2 hours
+                                    </Button>
+                                </div>
+                            </div>
+                            
                             <div v-if="form.errors.duration" class="text-sm text-destructive">
                                 {{ form.errors.duration }}
                             </div>
                             <div class="text-sm text-muted-foreground">
-                                Enter duration in minutes (e.g., "30") or MM:SS format (e.g., "30:45")
+                                Enter the audio duration using separate fields for hours, minutes, and seconds
                             </div>
                         </div>
                     </CardContent>

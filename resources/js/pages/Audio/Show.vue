@@ -38,6 +38,7 @@ interface Audio {
     name: string
     description: string
     google_cloud_url: string
+    storage_type: 'google_drive' | 'local'
     duration: number
     formatted_duration: string
     thumbnail_url?: string
@@ -65,9 +66,9 @@ const props = defineProps<{
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Dashboard', href: '/dashboard' },
-    { title: 'Audio Courses', href: '/audio' },
-    { title: props.audio.name, href: '#' }
+    { name: 'Home', href: '/dashboard' },
+    { name: 'Audio Courses', href: '/audio' },
+    { name: props.audio.name, href: `/audio/${props.audio.id}` }
 ]
 
 // Audio player state
@@ -88,6 +89,14 @@ const contentTimeListened = computed(() => Math.floor(currentTime.value))
 
 // ✅ THUMBNAIL ERROR HANDLING
 const thumbnailError = ref(false)
+
+// Get audio source URL based on storage type
+const audioSourceUrl = computed(() => {
+    if (props.audio.storage_type === 'local') {
+        return `/audio/${props.audio.id}/stream`
+    }
+    return props.audio.google_cloud_url
+})
 
 // Progress tracking
 const lastSavedTime = ref(currentTime.value)
@@ -364,7 +373,11 @@ function onError(event: Event) {
                 error.value = 'Failed to load audio. The file might be private or moved.'
         }
     } else {
-        error.value = 'Failed to load audio from Google Drive. Please check if the file is publicly accessible.'
+        if (props.audio.storage_type === 'local') {
+            error.value = 'Failed to load audio from local storage. Please contact support.'
+        } else {
+            error.value = 'Failed to load audio from Google Drive. Please check if the file is publicly accessible.'
+        }
     }
 
     isLoading.value = false
@@ -564,7 +577,7 @@ onMounted(() => {
                     <!-- Audio Element -->
                     <audio
                         ref="audioRef"
-                        :src="audio.google_cloud_url"
+                        :src="audioSourceUrl"
                         preload="metadata"
                         @loadstart="onLoadStart"
                         @canplay="onCanPlay"
@@ -590,7 +603,7 @@ onMounted(() => {
                                         <RefreshCw class="h-4 w-4 mr-2" />
                                         Retry
                                     </Button>
-                                    <Button asChild size="sm" variant="outline">
+                                    <Button v-if="audio.storage_type === 'google_drive'" asChild size="sm" variant="outline">
                                         <a :href="audio.google_cloud_url" target="_blank">
                                             <ExternalLink class="h-4 w-4 mr-2" />
                                             Open Direct Link
@@ -605,7 +618,7 @@ onMounted(() => {
                     <div v-if="isLoading && !error" class="text-center py-8">
                         <div class="flex items-center justify-center gap-2 text-muted-foreground mb-4">
                             <RefreshCw class="h-5 w-5 animate-spin" />
-                            <span>Loading audio from Google Drive...</span>
+                            <span>Loading audio...</span>
                         </div>
                         <div class="text-sm text-muted-foreground">
                             This may take a moment for large files

@@ -118,6 +118,32 @@ class User extends Authenticatable
         );
     }
 
+    public function generateAudioLoginLink($audioId)
+    {
+        // Generate a secure random token
+        $token = Str::random(64);
+
+        // Set expiration (24 hours)
+        $expiresAt = now()->addHours(24);
+
+        // Store hashed token in database
+        $this->update([
+            'login_token' => hash('sha256', $token),
+            'login_token_expires_at' => $expiresAt,
+        ]);
+
+        // Create signed URL with user and audio parameters
+        return URL::temporarySignedRoute(
+            'auth.audio-token-login',
+            $expiresAt,
+            [
+                'user' => $this->id,
+                'audio' => $audioId,
+                'token' => $token
+            ]
+        );
+    }
+
     /**
      * Check if login token has expired
      */

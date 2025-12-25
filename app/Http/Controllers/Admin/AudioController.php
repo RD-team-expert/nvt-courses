@@ -73,14 +73,18 @@ class AudioController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:2000',
-            'google_cloud_url' => 'required|url|max:500',
+            'storage_type' => 'required|in:google_drive,local',
+            'google_cloud_url' => 'required_if:storage_type,google_drive|nullable|url|max:500',
+            'audio_file' => 'required_if:storage_type,local|nullable|file|mimes:mp3,wav,ogg,m4a|max:102400',
             'duration' => 'nullable|string',
             'thumbnail' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp',
             'thumbnail_url' => 'nullable|url|max:500',
             'audio_category_id' => 'nullable|exists:audio_categories,id',
             'is_active' => 'boolean'
         ], [
-            'duration.regex' => 'Duration must be in HH:MM:SS format (e.g., 01:30:45)'
+            'duration.regex' => 'Duration must be in HH:MM:SS format (e.g., 01:30:45)',
+            'audio_file.required_if' => 'Audio file is required when using local storage',
+            'google_cloud_url.required_if' => 'Google Drive URL is required when using Google Drive storage',
         ]);
 
         // Handle thumbnail upload
@@ -89,18 +93,37 @@ class AudioController extends Controller
             $thumbnailPath = $request->file('thumbnail')->store('audio/thumbnails', 'public');
         }
 
+        // Handle audio file storage
+        $localPath = null;
+        $googleCloudUrl = null;
+
+        if ($validated['storage_type'] === 'local') {
+            // Store audio file locally
+            if ($request->hasFile('audio_file')) {
+                $localPath = $request->file('audio_file')->store('audio/files', 'public');
+                
+                // Verify file was stored successfully
+                if (!Storage::disk('public')->exists($localPath)) {
+                    return back()->withErrors(['audio_file' => 'Failed to store audio file'])->withInput();
+                }
+            }
+        } else {
+            // Use Google Drive URL
+            $googleCloudUrl = $validated['google_cloud_url'];
+        }
+
         // Convert HH:MM:SS to seconds for database storage
         $durationInSeconds = null;
         if (!empty($validated['duration'])) {
             $durationInSeconds = $this->convertTimeToSeconds($validated['duration']);
-
-
         }
 
         $audio = Audio::create([
             'name' => $validated['name'],
             'description' => $validated['description'],
-            'google_cloud_url' => $validated['google_cloud_url'],
+            'storage_type' => $validated['storage_type'],
+            'google_cloud_url' => $googleCloudUrl,
+            'local_path' => $localPath,
             'duration' => $durationInSeconds,
             'thumbnail_path' => $thumbnailPath,
             'thumbnail_url' => $validated['thumbnail_url'],
@@ -108,8 +131,6 @@ class AudioController extends Controller
             'is_active' => $validated['is_active'] ?? true,
             'created_by' => auth()->id(),
         ]);
-
-
 
         return redirect()->route('admin.audio.index')
             ->with('success', 'Audio created successfully.');

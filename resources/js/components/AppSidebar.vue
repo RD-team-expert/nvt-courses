@@ -220,6 +220,11 @@ const otherAdminNavItems: NavItem[] = [
         icon: Clock,
     },
     {
+        title: 'Audio Assignments',
+        href: '/admin/audio-assignments',
+        icon: Volume2,
+    },
+    {
         title: 'Admin online course',
         href: '/admin/course-online',
         icon: Clock,
