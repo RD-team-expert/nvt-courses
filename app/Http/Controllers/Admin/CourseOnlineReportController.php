@@ -882,6 +882,7 @@ class CourseOnlineReportController extends Controller
     private function getActualSessionDuration($sessionStart, $sessionEnd, $activePlaybackTime = null, $sessionId = null, $contentId = null)
     {
         // Priority 1: Use active_playback_time if available (most accurate)
+        // ✅ active_playback_time is stored in SECONDS, convert to minutes
         if ($activePlaybackTime && $activePlaybackTime > 0) {
             return round($activePlaybackTime / 60, 2); // Convert seconds to minutes
         }
@@ -898,7 +899,10 @@ class CourseOnlineReportController extends Controller
             if ($sessionEnd) {
                 $end = Carbon::parse($sessionEnd);
                 $minutes = $start->diffInMinutes($end);
-                return max(0, $minutes);
+                
+                // ✅ Cap at 3 hours (180 minutes) to prevent corrupted data from inflating totals
+                // Sessions longer than 3 hours are likely due to browser/tab staying open
+                return max(0, min($minutes, 180));
             }
             
             // Priority 3: For active sessions (no end time), try to use video duration

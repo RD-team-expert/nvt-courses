@@ -93,31 +93,33 @@ class ProgressController extends Controller
         }
 
         // ✅ FIXED: Calculate progress based on REQUIRED content only
-        $totalRequiredContent = \App\Models\ModuleContent::whereHas('module', function ($query) use ($courseOnlineId) {
+        $requiredContentIds = \App\Models\ModuleContent::whereHas('module', function ($query) use ($courseOnlineId) {
             $query->where('course_online_id', $courseOnlineId)
                 ->where('is_required', true);
         })
         ->where('is_required', true)
-        ->count();
+        ->pluck('id');
 
-        if ($totalRequiredContent === 0) {
+        if ($requiredContentIds->isEmpty()) {
             // No required content, don't update progress
             return;
         }
 
-        $completedRequiredContent = UserContentProgress::where('user_id', auth()->id())
+        // ✅ NEW: Calculate average completion percentage across all required content
+        $contentProgress = UserContentProgress::where('user_id', auth()->id())
             ->where('course_online_id', $courseOnlineId)
-            ->where('is_completed', true)
-            ->whereHas('content', function ($query) {
-                $query->where('is_required', true)
-                    ->whereHas('module', function ($subQuery) {
-                        $subQuery->where('is_required', true);
-                    });
-            })
-            ->count();
+            ->whereIn('content_id', $requiredContentIds)
+            ->get();
 
-        // ✅ Calculate progress as percentage of completed required content
-        $totalProgress = round(($completedRequiredContent / $totalRequiredContent) * 100, 2);
+        // Calculate total completion percentage
+        $totalCompletion = 0;
+        foreach ($requiredContentIds as $contentId) {
+            $progress = $contentProgress->firstWhere('content_id', $contentId);
+            $totalCompletion += $progress ? ($progress->completion_percentage ?? 0) : 0;
+        }
+
+        // ✅ Calculate progress as average completion percentage
+        $totalProgress = round($totalCompletion / $requiredContentIds->count(), 2);
 
         // Find current module
         $currentModuleId = UserContentProgress::where('user_id', auth()->id())

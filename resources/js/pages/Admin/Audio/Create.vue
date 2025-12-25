@@ -44,7 +44,9 @@ const breadcrumbs: BreadcrumbItem[] = [
 const form = useForm({
     name: '',
     description: '',
+    storage_type: 'google_drive' as 'google_drive' | 'local',
     google_cloud_url: '',
+    audio_file: null as File | null,
     duration: '', // HH:MM:SS format
     thumbnail: null as File | null,
     thumbnail_url: '',
@@ -55,107 +57,70 @@ const form = useForm({
 const isSubmitting = ref(false)
 const thumbnailPreview = ref<string | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
-const durationInput = ref<HTMLInputElement | null>(null)
+const audioFileInputRef = ref<HTMLInputElement | null>(null)
 
-// Duration state
-const durationDisplay = ref('00:00:00')
+// Duration state - separate inputs for hours, minutes, seconds
+const durationHours = ref<number>(0)
+const durationMinutes = ref<number>(0)
+const durationSeconds = ref<number>(0)
 
-// Update form duration
+// Update form duration from separate inputs
 const updateFormDuration = () => {
-    form.duration = durationDisplay.value === '00:00:00' ? '' : durationDisplay.value
+    const h = durationHours.value.toString().padStart(2, '0')
+    const m = durationMinutes.value.toString().padStart(2, '0')
+    const s = durationSeconds.value.toString().padStart(2, '0')
+    
+    // Only set duration if at least one value is non-zero
+    if (durationHours.value > 0 || durationMinutes.value > 0 || durationSeconds.value > 0) {
+        form.duration = `${h}:${m}:${s}`
+    } else {
+        form.duration = ''
+    }
 }
 
-// Enhanced input handler with better validation
-const handleDurationInput = (event: Event) => {
-    const target = event.target as HTMLInputElement
-    let input = target.value
-
-    // Remove all non-digits
-    let numbersOnly = input.replace(/\D/g, '')
-
-    // Limit to 6 digits maximum (HHMMSS)
-    if (numbersOnly.length > 6) {
-        numbersOnly = numbersOnly.substring(0, 6)
+// Handle duration input changes with validation
+const handleDurationChange = (type: 'hours' | 'minutes' | 'seconds', value: string) => {
+    let numValue = parseInt(value) || 0
+    
+    // Validate ranges
+    if (type === 'hours') {
+        numValue = Math.max(0, Math.min(99, numValue))
+        durationHours.value = numValue
+    } else if (type === 'minutes') {
+        numValue = Math.max(0, Math.min(59, numValue))
+        durationMinutes.value = numValue
+    } else if (type === 'seconds') {
+        numValue = Math.max(0, Math.min(59, numValue))
+        durationSeconds.value = numValue
     }
-
-    // If empty or all zeros, reset to 00:00:00
-    if (!numbersOnly || numbersOnly === '0' || numbersOnly === '00' || numbersOnly === '000') {
-        durationDisplay.value = '00:00:00'
-        target.value = '00:00:00'
-        updateFormDuration()
-        return
-    }
-
-    // Pad with leading zeros to make it 6 digits for processing
-    const padded = numbersOnly.padStart(6, '0')
-
-    // Extract components
-    let hours = parseInt(padded.substring(0, 2))
-    let minutes = parseInt(padded.substring(2, 4))
-    let seconds = parseInt(padded.substring(4, 6))
-
-    // Validate and adjust ranges
-    if (hours > 23) hours = 23
-    if (minutes > 59) minutes = 59
-    if (seconds > 59) seconds = 59
-
-    // Format as HH:MM:SS
-    const formatted = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
-
-    // Update values
-    durationDisplay.value = formatted
-    target.value = formatted
+    
     updateFormDuration()
 }
 
-// Format for readable display
-const formatDurationReadable = (timeString: string): string => {
-    if (!timeString || timeString === '00:00:00') return '0 seconds'
-
-    const [hours, minutes, seconds] = timeString.split(':').map(Number)
-    const parts = []
-
-    if (hours > 0) parts.push(`${hours} hour${hours !== 1 ? 's' : ''}`)
-    if (minutes > 0) parts.push(`${minutes} minute${minutes !== 1 ? 's' : ''}`)
-    if (seconds > 0) parts.push(`${seconds} second${seconds !== 1 ? 's' : ''}`)
-
-    if (parts.length === 0) return '0 seconds'
-    if (parts.length === 1) return parts[0]
-    if (parts.length === 2) return `${parts[0]} and ${parts[1]}`
-    return `${parts[0]}, ${parts[1]}, and ${parts[2]}`
-}
-
-// Handle paste events
-const handleDurationPaste = (event: ClipboardEvent) => {
-    event.preventDefault()
-    const pastedText = event.clipboardData?.getData('text') || ''
-
-    // Try to parse various formats
-    let numbersOnly = pastedText.replace(/\D/g, '')
-
-    if (numbersOnly.length <= 6) {
-        const fakeEvent = { target: { value: numbersOnly } }
-        handleDurationInput(fakeEvent as any)
-    }
-}
-
-// Set duration preset
-const setDurationPreset = (timeString: string) => {
-    durationDisplay.value = timeString
+// Quick preset buttons
+const setDurationPreset = (hours: number, minutes: number, seconds: number) => {
+    durationHours.value = hours
+    durationMinutes.value = minutes
+    durationSeconds.value = seconds
     updateFormDuration()
-    if (durationInput.value) {
-        durationInput.value.value = timeString
-    }
 }
 
 // Clear duration
 const clearDuration = () => {
-    durationDisplay.value = '00:00:00'
+    durationHours.value = 0
+    durationMinutes.value = 0
+    durationSeconds.value = 0
     updateFormDuration()
-    if (durationInput.value) {
-        durationInput.value.value = '00:00:00'
-    }
 }
+
+// Computed readable duration
+const readableDuration = computed(() => {
+    const parts = []
+    if (durationHours.value > 0) parts.push(`${durationHours.value}h`)
+    if (durationMinutes.value > 0) parts.push(`${durationMinutes.value}m`)
+    if (durationSeconds.value > 0) parts.push(`${durationSeconds.value}s`)
+    return parts.length > 0 ? parts.join(' ') : 'Not set'
+})
 
 // Handle thumbnail file selection
 function handleThumbnailChange(event: Event) {
@@ -207,6 +172,45 @@ function triggerFileInput() {
     fileInputRef.value?.click()
 }
 
+// Handle audio file selection
+function handleAudioFileChange(event: Event) {
+    const target = event.target as HTMLInputElement
+    const file = target.files?.[0]
+
+    if (file) {
+        // Validate file size (50MB)
+        if (file.size > 50 * 1024 * 1024) {
+            alert('Audio file size must be less than 50MB')
+            target.value = ''
+            return
+        }
+
+        // Validate file type
+        if (!file.type.startsWith('audio/')) {
+            alert('Please select an audio file')
+            target.value = ''
+            return
+        }
+
+        form.audio_file = file
+    }
+}
+
+// Remove audio file
+function removeAudioFile() {
+    form.audio_file = null
+
+    // Reset file input
+    if (audioFileInputRef.value) {
+        audioFileInputRef.value.value = ''
+    }
+}
+
+// Trigger audio file input
+function triggerAudioFileInput() {
+    audioFileInputRef.value?.click()
+}
+
 // Submit form
 const submit = async () => {
     isSubmitting.value = true
@@ -216,7 +220,8 @@ const submit = async () => {
     form.transform((data) => ({
         ...data,
         duration: data.duration || null,
-        audio_category_id: data.audio_category_id || null
+        audio_category_id: data.audio_category_id || null,
+        google_cloud_url: data.storage_type === 'google_drive' ? data.google_cloud_url : null
     })).post('/admin/audio', {
         onFinish: () => {
             isSubmitting.value = false
@@ -320,12 +325,60 @@ updateFormDuration()
                             Media Information
                         </CardTitle>
                         <CardDescription>
-                            Provide the Google Cloud Storage URL and media details
+                            Choose storage type and provide media details
                         </CardDescription>
                     </CardHeader>
                     <CardContent class="space-y-4">
-                        <!-- Google Cloud URL -->
-                        <div class="space-y-2">
+                        <!-- Storage Type Selection -->
+                        <div class="space-y-3">
+                            <Label>Storage Type *</Label>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div
+                                    @click="form.storage_type = 'google_drive'"
+                                    class="relative flex items-center space-x-3 rounded-lg border p-4 cursor-pointer transition-all"
+                                    :class="{
+                                        'border-primary bg-primary/5': form.storage_type === 'google_drive',
+                                        'border-input hover:border-primary/50': form.storage_type !== 'google_drive'
+                                    }"
+                                >
+                                    <input
+                                        type="radio"
+                                        name="storage_type"
+                                        value="google_drive"
+                                        :checked="form.storage_type === 'google_drive'"
+                                        class="h-4 w-4 text-primary"
+                                    />
+                                    <div class="flex-1">
+                                        <div class="font-medium">Google Drive</div>
+                                        <div class="text-xs text-muted-foreground">Store audio in Google Drive</div>
+                                    </div>
+                                </div>
+
+                                <div
+                                    @click="form.storage_type = 'local'"
+                                    class="relative flex items-center space-x-3 rounded-lg border p-4 cursor-pointer transition-all"
+                                    :class="{
+                                        'border-primary bg-primary/5': form.storage_type === 'local',
+                                        'border-input hover:border-primary/50': form.storage_type !== 'local'
+                                    }"
+                                >
+                                    <input
+                                        type="radio"
+                                        name="storage_type"
+                                        value="local"
+                                        :checked="form.storage_type === 'local'"
+                                        class="h-4 w-4 text-primary"
+                                    />
+                                    <div class="flex-1">
+                                        <div class="font-medium">Local Storage</div>
+                                        <div class="text-xs text-muted-foreground">Upload audio file to server</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Google Cloud URL (shown when Google Drive is selected) -->
+                        <div v-if="form.storage_type === 'google_drive'" class="space-y-2">
                             <Label for="google_cloud_url">Google Drive/Cloud URL *</Label>
                             <Input
                                 id="google_cloud_url"
@@ -343,22 +396,196 @@ updateFormDuration()
                             </div>
                         </div>
 
-                        <!-- Enhanced Duration Input -->
-                        <div class="space-y-2">
-                            <Label for="duration">Duration</Label>
-                            <Input
-                                id="duration"
-                                v-model="form.duration"
-                                type="text"
-                                step="1"
-                                placeholder="30 (minutes) or 30:45 (MM:SS)"
-                                :class="{ 'border-destructive': form.errors.duration }"
+                        <!-- Local File Upload (shown when Local is selected) -->
+                        <div v-if="form.storage_type === 'local'" class="space-y-3">
+                            <Label>Upload Audio File *</Label>
+
+                            <!-- Hidden file input -->
+                            <input
+                                ref="audioFileInputRef"
+                                type="file"
+                                accept="audio/*"
+                                @change="handleAudioFileChange"
+                                class="hidden"
                             />
+
+                            <!-- Upload Area -->
+                            <div
+                                v-if="!form.audio_file"
+                                @click="triggerAudioFileInput"
+                                class="border-2 border-dashed border-input rounded-lg p-6 text-center cursor-pointer hover:border-primary transition-colors"
+                                :class="{ 'border-destructive': form.errors.audio_file }"
+                            >
+                                <Upload class="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                                <div class="text-sm font-medium mb-2">Click to upload audio file</div>
+                                <div class="text-xs text-muted-foreground">
+                                    MP3, WAV, OGG, M4A up to 50MB
+                                </div>
+                            </div>
+
+                            <!-- File Preview -->
+                            <div v-if="form.audio_file" class="space-y-3">
+                                <div class="flex items-center gap-3 p-4 rounded-lg border bg-muted/50">
+                                    <Volume2 class="h-8 w-8 text-primary" />
+                                    <div class="flex-1 min-w-0">
+                                        <div class="font-medium truncate">{{ form.audio_file.name }}</div>
+                                        <div class="text-sm text-muted-foreground">
+                                            {{ (form.audio_file.size / (1024 * 1024)).toFixed(2) }} MB
+                                        </div>
+                                    </div>
+                                    <Button
+                                        @click="removeAudioFile"
+                                        variant="destructive"
+                                        size="sm"
+                                        type="button"
+                                    >
+                                        <X class="h-4 w-4" />
+                                    </Button>
+                                </div>
+                                <div class="flex gap-2">
+                                    <Button @click="triggerAudioFileInput" variant="outline" size="sm" type="button">
+                                        <Upload class="h-4 w-4 mr-2" />
+                                        Change File
+                                    </Button>
+                                </div>
+                            </div>
+
+                            <!-- Error Message -->
+                            <div v-if="form.errors.audio_file" class="text-sm text-destructive">
+                                {{ form.errors.audio_file }}
+                            </div>
+                        </div>
+
+                        <!-- User-Friendly Duration Input -->
+                        <div class="space-y-3">
+                            <Label>Duration</Label>
+                            
+                            <!-- Duration Input Grid -->
+                            <div class="grid grid-cols-3 gap-3">
+                                <!-- Hours -->
+                                <div class="space-y-2">
+                                    <Label for="hours" class="text-xs text-muted-foreground">Hours</Label>
+                                    <Input
+                                        id="hours"
+                                        type="number"
+                                        min="0"
+                                        max="99"
+                                        :value="durationHours"
+                                        @input="handleDurationChange('hours', ($event.target as HTMLInputElement).value)"
+                                        placeholder="0"
+                                        class="text-center"
+                                    />
+                                </div>
+                                
+                                <!-- Minutes -->
+                                <div class="space-y-2">
+                                    <Label for="minutes" class="text-xs text-muted-foreground">Minutes</Label>
+                                    <Input
+                                        id="minutes"
+                                        type="number"
+                                        min="0"
+                                        max="59"
+                                        :value="durationMinutes"
+                                        @input="handleDurationChange('minutes', ($event.target as HTMLInputElement).value)"
+                                        placeholder="0"
+                                        class="text-center"
+                                    />
+                                </div>
+                                
+                                <!-- Seconds -->
+                                <div class="space-y-2">
+                                    <Label for="seconds" class="text-xs text-muted-foreground">Seconds</Label>
+                                    <Input
+                                        id="seconds"
+                                        type="number"
+                                        min="0"
+                                        max="59"
+                                        :value="durationSeconds"
+                                        @input="handleDurationChange('seconds', ($event.target as HTMLInputElement).value)"
+                                        placeholder="0"
+                                        class="text-center"
+                                    />
+                                </div>
+                            </div>
+                            
+                            <!-- Duration Display -->
+                            <div class="flex items-center justify-between p-3 rounded-lg bg-muted/50 border">
+                                <div class="flex items-center gap-2">
+                                    <Clock class="h-4 w-4 text-muted-foreground" />
+                                    <span class="text-sm font-medium">Total Duration:</span>
+                                    <span class="text-sm text-muted-foreground">{{ readableDuration }}</span>
+                                </div>
+                                <Button
+                                    v-if="durationHours > 0 || durationMinutes > 0 || durationSeconds > 0"
+                                    @click="clearDuration"
+                                    variant="ghost"
+                                    size="sm"
+                                    type="button"
+                                >
+                                    <X class="h-4 w-4" />
+                                </Button>
+                            </div>
+                            
+                            <!-- Quick Presets -->
+                            <div class="space-y-2">
+                                <Label class="text-xs text-muted-foreground">Quick Presets:</Label>
+                                <div class="flex flex-wrap gap-2">
+                                    <Button
+                                        @click="setDurationPreset(0, 5, 0)"
+                                        variant="outline"
+                                        size="sm"
+                                        type="button"
+                                    >
+                                        5 min
+                                    </Button>
+                                    <Button
+                                        @click="setDurationPreset(0, 10, 0)"
+                                        variant="outline"
+                                        size="sm"
+                                        type="button"
+                                    >
+                                        10 min
+                                    </Button>
+                                    <Button
+                                        @click="setDurationPreset(0, 15, 0)"
+                                        variant="outline"
+                                        size="sm"
+                                        type="button"
+                                    >
+                                        15 min
+                                    </Button>
+                                    <Button
+                                        @click="setDurationPreset(0, 30, 0)"
+                                        variant="outline"
+                                        size="sm"
+                                        type="button"
+                                    >
+                                        30 min
+                                    </Button>
+                                    <Button
+                                        @click="setDurationPreset(1, 0, 0)"
+                                        variant="outline"
+                                        size="sm"
+                                        type="button"
+                                    >
+                                        1 hour
+                                    </Button>
+                                    <Button
+                                        @click="setDurationPreset(2, 0, 0)"
+                                        variant="outline"
+                                        size="sm"
+                                        type="button"
+                                    >
+                                        2 hours
+                                    </Button>
+                                </div>
+                            </div>
+                            
                             <div v-if="form.errors.duration" class="text-sm text-destructive">
                                 {{ form.errors.duration }}
                             </div>
                             <div class="text-sm text-muted-foreground">
-                                Enter duration in minutes (e.g., "30") or MM:SS format (e.g., "30:45")
+                                Enter the audio duration using separate fields for hours, minutes, and seconds
                             </div>
                         </div>
                     </CardContent>
@@ -495,7 +722,7 @@ updateFormDuration()
                     <AlertTriangle class="h-4 w-4" />
                     <AlertDescription>
                         <strong>Important:</strong> Make sure your Google Drive file is set to "Anyone with the link can view"
-                        for proper audio streaming. Duration should be entered in HH:MM:SS format (e.g., 01:30:45 for 1 hour, 30 minutes, 45 seconds).
+                        for proper audio streaming.
                     </AlertDescription>
                 </Alert>
 

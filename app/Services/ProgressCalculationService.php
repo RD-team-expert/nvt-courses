@@ -88,8 +88,8 @@ class ProgressCalculationService
      * Calculate actual progress from content completion
      * This is the TRUTH - what user actually completed
      * 
-     * ✅ SMART: Checks BOTH user_content_progress AND learning_sessions
-     * to find if user EVER completed the content (handles overwrites)
+     * ✅ UPDATED: Uses average completion percentage across all required content
+     * instead of just counting completed items
      * 
      * @param int $userId
      * @param int $courseOnlineId
@@ -117,24 +117,67 @@ class ProgressCalculationService
             ];
         }
         
-        // ✅ SMART: Check each required content item
+        // ✅ NEW: Calculate average completion percentage across all required content
+        $totalCompletion = 0;
         $completedRequired = 0;
         
         foreach ($requiredContent as $content) {
-            $isCompleted = $this->isContentCompleted($userId, $courseOnlineId, $content->id);
-            if ($isCompleted) {
+            $contentCompletion = $this->getContentCompletionPercentage($userId, $courseOnlineId, $content->id);
+            $totalCompletion += $contentCompletion;
+            
+            // Also count fully completed items for backward compatibility
+            if ($contentCompletion >= 100) {
                 $completedRequired++;
             }
         }
         
-        $progress = round(($completedRequired / $totalRequired) * 100, 2);
+        // Calculate average progress across all required content
+        $progress = round($totalCompletion / $totalRequired, 2);
         
         return [
             'progress' => $progress,
             'completed' => $completedRequired,
             'total' => $totalRequired,
-            'details' => "Completed {$completedRequired} out of {$totalRequired} required items"
+            'details' => "Average completion: {$progress}%, Fully completed: {$completedRequired}/{$totalRequired}"
         ];
+    }
+    
+    /**
+     * ✅ NEW: Get completion percentage for a specific content item
+     * Returns the highest completion percentage found across all sources
+     * 
+     * @param int $userId
+     * @param int $courseOnlineId
+     * @param int $contentId
+     * @return float
+     */
+    private function getContentCompletionPercentage(int $userId, int $courseOnlineId, int $contentId): float
+    {
+        // Source 1: Check user_content_progress table
+        $contentProgress = DB::table('user_content_progress')
+            ->where('user_id', $userId)
+            ->where('course_online_id', $courseOnlineId)
+            ->where('content_id', $contentId)
+            ->first();
+        
+        $maxCompletion = 0;
+        
+        if ($contentProgress) {
+            $maxCompletion = max($maxCompletion, $contentProgress->completion_percentage ?? 0);
+        }
+        
+        // Source 2: Check learning sessions for highest video completion
+        $highestSessionCompletion = DB::table('learning_sessions')
+            ->where('user_id', $userId)
+            ->where('course_online_id', $courseOnlineId)
+            ->where('content_id', $contentId)
+            ->max('video_completion_percentage');
+        
+        if ($highestSessionCompletion) {
+            $maxCompletion = max($maxCompletion, $highestSessionCompletion);
+        }
+        
+        return min($maxCompletion, 100); // Cap at 100%
     }
     
     /**
