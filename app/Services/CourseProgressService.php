@@ -64,8 +64,6 @@ class CourseProgressService
                 'course_registrations.completed_at as registration_completed_at',
                 // Deadline: use courses.end_date (we'll get the latest availability end_date separately)
                 'courses.end_date as course_end_date',
-                // Course beginning date for traditional courses
-                'courses.start_date as course_beginning_date',
             ]);
         
         // Apply filters
@@ -201,8 +199,6 @@ class CourseProgressService
                 'course_online_assignments.progress_percentage',
                 // Use course deadline if assignment deadline is null
                 DB::raw('COALESCE(course_online_assignments.deadline, course_online.deadline) as deadline'),
-                // Course beginning date for online courses (use assignment date)
-                'course_online_assignments.assigned_at as course_beginning_date',
             ]);
         
         // Apply filters
@@ -325,8 +321,6 @@ class CourseProgressService
             'learning_score' => $learningScore,
             'score_band' => $this->determineScoreBand($learningScore),
             'compliance_status' => $this->calculateComplianceStatus($deadline, $assignment->status, $progressPercentage, $learningScore),
-            // Course beginning date - different logic for traditional vs online
-            'course_beginning_date' => $assignment->course_beginning_date ? Carbon::parse($assignment->course_beginning_date) : null,
             // Additional debug info for traditional courses
             'total_sessions' => $assignment->total_sessions ?? null,
             'attended_sessions' => $assignment->attended_sessions ?? null,

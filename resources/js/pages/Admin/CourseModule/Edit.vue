@@ -102,7 +102,7 @@ onMounted(() => {
 
 // Submit form
 const submit = () => {
-    form.put(route('admin.course-modules.update', [props.course.id, props.module.id]), {
+    form.patch(route('admin.course-modules.update', [props.course.id, props.module.id]), {
         onSuccess: () => {
             // Update original order number after successful save
             originalOrderNumber.value = form.order_number
