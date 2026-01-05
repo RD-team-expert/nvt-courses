@@ -86,15 +86,14 @@ class ExcelExportService
                 'B' => 'Department',
                 'C' => 'Course type',
                 'D' => 'Course Name',
-                'E' => 'Course Beginning Date',
-                'F' => 'Completion Status',
-                'G' => 'DaysOverdue',
-                'H' => 'progress%',
-                'I' => 'Start Course',
-                'J' => 'Completion Date',
-                'K' => 'Overall Learning Score (0-100)',
-                'L' => 'Score Band (Excellent / Good / Needs Attention)',
-                'M' => 'Compliance Status (Compliant/At Risk/Non-Compliant)',
+                'E' => 'Completion Status',
+                'F' => 'DaysOverdue',
+                'G' => 'progress%',
+                'H' => 'Start Course',
+                'I' => 'Completion Date',
+                'J' => 'Overall Learning Score (0-100)',
+                'K' => 'Score Band (Excellent / Good / Needs Attention)',
+                'L' => 'Compliance Status (Compliant/At Risk/Non-Compliant)',
             ];
         } else {
             // Non-completed courses - remove completion date column as requested
@@ -103,14 +102,13 @@ class ExcelExportService
                 'B' => 'Department',
                 'C' => 'Course type',
                 'D' => 'Course Name',
-                'E' => 'Course Beginning Date',
-                'F' => 'Completion Status',
-                'G' => 'DaysOverdue',
-                'H' => 'progress%',
-                'I' => 'Start Course',
-                'J' => 'Overall Learning Score (0-100)',
-                'K' => 'Score Band (Excellent / Good / Needs Attention)',
-                'L' => 'Compliance Status (Compliant/At Risk/Non-Compliant)',
+                'E' => 'Completion Status',
+                'F' => 'DaysOverdue',
+                'G' => 'progress%',
+                'H' => 'Start Course',
+                'I' => 'Overall Learning Score (0-100)',
+                'J' => 'Score Band (Excellent / Good / Needs Attention)',
+                'K' => 'Compliance Status (Compliant/At Risk/Non-Compliant)',
             ];
         }
         
@@ -144,7 +142,7 @@ class ExcelExportService
         ];
         
         // Dynamic header styling based on sheet type
-        $headerRange = $sheetName === 'Completed Courses (KPI)' ? 'A1:M1' : 'A1:L1';
+        $headerRange = $sheetName === 'Completed Courses (KPI)' ? 'A1:L1' : 'A1:K1';
         $sheet->getStyle($headerRange)->applyFromArray($headerStyle);
         $sheet->getRowDimension(1)->setRowHeight(40);
         
@@ -163,55 +161,31 @@ class ExcelExportService
             // D: Course Name
             $sheet->setCellValue('D' . $row, $assignment['course_name'] ?? '');
             
-            // E: Course Beginning Date
-            $courseBeginningDate = $assignment['course_beginning_date_formatted'] ?? '';
-            $sheet->setCellValue('E' . $row, $courseBeginningDate);
+            // E: Completion Status
+            $sheet->setCellValue('E' . $row, $assignment['completion_status'] ?? '');
             
-            // F: Completion Status
-            $sheet->setCellValue('F' . $row, $assignment['completion_status'] ?? '');
-            
-            // G: Days overdue - numeric or empty
+            // F: Days overdue - numeric or empty
             $daysOverdue = $assignment['days_overdue'] ?? null;
             if ($daysOverdue !== null && $daysOverdue > 0) {
-                $sheet->setCellValue('G' . $row, $daysOverdue);
+                $sheet->setCellValue('F' . $row, $daysOverdue);
             } else {
-                $sheet->setCellValue('G' . $row, '');
+                $sheet->setCellValue('F' . $row, '');
             }
             
-            // H: Progress percentage
+            // G: Progress percentage
             $progress = $assignment['progress_percentage'] ?? 0;
-            $sheet->setCellValue('H' . $row, $progress . '%');
+            $sheet->setCellValue('G' . $row, $progress . '%');
             
-            // I: Start Course Date
+            // H: Start Course Date
             $startDate = $assignment['started_date'] ?? '';
-            $sheet->setCellValue('I' . $row, $startDate);
+            $sheet->setCellValue('H' . $row, $startDate);
             
             if ($sheetName === 'Completed Courses (KPI)') {
-                // Completed sheet - include completion date in column J
+                // Completed sheet - include completion date in column I
                 $completionDate = $assignment['completion_date'] ?? '';
-                $sheet->setCellValue('J' . $row, $completionDate);
+                $sheet->setCellValue('I' . $row, $completionDate);
                 
-                // K: Learning score
-                $sheet->setCellValue('K' . $row, $assignment['learning_score'] ?? 0);
-                
-                // L: Score band
-                $sheet->setCellValue('L' . $row, $assignment['score_band'] ?? '');
-                
-                // M: Compliance status
-                $sheet->setCellValue('M' . $row, $assignment['compliance_status'] ?? '');
-                
-                // Alternate row colors
-                if ($row % 2 == 0) {
-                    $sheet->getStyle('A' . $row . ':M' . $row)->applyFromArray([
-                        'fill' => [
-                            'fillType' => Fill::FILL_SOLID,
-                            'startColor' => ['rgb' => 'B8CCE4'],
-                        ],
-                    ]);
-                }
-            } else {
-                // Non-completed sheet - no completion date column
-                // J: Learning score (shifted up)
+                // J: Learning score
                 $sheet->setCellValue('J' . $row, $assignment['learning_score'] ?? 0);
                 
                 // K: Score band
@@ -229,6 +203,26 @@ class ExcelExportService
                         ],
                     ]);
                 }
+            } else {
+                // Non-completed sheet - no completion date column
+                // I: Learning score (shifted up)
+                $sheet->setCellValue('I' . $row, $assignment['learning_score'] ?? 0);
+                
+                // J: Score band
+                $sheet->setCellValue('J' . $row, $assignment['score_band'] ?? '');
+                
+                // K: Compliance status
+                $sheet->setCellValue('K' . $row, $assignment['compliance_status'] ?? '');
+                
+                // Alternate row colors
+                if ($row % 2 == 0) {
+                    $sheet->getStyle('A' . $row . ':K' . $row)->applyFromArray([
+                        'fill' => [
+                            'fillType' => Fill::FILL_SOLID,
+                            'startColor' => ['rgb' => 'B8CCE4'],
+                        ],
+                    ]);
+                }
             }
             
             $row++;
@@ -237,8 +231,8 @@ class ExcelExportService
         // Apply borders to all data cells
         if ($row > 2) {
             $borderRange = $sheetName === 'Completed Courses (KPI)' 
-                ? 'A1:M' . ($row - 1) 
-                : 'A1:L' . ($row - 1);
+                ? 'A1:L' . ($row - 1) 
+                : 'A1:K' . ($row - 1);
             $sheet->getStyle($borderRange)->applyFromArray([
                 'borders' => [
                     'allBorders' => [
@@ -254,21 +248,20 @@ class ExcelExportService
         $sheet->getColumnDimension('B')->setWidth(15);  // Department
         $sheet->getColumnDimension('C')->setWidth(12);  // Course type
         $sheet->getColumnDimension('D')->setWidth(25);  // Course Name
-        $sheet->getColumnDimension('E')->setWidth(18);  // Course Beginning Date
-        $sheet->getColumnDimension('F')->setWidth(20);  // Completion Status
-        $sheet->getColumnDimension('G')->setWidth(12);  // DaysOverdue
-        $sheet->getColumnDimension('H')->setWidth(12);  // progress%
-        $sheet->getColumnDimension('I')->setWidth(15);  // Start Course
+        $sheet->getColumnDimension('E')->setWidth(20);  // Completion Status
+        $sheet->getColumnDimension('F')->setWidth(12);  // DaysOverdue
+        $sheet->getColumnDimension('G')->setWidth(12);  // progress%
+        $sheet->getColumnDimension('H')->setWidth(15);  // Start Course
         
         if ($sheetName === 'Completed Courses (KPI)') {
-            $sheet->getColumnDimension('J')->setWidth(15);  // Completion Date
-            $sheet->getColumnDimension('K')->setWidth(18);  // Learning Score
-            $sheet->getColumnDimension('L')->setWidth(20);  // Score Band
-            $sheet->getColumnDimension('M')->setWidth(20);  // Compliance Status
-        } else {
+            $sheet->getColumnDimension('I')->setWidth(15);  // Completion Date
             $sheet->getColumnDimension('J')->setWidth(18);  // Learning Score
             $sheet->getColumnDimension('K')->setWidth(20);  // Score Band
             $sheet->getColumnDimension('L')->setWidth(20);  // Compliance Status
+        } else {
+            $sheet->getColumnDimension('I')->setWidth(18);  // Learning Score
+            $sheet->getColumnDimension('J')->setWidth(20);  // Score Band
+            $sheet->getColumnDimension('K')->setWidth(20);  // Compliance Status
         }
         
         // Center align certain columns
@@ -278,28 +271,27 @@ class ExcelExportService
             $sheet->getStyle('F2:F' . ($row - 1))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
             $sheet->getStyle('G2:G' . ($row - 1))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
             $sheet->getStyle('H2:H' . ($row - 1))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle('I2:I' . ($row - 1))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
             
             if ($sheetName === 'Completed Courses (KPI)') {
+                $sheet->getStyle('I2:I' . ($row - 1))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
                 $sheet->getStyle('J2:J' . ($row - 1))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
                 $sheet->getStyle('K2:K' . ($row - 1))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
                 $sheet->getStyle('L2:L' . ($row - 1))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-                $sheet->getStyle('M2:M' . ($row - 1))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
             } else {
+                $sheet->getStyle('I2:I' . ($row - 1))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
                 $sheet->getStyle('J2:J' . ($row - 1))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
                 $sheet->getStyle('K2:K' . ($row - 1))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-                $sheet->getStyle('L2:L' . ($row - 1))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
             }
         }
         
         // Add filter dropdown to headers
-        $filterRange = $sheetName === 'Completed Courses (KPI)' ? 'A1:M1' : 'A1:L1';
+        $filterRange = $sheetName === 'Completed Courses (KPI)' ? 'A1:L1' : 'A1:K1';
         $sheet->setAutoFilter($filterRange);
         
         // If no data, add a message
         if ($data->isEmpty()) {
             $sheet->setCellValue('A2', 'No data available');
-            $mergeRange = $sheetName === 'Completed Courses (KPI)' ? 'A2:M2' : 'A2:L2';
+            $mergeRange = $sheetName === 'Completed Courses (KPI)' ? 'A2:L2' : 'A2:K2';
             $sheet->mergeCells($mergeRange);
             $sheet->getStyle('A2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
         }
