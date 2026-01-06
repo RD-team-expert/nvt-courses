@@ -46,9 +46,16 @@ class ContentViewControllerTest extends TestCase
         
         // Create content
         $this->content = ModuleContent::factory()->create([
-            'course_module_id' => $module->id,
+            'module_id' => $module->id, // ✅ Fix: use module_id not course_module_id
             'video_id' => $video->id,
             'content_type' => 'video',
+        ]);
+        
+        // ✅ Create course assignment so user has access
+        \App\Models\CourseOnlineAssignment::factory()->create([
+            'user_id' => $this->user->id,
+            'course_online_id' => $course->id,
+            'status' => 'assigned',
         ]);
     }
 

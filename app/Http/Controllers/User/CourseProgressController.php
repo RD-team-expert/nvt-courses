@@ -60,18 +60,23 @@ class CourseProgressController extends Controller
             'attention_score' => 100,
             'is_active' => true,
         ]);
+        
+        // Get module safely to avoid lazy loading
+        $module = $content->relationLoaded('module') ? $content->module : $content->load('module')->module;
 
         // Create or update content progress
         $contentProgress = UserContentProgress::updateOrCreate(
             [
                 'user_id' => $user->id,
-                'module_content_id' => $content->id,
+                'content_id' => $content->id, // ✅ Fix: use content_id
             ],
             [
-                'started_at' => now(),
+                'course_online_id' => $module->course_online_id,
+                'module_id' => $content->module_id,
+                'video_id' => $content->video_id,
+                'content_type' => $content->content_type,
+                'playback_position' => 0, // ✅ Fix: use playback_position, set to 0
                 'last_accessed_at' => now(),
-                'current_position' => 0,
-                'is_active' => true,
             ]
         );
 
@@ -121,7 +126,7 @@ class CourseProgressController extends Controller
 
         // Update content progress
         $contentProgress = UserContentProgress::where('user_id', $user->id)
-            ->where('module_content_id', $session->module_content_id)
+            ->where('content_id', $session->module_content_id) // ✅ Fix: use content_id
             ->first();
 
         if ($contentProgress) {
@@ -131,7 +136,7 @@ class CourseProgressController extends Controller
             );
 
             $contentProgress->update([
-                'current_position' => $validated['current_position'],
+                'playback_position' => (float) ($validated['current_position'] ?? 0), // ✅ Fix: use playback_position, ensure never null
                 'completion_percentage' => $completionPercentage,
                 'time_spent' => $sessionDuration,
                 'last_accessed_at' => now(),
@@ -185,7 +190,7 @@ class CourseProgressController extends Controller
 
         // Update content progress final state
         $contentProgress = UserContentProgress::where('user_id', $user->id)
-            ->where('module_content_id', $session->module_content_id)
+            ->where('content_id', $session->module_content_id) // ✅ Fix: use content_id
             ->first();
 
         if ($contentProgress) {
@@ -195,7 +200,7 @@ class CourseProgressController extends Controller
             );
 
             $contentProgress->update([
-                'current_position' => $finalPosition,
+                'playback_position' => (float) ($finalPosition ?? 0), // ✅ Fix: use playback_position, ensure never null
                 'completion_percentage' => $completionPercentage,
                 'time_spent' => $totalDuration,
                 'is_completed' => $completionPercentage >= 95,
@@ -236,7 +241,10 @@ class CourseProgressController extends Controller
         }
 
         // Get detailed progress
-        $modules = $courseOnline->modules()->orderBy('order_number')->get()->map(function ($module) use ($user) {
+        // ✅ FIXED N+1: Eager load content before mapping
+        $courseOnline->load(['modules.content' => fn($q) => $q->orderBy('order_number')]);
+        
+        $modules = $courseOnline->modules->sortBy('order_number')->values()->map(function ($module) use ($user) {
             $moduleProgress = $this->getModuleProgressData($module, $user->id);
 
             return [
@@ -246,13 +254,14 @@ class CourseProgressController extends Controller
                 'is_required' => $module->is_required,
                 'is_unlocked' => $this->isModuleUnlocked($module, $user->id),
                 'progress' => $moduleProgress,
-                'content' => $module->content()->orderBy('order_number')->get()->map(function ($content) use ($user) {
+                // ✅ FIXED N+1: Use already loaded content
+                'content' => $module->content->sortBy('order_number')->values()->map(function ($content) use ($user, $module) {
                     return [
                         'id' => $content->id,
                         'title' => $content->title,
                         'content_type' => $content->content_type,
                         'is_required' => $content->is_required,
-                        'is_unlocked' => $this->isContentUnlocked($content, $user->id),
+                        'is_unlocked' => $this->isContentUnlocked($content, $user->id, $module),
                         'progress' => $this->getContentProgressData($content, $user->id),
                     ];
                 }),
@@ -377,20 +386,29 @@ class CourseProgressController extends Controller
      */
     private function hasContentAccess(ModuleContent $content, int $userId): bool
     {
-        $assignment = CourseOnlineAssignment::where('course_online_id', $content->module->course_online_id)
+        // Ensure module is loaded to avoid lazy loading
+        $module = $content->relationLoaded('module') ? $content->module : $content->load('module')->module;
+        
+        $assignment = CourseOnlineAssignment::where('course_online_id', $module->course_online_id)
             ->where('user_id', $userId)
             ->first();
 
-        return $assignment && $this->isContentUnlocked($content, $userId);
+        return $assignment && $this->isContentUnlocked($content, $userId, $module);
     }
 
     /**
      * Check if content is unlocked for user
+     * @param ModuleContent $content
+     * @param int $userId
+     * @param CourseModule|null $module Pass module to avoid lazy loading
      */
-    private function isContentUnlocked(ModuleContent $content, int $userId): bool
+    private function isContentUnlocked(ModuleContent $content, int $userId, ?CourseModule $module = null): bool
     {
+        // Use passed module or try to get from loaded relation
+        $contentModule = $module ?? ($content->relationLoaded('module') ? $content->module : $content->module);
+        
         // Check if module is unlocked
-        if (!$this->isModuleUnlocked($content->module, $userId)) {
+        if (!$this->isModuleUnlocked($contentModule, $userId)) {
             return false;
         }
 
@@ -399,11 +417,10 @@ class CourseProgressController extends Controller
             return true;
         }
 
-        // Check if previous required content is completed
-        $previousContent = $content->module->content()
-            ->where('order_number', '<', $content->order_number)
-            ->where('is_required', true)
-            ->get();
+        // Check if previous required content is completed - use loaded content if available
+        $previousContent = $contentModule->relationLoaded('content')
+            ? $contentModule->content->where('order_number', '<', $content->order_number)->where('is_required', true)
+            : $contentModule->content()->where('order_number', '<', $content->order_number)->where('is_required', true)->get();
 
         foreach ($previousContent as $prevContent) {
             if (!$this->isContentCompleted($prevContent, $userId)) {
@@ -445,7 +462,7 @@ class CourseProgressController extends Controller
     private function isContentCompleted(ModuleContent $content, int $userId): bool
     {
         return UserContentProgress::where('user_id', $userId)
-            ->where('module_content_id', $content->id)
+            ->where('content_id', $content->id) // ✅ Fix: use content_id
             ->where('is_completed', true)
             ->exists();
     }
@@ -570,7 +587,20 @@ class CourseProgressController extends Controller
      */
     private function markContentCompleted(UserContentProgress $contentProgress): void
     {
+        // ✅ Calculate final position based on content type
+        $finalPosition = 0;
+        $content = $contentProgress->moduleContent;
+        
+        if ($content) {
+            if ($content->content_type === 'pdf' && $content->pdf_page_count) {
+                $finalPosition = $content->pdf_page_count;
+            } elseif ($content->content_type === 'video' && $content->video) {
+                $finalPosition = $content->video->duration ?? 0;
+            }
+        }
+        
         $contentProgress->update([
+            'playback_position' => (float) ($finalPosition ?? 0), // ✅ Ensure never null
             'completed_at' => now(),
             'is_completed' => true,
             'completion_percentage' => 100,
@@ -585,10 +615,16 @@ class CourseProgressController extends Controller
      */
     private function checkUnlockProgress(ModuleContent $content, int $userId): void
     {
+        // Get module safely to avoid lazy loading
+        $module = $content->relationLoaded('module') ? $content->module : $content->load('module')->module;
+        
         // Check if module is now completed
-        if ($this->isModuleCompleted($content->module, $userId)) {
-            // Update course progress
-            $this->updateCourseProgress($content->module->courseOnline, $userId);
+        if ($this->isModuleCompleted($module, $userId)) {
+            // Update course progress - ensure courseOnline is loaded
+            if (!$module->relationLoaded('courseOnline')) {
+                $module->load('courseOnline');
+            }
+            $this->updateCourseProgress($module->courseOnline, $userId);
         }
     }
 
@@ -754,14 +790,14 @@ class CourseProgressController extends Controller
     private function getContentProgressData(ModuleContent $content, int $userId): array
     {
         $progress = UserContentProgress::where('user_id', $userId)
-            ->where('module_content_id', $content->id)
+            ->where('content_id', $content->id) // ✅ Fix: use content_id
             ->first();
 
         return [
             'is_completed' => $progress?->is_completed ?? false,
             'completion_percentage' => $progress?->completion_percentage ?? 0,
             'time_spent' => $progress?->time_spent ?? 0,
-            'current_position' => $progress?->current_position ?? 0,
+            'playback_position' => $progress?->playback_position ?? 0, // ✅ Fix: use playback_position
             'last_accessed' => $progress?->last_accessed_at?->toISOString(),
         ];
     }

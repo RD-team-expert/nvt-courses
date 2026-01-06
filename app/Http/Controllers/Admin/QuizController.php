@@ -22,8 +22,9 @@ class QuizController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Quiz::with(['course', 'courseOnline', 'questions'])
-            ->withCount('attempts');
+        // ✅ FIXED N+1: Use withCount for questions instead of loading all questions
+        $query = Quiz::with(['course', 'courseOnline'])
+            ->withCount(['attempts', 'questions']);
 
         // Apply filters if provided
         if ($request->filled('course_id')) {
@@ -50,7 +51,8 @@ class QuizController extends Controller
 
         // Transform the collection while preserving pagination structure
         $quizzes->getCollection()->transform(function ($quiz) {
-            $associatedCourse = $quiz->getAssociatedCourse();
+            // ✅ FIXED N+1: Use already loaded course/courseOnline instead of getAssociatedCourse()
+            $associatedCourse = $quiz->course ?? $quiz->courseOnline;
 
             return [
                 'id' => $quiz->id,
@@ -62,7 +64,7 @@ class QuizController extends Controller
                 ] : null,
                 'status' => $quiz->status,
                 'total_points' => $quiz->total_points,
-                'questions_count' => $quiz->questions->count(),
+                'questions_count' => $quiz->questions_count, // ✅ Use withCount result
                 'attempts_count' => $quiz->attempts_count,
                 'created_at' => $quiz->created_at,
                 'pass_threshold' => $quiz->pass_threshold,

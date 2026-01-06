@@ -125,28 +125,28 @@ class CourseAssignmentController extends Controller
         ->orderBy('name')
         ->get(['id', 'name']);
 
-    // ✅ FIXED: Check if user has THIS specific course
+    // ✅ FIXED N+1: Pre-fetch user IDs that have the selected course assigned
+    $usersWithSelectedCourse = [];
+    if ($selectedCourseId) {
+        $usersWithSelectedCourse = \App\Models\CourseOnlineAssignment::where('course_online_id', $selectedCourseId)
+            ->pluck('user_id')
+            ->toArray();
+    }
+
+    // ✅ FIXED N+1: Eager load courseAssignments with filtered status
     $users = User::where('role', '!=', 'admin')
-        ->with('department')
+        ->with(['department', 'courseAssignments' => fn($q) => $q->where('status', 'in_progress')])
         ->orderBy('name')
         ->get()
-        ->map(function($user) use ($selectedCourseId) {
-            // ✅ Check if user has this SPECIFIC course assigned
-            $hasThisCourse = false;
-            if ($selectedCourseId) {
-                $hasThisCourse = \App\Models\CourseOnlineAssignment::where('user_id', $user->id)
-                    ->where('course_online_id', $selectedCourseId)
-                    ->exists();
-            }
-
+        ->map(function($user) use ($selectedCourseId, $usersWithSelectedCourse) {
             return [
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
                 'department_id' => $user->department_id,
                 'department_name' => $user->department?->name ?? 'No Department',
-                'active_assignments' => $user->courseAssignments()->where('status', 'in_progress')->count(),
-                'has_selected_course' => $hasThisCourse, // ✅ NEW: Flag for this specific course
+                'active_assignments' => $user->courseAssignments->count(), // ✅ Use eager loaded relation
+                'has_selected_course' => in_array($user->id, $usersWithSelectedCourse), // ✅ Use pre-fetched data
             ];
         });
 

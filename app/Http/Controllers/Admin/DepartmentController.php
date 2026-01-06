@@ -19,7 +19,17 @@ class DepartmentController extends Controller
      */
     public function index(): Response
     {
-        $departments = Department::with(['parent', 'children', 'activeManagerRoles.manager'])
+        // ✅ FIXED N+1: Added users and recursive children loading with counts
+        // Also load parent chain for hierarchy path calculation
+        $departments = Department::with([
+                'parent.parent.parent', // Load up to 3 levels of parent hierarchy
+                'children.parent', // Children need their parent (current dept) loaded
+                'children.users', 
+                'children.activeManagerRoles.manager',
+                'users',
+                'activeManagerRoles.manager'
+            ])
+            ->withCount(['users', 'children'])
             ->whereNull('parent_id') // Get top-level departments
             ->get()
             ->map(function ($department) {
@@ -74,8 +84,10 @@ class DepartmentController extends Controller
      */
     public function show(Department $department): Response
     {
+        // ✅ FIXED N+1: Added parent chain loading for hierarchy path
         $department->load([
-            'parent',
+            'parent.parent.parent', // Load parent chain for hierarchy path
+            'children.parent', // Children need parent for hierarchy path
             'children.activeManagerRoles.manager',
             'activeManagerRoles.manager.userLevel',
             'users.userLevel'
@@ -139,9 +151,24 @@ class DepartmentController extends Controller
             'is_active' => 'boolean',
         ]);
 
-        // Prevent circular references
-        if ($validated['parent_id'] && $department->isChildOf(Department::find($validated['parent_id']))) {
-            return back()->withErrors(['parent_id' => 'Cannot set a child department as parent.']);
+        // Prevent circular references - safely check if parent_id exists and is not null
+        $parentId = $validated['parent_id'] ?? null;
+        if ($parentId) {
+            // Load parent chain on department to check if potential parent is already a descendant
+            $department->load('parent.parent.parent.parent');
+            $potentialParent = Department::find($parentId);
+            
+            // Check if the potential parent is actually a descendant of this department
+            // This would create a circular reference
+            if ($potentialParent) {
+                // Load the potential parent's parent chain
+                $potentialParent->load('parent.parent.parent.parent');
+                
+                // Check if potential parent is a child of the current department
+                if ($potentialParent->isChildOf($department)) {
+                    return back()->withErrors(['parent_id' => 'Cannot set a child department as parent.']);
+                }
+            }
         }
 
         $department->update($validated);
@@ -178,12 +205,13 @@ class DepartmentController extends Controller
      */
     public function getManagerCandidates(Department $department)
     {
+        // ✅ FIXED N+1: Added activeManagerRoles to eager loading
         // Get users who can be managers (L2+ levels)
         $managerCandidates = User::whereHas('userLevel', function ($query) {
             $query->where('hierarchy_level', '>=', 2);
         })
             ->where('status', 'active')
-            ->with('userLevel', 'department')
+            ->with(['userLevel', 'department', 'activeManagerRoles'])
             ->get()
             ->map(function ($user) {
                 return [
@@ -192,7 +220,9 @@ class DepartmentController extends Controller
                     'email' => $user->email,
                     'level' => $user->userLevel?->name,
                     'department' => $user->department?->name,
-                    'current_roles' => $user->activeManagerRoles->pluck('role_type')->toArray()
+                    'current_roles' => $user->relationLoaded('activeManagerRoles') 
+                        ? $user->activeManagerRoles->pluck('role_type')->toArray() 
+                        : []
                 ];
             });
 
@@ -204,6 +234,11 @@ class DepartmentController extends Controller
      */
     private function formatDepartmentForFrontend(Department $department): array
     {
+        // ✅ FIXED N+1: Use loaded relationships or counts safely
+        $usersCount = $department->users_count ?? ($department->relationLoaded('users') ? $department->users->count() : 0);
+        $childrenCount = $department->children_count ?? ($department->relationLoaded('children') ? $department->children->count() : 0);
+        $managersCount = $department->relationLoaded('activeManagerRoles') ? $department->activeManagerRoles->count() : 0;
+        
         return [
             'id' => $department->id,
             'name' => $department->name,
@@ -211,21 +246,25 @@ class DepartmentController extends Controller
             'department_code' => $department->department_code,
             'is_active' => $department->is_active,
             'parent_id' => $department->parent_id,
-            'parent_name' => $department->parent?->name,
-            'children_count' => $department->children->count(),
-            'users_count' => $department->users->count(),
-            'managers_count' => $department->activeManagerRoles->count(),
+            'parent_name' => $department->relationLoaded('parent') ? $department->parent?->name : null,
+            'children_count' => $childrenCount,
+            'users_count' => $usersCount,
+            'managers_count' => $managersCount,
             'hierarchy_path' => $department->getHierarchyPath(),
-            'children' => $department->children->map(function ($child) {
-                return $this->formatDepartmentForFrontend($child);
-            }),
-            'managers' => $department->activeManagerRoles->map(function ($role) {
-                return [
-                    'name' => $role->manager->name,
-                    'role_type' => $role->getRoleDisplayName(),
-                    'is_primary' => $role->is_primary
-                ];
-            })
+            'children' => $department->relationLoaded('children') 
+                ? $department->children->map(function ($child) {
+                    return $this->formatDepartmentForFrontend($child);
+                })
+                : [],
+            'managers' => $department->relationLoaded('activeManagerRoles')
+                ? $department->activeManagerRoles->map(function ($role) {
+                    return [
+                        'name' => $role->relationLoaded('manager') ? $role->manager->name : 'Unknown',
+                        'role_type' => $role->getRoleDisplayName(),
+                        'is_primary' => $role->is_primary
+                    ];
+                })
+                : []
         ];
     }
     public function getEmployees(Department $department)

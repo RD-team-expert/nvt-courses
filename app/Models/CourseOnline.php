@@ -59,13 +59,35 @@ class CourseOnline extends Model
         return $this->modules->sum('estimated_duration');
     }
 
+    /**
+     * Get enrollment count - use loaded assignments if available to avoid N+1
+     * ✅ FIXED N+1: Use loaded relationship when available
+     */
     public function getEnrollmentCountAttribute()
     {
+        // If assignments are already loaded, use them
+        if ($this->relationLoaded('assignments')) {
+            return $this->assignments->count();
+        }
+        // Otherwise query (will trigger N+1 if used in a loop without eager loading)
         return $this->assignments()->count();
     }
 
+    /**
+     * Get completion rate - use loaded assignments if available to avoid N+1
+     * ✅ FIXED N+1: Use loaded relationship when available
+     */
     public function getCompletionRateAttribute()
     {
+        // If assignments are already loaded, use them
+        if ($this->relationLoaded('assignments')) {
+            $total = $this->assignments->count();
+            if ($total === 0) return 0;
+            $completed = $this->assignments->where('status', 'completed')->count();
+            return round(($completed / $total) * 100, 2);
+        }
+        
+        // Otherwise query
         $total = $this->assignments()->count();
         if ($total === 0) return 0;
 

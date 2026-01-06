@@ -4,6 +4,7 @@ namespace App\Services\ContentView;
 
 use App\Models\ModuleContent;
 use App\Models\UserContentProgress;
+use App\Models\CourseModule;
 
 class ContentNavigationService
 {
@@ -25,12 +26,22 @@ class ContentNavigationService
     }
 
     /**
+     * Get the module for content, safely handling lazy loading
+     */
+    private function getContentModule(ModuleContent $content): CourseModule
+    {
+        return $content->relationLoaded('module') ? $content->module : $content->load('module')->module;
+    }
+
+    /**
      * Get previous content in the module
      * Returns null if this is the first item
      */
     public function getPreviousContent(ModuleContent $content): ?array
     {
-        $previousInModule = $content->module->contents()
+        $module = $this->getContentModule($content);
+        
+        $previousInModule = $module->contents()
             ->where('order_number', '<', $content->order_number)
             ->orderBy('order_number', 'desc')
             ->first();
@@ -53,7 +64,9 @@ class ContentNavigationService
      */
     public function getNextContent(ModuleContent $content): ?array
     {
-        $nextInModule = $content->module->contents()
+        $module = $this->getContentModule($content);
+        
+        $nextInModule = $module->contents()
             ->where('order_number', '>', $content->order_number)
             ->orderBy('order_number', 'asc')
             ->first();
@@ -116,7 +129,9 @@ class ContentNavigationService
      */
     public function getModuleContentList(ModuleContent $currentContent, int $userId): array
     {
-        $allContent = $currentContent->module->contents()
+        $module = $this->getContentModule($currentContent);
+        
+        $allContent = $module->contents()
             ->orderBy('order_number')
             ->get();
 

@@ -87,6 +87,7 @@ class UserContentProgress extends Model
     public function updatePdfProgress(int $pagesViewed, int $totalPages): void
     {
         $this->pdf_pages_viewed = $pagesViewed;
+        $this->playback_position = $pagesViewed; // ✅ Set to pages viewed for PDFs
         $this->last_accessed_at = now();
 
         if ($totalPages > 0) {
