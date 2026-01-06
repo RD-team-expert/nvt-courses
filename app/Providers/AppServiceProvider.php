@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\ServiceProvider;
 use Inertia\Inertia;
@@ -23,6 +24,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // ✅ N+1 PREVENTION: Prevent lazy loading in development to catch N+1 issues early
+        // This will throw an exception if a relationship is accessed without eager loading
+        Model::preventLazyLoading(!app()->isProduction());
+        
         // Share flash messages with Inertia
         Inertia::share([
             'flash' => function () {

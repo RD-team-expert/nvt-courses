@@ -201,7 +201,8 @@ class EvaluationNotificationController extends Controller
 
 
             // Get employee and evaluation data
-            $employees = User::with(['evaluations.history', 'department'])
+            // ✅ FIXED N+1: Added evaluations.course eager loading
+            $employees = User::with(['evaluations.history', 'evaluations.course', 'department', 'userLevel'])
                 ->whereIn('id', $validated['employee_ids'])
                 ->get();
 

@@ -18,7 +18,12 @@ class QuizController extends Controller
         $user = auth()->user();
 
         // Get quizzes from both regular and online courses (exclude module quizzes)
-        $quizzes = Quiz::with(['course', 'courseOnline'])
+        // ✅ FIXED N+1: Added attempts eager loading filtered by current user
+        $quizzes = Quiz::with([
+                'course',
+                'courseOnline',
+                'attempts' => fn($q) => $q->where('user_id', $user->id)
+            ])
             ->where('status', 'published')
             ->where(function($q) {
                 $q->where('is_module_quiz', false)
@@ -42,15 +47,16 @@ class QuizController extends Controller
             ->paginate(10);
 
         $quizzes->getCollection()->transform(function ($quiz) use ($user) {
-            $userAttempts = $quiz->attempts()->where('user_id', $user->id)->get();
+            // ✅ FIXED N+1: Use eager loaded attempts instead of querying
+            $userAttempts = $quiz->attempts;
             $attemptCount = $userAttempts->count();
             $hasPassed = $userAttempts->contains('passed', true);
 
             $latestAttempt = $userAttempts->sortByDesc('created_at')->first();
 
 
-            // Get associated course
-            $associatedCourse = $quiz->getAssociatedCourse();
+            // Get associated course (already eager loaded)
+            $associatedCourse = $quiz->course ?? $quiz->courseOnline;
 
             return [
                 'id' => $quiz->id,

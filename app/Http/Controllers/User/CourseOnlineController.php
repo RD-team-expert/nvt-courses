@@ -26,12 +26,18 @@ class CourseOnlineController extends Controller
 
 
         // Get user's course assignments with related data
+        // ✅ FIXED N+1: Added modules.content eagerly loading for progress calculations
         $assignments = CourseOnlineAssignment::with([
-            'courseOnline.modules',
+            'courseOnline.modules.content',
+            'courseOnline.modules.quiz',
             'currentModule',
             'assignedBy'
         ])
             ->where('user_id', $user->id)
+            ->withCount(['courseOnline as modules_count' => function($query) {
+                $query->select(\DB::raw('count(course_modules.id)'))
+                    ->join('course_modules', 'course_online.id', '=', 'course_modules.course_online_id');
+            }])
             ->orderBy('created_at', 'desc')
             ->get()
             ->map(function ($assignment) use ($user) {
@@ -102,7 +108,9 @@ class CourseOnlineController extends Controller
                         'id' => $nextContent->id,
                         'title' => $nextContent->title,
                         'content_type' => $nextContent->content_type,
-                        'module_name' => $nextContent->module->name,
+                        'module_name' => $nextContent->relationLoaded('module') 
+                            ? $nextContent->module->name 
+                            : $nextContent->load('module')->module->name,
                     ] : null,
                 ];
 
@@ -171,12 +179,13 @@ class CourseOnlineController extends Controller
         }
 
         // Eager load relationships to avoid N+1 queries
-        $courseOnline->load(['modules.content.video']);
+        // ✅ FIXED N+1: Added quiz eager loading
+        $courseOnline->load(['modules.content.video', 'modules.quiz']);
 
-        // Get user progress for each module
-        $modulesWithProgress = $courseOnline->modules()
-            ->orderBy('order_number')
-            ->get()
+        // Get user progress for each module - use already loaded modules
+        $modulesWithProgress = $courseOnline->modules
+            ->sortBy('order_number')
+            ->values()
             ->map(function ($module) use ($user) {
                 $progress = $this->getModuleProgress($module, $user->id);
 
@@ -206,7 +215,7 @@ class CourseOnlineController extends Controller
                         'max_attempts' => $quizStatus['max_attempts'] ?? 0,
                         'can_attempt' => $quizStatus['can_attempt'] ?? false,
                     ],
-                    'content' => $module->content->map(function ($content) use ($user) {
+                    'content' => $module->content->map(function ($content) use ($user, $module) {
                         $contentProgress = $this->getContentProgress($content, $user->id);
 
                         return [
@@ -216,7 +225,7 @@ class CourseOnlineController extends Controller
                             'order_number' => $content->order_number,
                             'is_required' => $content->is_required,
                             'duration' => $content->duration,
-                            'is_unlocked' => $this->isContentUnlocked($content, $user->id),
+                            'is_unlocked' => $this->isContentUnlocked($content, $user->id, $module),
                             'progress' => $contentProgress,
                             'video' => $content->video ? [
                                 'id' => $content->video->id,
@@ -579,9 +588,23 @@ class CourseOnlineController extends Controller
         return $module->isUnlockedForUser($userId);
     }
 
-    private function isContentUnlocked(ModuleContent $content, int $userId): bool
+    /**
+     * Check if content is unlocked for user
+     * @param ModuleContent $content
+     * @param int $userId
+     * @param CourseModule|null $module Pass module to avoid lazy loading
+     */
+    private function isContentUnlocked(ModuleContent $content, int $userId, ?CourseModule $module = null): bool
     {
-        if (!$this->isModuleUnlocked($content->module, $userId)) {
+        // Use passed module or try to get from loaded relation
+        $contentModule = $module ?? ($content->relationLoaded('module') ? $content->module : null);
+        
+        if (!$contentModule) {
+            // Fallback: load the module (should be avoided)
+            $contentModule = $content->module;
+        }
+        
+        if (!$this->isModuleUnlocked($contentModule, $userId)) {
             return false;
         }
 
@@ -589,10 +612,10 @@ class CourseOnlineController extends Controller
             return true;
         }
 
-        $previousContent = $content->module->content()
-            ->where('order_number', '<', $content->order_number)
-            ->where('is_required', true)
-            ->get();
+        // Use loaded content from module if available
+        $previousContent = $contentModule->relationLoaded('content')
+            ? $contentModule->content->where('order_number', '<', $content->order_number)->where('is_required', true)
+            : $contentModule->content()->where('order_number', '<', $content->order_number)->where('is_required', true)->get();
 
         foreach ($previousContent as $prevContent) {
             if (!$this->isContentCompleted($prevContent, $userId)) {
@@ -605,16 +628,26 @@ class CourseOnlineController extends Controller
 
     private function getNextUnlockedContent(CourseOnline $courseOnline, int $userId)
     {
-        $modules = $courseOnline->modules()->orderBy('order_number')->get();
+        // ✅ FIXED N+1: Use already loaded modules if available, eager load content
+        if (!$courseOnline->relationLoaded('modules')) {
+            $courseOnline->load(['modules.content']);
+        }
+        
+        $modules = $courseOnline->modules->sortBy('order_number');
 
         foreach ($modules as $module) {
             if (!$this->isModuleUnlocked($module, $userId)) {
                 continue;
             }
 
-            $content = $module->content()->orderBy('order_number')->get();
+            // ✅ FIXED N+1: Use already loaded content
+            $content = $module->relationLoaded('content') 
+                ? $module->content->sortBy('order_number')
+                : $module->content()->orderBy('order_number')->get();
+                
             foreach ($content as $item) {
-                if ($this->isContentUnlocked($item, $userId) && !$this->isContentCompleted($item, $userId)) {
+                // Pass module to avoid lazy loading
+                if ($this->isContentUnlocked($item, $userId, $module) && !$this->isContentCompleted($item, $userId)) {
                     return $item;
                 }
             }
@@ -625,10 +658,14 @@ class CourseOnlineController extends Controller
 
     private function getCompletedModulesCount(int $courseId, int $userId): int
     {
-        $course = CourseOnline::find($courseId);
+        // ✅ FIXED N+1: Load modules once with required filter
+        $modules = CourseModule::where('course_online_id', $courseId)
+            ->where('is_required', true)
+            ->get();
+            
         $completedCount = 0;
 
-        foreach ($course->modules()->where('is_required', true)->get() as $module) {
+        foreach ($modules as $module) {
             if ($this->isModuleCompleted($module, $userId)) {
                 $completedCount++;
             }
