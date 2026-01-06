@@ -1165,12 +1165,12 @@ const onTimeUpdate = () => {
                            'seconds (', Math.round(progressPercentage.value, 1), '%)')
             }
             
-            // ✅ PRODUCTION-SAFE: Send heartbeat at key milestones (25%, 50%, 75%, 90%)
+            // ✅ OPTIMIZED: Send heartbeat only at 50% milestone (middle of video)
             const completion = Math.round(progressPercentage.value)
-            if (sessionId.value && [25, 50, 75, 90].includes(completion)) {
+            if (sessionId.value && completion === 50) {
                 const lastMilestone = parseInt(localStorage.getItem(`milestone_${props.content.id}`) || '0')
                 if (completion > lastMilestone) {
-                    console.log('🎯 Milestone reached:', completion + '% - sending heartbeat')
+                    console.log('🎯 Middle of video reached (50%) - sending heartbeat')
                     sendHeartbeat()
                     localStorage.setItem(`milestone_${props.content.id}`, completion.toString())
                 }
@@ -1221,8 +1221,8 @@ const onPause = () => {
 
         console.log('⏸️ Pause detected, total pauses:', totalPauseCount.value, 'Active playback time:', Math.floor(activePlaybackTime.value), 'seconds')
 
-        // ✅ PRODUCTION-SAFE: Send heartbeat on pause to save progress immediately
-        if (sessionId.value && activePlaybackTime.value > 0) {
+        // ✅ OPTIMIZED: Always send heartbeat on pause to save progress
+        if (sessionId.value) {
             console.log('💓 Sending heartbeat on pause to save progress')
             sendHeartbeat()
         }
@@ -1241,7 +1241,13 @@ const onEnded = async () => {
     // ✅ Task 6.2: Stop active playback tracking when video ends
     isActivelyPlaying.value = false
     
-    // Update progress first
+    // ✅ OPTIMIZED: Send heartbeat when video finishes
+    if (sessionId.value) {
+        console.log('💓 Sending heartbeat on video end to save final progress')
+        await sendHeartbeat()
+    }
+    
+    // Update progress
     await updateProgress()
     
     // ✅ FIXED: End session before marking as completed
@@ -1282,6 +1288,12 @@ const onVideoSeeked = () => {
         })
     }
     previousSeekPosition = currentPosition
+    
+    // ✅ OPTIMIZED: Send heartbeat on seek to save progress
+    if (sessionId.value) {
+        console.log('💓 Sending heartbeat on seek to save progress')
+        sendHeartbeat()
+    }
 }
 
 
@@ -1329,31 +1341,10 @@ onMounted(async () => {
         }
     }, 600000)  // ✅ CHANGED: 10 minutes (was 180000 = 3 minutes) - reduces API calls by 70%
 
-    // ✅ PRODUCTION-SAFE: Smart heartbeat strategy
-    // - Send heartbeat every 3 minutes (much less server load)
-    // - Only send if there's meaningful data to save
-    // - Rely on event-based updates for immediate data saving
-    let lastHeartbeatData = { activePlayback: 0, completion: 0 }
-    
-    const heartbeatInterval = setInterval(() => {
-        if (props.content.content_type === 'video' && sessionId.value && !isCompleted.value) {
-            // Only send heartbeat if there's meaningful change in data
-            const currentActivePlayback = Math.floor(activePlaybackTime.value)
-            const currentCompletion = Math.round(progressPercentage.value)
-            
-            const hasSignificantChange = 
-                Math.abs(currentActivePlayback - lastHeartbeatData.activePlayback) >= 10 || // 10+ seconds change
-                Math.abs(currentCompletion - lastHeartbeatData.completion) >= 5 // 5%+ completion change
-            
-            if (hasSignificantChange) {
-                console.log('💓 Heartbeat: Significant change detected, sending update')
-                sendHeartbeat()
-                lastHeartbeatData = { activePlayback: currentActivePlayback, completion: currentCompletion }
-            } else {
-                console.log('💓 Heartbeat: No significant change, skipping')
-            }
-        }
-    }, 180000)  // Send heartbeat every 3 minutes (production-safe)
+    // ✅ OPTIMIZED: Event-based heartbeat strategy only
+    // - NO automatic timed intervals to reduce server load
+    // - Heartbeat sent only on user interactions (pause, seek) and milestones (50%, 100%)
+    // - This prevents excessive API calls when 70+ users are watching simultaneously
 
     // ✅ NEW: Active playback time tracking interval (Task 6.2)
     // This is the ONLY timer we need - it tracks actual playback time
@@ -1464,7 +1455,6 @@ onMounted(async () => {
         // End session before unmounting
         endSession()
         clearInterval(progressInterval)
-        clearInterval(heartbeatInterval)  // ✅ Clear heartbeat interval
         clearInterval(activePlaybackInterval)  // ✅ Clear active playback interval (Task 6.2)
 
         // Cleanup video event listener
