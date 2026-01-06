@@ -113,6 +113,10 @@ const formattedDuration = computed(() => formatTime(duration.value))
 const canMarkComplete = computed(() => progress.value >= 95 || currentTime.value >= duration.value - 30)
 const progressBarValue = computed(() => Math.min(progress.value, 100))
 
+// ✅ COMPUTED SLIDER VALUES (arrays for proper reactivity)
+const progressSliderValue = computed(() => [currentTime.value])
+const volumeSliderValue = computed(() => [volume.value])
+
 // ✅ FORMAT CONTENT TIME LISTENED (like "1m listened")
 const formattedContentTimeListened = computed(() => {
     const totalSeconds = contentTimeListened.value
@@ -165,7 +169,8 @@ function seek(newTime: number) {
     audioRef.value.currentTime = newTime
     currentTime.value = newTime
 
-    // Debounce progress saving when seeking
+    // Debounce progress saving when seeking (event-based saving)
+    // Wait 1 second after user stops seeking to save
     if (progressSaveDebounceTimeout.value) {
         clearTimeout(progressSaveDebounceTimeout.value)
     }
@@ -205,6 +210,10 @@ function changePlaybackRate(rate: number) {
     if (!audioRef.value) return
     playbackRate.value = rate
     audioRef.value.playbackRate = rate
+    // Save progress when playback rate changes (event-based saving)
+    if (isPlaying.value) {
+        saveProgress()
+    }
 }
 
 // ✅ SAVE PROGRESS (keep total_listened_time for backend compatibility)
@@ -324,12 +333,16 @@ function onPlay() {
 
 function onPause() {
     isPlaying.value = false
+    // Save progress when user pauses (event-based saving)
     saveProgress()
 }
 
 function onEnded() {
     isPlaying.value = false
     currentTime.value = duration.value
+
+    // Save final progress before marking complete
+    saveProgress()
 
     // Auto-mark as completed if not already
     if (!props.user_progress.is_completed) {
@@ -394,12 +407,12 @@ onMounted(() => {
         audioRef.value.preload = 'metadata'
     }
 
-    // Auto-save progress every 10 seconds
+    // Auto-save progress every 60 seconds (reduced from 10s to prevent server overload)
     saveInterval.value = setInterval(() => {
         if (isPlaying.value) {
             saveProgress()
         }
-    }, 10000)
+    }, 600000) // 60 seconds instead of 10
 
     // Save progress on page unload
     const handleBeforeUnload = () => {
@@ -656,11 +669,11 @@ onMounted(() => {
                                 <span>{{ formattedDuration }}</span>
                             </div>
                             <Slider
-                                :value="[currentTime]"
+                                :model-value="progressSliderValue"
                                 :max="duration"
                                 :step="1"
-                                @update:modelValue="(value) => seek(value[0])"
-                                class="w-full"
+                                @update:model-value="(value) => seek(value[0])"
+                                class="w-full cursor-pointer audio-progress-slider"
                                 :disabled="!canPlay"
                             />
                             <div class="flex justify-between text-xs text-muted-foreground">
@@ -673,19 +686,19 @@ onMounted(() => {
                         <!-- Additional Controls -->
                         <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
                             <!-- Volume Control -->
-                            <div class="flex items-center gap-3">
-                                <Button @click="toggleMute" variant="ghost" size="sm">
+                            <div class="flex items-center gap-3 min-w-[200px]">
+                                <Button @click="toggleMute" variant="ghost" size="sm" class="shrink-0">
                                     <Volume2 v-if="!isMuted && volume > 0" class="h-4 w-4" />
                                     <VolumeX v-else class="h-4 w-4" />
                                 </Button>
                                 <Slider
-                                    :value="[volume]"
+                                    :model-value="volumeSliderValue"
                                     :max="1"
-                                    :step="0.1"
-                                    @update:modelValue="changeVolume"
-                                    class="w-24"
+                                    :step="0.01"
+                                    @update:model-value="changeVolume"
+                                    class="w-32 cursor-pointer audio-volume-slider"
                                 />
-                                <span class="text-xs text-muted-foreground min-w-[3ch]">
+                                <span class="text-xs text-muted-foreground min-w-[3ch] font-medium">
                                     {{ Math.round(volume * 100) }}%
                                 </span>
                             </div>
@@ -744,5 +757,63 @@ kbd {
     padding: 0.125rem 0.25rem;
     font-size: 0.75rem;
     font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
+}
+
+/* Enhanced Audio Progress Slider */
+:deep(.audio-progress-slider [data-slot="slider-track"]) {
+    height: 8px !important;
+    background-color: hsl(var(--muted));
+    border-radius: 9999px;
+}
+
+:deep(.audio-progress-slider [data-slot="slider-range"]) {
+    background: linear-gradient(90deg, hsl(var(--primary)) 0%, hsl(var(--primary) / 0.8) 100%);
+    height: 100%;
+    border-radius: 9999px;
+}
+
+:deep(.audio-progress-slider [data-slot="slider-thumb"]) {
+    width: 16px;
+    height: 16px;
+    background-color: hsl(var(--background));
+    border: 2px solid hsl(var(--primary));
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
+}
+
+:deep(.audio-progress-slider [data-slot="slider-thumb"]:hover) {
+    transform: scale(1.2);
+    box-shadow: 0 0 0 6px hsl(var(--primary) / 0.2);
+}
+
+:deep(.audio-progress-slider [data-slot="slider-thumb"]:active) {
+    transform: scale(1.3);
+}
+
+/* Enhanced Volume Slider */
+:deep(.audio-volume-slider [data-slot="slider-track"]) {
+    height: 6px !important;
+    background-color: hsl(var(--muted));
+    border-radius: 9999px;
+}
+
+:deep(.audio-volume-slider [data-slot="slider-range"]) {
+    background: linear-gradient(90deg, hsl(var(--primary)) 0%, hsl(var(--primary) / 0.7) 100%);
+    height: 100%;
+    border-radius: 9999px;
+}
+
+:deep(.audio-volume-slider [data-slot="slider-thumb"]) {
+    width: 14px;
+    height: 14px;
+    background-color: hsl(var(--background));
+    border: 2px solid hsl(var(--primary));
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
+}
+
+:deep(.audio-volume-slider [data-slot="slider-thumb"]:hover) {
+    transform: scale(1.15);
+    box-shadow: 0 0 0 4px hsl(var(--primary) / 0.15);
 }
 </style>

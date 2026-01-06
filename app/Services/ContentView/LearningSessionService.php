@@ -5,6 +5,7 @@ namespace App\Services\ContentView;
 use App\Models\User;
 use App\Models\ModuleContent;
 use App\Models\LearningSession;
+use App\Models\CourseModule;
 use Carbon\Carbon;
 
 class LearningSessionService
@@ -14,6 +15,14 @@ class LearningSessionService
     public function __construct(ContentProgressService $progressService)
     {
         $this->progressService = $progressService;
+    }
+    
+    /**
+     * Get the module for content, safely handling lazy loading
+     */
+    private function getContentModule(ModuleContent $content): CourseModule
+    {
+        return $content->relationLoaded('module') ? $content->module : $content->load('module')->module;
     }
 
     /**
@@ -26,9 +35,12 @@ class LearningSessionService
     float $position = 0,
     ?int $apiKeyId = null
 ): LearningSession {
+    // Get module safely to avoid lazy loading
+    $module = $this->getContentModule($content);
+    
     // ✅ NEW: Check if course is already completed
     $assignment = \App\Models\CourseOnlineAssignment::where('user_id', $user->id)
-        ->where('course_online_id', $content->module->course_online_id)
+        ->where('course_online_id', $module->course_online_id)
         ->first();
     
     if ($assignment && $assignment->status === 'completed') {
@@ -77,7 +89,7 @@ class LearningSessionService
     // Create new session
     $session = LearningSession::create([
         'user_id' => $user->id,
-        'course_online_id' => $content->module->course_online_id,
+        'course_online_id' => $module->course_online_id,
         'content_id' => $content->id,
         'api_key_id' => $apiKeyId,
         'session_start' => now(),

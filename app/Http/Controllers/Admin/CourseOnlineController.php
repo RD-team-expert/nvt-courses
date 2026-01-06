@@ -68,7 +68,7 @@ class CourseOnlineController extends Controller
     }
 
     /**
-     * ✅ FIXED: Calculate completion rate for a course using average progress
+     * ✅ FIXED N+1: Calculate completion rate for a course using loaded assignments
      */
     private function calculateCourseCompletionRate($course)
     {
@@ -76,8 +76,12 @@ class CourseOnlineController extends Controller
             return 0;
         }
 
-        // ✅ FIXED: Use average progress percentage instead of only counting completed
-        $averageProgress = $course->assignments()->avg('progress_percentage') ?? 0;
+        // ✅ FIXED N+1: Use loaded assignments instead of query builder
+        if ($course->relationLoaded('assignments')) {
+            $averageProgress = $course->assignments->avg('progress_percentage') ?? 0;
+        } else {
+            $averageProgress = $course->assignments()->avg('progress_percentage') ?? 0;
+        }
 
         return round($averageProgress, 2);
     }

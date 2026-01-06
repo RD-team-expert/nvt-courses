@@ -289,10 +289,12 @@ class ContentViewController extends Controller
             // Mark as completed via service
             $completed = $this->progressService->markAsCompleted($progress);
 
+            // Get module safely to avoid lazy loading
+            $module = $content->relationLoaded('module') ? $content->module : $content->load('module')->module;
 
             // Calculate course progress
             $courseProgress = $this->progressService->calculateCourseProgress(
-                $content->module->course_online_id,
+                $module->course_online_id,
                 $user->id
             );
 

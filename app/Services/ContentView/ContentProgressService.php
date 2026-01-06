@@ -6,11 +6,20 @@ use App\Models\User;
 use App\Models\ModuleContent;
 use App\Models\UserContentProgress;
 use App\Models\CourseOnlineAssignment;
+use App\Models\CourseModule;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 
 class ContentProgressService
 {
+    /**
+     * Get the module for content, safely handling lazy loading
+     */
+    private function getContentModule(ModuleContent $content): CourseModule
+    {
+        return $content->relationLoaded('module') ? $content->module : $content->load('module')->module;
+    }
+    
     /**
      * Get or create progress record for user and content
      * This is the main entry point for progress tracking
@@ -26,6 +35,9 @@ class ContentProgressService
             if ($progress) {
                 return $progress;
             }
+            
+            // Get module safely to avoid lazy loading
+            $module = $this->getContentModule($content);
 
             // If not found, acquire lock to ensure uniqueness
             // We lock the user row or use a mutex if available, but for now, we'll use atomic creation
@@ -37,11 +49,12 @@ class ContentProgressService
                     'content_id' => $content->id,
                 ],
                 [
-                    'course_online_id' => $content->module->course_online_id,
+                    'course_online_id' => $module->course_online_id,
                     'module_id' => $content->module_id,
                     'video_id' => $content->video_id,
                     'content_type' => $content->content_type,
                     'watch_time' => 0,
+                    'playback_position' => 0, // ✅ Explicitly set to 0
                     'completion_percentage' => 0,
                     'is_completed' => false,
                     'task_completed' => false,
@@ -81,8 +94,9 @@ class ContentProgressService
         }
 
         // Update progress
+        // ✅ CRITICAL: Always ensure playback_position is numeric, never null
         $progress->update([
-            'playback_position' => $currentPosition,
+            'playback_position' => (float) ($currentPosition ?? 0), // ✅ Cast to float, ensure never null
             'completion_percentage' => min(100, max(0, $completionPercentage)),
             'watch_time' => $adjustedWatchTime ?? $progress->watch_time,
             'is_completed' => $completionPercentage >= 100,
@@ -104,14 +118,17 @@ class ContentProgressService
         $finalPosition = 0;
         $content = $progress->content;
 
-        if ($content->content_type === 'pdf' && $content->pdf_page_count) {
-            $finalPosition = $content->pdf_page_count; // Last page
-        } elseif ($content->content_type === 'video' && $content->video) {
-            $finalPosition = $content->video->duration; // End of video
+        if ($content) {
+            if ($content->content_type === 'pdf' && $content->pdf_page_count) {
+                $finalPosition = $content->pdf_page_count; // Last page
+            } elseif ($content->content_type === 'video' && $content->video) {
+                $finalPosition = $content->video->duration ?? 0; // ✅ Ensure video duration is never null
+            }
         }
 
+        // ✅ CRITICAL: Always ensure playback_position is numeric, never null
         $progress->update([
-            'playback_position' => $finalPosition,
+            'playback_position' => (float) ($finalPosition ?? 0), // ✅ Cast to float, ensure never null
             'completion_percentage' => 100,
             'is_completed' => true,
             'completed_at' => now(),

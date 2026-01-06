@@ -147,6 +147,31 @@ const safeAnalytics = computed(() => props.analytics || {
     top_categories: []
 })
 
+// Pagination range calculation - shows pages around current page
+const paginationRange = computed(() => {
+    const current = safeHistory.value.current_page
+    const last = safeHistory.value.last_page
+    const delta = 2 // Number of pages to show on each side of current page
+    const range: number[] = []
+    
+    let start = Math.max(1, current - delta)
+    let end = Math.min(last, current + delta)
+    
+    // Adjust if we're near the beginning or end
+    if (current <= delta + 1) {
+        end = Math.min(last, delta * 2 + 1)
+    }
+    if (current >= last - delta) {
+        start = Math.max(1, last - delta * 2)
+    }
+    
+    for (let i = start; i <= end; i++) {
+        range.push(i)
+    }
+    
+    return range
+})
+
 // Group history by evaluation
 const groupedHistory = computed(() => {
     const groups: { [key: number]: any } = {}
@@ -690,7 +715,23 @@ const activeFilterCount = computed(() => {
                             </div>
 
                             <div class="flex items-center space-x-1">
-                                <template v-for="page in Math.min(5, safeHistory.last_page)" :key="page">
+                                <!-- First page -->
+                                <Button
+                                    v-if="paginationRange[0] > 1"
+                                    asChild
+                                    variant="outline"
+                                    size="sm"
+                                >
+                                    <Link :href="route('admin.evaluations.history', { ...filterForm.data, page: 1 })">
+                                        1
+                                    </Link>
+                                </Button>
+                                
+                                <!-- Ellipsis before -->
+                                <span v-if="paginationRange[0] > 2" class="px-2 text-muted-foreground">...</span>
+                                
+                                <!-- Page numbers -->
+                                <template v-for="page in paginationRange" :key="page">
                                     <Button
                                         asChild
                                         :variant="page === safeHistory.current_page ? 'default' : 'outline'"
@@ -701,6 +742,21 @@ const activeFilterCount = computed(() => {
                                         </Link>
                                     </Button>
                                 </template>
+                                
+                                <!-- Ellipsis after -->
+                                <span v-if="paginationRange[paginationRange.length - 1] < safeHistory.last_page - 1" class="px-2 text-muted-foreground">...</span>
+                                
+                                <!-- Last page -->
+                                <Button
+                                    v-if="paginationRange[paginationRange.length - 1] < safeHistory.last_page"
+                                    asChild
+                                    variant="outline"
+                                    size="sm"
+                                >
+                                    <Link :href="route('admin.evaluations.history', { ...filterForm.data, page: safeHistory.last_page })">
+                                        {{ safeHistory.last_page }}
+                                    </Link>
+                                </Button>
                             </div>
 
                             <div class="flex items-center space-x-2">

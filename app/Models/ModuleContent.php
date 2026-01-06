@@ -129,6 +129,7 @@ class ModuleContent extends Model
                 'module_id' => $this->module_id,
                 'content_type' => $this->content_type,
                 'video_id' => $this->video_id,
+                'playback_position' => $data['playback_position'] ?? 0, // ✅ Ensure never null
                 'completion_percentage' => $data['completion_percentage'] ?? 0,
                 'is_completed' => $data['is_completed'] ?? false,
                 'last_accessed_at' => now(),

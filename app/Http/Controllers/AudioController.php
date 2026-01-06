@@ -137,9 +137,12 @@ class AudioController extends Controller
             $streamingUrl = route('audio.stream', $audio->id);
         } else {
             // For Google Drive, process the URL
-            $streamingUrl = $this->googleDriveService->processUrl($audio->google_cloud_url);
+            $processedUrl = $this->googleDriveService->processUrl($audio->google_cloud_url);
             
-            if (!$streamingUrl) {
+            if ($processedUrl && isset($processedUrl['streaming_url'])) {
+                // Use the processed streaming URL
+                $streamingUrl = $processedUrl['streaming_url'];
+            } else {
                 // Fallback to original URL if processing fails
                 $streamingUrl = $audio->google_cloud_url;
             }

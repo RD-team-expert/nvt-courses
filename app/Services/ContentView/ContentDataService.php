@@ -5,16 +5,32 @@ namespace App\Services\ContentView;
 use App\Models\ModuleContent;
 use App\Models\UserContentProgress;
 use App\Models\Video;
+use App\Models\CourseModule;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 
 class ContentDataService
 {
     /**
+     * Get the module for content, safely handling lazy loading
+     */
+    private function getContentModule(ModuleContent $content): CourseModule
+    {
+        return $content->relationLoaded('module') ? $content->module : $content->load('module')->module;
+    }
+    
+    /**
      * Prepare complete content data for Inertia response
      */
     public function prepareContentData(ModuleContent $content): array
     {
+        $module = $this->getContentModule($content);
+        
+        // Ensure courseOnline is loaded on the module
+        if (!$module->relationLoaded('courseOnline')) {
+            $module->load('courseOnline');
+        }
+        
         return [
             'id' => $content->id,
             'title' => $content->title,
@@ -25,18 +41,18 @@ class ContentDataService
             'duration' => $content->duration,
             'pdf_page_count' => $content->pdf_page_count,
 
-            // ✅ FIXED: Complete module data
+            // ✅ FIXED: Complete module data - using loaded module
             'module' => [
-                'id' => $content->module->id,
-                'title' => $content->module->title,  // ✅ Added title
-                'name' => $content->module->name,
-                'course_id' => $content->module->course_online_id,
+                'id' => $module->id,
+                'title' => $module->title,  // ✅ Added title
+                'name' => $module->name,
+                'course_id' => $module->course_online_id,
 
                 // ✅ FIXED: Add complete course data
                 'course' => [
-                    'id' => $content->module->courseOnline->id ?? 0,
-                    'title' => $content->module->courseOnline->title ?? 'Unknown Course',
-                    'name' => $content->module->courseOnline->name ?? 'Unknown Course',
+                    'id' => $module->courseOnline->id ?? 0,
+                    'title' => $module->courseOnline->title ?? 'Unknown Course',
+                    'name' => $module->courseOnline->name ?? 'Unknown Course',
                 ],
             ],
         ];
@@ -161,6 +177,12 @@ class ContentDataService
     $contentData = $this->prepareContentData($content);
     $progressData = $this->prepareProgressData($progress);
     $navigationData = $navigation;
+    
+    // Get module safely
+    $module = $this->getContentModule($content);
+    if (!$module->relationLoaded('courseOnline')) {
+        $module->load('courseOnline');
+    }
 
     $response = [
         'content' => $contentData,
@@ -170,16 +192,16 @@ class ContentDataService
 
         // ✅ ADD THIS: Send course data separately for easier access
         'course' => [
-            'id' => $content->module->courseOnline->id ?? 0,
-            'name' => $content->module->courseOnline->name ?? 'Unknown Course',
-            'title' => $content->module->courseOnline->title ?? 'Unknown Course',
+            'id' => $module->courseOnline->id ?? 0,
+            'name' => $module->courseOnline->name ?? 'Unknown Course',
+            'title' => $module->courseOnline->title ?? 'Unknown Course',
         ],
 
         // ✅ ADD THIS: Send module data separately
         'module' => [
-            'id' => $content->module->id ?? 0,
-            'name' => $content->module->name ?? 'Unknown Module',
-            'title' => $content->module->title ?? 'Unknown Module',
+            'id' => $module->id ?? 0,
+            'name' => $module->name ?? 'Unknown Module',
+            'title' => $module->title ?? 'Unknown Module',
         ],
     ];
 

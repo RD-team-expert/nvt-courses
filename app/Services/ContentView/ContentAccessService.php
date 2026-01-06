@@ -16,8 +16,21 @@ class ContentAccessService
      */
     public function checkAccess(User $user, ModuleContent $content): ?CourseOnlineAssignment
     {
+        // Get course_online_id safely to avoid lazy loading
+        if ($content->relationLoaded('module')) {
+            $courseOnlineId = $content->module->course_online_id;
+        } else {
+            // Load the module to get course_online_id
+            $content->load('module');
+            $courseOnlineId = $content->module->course_online_id ?? null;
+        }
+        
+        if (!$courseOnlineId) {
+            return null;
+        }
+        
         // Check if user has assignment for this course
-        $assignment = CourseOnlineAssignment::where('course_online_id', $content->module->course_online_id)
+        $assignment = CourseOnlineAssignment::where('course_online_id', $courseOnlineId)
             ->where('user_id', $user->id)
             ->first();
 

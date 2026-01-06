@@ -129,14 +129,25 @@ class Department extends Model
 
     /**
      * Get full department hierarchy path
+     * Uses only pre-loaded parent relationships to avoid lazy loading
      */
     public function getHierarchyPath(): string
     {
         $path = [$this->name];
+        
+        // Only traverse if parent is already loaded (avoid lazy loading)
+        if (!$this->relationLoaded('parent')) {
+            return $this->name;
+        }
+        
         $parent = $this->parent;
 
         while ($parent) {
             array_unshift($path, $parent->name);
+            // Check if the next parent is loaded before traversing
+            if (!$parent->relationLoaded('parent')) {
+                break;
+            }
             $parent = $parent->parent;
         }
 
@@ -145,14 +156,24 @@ class Department extends Model
 
     /**
      * Check if department is a child of another department
+     * Uses only pre-loaded parent relationships to avoid lazy loading
      */
     public function isChildOf(Department $department): bool
     {
+        // Requires parent to be loaded
+        if (!$this->relationLoaded('parent')) {
+            return false;
+        }
+        
         $parent = $this->parent;
 
         while ($parent) {
             if ($parent->id === $department->id) {
                 return true;
+            }
+            // Check if the next parent is loaded before traversing
+            if (!$parent->relationLoaded('parent')) {
+                break;
             }
             $parent = $parent->parent;
         }
