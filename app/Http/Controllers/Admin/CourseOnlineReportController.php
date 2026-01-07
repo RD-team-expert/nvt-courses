@@ -224,6 +224,13 @@ class CourseOnlineReportController extends Controller
             if (!empty($filters['department_id'])) {
                 $query->where('users.department_id', $filters['department_id']);
             }
+            // Apply suspicious-only filter at query-level for correct pagination
+            if (!empty($filters['suspicious_only'])) {
+                $val = $filters['suspicious_only'];
+                if ($val === '1' || $val === 1 || $val === true || $val === 'true') {
+                    $query->where('learning_sessions.is_suspicious_activity', 1);
+                }
+            }
 
             $sessions = $query->select([
                 'learning_sessions.id',
@@ -307,9 +314,10 @@ class CourseOnlineReportController extends Controller
                     'allowed_time_formatted' => $this->formatDuration($allowedTimeMinutes),
                     // Existing fields
                     'stored_attention' => $session->attention_score ?? 0,
-                    'simulated_attention' => $simulatedAttention,
-                    'attention_score' => $simulatedAttention,
-                    'engagement_level' => $this->calculateEngagementLevel($simulatedAttention),
+                        'simulated_attention' => $simulatedAttention,
+                        // Prefer stored attention_score when present (calculated at session end). Fall back to simulated.
+                        'attention_score' => ($session->attention_score ?? 0) > 0 ? $session->attention_score : $simulatedAttention,
+                        'engagement_level' => $this->calculateEngagementLevel((($session->attention_score ?? 0) > 0) ? $session->attention_score : $simulatedAttention),
                     'is_suspicious' => $isSuspicious,
                     'session_status' => $session->session_end ? 'Completed' : 'Active',
                     'performance_rating' => $this->calculateSessionPerformance($calculatedDuration, $simulatedAttention, $isSuspicious),
@@ -317,12 +325,7 @@ class CourseOnlineReportController extends Controller
                 ];
             });
 
-            // Apply suspicious filter after transformation if needed
-            if (!empty($filters['suspicious_only']) && $filters['suspicious_only'] === '1') {
-                $sessions->getCollection()->filter(function ($session) {
-                    return $session['is_suspicious'] === true;
-                });
-            }
+            // (No post-paginate collection filter needed; handled at query-level above)
 
             $courses = CourseOnline::where('is_active', true)->select('id', 'name')->orderBy('name')->get();
             $users = User::where('role', '!=', 'admin')->select('id', 'name', 'email')->orderBy('name')->get();
@@ -856,7 +859,7 @@ class CourseOnlineReportController extends Controller
                 'stored_attention' => $session->attention_score ?? 0,
                 'simulated_attention' => $simulatedAttention,
                 'is_suspicious' => $isSuspicious,
-                'engagement_level' => $this->calculateEngagementLevel($simulatedAttention),
+                'engagement_level' => $this->calculateEngagementLevel((($session->attention_score ?? 0) > 0) ? $session->attention_score : $simulatedAttention),
                 'score_details' => $attentionResult['details'] ?? [],
             ];
         }
@@ -1105,6 +1108,8 @@ class CourseOnlineReportController extends Controller
                 'suspicious_sessions' => $suspiciousCount,
                 'stored_average_duration' => round(LearningSession::avg('total_duration_minutes') ?? 0, 1),
                 'real_average_duration' => round($avgRealDuration, 1),
+                // Backwards-compatible key expected by frontend
+                'average_session_duration' => round($avgRealDuration, 1),
                 'total_real_learning_hours' => round($totalRealMinutes / 60, 1),
                 'stored_average_attention' => 0,
                 'simulated_average_attention' => round($avgSimulatedAttention, 1),
