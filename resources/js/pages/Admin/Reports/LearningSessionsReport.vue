@@ -65,8 +65,35 @@ const props = defineProps({
     stats: Object,
 })
 
-// Computed value for checking if pagination is needed
-const lastPage = computed(() => props.sessions?.meta?.last_page || 1)
+// Computed value for checking if pagination is needed (robustly handle different payload shapes)
+const lastPage = computed(() => {
+    const meta = props.sessions?.meta || {}
+
+    if (meta.last_page != null) return meta.last_page
+    if (meta.lastPage != null) return meta.lastPage
+    if (meta.total != null && meta.per_page) return Math.ceil(meta.total / meta.per_page)
+
+    // Fallback: attempt to parse page numbers from links (if available)
+    try {
+        const links = props.sessions?.links || []
+        const pages = links
+            .map(l => {
+                if (!l || !l.url) return null
+                try {
+                    const u = new URL(l.url, typeof window !== 'undefined' ? window.location.origin : 'http://localhost')
+                    const p = u.searchParams.get('page')
+                    return p ? Number(p) : null
+                } catch (_) {
+                    return null
+                }
+            })
+            .filter(Boolean)
+
+        return pages.length ? Math.max(...pages) : 1
+    } catch (e) {
+        return 1
+    }
+})
 
 // Define breadcrumbs
 const breadcrumbs: BreadcrumbItemType[] = [
@@ -613,14 +640,14 @@ if (typeof window !== 'undefined') {
                 </div>
 
                 <!-- Pagination -->
-                <div v-if="users.data && users.data.length > 0 && users.last_page > 1" class="px-4 sm:px-6 py-3 border-t border-gray-200">
+                <div v-if="sessions?.data?.length > 0 && (lastPage > 1 || (sessions?.links && sessions.links.length > 0))" class="px-4 sm:px-6 py-3 border-t border-gray-200">
                     <div class="flex items-center justify-between">
                         <div class="text-sm text-muted-foreground">
-                            Showing {{ users.from }} to {{ users.to }} of {{ users.total }} results
+                            Showing {{ sessions?.meta?.from || 1 }} to {{ sessions?.meta?.to || sessions.data.length }} of {{ sessions?.meta?.total || sessions.data.length }} results
                         </div>
                         <div class="flex space-x-2">
-                            <a v-for="link in users.links"
-                               :key="link.label"
+                            <a v-for="(link, index) in sessions?.links || []"
+                               :key="link.url || link.label || index"
                                :href="link.url"
                                :class="{
            'bg-primary text-primary-foreground': link.active,
