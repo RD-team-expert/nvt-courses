@@ -132,8 +132,10 @@ class CourseOnlineController extends Controller
             'total_minutes_spent' => (int) $totalMinutes,  // ✅ Ensure integer
             'average_completion_rate' => $assignments->avg('progress_percentage') ?? 0,
             'certificates_earned' => $assignments->where('status', 'completed')->count(),
-            // ✅ NEW: Add deadline-related stats
-            'overdue_courses' => $assignments->where('deadline_info.status', 'overdue')->count(),
+            // ✅ FIXED: Add deadline-related stats using filter() for nested array access
+            'overdue_courses' => $assignments->filter(function($a) {
+                return $a['deadline_info']['status'] === 'overdue';
+            })->count(),
             'due_soon_courses' => $assignments->filter(function($a) {
                 return in_array($a['deadline_info']['status'], ['due_today', 'due_tomorrow', 'due_soon']);
             })->count(),
@@ -298,6 +300,19 @@ class CourseOnlineController extends Controller
     // ✅ FIXED: Calculate deadline information for assignments
     private function calculateDeadlineInfo($assignment): array
     {
+        // ✅ FIX: If assignment is completed, never show as overdue
+        if ($assignment->status === 'completed') {
+            return [
+                'status' => 'no_deadline',
+                'message' => 'Course completed',
+                'days_remaining' => null,
+                'urgency_level' => 'none',
+                'formatted_deadline' => null,
+                'is_overdue' => false,
+                'time_remaining' => 'Completed',
+            ];
+        }
+        
         if (!$assignment->deadline) {
             return [
                 'status' => 'no_deadline',
@@ -305,6 +320,8 @@ class CourseOnlineController extends Controller
                 'days_remaining' => null,
                 'urgency_level' => 'none',
                 'formatted_deadline' => null,
+                'is_overdue' => false,
+                'time_remaining' => 'No deadline',
             ];
         }
 

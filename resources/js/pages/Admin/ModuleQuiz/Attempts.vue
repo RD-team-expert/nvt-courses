@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3'
+import { Head, Link, router } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import type { BreadcrumbItem } from '@/types'
+import { ref } from 'vue'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -15,7 +16,7 @@ import {
     TableRow,
 } from '@/components/ui/table'
 
-import { ArrowLeft, CheckCircle, XCircle, Users, Target, BarChart3 } from 'lucide-vue-next'
+import { ArrowLeft, CheckCircle, XCircle, Users, Target, BarChart3, RotateCcw } from 'lucide-vue-next'
 
 interface User {
     id: number
@@ -82,6 +83,35 @@ const stats = {
     avgScore: props.attempts.data.length > 0 
         ? (props.attempts.data.reduce((sum, a) => sum + a.score_percentage, 0) / props.attempts.data.length).toFixed(1)
         : 0
+}
+
+const resettingUserId = ref<number | null>(null)
+
+const resetUserAttempts = (userId: number, userName: string) => {
+    if (!confirm(`Are you sure you want to reset ALL quiz attempts for ${userName}?\n\nThis will:\n- Delete all their attempts\n- Delete all their answers\n- Allow them to retake the quiz from scratch\n\nThis action cannot be undone!`)) {
+        return
+    }
+
+    resettingUserId.value = userId
+
+    router.post(
+        route('admin.module-quiz.reset-attempts', {
+            courseOnline: props.course.id,
+            courseModule: props.module.id,
+            quiz: props.quiz.id
+        }),
+        { user_id: userId },
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                resettingUserId.value = null
+            },
+            onError: () => {
+                resettingUserId.value = null
+                alert('Failed to reset attempts. Please try again.')
+            }
+        }
+    )
 }
 </script>
 
@@ -197,16 +227,27 @@ const stats = {
                                     {{ attempt.completed_at || 'In Progress' }}
                                 </TableCell>
                                 <TableCell>
-                                    <Button as-child variant="outline" size="sm">
-                                        <Link :href="route('admin.module-quiz.attempts.show', { 
-                                            courseOnline: course.id, 
-                                            courseModule: module.id, 
-                                            quiz: quiz.id,
-                                            attempt: attempt.id 
-                                        })">
-                                            View Answers
-                                        </Link>
-                                    </Button>
+                                    <div class="flex gap-2">
+                                        <Button as-child variant="outline" size="sm">
+                                            <Link :href="route('admin.module-quiz.attempts.show', { 
+                                                courseOnline: course.id, 
+                                                courseModule: module.id, 
+                                                quiz: quiz.id,
+                                                attempt: attempt.id 
+                                            })">
+                                                View Answers
+                                            </Link>
+                                        </Button>
+                                        <Button 
+                                            variant="destructive" 
+                                            size="sm"
+                                            @click="resetUserAttempts(attempt.user.id, attempt.user.name)"
+                                            :disabled="resettingUserId === attempt.user.id"
+                                        >
+                                            <RotateCcw class="h-4 w-4 mr-1" />
+                                            {{ resettingUserId === attempt.user.id ? 'Resetting...' : 'Reset Attempts' }}
+                                        </Button>
+                                    </div>
                                 </TableCell>
                             </TableRow>
                         </TableBody>

@@ -242,7 +242,7 @@
         @endif
 
         <div class="data-section">
-            <h2>Team Member Evaluation Summary</h2>
+            <h2>Team Member Evaluation Summary - {{ $reportMonth ?? now()->format('F Y') }}</h2>
 
             <table>
                 <thead>
@@ -256,42 +256,50 @@
                 </tr>
                 </thead>
                 <tbody>
-                @foreach($employees as $employee)
-                    @foreach($employee->evaluations as $evaluation)
-                        <tr>
-                            <td><strong>{{ $employee->name }}</strong></td>
-                            <td>{{ $employee->department?->name ?? 'N/A' }}</td>
-                            <td>{{ $evaluation->course?->name ?? 'N/A' }}</td>
-                            <td class="score-highlight">{{ $evaluation->total_score }}</td>
-                            <td>
-                                @php
-                                    $score = $evaluation->total_score;
-                                    $performanceClass = '';
-                                    $performanceLabel = '';
-                                    
-                                    if ($score >= 13) {
-                                        $performanceClass = 'outstanding-badge';
-                                        $performanceLabel = 'Outstanding';
-                                    } elseif ($score >= 10) {
-                                        $performanceClass = 'reliable-badge';
-                                        $performanceLabel = 'Reliable';
-                                    } elseif ($score >= 7) {
-                                        $performanceClass = 'developing-badge';
-                                        $performanceLabel = 'Developing';
-                                    } elseif ($score >= 0) {
-                                        $performanceClass = 'underperforming-badge';
-                                        $performanceLabel = 'Underperforming';
-                                    } else {
+                @if(isset($detailedEvaluations) && !empty($detailedEvaluations))
+                    @foreach($detailedEvaluations as $employeeData)
+                        @foreach($employeeData['evaluations'] as $evaluation)
+                            <tr>
+                                <td><strong>{{ $employeeData['employee']['name'] }}</strong></td>
+                                <td>{{ $employeeData['employee']['department'] }}</td>
+                                <td>{{ $evaluation['course'] }}</td>
+                                <td class="score-highlight">{{ $evaluation['total_score'] }}</td>
+                                <td>
+                                    @php
+                                        $score = $evaluation['total_score'];
                                         $performanceClass = '';
-                                        $performanceLabel = 'Not Rated';
-                                    }
-                                @endphp
-                                <span class="performance-badge {{ $performanceClass }}">{{ $performanceLabel }}</span>
-                            </td>
-                            <td>{{ $evaluation->created_at->format('M d, Y') }}</td>
-                        </tr>
+                                        $performanceLabel = '';
+                                        
+                                        if ($score >= 13) {
+                                            $performanceClass = 'outstanding-badge';
+                                            $performanceLabel = 'Outstanding';
+                                        } elseif ($score >= 10) {
+                                            $performanceClass = 'reliable-badge';
+                                            $performanceLabel = 'Reliable';
+                                        } elseif ($score >= 7) {
+                                            $performanceClass = 'developing-badge';
+                                            $performanceLabel = 'Developing';
+                                        } elseif ($score >= 0) {
+                                            $performanceClass = 'underperforming-badge';
+                                            $performanceLabel = 'Underperforming';
+                                        } else {
+                                            $performanceClass = '';
+                                            $performanceLabel = 'Not Rated';
+                                        }
+                                    @endphp
+                                    <span class="performance-badge {{ $performanceClass }}">{{ $performanceLabel }}</span>
+                                </td>
+                                <td>{{ $evaluation['created_at'] }}</td>
+                            </tr>
+                        @endforeach
                     @endforeach
-                @endforeach
+                @else
+                    <tr>
+                        <td colspan="6" style="text-align: center; padding: 20px; color: #666;">
+                            No evaluations found for courses assigned in {{ $reportMonth ?? now()->format('F Y') }}
+                        </td>
+                    </tr>
+                @endif
                 </tbody>
             </table>
         </div>
@@ -312,12 +320,12 @@
                             <div><strong>Email:</strong> {{ $employeeData['employee']['email'] }}</div>
                         </div>
 
-                        {{-- ✅ NEW: Overall Performance Summary --}}
+                        {{-- ✅ Overall Performance Summary --}}
                         <div class="overall-summary">
                             <h4>📊 Overall Performance Summary</h4>
                             <div class="stats-grid">
                                 <div class="stat-card">
-                                    <div class="stat-value">{{ $employeeData['overall_average'] }}%</div>
+                                    <div class="stat-value">{{ $employeeData['overall_average'] }}</div>
                                     <div class="stat-label">Overall Average Score</div>
                                 </div>
                                 <div class="stat-card">
@@ -325,7 +333,7 @@
                                     <div class="stat-label">Total Courses</div>
                                 </div>
                                 <div class="stat-card">
-                                    <div class="stat-value">{{ $employeeData['total_scores_count'] }}</div>
+                                    <div class="stat-value">{{ $employeeData['total_evaluations'] }}</div>
                                     <div class="stat-label">Total Evaluations</div>
                                 </div>
                             </div>

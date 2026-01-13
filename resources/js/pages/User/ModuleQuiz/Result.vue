@@ -71,6 +71,7 @@ interface NextModule {
     id: number
     name: string
     is_unlocked: boolean
+    first_content_id?: number | null
 }
 
 const props = defineProps<{
@@ -165,7 +166,10 @@ const retryQuiz = () => {
                     as-child
                     class="flex-1 w-full sm:w-auto"
                 >
-                    <Link :href="`/courses-online/${course.id}`" class="flex items-center justify-center">
+                    <Link 
+                        :href="nextModule.first_content_id ? `/content/${nextModule.first_content_id}` : `/courses-online/${course.id}`" 
+                        class="flex items-center justify-center"
+                    >
                         <span class="truncate">Continue to {{ nextModule.name }}</span>
                         <ArrowRight class="h-4 w-4 ml-2 flex-shrink-0" />
                     </Link>
