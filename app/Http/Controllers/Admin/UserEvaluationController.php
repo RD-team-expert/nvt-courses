@@ -8,6 +8,7 @@ use App\Models\EvaluationConfig;
 use App\Models\EvaluationType;
 use App\Models\User;
 use App\Models\Course;
+use App\Models\CourseAssignment;
 use App\Models\Department;
 use App\Models\Incentive;
 use App\Models\EvaluationHistory;
@@ -27,22 +28,30 @@ class UserEvaluationController extends Controller
                 ->select(['id', 'name', 'email', 'department_id', 'user_level_id', 'user_level_tier_id'])
                 ->get()
                 ->map(function ($user) {
-                    // Get actual completed courses for this user
-                    $completedCourses = [];
+                    // Get assigned courses for this user (not just completed)
+                    $assignedCourses = [];
 
                     try {
-                        $registrations = DB::table('course_registrations')
-                            ->join('courses', 'course_registrations.course_id', '=', 'courses.id')
-                            ->where('course_registrations.user_id', $user->id)
-                            ->whereNotNull('course_registrations.completed_at')
-                            ->select('courses.id', 'courses.name', 'course_registrations.completed_at')
+                        $assignments = DB::table('course_assignments')
+                            ->join('courses', 'course_assignments.course_id', '=', 'courses.id')
+                            ->where('course_assignments.user_id', $user->id)
+                            ->select(
+                                'courses.id', 
+                                'courses.name', 
+                                'course_assignments.assigned_at',
+                                'course_assignments.completed_at',
+                                'course_assignments.status'
+                            )
+                            ->orderBy('course_assignments.assigned_at', 'desc')
                             ->get();
 
-                        foreach ($registrations as $registration) {
-                            $completedCourses[] = [
-                                'id' => $registration->id,
-                                'title' => $registration->name,
-                                'completed_at' => $registration->completed_at,
+                        foreach ($assignments as $assignment) {
+                            $assignedCourses[] = [
+                                'id' => $assignment->id,
+                                'title' => $assignment->name,
+                                'assigned_at' => $assignment->assigned_at,
+                                'completed_at' => $assignment->completed_at,
+                                'status' => $assignment->status,
                             ];
                         }
                     } catch (Exception $e1) {
@@ -50,24 +59,27 @@ class UserEvaluationController extends Controller
                             $pivotData = DB::table('course_user')
                                 ->join('courses', 'course_user.course_id', '=', 'courses.id')
                                 ->where('course_user.user_id', $user->id)
-                                ->whereNotNull('course_user.completed_at')
                                 ->select('courses.id', 'courses.name', 'course_user.completed_at')
                                 ->get();
 
                             foreach ($pivotData as $pivot) {
-                                $completedCourses[] = [
+                                $assignedCourses[] = [
                                     'id' => $pivot->id,
                                     'title' => $pivot->name,
+                                    'assigned_at' => null,
                                     'completed_at' => $pivot->completed_at,
+                                    'status' => $pivot->completed_at ? 'completed' : 'in_progress',
                                 ];
                             }
                         } catch (Exception $e2) {
                             $allCourses = Course::select(['id', 'name'])->get();
                             foreach ($allCourses as $course) {
-                                $completedCourses[] = [
+                                $assignedCourses[] = [
                                     'id' => $course->id,
                                     'title' => $course->name,
-                                    'completed_at' => now()->subDays(rand(1, 30))->toDateString(),
+                                    'assigned_at' => now()->subDays(rand(1, 30))->toDateString(),
+                                    'completed_at' => null,
+                                    'status' => 'pending',
                                 ];
                             }
                         }
@@ -89,7 +101,7 @@ class UserEvaluationController extends Controller
                             'tier_name' => $user->userLevelTier->tier_name,
                             'tier_order' => $user->userLevelTier->tier_order,
                         ] : null,
-                        'completed_courses' => $completedCourses
+                        'completed_courses' => $assignedCourses
                     ];
                 });
 
@@ -225,32 +237,42 @@ class UserEvaluationController extends Controller
                 ->select(['id', 'name', 'email', 'department_id', 'user_level_id', 'user_level_tier_id'])
                 ->get()
                 ->map(function ($user) {
-                    // Get completed courses for each user
-                    $completedCourses = [];
+                    // Get assigned courses for each user (not just completed)
+                    $assignedCourses = [];
 
                     try {
-                        $registrations = DB::table('course_registrations')
-                            ->join('courses', 'course_registrations.course_id', '=', 'courses.id')
-                            ->where('course_registrations.user_id', $user->id)
-                            ->whereNotNull('course_registrations.completed_at')
-                            ->select('courses.id', 'courses.name', 'course_registrations.completed_at')
+                        $assignments = DB::table('course_assignments')
+                            ->join('courses', 'course_assignments.course_id', '=', 'courses.id')
+                            ->where('course_assignments.user_id', $user->id)
+                            ->select(
+                                'courses.id', 
+                                'courses.name', 
+                                'course_assignments.assigned_at',
+                                'course_assignments.completed_at',
+                                'course_assignments.status'
+                            )
+                            ->orderBy('course_assignments.assigned_at', 'desc')
                             ->get();
 
-                        foreach ($registrations as $registration) {
-                            $completedCourses[] = [
-                                'id' => $registration->id,
-                                'title' => $registration->name,
-                                'completed_at' => $registration->completed_at,
+                        foreach ($assignments as $assignment) {
+                            $assignedCourses[] = [
+                                'id' => $assignment->id,
+                                'title' => $assignment->name,
+                                'assigned_at' => $assignment->assigned_at,
+                                'completed_at' => $assignment->completed_at,
+                                'status' => $assignment->status,
                             ];
                         }
                     } catch (Exception $e) {
                         // Fallback to all courses
                         $allCourses = Course::select(['id', 'name'])->get();
                         foreach ($allCourses as $course) {
-                            $completedCourses[] = [
+                            $assignedCourses[] = [
                                 'id' => $course->id,
                                 'title' => $course->name,
-                                'completed_at' => now()->subDays(rand(1, 30))->toDateString(),
+                                'assigned_at' => now()->subDays(rand(1, 30))->toDateString(),
+                                'completed_at' => null,
+                                'status' => 'pending',
                             ];
                         }
                     }
@@ -272,7 +294,7 @@ class UserEvaluationController extends Controller
                             'tier_name' => $user->userLevelTier->tier_name,
                             'tier_order' => $user->userLevelTier->tier_order,
                         ] : null,
-                        'completed_courses' => $completedCourses
+                        'completed_courses' => $assignedCourses
                     ];
                 });
 
@@ -285,7 +307,7 @@ class UserEvaluationController extends Controller
         }
     }
 
-    // Enhanced: Get completed courses for a specific user with level/tier info
+    // Enhanced: Get assigned courses for a specific user (not just completed)
     public function getUserCourses(Request $request)
     {
         $userId = $request->get('user_id');
@@ -295,39 +317,50 @@ class UserEvaluationController extends Controller
         }
 
         try {
-            $completedCourses = [];
+            $assignedCourses = [];
 
-            // Try to get real completed courses
+            // Get all assigned courses from course_assignments table
             try {
-                $registrations = DB::table('course_registrations')
-                    ->join('courses', 'course_registrations.course_id', '=', 'courses.id')
-                    ->where('course_registrations.user_id', $userId)
-                    ->whereNotNull('course_registrations.completed_at')
-                    ->select('courses.id', 'courses.name', 'courses.description', 'course_registrations.completed_at')
+                $assignments = DB::table('course_assignments')
+                    ->join('courses', 'course_assignments.course_id', '=', 'courses.id')
+                    ->where('course_assignments.user_id', $userId)
+                    ->select(
+                        'courses.id', 
+                        'courses.name', 
+                        'courses.description', 
+                        'course_assignments.assigned_at',
+                        'course_assignments.completed_at',
+                        'course_assignments.status'
+                    )
+                    ->orderBy('course_assignments.assigned_at', 'desc')
                     ->get();
 
-                foreach ($registrations as $registration) {
-                    $completedCourses[] = [
-                        'id' => $registration->id,
-                        'title' => $registration->name,
-                        'description' => $registration->description,
-                        'completed_at' => $registration->completed_at,
+                foreach ($assignments as $assignment) {
+                    $assignedCourses[] = [
+                        'id' => $assignment->id,
+                        'title' => $assignment->name,
+                        'description' => $assignment->description,
+                        'assigned_at' => $assignment->assigned_at,
+                        'completed_at' => $assignment->completed_at,
+                        'status' => $assignment->status,
                     ];
                 }
             } catch (Exception $e) {
                 // Fallback: return all courses
                 $allCourses = Course::select(['id', 'name', 'description'])->get();
                 foreach ($allCourses as $course) {
-                    $completedCourses[] = [
+                    $assignedCourses[] = [
                         'id' => $course->id,
                         'title' => $course->name,
                         'description' => $course->description,
-                        'completed_at' => now()->subDays(rand(1, 30))->toDateString(),
+                        'assigned_at' => now()->subDays(rand(1, 30))->toDateString(),
+                        'completed_at' => null,
+                        'status' => 'pending',
                     ];
                 }
             }
 
-            return response()->json(['courses' => $completedCourses]);
+            return response()->json(['courses' => $assignedCourses]);
 
         } catch (Exception $e) {
 

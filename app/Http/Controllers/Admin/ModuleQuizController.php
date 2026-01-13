@@ -756,6 +756,29 @@ class ModuleQuizController extends Controller
     }
 
     /**
+     * Reset quiz attempts for a specific user
+     * Allows the user to retake the quiz from scratch
+     */
+    public function resetUserAttempts(Request $request, CourseOnline $courseOnline, CourseModule $courseModule, Quiz $quiz)
+    {
+        if (!$quiz->isModuleQuiz()) {
+            return back()->withErrors(['error' => 'Not a module quiz']);
+        }
+
+        $request->validate([
+            'user_id' => 'required|exists:users,id',
+        ]);
+
+        $user = \App\Models\User::findOrFail($request->user_id);
+
+        if ($quiz->resetUserAttempts($user->id)) {
+            return back()->with('success', "Quiz attempts reset successfully for {$user->name}. They can now retake the quiz.");
+        }
+
+        return back()->with('error', 'Failed to reset quiz attempts. Please try again.');
+    }
+
+    /**
      * Custom validation for question data based on question type.
      */
     private function validateQuestionData($questions)

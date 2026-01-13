@@ -368,14 +368,9 @@ class CourseAssignmentController extends Controller
     private function generateUserLoginLink(User $user, CourseOnline $course): ?string
     {
         try {
-            // Check if user has a password
-            
- 
-
             // Generate temporary login token
-             $token = Str::random(64);
-
- $expiresAt = now()->addHours(24);
+            $token = Str::random(64);
+            $expiresAt = now()->addWeek(); // ✅ Changed from 24 hours to 1 week
 
             // Store token in user record or cache (you might want to create a separate table)
             $user->update([
@@ -386,7 +381,7 @@ class CourseAssignmentController extends Controller
             // Create signed URL for token login
             $loginUrl = URL::temporarySignedRoute(
                 'auth.token-login',
-               $expiresAt, 
+                $expiresAt, 
                 [
                     'user' => $user->id,
                     'course' => $course->id,
@@ -396,7 +391,7 @@ class CourseAssignmentController extends Controller
 
             Log::info('🔗 Login link generated', [
                 'user_id' => $user->id,
-                'expires_at' => now()->addDays(7)->toDateTimeString(),
+                'expires_at' => $expiresAt->toDateTimeString(),
             ]);
 
             return $loginUrl;

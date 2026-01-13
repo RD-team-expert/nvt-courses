@@ -109,7 +109,9 @@ class EvaluationNotificationController extends Controller
             'employee_ids.*' => 'exists:users,id',
             'target_manager_levels' => 'required|array|min:1',
             'target_manager_levels.*' => 'in:L2,L3,L4,all',
-            'email_subject' => 'nullable|string|max:255'
+            'email_subject' => 'nullable|string|max:255',
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date|after_or_equal:start_date'
         ]);
 
 
@@ -121,9 +123,11 @@ class EvaluationNotificationController extends Controller
             );
 
 
-            // Add email subject to preview
+            // Add email subject and date filters to preview
             $preview['email_subject'] = $validated['email_subject'] ??
                 'Evaluation Report - ' . ($preview['summary']['departments'][0] ?? 'Multiple Departments');
+            $preview['start_date'] = $validated['start_date'] ?? null;
+            $preview['end_date'] = $validated['end_date'] ?? null;
 
 
             // Get the same data as index method
@@ -186,7 +190,9 @@ class EvaluationNotificationController extends Controller
             'target_manager_levels' => 'required|array|min:1',
             'target_manager_levels.*' => 'in:L2,L3,L4,all',
             'email_subject' => 'required|string|max:255',
-            'custom_message' => 'nullable|string|max:1000'
+            'custom_message' => 'nullable|string|max:1000',
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date|after_or_equal:start_date'
         ]);
 
 
@@ -200,9 +206,17 @@ class EvaluationNotificationController extends Controller
             }
 
 
-            // Get employee and evaluation data
-            // ✅ FIXED N+1: Added evaluations.course eager loading
-            $employees = User::with(['evaluations.history', 'evaluations.course', 'department', 'userLevel'])
+            // Get employee and evaluation data with date filtering
+            // ✅ FIXED N+1: Added evaluations.course and evaluations.courseOnline eager loading
+            $employees = User::with(['evaluations' => function($query) use ($validated) {
+                    // Apply date filters to evaluations if provided
+                    if (!empty($validated['start_date'])) {
+                        $query->whereDate('created_at', '>=', $validated['start_date']);
+                    }
+                    if (!empty($validated['end_date'])) {
+                        $query->whereDate('created_at', '<=', $validated['end_date']);
+                    }
+                }, 'evaluations.history', 'evaluations.course', 'evaluations.courseOnline', 'department', 'userLevel'])
                 ->whereIn('id', $validated['employee_ids'])
                 ->get();
 
@@ -210,6 +224,16 @@ class EvaluationNotificationController extends Controller
             $evaluationIds = $employees->flatMap->evaluations->pluck('id')->toArray();
             $employeeNames = $employees->pluck('name')->toArray();
             $departmentName = $employees->first()->department?->name ?? 'Multiple Departments';
+            
+            // Build date range text for notification name
+            $dateRangeText = '';
+            if (!empty($validated['start_date']) || !empty($validated['end_date'])) {
+                $dateRangeText = ' (' . 
+                    (!empty($validated['start_date']) ? date('M d', strtotime($validated['start_date'])) : 'Start') . 
+                    ' - ' . 
+                    (!empty($validated['end_date']) ? date('M d, Y', strtotime($validated['end_date'])) : 'End') . 
+                    ')';
+            }
 
 
             // Get the first employee's department_id
@@ -218,7 +242,7 @@ class EvaluationNotificationController extends Controller
 
             // Create notification record
             $notification = NotificationTemplate::create([
-                'name' => 'Evaluation Report - ' . $departmentName . ' - ' . now()->format('M d, Y'),
+                'name' => 'Evaluation Report - ' . $departmentName . $dateRangeText . ' - ' . now()->format('M d, Y'),
                 'content' => json_encode([
                     'type' => 'evaluation_report',
                     'target_manager_level' => implode(',', $validated['target_manager_levels']),
@@ -228,6 +252,8 @@ class EvaluationNotificationController extends Controller
                     'custom_message' => $validated['custom_message'] ?? '',
                     'evaluation_ids' => $evaluationIds,
                     'employee_names' => $employeeNames,
+                    'start_date' => $validated['start_date'] ?? null,
+                    'end_date' => $validated['end_date'] ?? null,
                     'created_by' => auth()->id(),
                     'status' => 'pending'
                 ]),
@@ -269,7 +295,9 @@ class EvaluationNotificationController extends Controller
                 $managers,
                 $employees,
                 $validated['email_subject'],
-                $validated['custom_message'] ?? ''
+                $validated['custom_message'] ?? '',
+                $validated['start_date'] ?? null,
+                $validated['end_date'] ?? null
             );
 
 

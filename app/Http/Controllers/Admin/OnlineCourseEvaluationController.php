@@ -303,64 +303,45 @@ class OnlineCourseEvaluationController extends Controller
     }
 
     /**
-     * Get completed online courses for a user
+     * Get assigned online courses for a user (not just completed)
      * FIXED: Use 'name' column instead of 'title'
      */
     private function getUserCompletedOnlineCourses($userId)
     {
-        $completedCourses = [];
+        $assignedCourses = [];
 
         try {
-            // Check course_online_assignments table for completed courses
+            // Get ALL assigned online courses (not just completed)
             $assignments = DB::table('course_online_assignments')
                 ->join('course_online', 'course_online_assignments.course_online_id', '=', 'course_online.id')
                 ->where('course_online_assignments.user_id', $userId)
-                ->where('course_online_assignments.status', 'completed')
                 ->select(
                     'course_online.id',
                     'course_online.name as title',
+                    'course_online_assignments.assigned_at',
                     'course_online_assignments.completed_at',
-                    'course_online_assignments.progress_percentage'  // ✅ CORRECT COLUMN NAME
+                    'course_online_assignments.status',
+                    'course_online_assignments.progress_percentage'
                 )
+                ->orderBy('course_online_assignments.assigned_at', 'desc')
                 ->get();
 
             foreach ($assignments as $assignment) {
-                $completedCourses[] = [
+                $assignedCourses[] = [
                     'id' => $assignment->id,
                     'title' => $assignment->title,
+                    'assigned_at' => $assignment->assigned_at,
                     'completed_at' => $assignment->completed_at,
-                    'progress' => $assignment->progress_percentage ?? 100,  // ✅ Use progress_percentage
+                    'status' => $assignment->status,
+                    'progress' => $assignment->progress_percentage ?? 0,
                 ];
-            }
-
-            // If no completed courses found, return all assigned online courses
-            if (empty($completedCourses)) {
-                $allAssignments = DB::table('course_online_assignments')
-                    ->join('course_online', 'course_online_assignments.course_online_id', '=', 'course_online.id')
-                    ->where('course_online_assignments.user_id', $userId)
-                    ->select(
-                        'course_online.id',
-                        'course_online.name as title',
-                        'course_online_assignments.assigned_at as completed_at',
-                        'course_online_assignments.progress_percentage'  // ✅ CORRECT COLUMN NAME
-                    )
-                    ->get();
-
-                foreach ($allAssignments as $assignment) {
-                    $completedCourses[] = [
-                        'id' => $assignment->id,
-                        'title' => $assignment->title,
-                        'completed_at' => $assignment->completed_at,
-                        'progress' => $assignment->progress_percentage ?? 0,  // ✅ Use progress_percentage
-                    ];
-                }
             }
 
         } catch (Exception $e) {
 
         }
 
-        return $completedCourses;
+        return $assignedCourses;
     }
 
 

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 use App\Enums\PerformanceLevel;
 
 class EvaluationEmailService
@@ -12,7 +13,7 @@ class EvaluationEmailService
      * Send evaluation report to managers
      */
 
-    public function sendEvaluationReport(array $managers, $employees, string $subject, string $customMessage = ''): array
+    public function sendEvaluationReport(array $managers, $employees, string $subject, string $customMessage = '', ?string $startDate = null, ?string $endDate = null): array
     {
         $results = [
             'success_count' => 0,
@@ -42,9 +43,45 @@ class EvaluationEmailService
             return $results;
         }
 
+        // Use provided date range or default to current month
+        $filterStartDate = $startDate ? \Carbon\Carbon::parse($startDate)->startOfDay() : now()->startOfMonth();
+        $filterEndDate = $endDate ? \Carbon\Carbon::parse($endDate)->endOfDay() : now()->endOfMonth();
+        
+        // Format report period for email
+        $reportPeriod = $startDate || $endDate 
+            ? $filterStartDate->format('M d, Y') . ' - ' . $filterEndDate->format('M d, Y')
+            : now()->format('F Y');
+
         // ✅ NEW: Prepare detailed evaluation data with overall average
-        $detailedEvaluations = $employees->map(function ($employee) {
-            $evaluations = $employee->evaluations->map(function ($evaluation) {
+        // FILTER: Only include evaluations for courses assigned in the specified date range
+        $detailedEvaluations = $employees->map(function ($employee) use ($filterStartDate, $filterEndDate) {
+            // Filter evaluations to only include courses assigned in specified date range
+            $filteredEvaluations = $employee->evaluations->filter(function ($evaluation) use ($employee, $filterStartDate, $filterEndDate) {
+                // Check if this is a regular course or online course
+                if ($evaluation->course_type === 'online' && $evaluation->course_online_id) {
+                    // Check online course assignment date
+                    $assignment = \DB::table('course_online_assignments')
+                        ->where('user_id', $employee->id)
+                        ->where('course_online_id', $evaluation->course_online_id)
+                        ->whereBetween('assigned_at', [$filterStartDate, $filterEndDate])
+                        ->first();
+                    
+                    return $assignment !== null;
+                } elseif ($evaluation->course_id) {
+                    // Check regular course assignment date
+                    $assignment = \DB::table('course_assignments')
+                        ->where('user_id', $employee->id)
+                        ->where('course_id', $evaluation->course_id)
+                        ->whereBetween('assigned_at', [$filterStartDate, $filterEndDate])
+                        ->first();
+                    
+                    return $assignment !== null;
+                }
+                
+                return false; // Exclude if no course assignment found
+            });
+
+            $evaluations = $filteredEvaluations->map(function ($evaluation) {
                 // Get performance level data if available
                 $performanceLevel = $evaluation->performance_level;
                 $performanceData = null;
@@ -60,9 +97,18 @@ class EvaluationEmailService
                     ];
                 }
                 
+                // Determine course name based on type
+                $courseName = 'Unknown Course';
+                if ($evaluation->course_type === 'online' && $evaluation->courseOnline) {
+                    $courseName = $evaluation->courseOnline->name;
+                } elseif ($evaluation->course) {
+                    $courseName = $evaluation->course->name;
+                }
+                
                 return [
                     'id' => $evaluation->id,
-                    'course' => $evaluation->course ? $evaluation->course->name : 'Unknown Course',
+                    'course' => $courseName,
+                    'course_type' => $evaluation->course_type ?? 'regular',
                     'total_score' => $evaluation->total_score,
                     'incentive_amount' => $evaluation->incentive_amount,
                     'performance_level' => $performanceLevel,
@@ -79,16 +125,19 @@ class EvaluationEmailService
                 ];
             })->toArray();
 
-            // ✅ NEW: Calculate overall average across ALL evaluations
-            $allScores = collect($evaluations)->flatMap(function ($eval) {
-                return collect($eval['detailed_scores'])->pluck('score');
-            });
+            // Skip employees with no evaluations for specified date range
+            if (empty($evaluations)) {
+                return null;
+            }
 
-            $overallAverage = $allScores->isNotEmpty()
-                ? round($allScores->average(), 2)
+            // ✅ FIXED: Calculate overall average of course total_scores (not detailed scores)
+            $courseTotalScores = collect($evaluations)->pluck('total_score');
+            
+            $overallAverage = $courseTotalScores->isNotEmpty()
+                ? round($courseTotalScores->average(), 2)
                 : 0;
 
-            // ✅ NEW: Also calculate course averages
+            // ✅ Calculate individual course averages from detailed scores
             $courseAverages = collect($evaluations)->map(function ($eval) {
                 $scores = collect($eval['detailed_scores'])->pluck('score');
                 return $scores->isNotEmpty() ? round($scores->average(), 2) : 0;
@@ -103,12 +152,18 @@ class EvaluationEmailService
                     'level' => $employee->userLevel ? $employee->userLevel->name : 'Unknown'
                 ],
                 'evaluations' => $evaluations,
-                'overall_average' => $overallAverage,              // ✅ NEW: Overall average
-                'course_averages' => $courseAverages->toArray(),  // ✅ NEW: Individual course averages
-                'total_evaluations' => count($evaluations),       // ✅ NEW: Total count
-                'total_scores_count' => $allScores->count()       // ✅ NEW: Total individual scores
+                'overall_average' => $overallAverage,              // ✅ FIXED: Average of course total_scores
+                'course_averages' => $courseAverages->toArray(),  // ✅ Individual course averages
+                'total_evaluations' => count($evaluations),       // ✅ FIXED: Number of courses
+                'total_courses' => count($evaluations)            // ✅ NEW: Same as total_evaluations for clarity
             ];
-        })->toArray();
+        })->filter()->values()->toArray(); // Remove null entries (employees with no evaluations in date range)
+
+        // If no evaluations match the date filter, return early
+        if (empty($detailedEvaluations)) {
+            Log::warning('No evaluations found for courses assigned in specified date range');
+            return $results;
+        }
 
         // Send emails to each manager
         foreach ($allManagers as $manager) {
@@ -120,8 +175,9 @@ class EvaluationEmailService
                     'subject' => $subject,
                     'customMessage' => $customMessage,
                     'evaluations' => $employees->flatMap->evaluations,
-                    'detailedEvaluations' => $detailedEvaluations,  // ✅ Now includes overall_average
-                    'performanceLevels' => PerformanceLevel::getForFrontend() // ✅ Include all performance levels for reference
+                    'detailedEvaluations' => $detailedEvaluations,  // ✅ Now includes overall_average and filtered by date range
+                    'performanceLevels' => PerformanceLevel::getForFrontend(), // ✅ Include all performance levels for reference
+                    'reportPeriod' => $reportPeriod // ✅ Add report period for email context
                 ], function ($message) use ($manager, $subject) {
                     $message->to($manager['email'], $manager['name'])
                         ->subject($subject);

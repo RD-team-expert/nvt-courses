@@ -616,7 +616,7 @@ onUnmounted(() => {
                             </div>
                             <div>
                                 <CardTitle>Select Department, Employee & Course</CardTitle>
-                                <CardDescription>Choose department first, then employee, and finally their completed course</CardDescription>
+                                <CardDescription>Choose department first, then employee, and finally their assigned course</CardDescription>
                             </div>
                         </div>
                     </CardHeader>
@@ -676,7 +676,7 @@ onUnmounted(() => {
 
                             <!-- Course Selection -->
                             <div class="space-y-2">
-                                <Label for="course">Select Completed Course *</Label>
+                                <Label for="course">Select Assigned Course *</Label>
                                 <div class="relative">
                                     <Select
                                         :model-value="form.course_id?.toString() || 'none'"
@@ -684,18 +684,21 @@ onUnmounted(() => {
                                         :disabled="form.processing || !form.user_id || isLoadingCourses"
                                     >
                                         <SelectTrigger id="course">
-                                            <SelectValue :placeholder="!form.user_id ? 'Select employee first...' : isLoadingCourses ? 'Loading courses...' : 'Choose a completed course...'" />
+                                            <SelectValue :placeholder="!form.user_id ? 'Select employee first...' : isLoadingCourses ? 'Loading courses...' : 'Choose an assigned course...'" />
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="none">
                                                 {{
                                                     !form.user_id ? 'Select employee first...' :
                                                         isLoadingCourses ? 'Loading courses...' :
-                                                            'Choose a completed course...'
+                                                            'Choose an assigned course...'
                                                 }}
                                             </SelectItem>
                                             <SelectItem v-for="course in availableCourses" :key="course.id" :value="course.id.toString()">
                                                 {{ course.title }}
+                                                <Badge v-if="course.status" :variant="course.status === 'completed' ? 'default' : 'secondary'" class="ml-2 text-xs">
+                                                    {{ course.status }}
+                                                </Badge>
                                             </SelectItem>
                                         </SelectContent>
                                     </Select>
@@ -703,8 +706,8 @@ onUnmounted(() => {
                                         <Loader2 class="h-4 w-4 animate-spin text-primary" />
                                     </div>
                                 </div>
-                                <p v-if="!form.user_id" class="text-xs text-muted-foreground">Select an employee to see their completed courses</p>
-                                <p v-else-if="availableCourses.length === 0 && !isLoadingCourses" class="text-xs text-destructive">This employee hasn't completed any courses yet</p>
+                                <p v-if="!form.user_id" class="text-xs text-muted-foreground">Select an employee to see their assigned courses</p>
+                                <p v-else-if="availableCourses.length === 0 && !isLoadingCourses" class="text-xs text-destructive">This employee has no assigned courses yet</p>
                                 <span v-if="form.errors.course_id" class="text-sm text-destructive">{{ form.errors.course_id }}</span>
                             </div>
 
@@ -734,6 +737,18 @@ onUnmounted(() => {
                                     <div>
                                         <span class="font-medium">Course:</span>
                                         <p>{{ selectedCourse.title }}</p>
+                                    </div>
+                                    <div v-if="selectedCourse.status">
+                                        <span class="font-medium">Status:</span>
+                                        <p>
+                                            <Badge :variant="selectedCourse.status === 'completed' ? 'default' : 'secondary'" class="text-xs">
+                                                {{ selectedCourse.status }}
+                                            </Badge>
+                                        </p>
+                                    </div>
+                                    <div v-if="selectedCourse.assigned_at">
+                                        <span class="font-medium">Assigned:</span>
+                                        <p>{{ new Date(selectedCourse.assigned_at).toLocaleDateString() }}</p>
                                     </div>
                                     <div v-if="selectedCourse.completed_at">
                                         <span class="font-medium">Completed:</span>

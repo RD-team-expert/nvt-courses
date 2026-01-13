@@ -92,6 +92,8 @@ const props = defineProps<{
             target_levels: Array<string>
         }
         email_subject?: string
+        start_date?: string
+        end_date?: string
     }
     showPreview?: boolean
 }>()
@@ -117,14 +119,18 @@ const filterForm = useForm({
 const previewForm = useForm({
     employee_ids: [] as number[],
     target_manager_levels: [] as string[],
-    email_subject: ''
+    email_subject: '',
+    start_date: '',
+    end_date: ''
 })
 
 const sendForm = useForm({
     employee_ids: [] as number[],
     target_manager_levels: [] as string[],
     email_subject: '',
-    custom_message: ''
+    custom_message: '',
+    start_date: '',
+    end_date: ''
 })
 
 // Safe defaults
@@ -185,7 +191,7 @@ function applyFilters() {
         start_date: filterForm.start_date || '',
         end_date: filterForm.end_date || '',
         search: filterForm.search || '',
-        performance_level: filterForm.performance_level || ''
+        performance_level: (filterForm.performance_level && filterForm.performance_level !== 'all') ? filterForm.performance_level : ''
     }
 
     // Remove empty/null values to avoid Axios serialization issues
@@ -238,6 +244,8 @@ function previewNotification() {
     previewForm.employee_ids = selectedEmployees.value
     previewForm.target_manager_levels = targetLevels.value
     previewForm.email_subject = generateEmailSubject()
+    previewForm.start_date = filterForm.start_date || ''
+    previewForm.end_date = filterForm.end_date || ''
 
     console.log('Form data:', previewForm.data)
     console.log('Route URL:', route('admin.evaluations.notifications.preview'))
@@ -271,9 +279,22 @@ function previewNotification() {
 function sendNotifications() {
     if (!props.preview || !isMounted.value) return
 
-    sendForm.employee_ids = selectedEmployees.value
-    sendForm.target_manager_levels = targetLevels.value
-    sendForm.email_subject = sendForm.email_subject || generateEmailSubject()
+    // Use employee IDs from preview data, not from selectedEmployees
+    const employeeIds = props.preview.employees.map(emp => emp.id)
+    
+    sendForm.employee_ids = employeeIds
+    sendForm.target_manager_levels = props.preview.summary.target_levels || targetLevels.value
+    sendForm.email_subject = sendForm.email_subject || props.preview.email_subject || generateEmailSubject()
+    sendForm.start_date = filterForm.start_date || ''
+    sendForm.end_date = filterForm.end_date || ''
+
+    console.log('Sending notifications with data:', {
+        employee_ids: sendForm.employee_ids,
+        target_manager_levels: sendForm.target_manager_levels,
+        email_subject: sendForm.email_subject,
+        start_date: sendForm.start_date,
+        end_date: sendForm.end_date
+    })
 
     sendForm.post(route('admin.evaluations.notifications.send'), {
         preserveState: false,
@@ -533,7 +554,7 @@ onUnmounted(() => {
                                             <SelectValue placeholder="All Levels" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="">All Levels</SelectItem>
+                                            <SelectItem value="all">All Levels</SelectItem>
                                             <SelectItem value="outstanding">Outstanding</SelectItem>
                                             <SelectItem value="reliable">Reliable</SelectItem>
                                             <SelectItem value="developing">Developing</SelectItem>
