@@ -409,6 +409,12 @@ class ModuleQuizController extends Controller
             ->first();
 
         $nextModuleUnlocked = $nextModule ? $nextModule->isUnlockedForUser($user->id) : false;
+        
+        // ✅ Get the first content of the next module for direct navigation
+        $nextModuleFirstContent = null;
+        if ($nextModule && $nextModuleUnlocked) {
+            $nextModuleFirstContent = $nextModule->getNextUnlockedContentForUser($user->id);
+        }
 
         return Inertia::render('User/ModuleQuiz/Result', [
             'module' => [
@@ -448,6 +454,7 @@ class ModuleQuizController extends Controller
                 'id' => $nextModule->id,
                 'name' => $nextModule->name,
                 'is_unlocked' => $nextModuleUnlocked,
+                'first_content_id' => $nextModuleFirstContent?->id, // ✅ Add first content ID
             ] : null,
         ]);
     }

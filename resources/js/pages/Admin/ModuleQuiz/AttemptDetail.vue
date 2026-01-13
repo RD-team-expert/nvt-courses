@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link, useForm } from '@inertiajs/vue3'
+import { Head, Link, useForm, router } from '@inertiajs/vue3'
 import { ref, computed } from 'vue'
 import AppLayout from '@/layouts/AppLayout.vue'
 import type { BreadcrumbItem } from '@/types'
@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
-import { ArrowLeft, CheckCircle, XCircle, User, Calendar, Clock, Target, Award, Save } from 'lucide-vue-next'
+import { ArrowLeft, CheckCircle, XCircle, User, Calendar, Clock, Target, Award, Save, RotateCcw } from 'lucide-vue-next'
 
 interface User {
     id: number
@@ -131,6 +131,39 @@ function getUserTextAnswer(question: Question): string {
     }
     return question.user_answer
 }
+
+const resetting = ref(false)
+
+function resetUserAttempts() {
+    if (!confirm(`Are you sure you want to reset ALL quiz attempts for ${props.user.name}?\n\nThis will:\n- Delete all their attempts\n- Delete all their answers\n- Allow them to retake the quiz from scratch\n\nThis action cannot be undone!`)) {
+        return
+    }
+
+    resetting.value = true
+
+    router.post(
+        route('admin.module-quiz.reset-attempts', {
+            courseOnline: props.course.id,
+            courseModule: props.module.id,
+            quiz: props.quiz.id
+        }),
+        { user_id: props.user.id },
+        {
+            onSuccess: () => {
+                // Redirect back to attempts list after reset
+                router.visit(route('admin.module-quiz.attempts', {
+                    courseOnline: props.course.id,
+                    courseModule: props.module.id,
+                    quiz: props.quiz.id
+                }))
+            },
+            onError: () => {
+                resetting.value = false
+                alert('Failed to reset attempts. Please try again.')
+            }
+        }
+    )
+}
 </script>
 
 <template>
@@ -139,17 +172,27 @@ function getUserTextAnswer(question: Question): string {
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="max-w-5xl mx-auto space-y-6 pb-12">
             <!-- Header -->
-            <div class="flex items-center gap-4">
-                <Button as-child variant="ghost" size="sm">
-                    <Link :href="route('admin.module-quiz.attempts', { courseOnline: course.id, courseModule: module.id, quiz: quiz.id })">
-                        <ArrowLeft class="h-4 w-4 mr-2" />
-                        Back to Attempts
-                    </Link>
-                </Button>
-                <div>
-                    <h1 class="text-2xl font-bold">Quiz Attempt Details</h1>
-                    <p class="text-muted-foreground">{{ quiz.title }}</p>
+            <div class="flex items-center justify-between gap-4">
+                <div class="flex items-center gap-4">
+                    <Button as-child variant="ghost" size="sm">
+                        <Link :href="route('admin.module-quiz.attempts', { courseOnline: course.id, courseModule: module.id, quiz: quiz.id })">
+                            <ArrowLeft class="h-4 w-4 mr-2" />
+                            Back to Attempts
+                        </Link>
+                    </Button>
+                    <div>
+                        <h1 class="text-2xl font-bold">Quiz Attempt Details</h1>
+                        <p class="text-muted-foreground">{{ quiz.title }}</p>
+                    </div>
                 </div>
+                <Button 
+                    variant="destructive" 
+                    @click="resetUserAttempts"
+                    :disabled="resetting"
+                >
+                    <RotateCcw class="h-4 w-4 mr-2" />
+                    {{ resetting ? 'Resetting...' : 'Reset All Attempts' }}
+                </Button>
             </div>
 
             <!-- Attempt Summary -->

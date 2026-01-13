@@ -723,4 +723,44 @@ class Quiz extends Model
                 : 0,
         ];
     }
+
+    /**
+     * Reset quiz attempts for a specific user
+     * This allows the user to retake the quiz from scratch
+     */
+    public function resetUserAttempts(int $userId): bool
+    {
+        try {
+            // Delete all quiz answers for this user's attempts
+            $attemptIds = $this->attempts()
+                ->where('user_id', $userId)
+                ->pluck('id');
+
+            if ($attemptIds->isNotEmpty()) {
+                // Delete answers first (foreign key constraint)
+                QuizAnswer::whereIn('quiz_attempt_id', $attemptIds)->delete();
+                
+                // Delete module quiz results if this is a module quiz
+                if ($this->isModuleQuiz()) {
+                    ModuleQuizResult::where('quiz_id', $this->id)
+                        ->where('user_id', $userId)
+                        ->delete();
+                }
+                
+                // Delete the attempts
+                $this->attempts()
+                    ->where('user_id', $userId)
+                    ->delete();
+            }
+
+            return true;
+        } catch (\Exception $e) {
+            \Log::error('Failed to reset quiz attempts', [
+                'quiz_id' => $this->id,
+                'user_id' => $userId,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
 }

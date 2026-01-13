@@ -586,7 +586,7 @@ onUnmounted(() => {
                             </div>
                             <div>
                                 <CardTitle>Select Department, Employee & Online Course</CardTitle>
-                                <CardDescription>Choose department first, then employee, and finally their completed online course</CardDescription>
+                                <CardDescription>Choose department first, then employee, and finally their assigned online course</CardDescription>
                             </div>
                         </div>
                     </CardHeader>
@@ -646,7 +646,7 @@ onUnmounted(() => {
 
                             <!-- Online Course Selection -->
                             <div class="space-y-2">
-                                <Label for="course">Select Completed Online Course *</Label>
+                                <Label for="course">Select Assigned Online Course *</Label>
                                 <div class="relative">
                                     <Select
                                         :model-value="form.course_online_id?.toString() || 'none'"
@@ -654,18 +654,24 @@ onUnmounted(() => {
                                         :disabled="form.processing || !form.user_id || isLoadingCourses"
                                     >
                                         <SelectTrigger id="course">
-                                            <SelectValue :placeholder="!form.user_id ? 'Select employee first...' : isLoadingCourses ? 'Loading courses...' : 'Choose a completed online course...'" />
+                                            <SelectValue :placeholder="!form.user_id ? 'Select employee first...' : isLoadingCourses ? 'Loading courses...' : 'Choose an assigned online course...'" />
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="none">
                                                 {{
                                                     !form.user_id ? 'Select employee first...' :
                                                         isLoadingCourses ? 'Loading courses...' :
-                                                            'Choose a completed online course...'
+                                                            'Choose an assigned online course...'
                                                 }}
                                             </SelectItem>
                                             <SelectItem v-for="course in availableCourses" :key="course.id" :value="course.id.toString()">
                                                 {{ course.title }}
+                                                <Badge v-if="course.status" :variant="course.status === 'completed' ? 'default' : 'secondary'" class="ml-2 text-xs">
+                                                    {{ course.status }}
+                                                </Badge>
+                                                <span v-if="course.progress !== undefined" class="ml-2 text-xs text-muted-foreground">
+                                                    ({{ Math.round(course.progress) }}%)
+                                                </span>
                                             </SelectItem>
                                         </SelectContent>
                                     </Select>
@@ -673,8 +679,8 @@ onUnmounted(() => {
                                         <Loader2 class="h-4 w-4 animate-spin text-primary" />
                                     </div>
                                 </div>
-                                <p v-if="!form.user_id" class="text-xs text-muted-foreground">Select an employee to see their completed online courses</p>
-                                <p v-else-if="availableCourses.length === 0 && !isLoadingCourses" class="text-xs text-destructive">This employee hasn't completed any online courses yet</p>
+                                <p v-if="!form.user_id" class="text-xs text-muted-foreground">Select an employee to see their assigned online courses</p>
+                                <p v-else-if="availableCourses.length === 0 && !isLoadingCourses" class="text-xs text-destructive">This employee has no assigned online courses yet</p>
                                 <span v-if="form.errors.course_online_id" class="text-sm text-destructive">{{ form.errors.course_online_id }}</span>
                             </div>
 
@@ -704,6 +710,22 @@ onUnmounted(() => {
                                     <div>
                                         <span class="font-medium">Online Course:</span>
                                         <p>{{ selectedCourse.title }}</p>
+                                    </div>
+                                    <div v-if="selectedCourse.status">
+                                        <span class="font-medium">Status:</span>
+                                        <p>
+                                            <Badge :variant="selectedCourse.status === 'completed' ? 'default' : 'secondary'" class="text-xs">
+                                                {{ selectedCourse.status }}
+                                            </Badge>
+                                        </p>
+                                    </div>
+                                    <div v-if="selectedCourse.progress !== undefined">
+                                        <span class="font-medium">Progress:</span>
+                                        <p>{{ Math.round(selectedCourse.progress) }}%</p>
+                                    </div>
+                                    <div v-if="selectedCourse.assigned_at">
+                                        <span class="font-medium">Assigned:</span>
+                                        <p>{{ new Date(selectedCourse.assigned_at).toLocaleDateString() }}</p>
                                     </div>
                                     <div v-if="selectedCourse.completed_at">
                                         <span class="font-medium">Completed:</span>

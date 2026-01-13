@@ -530,6 +530,7 @@ Route::post('videos/{video}/retry-transcode', [App\Http\Controllers\Admin\VideoC
     Route::get('quiz-attempts', [\App\Http\Controllers\Admin\QuizAttemptController::class, 'index'])->name('quiz-attempts.index');
     Route::get('quiz-attempts/{attempt}', [\App\Http\Controllers\Admin\QuizAttemptController::class, 'show'])->name('quiz-attempts.show');
     Route::put('quiz-attempts/{attempt}', [\App\Http\Controllers\Admin\QuizAttemptController::class, 'update'])->name('quiz-attempts.update');
+    Route::post('quiz-attempts/reset', [\App\Http\Controllers\Admin\QuizAttemptController::class, 'resetUserAttempts'])->name('quiz-attempts.reset');
 
     // ===== MODULE QUIZ MANAGEMENT =====
     Route::prefix('course-online/{courseOnline}/modules/{courseModule}/quiz')->name('module-quiz.')->group(function () {
@@ -543,6 +544,7 @@ Route::post('videos/{video}/retry-transcode', [App\Http\Controllers\Admin\VideoC
         Route::get('/{quiz}/attempts', [\App\Http\Controllers\Admin\ModuleQuizController::class, 'attempts'])->name('attempts');
         Route::get('/{quiz}/attempts/{attempt}', [\App\Http\Controllers\Admin\ModuleQuizController::class, 'showAttempt'])->name('attempts.show');
         Route::put('/{quiz}/attempts/{attempt}/grade', [\App\Http\Controllers\Admin\ModuleQuizController::class, 'gradeAttempt'])->name('grade-attempt');
+        Route::post('/{quiz}/reset-attempts', [\App\Http\Controllers\Admin\ModuleQuizController::class, 'resetUserAttempts'])->name('reset-attempts');
         Route::get('/{quiz}/statistics', [\App\Http\Controllers\Admin\ModuleQuizController::class, 'statistics'])->name('statistics');
         Route::patch('/{quiz}/toggle-status', [\App\Http\Controllers\Admin\ModuleQuizController::class, 'toggleStatus'])->name('toggle-status');
     });
