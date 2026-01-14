@@ -149,17 +149,8 @@ function resetUserAttempts() {
         }),
         { user_id: props.user.id },
         {
-            onSuccess: () => {
-                // Redirect back to attempts list after reset
-                router.visit(route('admin.module-quiz.attempts', {
-                    courseOnline: props.course.id,
-                    courseModule: props.module.id,
-                    quiz: props.quiz.id
-                }))
-            },
-            onError: () => {
+            onFinish: () => {
                 resetting.value = false
-                alert('Failed to reset attempts. Please try again.')
             }
         }
     )
