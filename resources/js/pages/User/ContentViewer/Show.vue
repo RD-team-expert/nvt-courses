@@ -175,6 +175,47 @@ const isFullscreen = ref(false)
 const isVideoLoading = ref(true)
 const isVideoReady = ref(false)
 
+// Controls visibility (hide controls automatically once video plays)
+const controlsVisible = ref(true)
+let controlsHideTimer: ReturnType<typeof setTimeout> | null = null
+
+function showControls() {
+    controlsVisible.value = true
+    if (controlsHideTimer) {
+        clearTimeout(controlsHideTimer)
+        controlsHideTimer = null
+    }
+    if (isPlaying.value) {
+        controlsHideTimer = setTimeout(() => {
+            controlsVisible.value = false
+            controlsHideTimer = null
+        }, 2000) // hide after 2s of playing
+    }
+}
+
+function hideControlsImmediately() {
+    if (controlsHideTimer) {
+        clearTimeout(controlsHideTimer)
+        controlsHideTimer = null
+    }
+    controlsVisible.value = false
+}
+
+function toggleControlsOnTap() {
+    if (!isVideoReady.value || isVideoLoading.value) return
+    if (isPlaying.value) {
+        controlsVisible.value = !controlsVisible.value
+        if (controlsVisible.value) {
+            showControls()
+        } else {
+            if (controlsHideTimer) { clearTimeout(controlsHideTimer); controlsHideTimer = null }
+        }
+    } else {
+        // If paused or not playing, always show controls
+        controlsVisible.value = true
+    }
+}
+
 // ========== QUALITY SELECTOR STATE ==========
 const availableQualities = ref<string[]>(['original'])
 const selectedQuality = ref<string>('original')
@@ -1227,10 +1268,14 @@ const onPause = () => {
             sendHeartbeat()
         }
         
+        // Show controls when paused
+        showControls()
         updateProgress()
     } else {
         // Still stop playback tracking even for completed videos
         isActivelyPlaying.value = false
+        // Keep controls visible
+        controlsVisible.value = true
     }
 }
 
@@ -1461,6 +1506,12 @@ onMounted(async () => {
         if (videoElement.value) {
             videoElement.value.removeEventListener('seeked', onVideoSeeked)
         }
+
+        // Clear controls hide timer if set
+        if (controlsHideTimer) {
+            clearTimeout(controlsHideTimer)
+            controlsHideTimer = null
+        }
     })
 
 // ✅ REMOVED: Duplicate event listener (line 1064) - was causing double sendBeacon calls
@@ -1576,7 +1627,7 @@ watch(currentPage, (newPage) => {
                         </div>
                         
                         <CardContent class="p-0">
-                            <div class="relative bg-black aspect-video">
+                            <div class="relative bg-black aspect-video" @mousemove="showControls" @click="toggleControlsOnTap" @touchend="toggleControlsOnTap">
                                 <!-- Video Element -->
                                 <video ref="videoElement" :src="video?.streaming_url"
                                     :poster="video?.thumbnail_url || ''" class="w-full h-full" preload="metadata"
@@ -1607,7 +1658,7 @@ watch(currentPage, (newPage) => {
                                 </div>
 
                                 <!-- Video Controls -->
-                                <div v-if="isVideoReady && !isVideoLoading"
+                                <div v-if="isVideoReady && !isVideoLoading && (controlsVisible || !isPlaying)"
                                     class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
                                     <div class="mb-4">
                                         <input type="range" :value="currentTime" :max="duration"

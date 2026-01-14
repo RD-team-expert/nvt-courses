@@ -772,7 +772,13 @@ class ModuleQuizController extends Controller
         $user = \App\Models\User::findOrFail($request->user_id);
 
         if ($quiz->resetUserAttempts($user->id)) {
-            return back()->with('success', "Quiz attempts reset successfully for {$user->name}. They can now retake the quiz.");
+            return redirect()
+                ->route('admin.module-quiz.attempts', [
+                    'courseOnline' => $courseOnline->id,
+                    'courseModule' => $courseModule->id,
+                    'quiz' => $quiz->id
+                ])
+                ->with('success', "Quiz attempts reset successfully for {$user->name}. They can now retake the quiz.");
         }
 
         return back()->with('error', 'Failed to reset quiz attempts. Please try again.');
