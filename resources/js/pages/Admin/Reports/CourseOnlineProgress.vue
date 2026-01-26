@@ -683,28 +683,23 @@ onBeforeUnmount(() => {
                     </div>
 
                     <!-- Pagination -->
-                    <div v-if="lastPage > 1" class="mt-6">
+                    <div v-if="assignments?.data?.length > 0 && (lastPage > 1 || (assignments?.links && assignments.links.length > 0))" class="px-4 sm:px-6 py-3 border-t border-gray-200 mt-6">
                         <div class="flex items-center justify-between">
                             <div class="text-sm text-muted-foreground">
-                                Showing {{ assignments.meta.from }} to {{ assignments.meta.to }} of {{ assignments.meta.total }} results
+                                Showing {{ assignments?.meta?.from || 1 }} to {{ assignments?.meta?.to || assignments.data.length }} of {{ assignments?.meta?.total || assignments.data.length }} results
                             </div>
                             <div class="flex space-x-2">
-                                <template v-for="link in assignments.links" :key="link.label">
-                                    <Button
-                                        v-if="link.url"
-                                        :variant="link.active ? 'default' : 'outline'"
-                                        size="sm"
-                                        @click="router.get(link.url)"
-                                        v-html="link.label"
-                                    />
-                                    <Button
-                                        v-else
-                                        variant="outline"
-                                        size="sm"
-                                        disabled
-                                        v-html="link.label"
-                                    />
-                                </template>
+                                <a v-for="(link, index) in assignments?.links || []"
+                                   :key="link.url || link.label || index"
+                                   :href="link.url"
+                                   :class="{
+                                       'bg-primary text-primary-foreground': link.active,
+                                       'hover:bg-muted': !link.active && link.url,
+                                       'text-muted-foreground cursor-not-allowed': !link.url
+                                   }"
+                                   class="px-3 py-2 text-sm font-medium border rounded-md transition-colors"
+                                   v-html="link.label">
+                                </a>
                             </div>
                         </div>
                     </div>
