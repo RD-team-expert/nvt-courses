@@ -64,6 +64,7 @@ class CourseProgressService
                 'course_registrations.completed_at as registration_completed_at',
                 // Deadline: use courses.end_date (we'll get the latest availability end_date separately)
                 'courses.end_date as course_end_date',
+            'courses.start_date as course_beginning_date', // ✅ This exists
             ]);
         
         // Apply filters
@@ -199,6 +200,8 @@ class CourseProgressService
                 'course_online_assignments.progress_percentage',
                 // Use course deadline if assignment deadline is null
                 DB::raw('COALESCE(course_online_assignments.deadline, course_online.deadline) as deadline'),
+                // Course beginning date for online courses (use assignment date)
+                'course_online_assignments.assigned_at as course_beginning_date',
             ]);
         
         // Apply filters
@@ -276,56 +279,62 @@ class CourseProgressService
      * @param string $courseType
      * @return array
      */
-    private function formatAssignmentData($assignment, string $courseType): array
-    {
-        $deadline = $assignment->deadline ? Carbon::parse($assignment->deadline) : null;
-        $completedAt = $assignment->completed_at ? Carbon::parse($assignment->completed_at) : null;
-        $startedAt = isset($assignment->started_at) && $assignment->started_at 
-            ? Carbon::parse($assignment->started_at) 
-            : null;
-        
-        $progressPercentage = (float) ($assignment->progress_percentage ?? 0);
-        
-        // Calculate learning score
-        $learningScore = $this->calculateLearningScore(
-            $assignment->user_id, 
-            $assignment->course_id, 
-            $courseType, 
-            $assignment->status,
-            $progressPercentage
-        );
-        
-        // Determine completion status
-        $completionStatus = $this->determineCompletionStatus($assignment->status, $deadline);
-        
-        // Calculate days overdue
-        $daysOverdue = $this->calculateDaysOverdue($deadline, $assignment->status);
-        
-        return [
-            'id' => $assignment->id,
-            'user_id' => $assignment->user_id,
-            'user_name' => $assignment->user_name,
-            'employee_code' => $assignment->employee_code ?? 'N/A',
-            'department' => $assignment->department_name ?? 'N/A',
-            'course_type' => $courseType,
-            'course_id' => $assignment->course_id,
-            'course_name' => $assignment->course_name,
-            'completion_status' => $completionStatus,
-            'status' => $assignment->status,
-            'progress_percentage' => $progressPercentage,
-            'assigned_at' => Carbon::parse($assignment->assigned_at),
-            'started_at' => $startedAt,
-            'completed_at' => $completedAt,
-            'deadline' => $deadline,
-            'days_overdue' => $daysOverdue,
-            'learning_score' => $learningScore,
-            'score_band' => $this->determineScoreBand($learningScore),
-            'compliance_status' => $this->calculateComplianceStatus($deadline, $assignment->status, $progressPercentage, $learningScore),
-            // Additional debug info for traditional courses
-            'total_sessions' => $assignment->total_sessions ?? null,
-            'attended_sessions' => $assignment->attended_sessions ?? null,
-        ];
-    }
+   private function formatAssignmentData($assignment, string $courseType): array
+{
+    $deadline = $assignment->deadline ? Carbon::parse($assignment->deadline) : null;
+    $completedAt = $assignment->completed_at ? Carbon::parse($assignment->completed_at) : null;
+    $startedAt = isset($assignment->started_at) && $assignment->started_at 
+        ? Carbon::parse($assignment->started_at) 
+        : null;
+    
+    // Parse course beginning date - will be null for online courses
+    $courseBeginningDate = isset($assignment->course_beginning_date) && $assignment->course_beginning_date
+        ? Carbon::parse($assignment->course_beginning_date)
+        : null;
+    
+    $progressPercentage = (float) ($assignment->progress_percentage ?? 0);
+    
+    // Calculate learning score
+    $learningScore = $this->calculateLearningScore(
+        $assignment->user_id, 
+        $assignment->course_id, 
+        $courseType, 
+        $assignment->status,
+        $progressPercentage
+    );
+    
+    // Determine completion status
+    $completionStatus = $this->determineCompletionStatus($assignment->status, $deadline);
+    
+    // Calculate days overdue
+    $daysOverdue = $this->calculateDaysOverdue($deadline, $assignment->status);
+    
+    return [
+        'id' => $assignment->id,
+        'user_id' => $assignment->user_id,
+        'user_name' => $assignment->user_name,
+        'employee_code' => $assignment->employee_code ?? 'N/A',
+        'department' => $assignment->department_name ?? 'N/A',
+        'course_type' => $courseType,
+        'course_id' => $assignment->course_id,
+        'course_name' => $assignment->course_name,
+        'completion_status' => $completionStatus,
+        'status' => $assignment->status,
+        'progress_percentage' => $progressPercentage,
+        'assigned_at' => Carbon::parse($assignment->assigned_at),
+        'started_at' => $startedAt,
+        'completed_at' => $completedAt,
+        'deadline' => $deadline,
+        'course_beginning_date' => $courseBeginningDate, // Will be Carbon for traditional, null for online
+        'days_overdue' => $daysOverdue,
+        'learning_score' => $learningScore,
+        'score_band' => $this->determineScoreBand($learningScore),
+        'compliance_status' => $this->calculateComplianceStatus($deadline, $assignment->status, $progressPercentage, $learningScore),
+        'total_sessions' => $assignment->total_sessions ?? null,
+        'attended_sessions' => $assignment->attended_sessions ?? null,
+    ];
+}
+
     
     /**
      * Determine completion status label based on calculated status
