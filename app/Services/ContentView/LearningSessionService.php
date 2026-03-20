@@ -186,7 +186,7 @@ class LearningSessionService
 
     // Accumulate incremental data
     $session->update([
-        // ❌ REMOVED: current_position
+        'current_position' => $currentPosition,  // ✅ ADD THIS BACK
         'last_heartbeat' => now(),  // ✅ FIXED: Update last_heartbeat timestamp
         'total_duration_minutes' => $currentDuration,
         'video_watch_time' => ($session->video_watch_time ?? 0) + $watchTimeIncrement,
@@ -283,7 +283,7 @@ class LearningSessionService
     // Update session with final data
     $session->update([
         'session_end' => now(),
-        // ❌ REMOVED: current_position
+        'current_position' => $finalPosition,  // ✅ ADD THIS BACK
         'total_duration_minutes' => $totalDuration,
         'video_watch_time' => $totalWatchTime,
         'video_skip_count' => $totalSkips,

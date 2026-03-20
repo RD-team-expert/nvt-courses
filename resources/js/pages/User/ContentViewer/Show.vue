@@ -117,6 +117,8 @@ interface Video {
     transcode_status?: string
     available_qualities?: string[]
     has_multiple_qualities?: boolean
+    subtitle_status: string | null
+    subtitle_vtt_url: string | null
 }
 
 
@@ -133,6 +135,18 @@ const props = defineProps<{
 
 
 }>()
+
+const subtitlesEnabled = ref(true)
+
+function toggleSubtitles() {
+    subtitlesEnabled.value = !subtitlesEnabled.value
+    if (videoElement.value) {
+        const tracks = videoElement.value.textTracks
+        if (tracks.length > 0) {
+            tracks[0].mode = subtitlesEnabled.value ? 'showing' : 'hidden'
+        }
+    }
+}
 
 // console.log('📦 Props received:', {
 //     content: props.content,
@@ -641,11 +655,10 @@ const sendHeartbeat = async () => {
 const endSession = async () => {
     if (!sessionId.value) return
 
-    console.log('🛑 Ending session:', sessionId.value, 'with payload:', {
-        completion_percentage: progressPercentage.value,
-        active_playback_time: Math.floor(activePlaybackTime.value),
-        current_time: currentTime.value,
-        duration: duration.value
+    // 👇 ADD THIS
+    console.log('🛑 Ending session - saving position:', {
+        current_position: props.content.content_type === 'video' ? currentTime.value : currentPage.value,
+        completion_percentage: progressPercentage.value
     })
 
     try {
@@ -806,6 +819,11 @@ const toggleFullscreen = async () => {
     } catch (error) {
         console.error('Fullscreen error:', error)
     }
+}
+
+const navigateBack = async () => {
+    await endSession()
+    router.visit(route('courses-online.show', safeCourse.value.id))
 }
 
 // ========== PDF METHODS ==========
@@ -1118,6 +1136,13 @@ const initializeQualitySelector = () => {
             const baseUrl = `/video/stream/${props.video.id}`
             const newUrl = savedQuality === 'original' ? baseUrl : `${baseUrl}/${savedQuality}`
             videoElement.value.src = newUrl
+
+            // ✅ After reload, jump to saved position
+            videoElement.value.addEventListener('loadedmetadata', () => {
+                if (videoElement.value) {
+                    videoElement.value.currentTime = safeUserProgress.value.current_position || 0
+                }
+            }, { once: true })
         }
     }
 }
@@ -1140,22 +1165,13 @@ const onLoadedData = () => {
     // ✅ Task 6.2: Video is ready, but don't start tracking until play event
 }
 
-const onCanPlay = async () => {
+const onCanPlay = () => {
     // console.log('✅ Video can start playing');
     isVideoLoading.value = false;
     isVideoReady.value = true;
 
-    // ✅ Task 6.2: Video is ready to play, but don't start active tracking until play event
-
-    // 🔥 NEW: Start session and increment API key usage when video is ready to play
-    if (props.video?.key_id && !sessionId.value) {
-        try {
-            await startSession(); // This will call your backend to increment active_users
-            // console.log('✅ Session started, API key incremented');
-        } catch (error) {
-            // console.error('❌ Failed to start session:', error);
-        }
-    }
+    // ✅ Session starts only when the user presses play (onPlay), NOT here.
+    // This ensures we only measure actual viewing activity, not page load time.
 };
 
 
@@ -1185,8 +1201,16 @@ const onPlaying = () => {
 const onLoadedMetadata = () => {
     if (videoElement.value) {
         duration.value = videoElement.value.duration
-        videoElement.value.currentTime = safeUserProgress.value.current_position || 0
-        console.log('📹 Video metadata loaded - Duration:', duration.value, 'seconds')
+        const savedPosition = safeUserProgress.value.current_position || 0
+        // ✅ Set flag BEFORE setting currentTime so onVideoSeeked ignores this
+        isRestoringPosition = true
+        previousSeekPosition = savedPosition
+        videoElement.value.currentTime = savedPosition
+        console.log('📹 Video metadata loaded - Duration:', duration.value, 'seconds, restoring to:', savedPosition)
+        const tracks = videoElement.value.textTracks
+        if (tracks.length > 0) {
+            tracks[0].mode = subtitlesEnabled.value ? 'showing' : 'hidden'
+        }
     }
 }
 
@@ -1197,7 +1221,7 @@ const onTimeUpdate = () => {
         const now = Date.now()
         if (now - lastTimeUpdate >= 1000) {  // Throttle to 1 second
             currentTime.value = videoElement.value.currentTime
-            previousSeekPosition = currentTime.value  // ✅ NEW: Track position for rewind detection (Task 6.4)
+            // previousSeekPosition = currentTime.value  // ✅ NEW: Track position for rewind detection (Task 6.4)
             lastTimeUpdate = now
             
             // Log progress every 10 seconds
@@ -1318,25 +1342,41 @@ const onFullscreenChange = () => {
 // ✅ Video seek event handler (will be added in onMounted)
 // ✅ Track previous position for rewind detection (Task 6.4)
 let previousSeekPosition = 0
+let isRestoringPosition = false  // ✅ NEW: flag to ignore automatic seek on page load
+
 const onVideoSeeked = () => {
-    // console.log('🔍 Manual seek detected via timeline')
+    // ✅ FIX: If page is restoring saved position, ignore this seek completely
+    if (isRestoringPosition) {
+        isRestoringPosition = false
+        previousSeekPosition = videoElement.value?.currentTime ?? 0
+        console.log('📍 Position restored to:', previousSeekPosition, '— skipping seek tracking')
+        return
+    }
+
     seekCountSinceLastHeartbeat.value++
     totalSeekCount.value++
-    
-    // ✅ NEW: Log rewind events (Task 6.4)
-    const currentPosition = currentTime.value
+
+    const currentPosition = videoElement.value?.currentTime ?? currentTime.value
+
+    // ✅ Detect FORWARD seeks as skips
+    const seekDelta = currentPosition - previousSeekPosition
+    if (seekDelta > 5) {
+        skipCountSinceLastHeartbeat.value++
+        totalSkipCount.value++
+        console.log('⏭️ Forward seek detected via timeline:', seekDelta, 'seconds')
+    }
+
+    // Detect rewinds
     if (currentPosition < previousSeekPosition) {
-        // User rewound the video
         logVideoEvent('rewind', {
             startPosition: previousSeekPosition,
             endPosition: currentPosition
         })
     }
+
     previousSeekPosition = currentPosition
-    
-    // ✅ OPTIMIZED: Send heartbeat on seek to save progress
+
     if (sessionId.value) {
-        console.log('💓 Sending heartbeat on seek to save progress')
         sendHeartbeat()
     }
 }
@@ -1347,6 +1387,12 @@ const onVideoSeeked = () => {
 // ========== LIFECYCLE ==========
 // LIFECYCLE
 onMounted(async () => {
+    console.log('🔖 Saved progress from server:', {
+        current_position: safeUserProgress.value.current_position,
+        completion_percentage: safeUserProgress.value.completion_percentage,
+        is_completed: safeUserProgress.value.is_completed,
+        time_spent: safeUserProgress.value.time_spent
+    })
     console.log('🚀 ContentViewer mounted for content:', props.content.id, 'type:', props.content.content_type)
     document.addEventListener('fullscreenchange', onFullscreenChange)
 
@@ -1371,11 +1417,12 @@ onMounted(async () => {
     } else if (props.content.content_type === 'video') {
         await nextTick()
         if (videoElement.value) {
-            videoElement.value.currentTime = safeUserProgress.value.current_position || 0
             videoElement.value.addEventListener('seeked', onVideoSeeked)
         }
     }
-
+const removeRouterHook = router.on('before', () => {
+    endSession()
+})
     // ✅ FIXED: Progress tracking interval - changed from 3 min to 10 min to reduce server load
     const progressInterval = setInterval(() => {
         if (
@@ -1498,6 +1545,7 @@ onMounted(async () => {
         document.removeEventListener('fullscreenchange', onFullscreenChange)
 
         // End session before unmounting
+        removeRouterHook()
         endSession()
         clearInterval(progressInterval)
         clearInterval(activePlaybackInterval)  // ✅ Clear active playback interval (Task 6.2)
@@ -1582,12 +1630,10 @@ watch(currentPage, (newPage) => {
                         </div>
                     </div>
                 </div>
-                <Button asChild variant="outline" class="w-full sm:w-auto">
-                    <Link :href="route('courses-online.show', safeCourse.id)">
-                    <ArrowLeft class="h-4 w-4 mr-2" />
-                    Back to Course
-                    </Link>
-                </Button>
+               <Button @click="navigateBack" variant="outline">
+    <ArrowLeft class="h-4 w-4 mr-2" />
+    Back to Course
+</Button>
             </div>
 
             <!-- ✅ OPTIONAL: Debug Panel to show tracking data -->
@@ -1638,6 +1684,14 @@ watch(currentPage, (newPage) => {
                                     @waiting="onWaiting" @playing="onPlaying" @loadedmetadata="onLoadedMetadata"
                                     @timeupdate="onTimeUpdate" @play="onPlay" @pause="onPause" @ended="onEnded"
                                     @volumechange="onVolumeChange">
+                                    <track
+                                    v-if="video?.subtitle_vtt_url"
+                                    kind="subtitles"
+                                    :src="video.subtitle_vtt_url"
+                                    srclang="ar"
+                                    label="العربية"
+                                    default
+                                    />
                                     Your browser does not support the video tag.
                                 </video>
 
@@ -1737,10 +1791,20 @@ watch(currentPage, (newPage) => {
                                                         {{ quality === 'original' ? 'Original' : quality.toUpperCase() }}
                                                     </option>
                                                 </select>
+                                               
                                                 <Loader2 v-if="isQualitySwitching" 
                                                     class="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-white" />
                                             </div>
-
+                                                <Button
+                                                 v-if="video?.subtitle_vtt_url"
+                                                 @click="toggleSubtitles"
+                                                  variant="ghost"
+                                                     size="sm"
+                                                     class="text-white hover:bg-white/20 p-2"
+                                                    :class="{ 'bg-white/30': subtitlesEnabled }"
+                                                        >
+                                                        CC
+                                                     </Button>
                                             <!-- Fullscreen Button -->
                                             <Button @click="toggleFullscreen" variant="ghost" size="sm"
                                                 class="text-white hover:bg-white/20 p-2 transition-all hover:scale-105">

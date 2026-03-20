@@ -134,4 +134,11 @@ class Audio extends Model
     {
         return $this->storage_type === 'google_drive';
     }
+
+    public function podcastPosts(): \Illuminate\Database\Eloquent\Relations\MorphMany
+{
+    return $this->morphMany(PodcastPost::class, 'mediable');
 }
+}
+
+
