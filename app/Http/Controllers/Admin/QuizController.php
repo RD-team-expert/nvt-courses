@@ -47,7 +47,7 @@ class QuizController extends Controller
             $query->where('status', $request->status);
         }
 
-        $quizzes = $query->orderBy('created_at', 'desc')->paginate(15);
+        $quizzes = $query->orderBy('created_at', 'desc')->paginate(100)->withQueryString();
 
         // Transform the collection while preserving pagination structure
         $quizzes->getCollection()->transform(function ($quiz) {

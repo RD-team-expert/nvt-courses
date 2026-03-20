@@ -247,24 +247,24 @@
             </Card>
 
             <!-- Pagination - Only show when there are quizzes -->
-            <div v-if="quizzes.data && quizzes.data.length > 0 && quizzes.meta" class="mt-6">
+            <div v-if="quizzes.data && quizzes.data.length > 0" class="mt-6">
                 <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div class="text-sm text-muted-foreground">
-                        Showing <span class="font-medium text-foreground">{{ quizzes.meta.from || 0 }}</span> to
-                        <span class="font-medium text-foreground">{{ quizzes.meta.to || 0 }}</span> of
-                        <span class="font-medium text-foreground">{{ quizzes.meta.total || 0 }}</span> quizzes
+                        Showing <span class="font-medium text-foreground">{{ from || 0 }}</span> to
+                        <span class="font-medium text-foreground">{{ to || 0 }}</span> of
+                        <span class="font-medium text-foreground">{{ total || 0 }}</span> quizzes
                     </div>
-                    <div class="flex flex-wrap gap-1 justify-center sm:justify-end">
-                        <Button
-                            v-for="link in quizzes.meta.links"
-                            :key="link.label"
-                            :disabled="!link.url || isLoading"
-                            @click="goToPage(link.url)"
-                            :variant="link.active ? 'default' : 'outline-solid'"
-                            size="sm"
-                            v-html="link.label"
-                        ></Button>
-                    </div>
+
+                    <!-- Custom Pagination Component -->
+                    <CustomPagination
+                        :current-page="currentPage"
+                        :last-page="lastPage"
+                        :total="total"
+                        :from="from"
+                        :to="to"
+                        :is-loading="isLoading"
+                        @page-change="handlePageChange"
+                    />
                 </div>
             </div>
 
@@ -308,13 +308,125 @@
 import { Link } from '@inertiajs/vue3';
 import Modal from '@/Components/Modal.vue';
 import { router } from '@inertiajs/vue3';
-import { ref, watch, computed } from 'vue';
+import { ref, watch, computed, onMounted } from 'vue';
 import { debounce } from 'lodash';
 import AdminLayout from "@/layouts/AdminLayout.vue";
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+// Custom Pagination Component Definition
+const CustomPagination = {
+    props: {
+        currentPage: {
+            type: Number,
+            required: true
+        },
+        lastPage: {
+            type: Number,
+            required: true
+        },
+        total: {
+            type: Number,
+            required: true
+        },
+        from: {
+            type: Number,
+            default: 0
+        },
+        to: {
+            type: Number,
+            default: 0
+        },
+        isLoading: {
+            type: Boolean,
+            default: false
+        }
+    },
+    emits: ['page-change'],
+    setup(props, { emit }) {
+        const pages = computed(() => {
+            const delta = 2; // Number of pages to show on each side of current page
+            const range = [];
+            const rangeWithDots = [];
+            let l;
+
+            for (let i = 1; i <= props.lastPage; i++) {
+                if (i === 1 || i === props.lastPage || (i >= props.currentPage - delta && i <= props.currentPage + delta)) {
+                    range.push(i);
+                }
+            }
+
+            range.forEach((i) => {
+                if (l) {
+                    if (i - l === 2) {
+                        rangeWithDots.push(l + 1);
+                    } else if (i - l !== 1) {
+                        rangeWithDots.push('...');
+                    }
+                }
+                rangeWithDots.push(i);
+                l = i;
+            });
+
+            return rangeWithDots;
+        });
+
+        const goToPage = (page) => {
+            if (page === '...' || page === props.currentPage || props.isLoading) return;
+            emit('page-change', page);
+        };
+
+        return {
+            pages,
+            goToPage
+        };
+    },
+    template: `
+        <div class="flex items-center gap-1">
+            <!-- Previous Button -->
+            <Button
+                v-if="currentPage > 1"
+                size="sm"
+                variant="outline"
+                @click="goToPage(currentPage - 1)"
+                :disabled="isLoading"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                </svg>
+            </Button>
+
+            <!-- Page Numbers -->
+            <template v-for="(page, index) in pages" :key="index">
+                <Button
+                    v-if="page !== '...'"
+                    size="sm"
+                    :variant="page === currentPage ? 'default' : 'outline'"
+                    @click="goToPage(page)"
+                    :disabled="isLoading || page === currentPage"
+                >
+                    {{ page }}
+                </Button>
+                <span v-else class="px-2 text-muted-foreground">...</span>
+            </template>
+
+            <!-- Next Button -->
+            <Button
+                v-if="currentPage < lastPage"
+                size="sm"
+                variant="outline"
+                @click="goToPage(currentPage + 1)"
+                :disabled="isLoading"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                </svg>
+            </Button>
+        </div>
+    `
+};
 
 export default {
     components: {
@@ -332,6 +444,7 @@ export default {
         SelectItem,
         SelectTrigger,
         SelectValue,
+        CustomPagination,
     },
     props: {
         quizzes: {
@@ -348,6 +461,9 @@ export default {
         },
     },
     setup(props) {
+        // Log initial props
+        console.log('📊 QuizIndex mounted with props:', props.quizzes);
+
         // Breadcrumbs
         const breadcrumbs = [
             { name: 'Dashboard', route: 'admin.dashboard' },
@@ -365,35 +481,58 @@ export default {
         const quizToDelete = ref(null);
         const isLoading = ref(false);
 
-        // ✅ Check if any filters are active
-        const hasActiveFilters = computed(() => {
-            return filters.value.course_id !== '' || filters.value.status !== '';
+        // Pagination computed properties - FIXED: Check both possible locations for pagination data
+        const currentPage = computed(() => {
+            return props.quizzes?.current_page || props.quizzes?.meta?.current_page || 1;
         });
 
-        // ✅ Get selected course name for empty message
+        const lastPage = computed(() => {
+            return props.quizzes?.last_page || props.quizzes?.meta?.last_page || 1;
+        });
+
+        const total = computed(() => {
+            return props.quizzes?.total || props.quizzes?.meta?.total || 0;
+        });
+
+        const from = computed(() => {
+            return props.quizzes?.from || props.quizzes?.meta?.from || 0;
+        });
+
+        const to = computed(() => {
+            return props.quizzes?.to || props.quizzes?.meta?.to || 0;
+        });
+
+        // Check if any filters are active
+        const hasActiveFilters = computed(() => {
+            return filters.value.course_id !== '' && filters.value.course_id !== 'all' || 
+                   filters.value.status !== '' && filters.value.status !== 'all';
+        });
+
+        // Get selected course name for empty message
         const getSelectedCourseName = () => {
             const selectedCourse = props.courses.find(course => course.id == filters.value.course_id);
             return selectedCourse ? selectedCourse.name : '';
         };
 
-        // ✅ Generate context-appropriate empty message
+        // Generate context-appropriate empty message
         const getFilteredEmptyMessage = () => {
             const courseName = getSelectedCourseName();
             const status = filters.value.status;
 
-            if (courseName && status) {
+            if (courseName && status && status !== 'all') {
                 return `No ${status} quizzes found for "${courseName}" course.`;
             } else if (courseName) {
                 return `No quizzes found for "${courseName}" course.`;
-            } else if (status) {
+            } else if (status && status !== 'all') {
                 return `No ${status} quizzes found. Try selecting a different status or clearing filters.`;
             } else {
                 return 'Try adjusting your filter criteria or clear all filters to see available quizzes.';
             }
         };
 
-        // ✅ Clear all filters
+        // Clear all filters
         const clearFilters = () => {
+            console.log('🔍 Clearing filters');
             filters.value = {
                 course_id: '',
                 status: '',
@@ -403,11 +542,12 @@ export default {
 
         // Debounced filter application
         const applyFilters = debounce(() => {
+            console.log('🔍 Applying filters:', filters.value);
             isLoading.value = true;
             
             // Filter out "all" values before sending to server
             const filteredParams = Object.fromEntries(
-                Object.entries(filters.value).filter(([key, value]) => value && value !== 'all')
+                Object.entries(filters.value).filter(([key, value]) => value && value !== 'all' && value !== '')
             );
             
             router.get(
@@ -424,74 +564,78 @@ export default {
         }, 300);
 
         // Watch for filter changes
-        watch(filters, applyFilters, { deep: true });
+        watch(filters, () => {
+            applyFilters();
+        }, { deep: true });
 
-        // Navigate to a specific page
-        const goToPage = (url) => {
-            if (url && !isLoading.value) {
-                isLoading.value = true;
-                router.get(url, {}, {
-                    preserveState: true,
-                    preserveScroll: true,
-                    onFinish: () => {
-                        isLoading.value = false;
-                    },
-                });
-            }
+        // Handle page change
+        const handlePageChange = (page) => {
+            console.log('📄 Changing to page:', page);
+            
+            // Get current query params
+            const params = new URLSearchParams(window.location.search);
+            
+            // Update page parameter
+            params.set('page', page);
+            
+            // Build the URL with existing filters
+            const url = `${route('admin.quizzes.index')}?${params.toString()}`;
+            
+            isLoading.value = true;
+            
+           router.get(
+        route('admin.quizzes.index'),
+        params,
+        {
+            preserveState: true,
+            preserveScroll: true,
+            onFinish: () => {
+                isLoading.value = false;
+            },
+        }
+    );
         };
 
         // Show delete confirmation modal
         const confirmDelete = (quizId) => {
-            console.log('confirmDelete called with quizId:', quizId);
+            console.log('🗑️ Confirm delete:', quizId);
             quizToDelete.value = quizId;
             showDeleteModal.value = true;
         };
 
         // Delete quiz
         const deleteQuiz = () => {
-            console.log('deleteQuiz called');
-            console.log('quizToDelete.value:', quizToDelete.value);
-            console.log('isLoading.value:', isLoading.value);
+            if (isLoading.value) return;
             
-            if (isLoading.value) {
-                console.log('Already loading, returning early');
-                return;
-            }
-            
+            console.log('🗑️ Deleting quiz:', quizToDelete.value);
             isLoading.value = true;
             
             const deleteUrl = route('admin.quizzes.destroy', quizToDelete.value);
-            console.log('Delete URL:', deleteUrl);
             
             router.delete(deleteUrl, {
                 preserveScroll: true,
-                onBefore: () => {
-                    console.log('onBefore: Request is about to be made');
-                },
-                onStart: () => {
-                    console.log('onStart: Request has started');
-                },
-                onSuccess: (page) => {
-                    console.log('onSuccess: Delete successful', page);
+                onSuccess: () => {
                     showDeleteModal.value = false;
                     quizToDelete.value = null;
                 },
                 onError: (errors) => {
-                    console.error('onError: Delete error:', errors);
+                    console.error('🗑️ Delete error:', errors);
                     showDeleteModal.value = false;
                 },
                 onFinish: () => {
-                    console.log('onFinish: Request finished');
                     isLoading.value = false;
                 },
             });
         };
 
+        onMounted(() => {
+            console.log('📊 Component mounted');
+        });
+
         return {
             breadcrumbs,
             filters,
             applyFilters,
-            goToPage,
             showDeleteModal,
             confirmDelete,
             deleteQuiz,
@@ -499,6 +643,13 @@ export default {
             hasActiveFilters,
             getFilteredEmptyMessage,
             clearFilters,
+            // Pagination properties
+            currentPage,
+            lastPage,
+            total,
+            from,
+            to,
+            handlePageChange,
         };
     },
 };

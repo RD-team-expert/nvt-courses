@@ -13,9 +13,11 @@ use App\Services\CsvExportService;
 use App\Services\DepartmentPerformanceService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Carbon\Carbon;
+
 
 class CourseOnlineReportController extends Controller
 {
@@ -196,160 +198,198 @@ class CourseOnlineReportController extends Controller
     /**
      * 🔍 FIXED: Learning Sessions Report with simulated attention
      */
-    public function learningSessionsReport(Request $request)
-    {
+    /**
+ * 🔍 FIXED: Learning Sessions Report with simulated attention
+ */
+public function learningSessionsReport(Request $request)
+{
+    try {
+        $filters = $request->only(['course_id', 'user_id', 'date_from', 'date_to', 'suspicious_only', 'department_id']);
 
-        try {
-            $filters = $request->only(['course_id', 'user_id', 'date_from', 'date_to', 'suspicious_only', 'department_id']);
+        $query = LearningSession::query()
+            ->join('users', 'learning_sessions.user_id', '=', 'users.id')
+            ->join('course_online', 'learning_sessions.course_online_id', '=', 'course_online.id')
+            ->leftJoin('module_content', 'learning_sessions.content_id', '=', 'module_content.id')
+            ->leftJoin('departments', 'users.department_id', '=', 'departments.id');
 
-            $query = LearningSession::query()
-                ->join('users', 'learning_sessions.user_id', '=', 'users.id')
-                ->join('course_online', 'learning_sessions.course_online_id', '=', 'course_online.id')
-                ->leftJoin('module_content', 'learning_sessions.content_id', '=', 'module_content.id')
-                ->leftJoin('departments', 'users.department_id', '=', 'departments.id');
-
-            // Apply filters
-            if (!empty($filters['course_id'])) {
-                $query->where('learning_sessions.course_online_id', $filters['course_id']);
-            }
-            if (!empty($filters['user_id'])) {
-                $query->where('learning_sessions.user_id', $filters['user_id']);
-            }
-            if (!empty($filters['date_from'])) {
-                $query->whereDate('learning_sessions.session_start', '>=', $filters['date_from']);
-            }
-            if (!empty($filters['date_to'])) {
-                $query->whereDate('learning_sessions.session_start', '<=', $filters['date_to']);
-            }
-            if (!empty($filters['department_id'])) {
-                $query->where('users.department_id', $filters['department_id']);
-            }
-            // Apply suspicious-only filter at query-level for correct pagination
-            if (!empty($filters['suspicious_only'])) {
-                $val = $filters['suspicious_only'];
-                if ($val === '1' || $val === 1 || $val === true || $val === 'true') {
-                    $query->where('learning_sessions.is_suspicious_activity', 1);
-                }
-            }
-
-            $sessions = $query->select([
-                'learning_sessions.id',
-                'users.name as user_name',
-                'users.email as user_email',
-                'users.employee_code',
-                'departments.name as department_name',
-                'course_online.name as course_name',
-                'module_content.title as content_title',
-                'module_content.content_type',
-                'learning_sessions.session_start',
-                'learning_sessions.session_end',
-                'learning_sessions.total_duration_minutes',
-                'learning_sessions.attention_score',
-                'learning_sessions.is_suspicious_activity',
-            ])
-                ->orderByDesc('learning_sessions.session_start')
-                ->paginate(20)
-                ->withQueryString();
-
-
-
-            // ✅ FIXED: Transform data with REAL duration and SIMULATED attention
-            $sessions->getCollection()->transform(function ($session) {
-                $activePlaybackTime = $session->active_playback_time ?? null;
-                $contentId = $session->content_id ?? null;
-                $calculatedDuration = $this->getActualSessionDuration(
-                    $session->session_start, 
-                    $session->session_end,
-                    $activePlaybackTime,
-                    $session->id,
-                    $contentId
-                );
-                $storedDuration = $session->total_duration_minutes ?? 0;
-
-                // ✅ Get full session data for skip/seek tracking AND active playback time
-                $fullSessionData = DB::table('learning_sessions')
-                    ->where('id', $session->id)
-                    ->select('video_skip_count', 'seek_count', 'pause_count', 'video_replay_count', 'video_completion_percentage', 'content_id', 'active_playback_time', 'is_within_allowed_time')
-                    ->first();
-                
-                $contentId = $fullSessionData->content_id ?? null;
-
-                // ✅ Generate simulated attention with video duration and skip/seek data
-                $attentionResult = $this->calculateSimulatedAttentionScore(
-                    $session->session_start,
-                    $session->session_end,
-                    $calculatedDuration,
-                    $contentId,
-                    $fullSessionData
-                );
-                
-                $simulatedAttention = $attentionResult['score'];
-                $isSuspicious = $attentionResult['is_suspicious'];
-                
-                // ✅ Extract active playback time and allowed time info
-                $activePlaybackMinutes = $attentionResult['active_playback_minutes'] ?? 0;
-                $isWithinAllowedTime = $attentionResult['is_within_allowed_time'] ?? true;
-                $allowedTimeMinutes = $attentionResult['allowed_time_minutes'] ?? 0;
-
-                return [
-                    'id' => $session->id,
-                    'user_name' => $session->user_name,
-                    'user_email' => $session->user_email,
-                    'employee_code' => $session->employee_code ?? 'N/A',
-                    'department' => $session->department_name ?? 'N/A',
-                    'course_name' => $session->course_name,
-                    'content_title' => $session->content_title ?? 'Course Overview',
-                    'content_type' => ucfirst($session->content_type ?? 'general'),
-                    'session_start' => Carbon::parse($session->session_start)->format('M d, Y H:i'),
-                    'session_end' => $session->session_end ? Carbon::parse($session->session_end)->format('H:i') : 'Active',
-                    'stored_duration' => $this->formatDuration($storedDuration),
-                    'calculated_duration' => $this->formatDuration($calculatedDuration),
-                    'duration' => $this->formatDuration($calculatedDuration),
-                    'duration_minutes' => $calculatedDuration,
-                    // ✅ NEW: Active playback time fields
-                    'active_playback_minutes' => round($activePlaybackMinutes, 1),
-                    'active_playback_formatted' => $this->formatDuration($activePlaybackMinutes),
-                    'is_within_allowed_time' => $isWithinAllowedTime,
-                    'allowed_time_minutes' => round($allowedTimeMinutes, 1),
-                    'allowed_time_formatted' => $this->formatDuration($allowedTimeMinutes),
-                    // Existing fields
-                    'stored_attention' => $session->attention_score ?? 0,
-                        'simulated_attention' => $simulatedAttention,
-                        // Prefer stored attention_score when present (calculated at session end). Fall back to simulated.
-                        'attention_score' => ($session->attention_score ?? 0) > 0 ? $session->attention_score : $simulatedAttention,
-                        'engagement_level' => $this->calculateEngagementLevel((($session->attention_score ?? 0) > 0) ? $session->attention_score : $simulatedAttention),
-                    'is_suspicious' => $isSuspicious,
-                    'session_status' => $session->session_end ? 'Completed' : 'Active',
-                    'performance_rating' => $this->calculateSessionPerformance($calculatedDuration, $simulatedAttention, $isSuspicious),
-                    'score_details' => $attentionResult['details'] ?? [],
-                ];
-            });
-
-            // (No post-paginate collection filter needed; handled at query-level above)
-
-            $courses = CourseOnline::where('is_active', true)->select('id', 'name')->orderBy('name')->get();
-            $users = User::where('role', '!=', 'admin')->select('id', 'name', 'email')->orderBy('name')->get();
-            $departments = Department::where('is_active', true)->select('id', 'name')->orderBy('name')->get();
-
-            // ✅ FIXED: Session statistics with REAL durations and SIMULATED attention
-            $sessionStats = $this->calculateSessionStatsWithSimulatedAttention();
-
-
-            return Inertia::render('Admin/Reports/LearningSessionsReport', [
-                'sessions' => $sessions,
-                'courses' => $courses,
-                'users' => $users,
-                'departments' => $departments,
-                'filters' => $filters,
-                'stats' => $sessionStats,
-            ]);
-
-        } catch (\Exception $e) {
-
-            throw $e;
+        // Apply filters
+        if (!empty($filters['course_id'])) {
+            $query->where('learning_sessions.course_online_id', $filters['course_id']);
         }
-    }
+        if (!empty($filters['user_id'])) {
+            $query->where('learning_sessions.user_id', $filters['user_id']);
+        }
+        if (!empty($filters['date_from'])) {
+            $query->whereDate('learning_sessions.session_start', '>=', $filters['date_from']);
+        }
+        if (!empty($filters['date_to'])) {
+            $query->whereDate('learning_sessions.session_start', '<=', $filters['date_to']);
+        }
+        if (!empty($filters['department_id'])) {
+            $query->where('users.department_id', $filters['department_id']);
+        }
+        // Apply suspicious-only filter at query-level for correct pagination
+        if (!empty($filters['suspicious_only'])) {
+            $val = $filters['suspicious_only'];
+            if ($val === '1' || $val === 1 || $val === true || $val === 'true') {
+                $query->where('learning_sessions.is_suspicious_activity', 1);
+            }
+        }
 
+        $sessions = $query->select([
+            // ✅ ALIASED to avoid JOIN id collision with users/course_online/departments tables
+            'learning_sessions.id as session_id',
+            'users.name as user_name',
+            'users.email as user_email',
+            'users.employee_code',
+            'departments.name as department_name',
+            'course_online.name as course_name',
+            'module_content.title as content_title',
+            'module_content.content_type',
+            'learning_sessions.session_start',
+            'learning_sessions.session_end',
+            'learning_sessions.total_duration_minutes',
+            'learning_sessions.attention_score',
+            'learning_sessions.is_suspicious_activity',
+            // ✅ ALL fields needed by transform loaded here — eliminates second DB query
+            'learning_sessions.content_id',
+            'learning_sessions.active_playback_time',
+            'learning_sessions.video_skip_count',
+            'learning_sessions.seek_count',
+            'learning_sessions.pause_count',
+            'learning_sessions.video_replay_count',
+            'learning_sessions.video_completion_percentage',
+            'learning_sessions.is_within_allowed_time',
+        ])
+            ->orderByDesc('learning_sessions.session_start')
+            ->paginate(20)
+            ->withQueryString();
+
+        // ✅ OPTIMIZED: Pre-load all content durations in ONE query before the loop
+        // This eliminates one DB call per session inside calculateSimulatedAttentionScore()
+        $contentIds = $sessions->getCollection()->pluck('content_id')->filter()->unique()->values();
+        $contentDurationsMap = DB::table('module_content')
+            ->whereIn('id', $contentIds)
+            ->pluck('duration', 'id') // keyed by content_id → duration in seconds
+            ->map(fn($seconds) => $seconds ? $seconds / 60 : null)
+            ->toArray();
+
+        // ✅ FIXED: Transform data with REAL duration and SIMULATED attention
+        $sessions->getCollection()->transform(function ($session) use ($contentDurationsMap) {
+
+            // ✅ All fields already loaded in select — no second DB query needed
+            $activePlaybackTime = $session->active_playback_time ?? null;
+            $contentId = $session->content_id ?? null;
+
+            $calculatedDuration = $this->getActualSessionDuration(
+                $session->session_start,
+                $session->session_end,
+                $activePlaybackTime,
+                $session->session_id,  // ✅ use aliased session_id
+                $contentId
+            );
+
+            $storedDuration = $session->total_duration_minutes ?? 0;
+
+            // ✅ OPTIMIZED: Use pre-loaded duration map — zero extra DB queries
+            $videoDurationMinutes = $contentDurationsMap[$contentId] ?? null;
+
+            // ✅ Pass $session directly — it already has all skip/seek/pause/replay fields
+            $attentionResult = $this->calculateSimulatedAttentionScore(
+                $session->session_start,
+                $session->session_end,
+                $calculatedDuration,
+                $contentId,
+                $session,
+                $videoDurationMinutes  // ✅ pre-loaded, no DB call inside function
+            );
+
+            $simulatedAttention = $attentionResult['score'];
+            $isSuspicious = $attentionResult['is_suspicious'];
+
+            // ✅ Extract active playback time and allowed time info
+            $activePlaybackMinutes = $attentionResult['active_playback_minutes'] ?? 0;
+            $isWithinAllowedTime = $attentionResult['is_within_allowed_time'] ?? true;
+            $allowedTimeMinutes = $attentionResult['allowed_time_minutes'] ?? 0;
+
+            // ✅ Prefer stored attention_score when present. Fall back to simulated.
+          $finalAttentionScore = $simulatedAttention;
+            return [
+                'id'                       => $session->session_id,
+                'user_name'                => $session->user_name,
+                'user_email'               => $session->user_email,
+                'employee_code'            => $session->employee_code ?? 'N/A',
+                'department'               => $session->department_name ?? 'N/A',
+                'course_name'              => $session->course_name,
+                'content_title'            => $session->content_title ?? 'Course Overview',
+                'content_type'             => ucfirst($session->content_type ?? 'general'),
+                'session_start'            => Carbon::parse($session->session_start)->format('M d, Y H:i'),
+                'session_end'              => $session->session_end
+                                                ? Carbon::parse($session->session_end)->format('H:i')
+                                                : 'Active',
+                'stored_duration'          => $this->formatDuration($storedDuration),
+                'calculated_duration'      => $this->formatDuration($calculatedDuration),
+                'duration'                 => $this->formatDuration($calculatedDuration),
+                'duration_minutes'         => $calculatedDuration,
+                // Active playback time fields
+                'active_playback_minutes'  => round($activePlaybackMinutes, 1),
+                'active_playback_formatted'=> $this->formatDuration($activePlaybackMinutes),
+                'is_within_allowed_time'   => $isWithinAllowedTime,
+                'allowed_time_minutes'     => round($allowedTimeMinutes, 1),
+                'allowed_time_formatted'   => $this->formatDuration($allowedTimeMinutes),
+                // Attention & engagement
+                'stored_attention'         => $session->attention_score ?? 0,
+                'simulated_attention'      => $simulatedAttention,
+                'attention_score'          => $finalAttentionScore,
+                'engagement_level'         => $this->calculateEngagementLevel($finalAttentionScore),
+                'is_suspicious'            => $isSuspicious,
+                'session_status'           => $session->session_end ? 'Completed' : 'Active',
+                'performance_rating'       => $this->calculateSessionPerformance(
+                                                $calculatedDuration,
+                                                $simulatedAttention,
+                                                $isSuspicious
+                                             ),
+                'score_details'            => $attentionResult['details'] ?? [],
+                // ✅ Activity breakdown — now populated directly from $session (no longer null)
+                'skip_count'               => $session->video_skip_count ?? 0,
+                'seek_count'               => $session->seek_count ?? 0,
+                'pause_count'              => $session->pause_count ?? 0,
+                'replay_count'             => $session->video_replay_count ?? 0,
+                'video_completion'         => $session->video_completion_percentage ?? 0,
+                // ✅ Cheating score & risk derived from suspicion + attention score
+                'cheating_score'           => $isSuspicious
+                                                ? min(100, ($attentionResult['score'] < 30
+                                                    ? (30 - $attentionResult['score']) * 2
+                                                    : 10))
+                                                : 0,
+                'cheating_risk'            => $isSuspicious
+                                                ? ($attentionResult['score'] < 20
+                                                    ? 'High'
+                                                    : ($attentionResult['score'] < 30 ? 'Medium' : 'Low'))
+                                                : 'None',
+            ];
+        });
+
+        $courses     = CourseOnline::where('is_active', true)->select('id', 'name')->orderBy('name')->get();
+        $users       = User::where('role', '!=', 'admin')->select('id', 'name', 'email')->orderBy('name')->get();
+        $departments = Department::where('is_active', true)->select('id', 'name')->orderBy('name')->get();
+
+        // ✅ Session statistics with REAL durations and SIMULATED attention
+        $sessionStats = $this->calculateSessionStatsWithSimulatedAttention();
+
+        return Inertia::render('Admin/Reports/LearningSessionsReport', [
+            'sessions'    => $sessions,
+            'courses'     => $courses,
+            'users'       => $users,
+            'departments' => $departments,
+            'filters'     => $filters,
+            'stats'       => $sessionStats,
+        ]);
+
+    } catch (\Exception $e) {
+        throw $e;
+    }
+}
     /**
      * 🔍 FIXED: User Performance Report with simulated attention
      */
@@ -563,237 +603,330 @@ class CourseOnlineReportController extends Controller
      * @param object|null $sessionData Session data with skip/seek counts and active_playback_time
      * @return array ['score' => int, 'is_suspicious' => bool, 'details' => array, 'is_within_allowed_time' => bool, 'active_playback_minutes' => float, 'allowed_time_minutes' => float]
      */
-    private function calculateSimulatedAttentionScore($sessionStart, $sessionEnd, $calculatedDuration, $contentId = null, $sessionData = null)
-    {
-        $details = [];
-        $isSuspicious = false;
-        
-        // ✅ Use ACTIVE playback time if available, otherwise fall back to calculated duration
-        $activePlaybackMinutes = isset($sessionData->active_playback_time) && $sessionData->active_playback_time > 0
-            ? ($sessionData->active_playback_time / 60)
-            : $calculatedDuration;
-        
-        // ✅ IMPROVED FALLBACK: If no active playback time, try to calculate from timestamps
-        if ($activePlaybackMinutes <= 0 && $sessionStart && $sessionEnd) {
-            try {
-                $start = new \DateTime($sessionStart);
-                $end = new \DateTime($sessionEnd);
-                
-                // Calculate total minutes, handling day boundaries correctly
-                $totalMinutes = $start->diff($end)->days * 24 * 60 + 
-                               $start->diff($end)->h * 60 + 
-                               $start->diff($end)->i;
-                
-                // Only use timestamp duration if it's reasonable (between 1 minute and 3 hours)
-                if ($totalMinutes >= 1 && $totalMinutes <= 180) {
-                    $activePlaybackMinutes = $totalMinutes;
-                    $details[] = 'Using timestamp duration as fallback';
-                } else {
-                    // Duration is unreasonable, skip timestamp fallback
-                    $details[] = 'Timestamp duration unreasonable (' . $totalMinutes . ' min)';
-                }
-            } catch (\Exception $e) {
-                // If timestamp parsing fails, continue with 0
-                $details[] = 'Timestamp parsing failed';
+    /**
+ * 🔧 UPDATED: Calculate attention score using ACTIVE PLAYBACK TIME
+ */
+private function calculateSimulatedAttentionScore($sessionStart, $sessionEnd, $calculatedDuration, $contentId = null, $sessionData = null, $videoDurationMinutes = null)
+{
+    // ============================================================
+    // 🚨 TEST LOG — if this doesn't appear, logging itself is broken
+    // Uses default channel (no 'daily') to guarantee it writes
+    // ============================================================
+    Log::info('🚨 [ATTN] FUNCTION ENTERED', [
+        'session_start'        => $sessionStart,
+        'content_id'           => $contentId,
+        'calculated_duration'  => $calculatedDuration,
+        'active_playback_time' => $sessionData->active_playback_time ?? 'NULL — property missing',
+        'video_skip_count'     => $sessionData->video_skip_count ?? 'NULL — property missing',
+        'pause_count'          => $sessionData->pause_count ?? 'NULL — property missing',
+        'replay_count'         => $sessionData->video_replay_count ?? 'NULL — property missing',
+        'video_completion'     => $sessionData->video_completion_percentage ?? 'NULL — property missing',
+        'sessionData_type'     => gettype($sessionData),
+        'sessionData_class'    => is_object($sessionData) ? get_class($sessionData) : 'NOT AN OBJECT',
+        'sessionData_is_null'  => is_null($sessionData),
+    ]);
+
+    $details = [];
+    $isSuspicious = false;
+
+    // ============================================================
+    // STEP 1: Determine active playback minutes
+    // ============================================================
+    $hasActivePlayback = isset($sessionData->active_playback_time) 
+                      && $sessionData->active_playback_time > 0;
+
+    $activePlaybackMinutes = $hasActivePlayback
+        ? ($sessionData->active_playback_time / 60)
+        : $calculatedDuration;
+
+    Log::info('🪵 [ATTN] STEP 1 — Playback source', [
+        'has_active_playback_time' => $hasActivePlayback,
+        'active_playback_minutes'  => $activePlaybackMinutes,
+        'source'                   => $hasActivePlayback
+            ? 'DB active_playback_time (seconds ÷ 60)'
+            : 'calculated_duration fallback',
+    ]);
+
+    // ============================================================
+    // STEP 1B: Timestamp fallback if still 0
+    // ============================================================
+    if ($activePlaybackMinutes <= 0 && $sessionStart && $sessionEnd) {
+        try {
+            $start        = new \DateTime($sessionStart);
+            $end          = new \DateTime($sessionEnd);
+            $diff         = $start->diff($end);
+            $totalMinutes = ($diff->days * 24 * 60) + ($diff->h * 60) + $diff->i;
+
+            Log::info('🪵 [ATTN] STEP 1B — Timestamp fallback', [
+                'timestamp_diff_minutes' => $totalMinutes,
+                'is_reasonable'          => ($totalMinutes >= 1 && $totalMinutes <= 180),
+            ]);
+
+            if ($totalMinutes >= 1 && $totalMinutes <= 180) {
+                $activePlaybackMinutes = $totalMinutes;
+                $details[] = 'Using timestamp duration as fallback';
+            } else {
+                $details[] = 'Timestamp duration unreasonable (' . $totalMinutes . ' min)';
+                Log::warning('🪵 [ATTN] STEP 1B — Unreasonable timestamp duration', [
+                    'minutes' => $totalMinutes,
+                ]);
             }
+        } catch (\Exception $e) {
+            $details[] = 'Timestamp parsing failed';
+            Log::error('🪵 [ATTN] STEP 1B — Timestamp parse FAILED', ['error' => $e->getMessage()]);
         }
-        
-        // ✅ FINAL FALLBACK: If still no duration but we have completion data, give base score
-        if ($activePlaybackMinutes <= 0) {
-            if ($sessionData && isset($sessionData->video_completion_percentage) && $sessionData->video_completion_percentage > 0) {
-                // Give a base score based on completion percentage only
-                $completionPct = $sessionData->video_completion_percentage;
-                if ($completionPct >= 95) {
-                    return [
-                        'score' => 60, // Good completion, no time data
-                        'is_suspicious' => false,
-                        'details' => ['High completion, no time data (+60)'],
-                        'is_within_allowed_time' => true,
-                        'active_playback_minutes' => 0,
-                        'allowed_time_minutes' => 0,
-                    ];
-                } elseif ($completionPct >= 80) {
-                    return [
-                        'score' => 50,
-                        'is_suspicious' => false,
-                        'details' => ['Good completion, no time data (+50)'],
-                        'is_within_allowed_time' => true,
-                        'active_playback_minutes' => 0,
-                        'allowed_time_minutes' => 0,
-                    ];
-                } elseif ($completionPct >= 60) {
-                    return [
-                        'score' => 40,
-                        'is_suspicious' => false,
-                        'details' => ['Moderate completion, no time data (+40)'],
-                        'is_within_allowed_time' => true,
-                        'active_playback_minutes' => 0,
-                        'allowed_time_minutes' => 0,
-                    ];
-                } else {
-                    return [
-                        'score' => 25,
-                        'is_suspicious' => true,
-                        'details' => ['Low completion, no time data (+25)'],
-                        'is_within_allowed_time' => true,
-                        'active_playback_minutes' => 0,
-                        'allowed_time_minutes' => 0,
-                    ];
-                }
+    } else {
+        Log::info('🪵 [ATTN] STEP 1B — Skipped timestamp fallback', [
+            'reason' => $activePlaybackMinutes > 0
+                ? 'already have playback minutes: ' . $activePlaybackMinutes
+                : 'missing session_start or session_end',
+        ]);
+    }
+
+    // ============================================================
+    // STEP 1C: Completion-only fallback (no time data at all)
+    // ============================================================
+    if ($activePlaybackMinutes <= 0) {
+        $completionPct = $sessionData->video_completion_percentage ?? 0;
+
+        Log::warning('🪵 [ATTN] STEP 1C — NO playback time at all, using completion fallback', [
+            'video_completion_pct' => $completionPct,
+        ]);
+
+        if ($sessionData && $completionPct > 0) {
+            if ($completionPct >= 95) {
+                Log::info('🪵 [ATTN] STEP 1C — EARLY RETURN: score=60 (high completion, no time)');
+                return ['score' => 60, 'is_suspicious' => false, 'details' => ['High completion, no time data (+60)'], 'is_within_allowed_time' => true, 'active_playback_minutes' => 0, 'allowed_time_minutes' => 0];
+            } elseif ($completionPct >= 80) {
+                Log::info('🪵 [ATTN] STEP 1C — EARLY RETURN: score=50 (good completion, no time)');
+                return ['score' => 50, 'is_suspicious' => false, 'details' => ['Good completion, no time data (+50)'], 'is_within_allowed_time' => true, 'active_playback_minutes' => 0, 'allowed_time_minutes' => 0];
+            } elseif ($completionPct >= 60) {
+                Log::info('🪵 [ATTN] STEP 1C — EARLY RETURN: score=40 (moderate completion, no time)');
+                return ['score' => 40, 'is_suspicious' => false, 'details' => ['Moderate completion, no time data (+40)'], 'is_within_allowed_time' => true, 'active_playback_minutes' => 0, 'allowed_time_minutes' => 0];
+            } else {
+                Log::warning('🪵 [ATTN] STEP 1C — EARLY RETURN: score=25, SUSPICIOUS (low completion, no time)');
+                return ['score' => 25, 'is_suspicious' => true, 'details' => ['Low completion, no time data (+25)'], 'is_within_allowed_time' => true, 'active_playback_minutes' => 0, 'allowed_time_minutes' => 0];
             }
-            
-            // Absolute last resort - no data at all
-            return [
-                'score' => 0, 
-                'is_suspicious' => true, 
-                'details' => ['No playback time or completion data'],
-                'is_within_allowed_time' => false,
-                'active_playback_minutes' => 0,
-                'allowed_time_minutes' => 0,
-            ];
         }
 
-        try {
-            // ✅ Base score starts at 0 (completely earned)
-            $score = 0;
-            
-            // ✅ Get video duration for this content
-            $videoDurationMinutes = null;
+        Log::warning('🪵 [ATTN] STEP 1C — EARLY RETURN: score=0, SUSPICIOUS (absolutely no data)');
+        return ['score' => 0, 'is_suspicious' => true, 'details' => ['No playback time or completion data'], 'is_within_allowed_time' => false, 'active_playback_minutes' => 0, 'allowed_time_minutes' => 0];
+    }
+
+    try {
+        $score = 0;
+
+        // ============================================================
+        // STEP 2: Video duration — use pre-loaded value if provided, DB only as last resort
+        // ============================================================
+        $videoDurationSeconds = null;
+
+        if ($videoDurationMinutes === null) {
+            // Caller did not pre-load — fall back to single DB lookup
             if ($contentId) {
                 $videoDurationSeconds = DB::table('module_content')
                     ->where('id', $contentId)
                     ->value('duration');
-                
-                if ($videoDurationSeconds) {
-                    $videoDurationMinutes = $videoDurationSeconds / 60;
-                }
-            }
-            
-            // ✅ Calculate allowed time window (Duration × 2)
-            $allowedTimeMinutes = $videoDurationMinutes ? ($videoDurationMinutes * 2) : 90; // Default 90 min if no video duration
-            
-            // ✅ Check if within allowed time window
-            $isWithinAllowedTime = $activePlaybackMinutes <= $allowedTimeMinutes;
-            
-            // ✅ Active playback time matching (up to 30 points)
-            if ($videoDurationMinutes && $videoDurationMinutes > 0) {
-                if ($isWithinAllowedTime) {
-                    // Within allowed time - good score, no "too long" penalty
-                    if ($activePlaybackMinutes >= $videoDurationMinutes * 0.8) {
-                        $score += 30;
-                        $details[] = 'Good active playback time (+30)';
-                    } elseif ($activePlaybackMinutes >= $videoDurationMinutes * 0.5) {
-                        $score += 20;
-                        $details[] = 'Acceptable active playback time (+20)';
-                    } else {
-                        $score += 10;
-                        $details[] = 'Short active playback time (+10)';
-                    }
-                } else {
-                    // Exceeded allowed time - apply penalty
-                    $score += 5;
-                    $details[] = 'Exceeded allowed time window (+5)';
-                    $isSuspicious = true;
-                }
+
+                $videoDurationMinutes = $videoDurationSeconds
+                    ? ($videoDurationSeconds / 60)
+                    : null;
+
+                Log::info('🪵 [ATTN] STEP 2 — Video duration DB lookup (fallback)', [
+                    'content_id'           => $contentId,
+                    'duration_seconds_raw' => $videoDurationSeconds ?? 'NOT FOUND IN DB',
+                    'duration_minutes'     => $videoDurationMinutes ?? 'NULL',
+                ]);
             } else {
-                // Fallback: Duration-based scoring without video reference (up to 20 points)
-                if ($activePlaybackMinutes >= 10 && $activePlaybackMinutes <= 45) {
-                    $score += 20;
-                    $details[] = 'Good session duration (+20)';
-                } elseif ($activePlaybackMinutes >= 5 && $activePlaybackMinutes < 10) {
-                    $score += 15;
-                    $details[] = 'Short focused session (+15)';
-                } elseif ($activePlaybackMinutes > 45 && $activePlaybackMinutes <= 60) {
-                    $score += 10;
-                    $details[] = 'Long session (+10)';
-                } elseif ($activePlaybackMinutes > 60) {
-                    $score += 5;
-                    $details[] = 'Very long session (+5)';
-                } else {
-                    $details[] = 'Very short session (no duration bonus)';
-                }
+                Log::warning('🪵 [ATTN] STEP 2 — content_id is NULL, skipping video duration lookup');
             }
-            
-            // ✅ Session completion bonus (5 points)
-            if ($sessionEnd) {
-                $score += 5;
-                $details[] = 'Session completed (+5)';
-            }
-            
-            // ✅ Pauses and rewinds do NOT affect score if within allowed time (UNLIMITED)
-            if ($sessionData && $isWithinAllowedTime) {
-                $pauseCount = $sessionData->pause_count ?? 0;
-                $replayCount = $sessionData->video_replay_count ?? 0;
-                
-                // Pauses are normal behavior - give bonus for engagement (UNLIMITED)
-                if ($pauseCount > 0) {
-                    $score += 10;
-                    $details[] = 'Normal pause behavior (+10)';
-                }
-                
-                // Replays show attention to detail (UNLIMITED)
-                if ($replayCount > 0) {
-                    $score += 10;
-                    $details[] = 'Replay behavior shows engagement (+10)';
-                }
-            }
-            
-            // ✅ Video completion bonus (up to 35 points)
-            if ($sessionData && isset($sessionData->video_completion_percentage)) {
-                $completionPct = $sessionData->video_completion_percentage;
-                if ($completionPct >= 95) {
-                    $score += 35;
-                    $details[] = 'Full video completion (+35)';
-                } elseif ($completionPct >= 80) {
-                    $score += 25;
-                    $details[] = 'High video completion (+25)';
-                } elseif ($completionPct >= 60) {
-                    $score += 15;
-                    $details[] = 'Moderate video completion (+15)';
-                } elseif ($completionPct >= 40) {
-                    $score += 5;
-                    $details[] = 'Low video completion (+5)';
-                }
-            }
-            
-            // ✅ Only apply skip penalty (skipping forward is still suspicious)
-            if ($sessionData) {
-                $skipCount = $sessionData->video_skip_count ?? 0;
-                if ($skipCount >= 1) {
-                    $score -= 30;
-                    $isSuspicious = true;
-                    $details[] = "PENALTY: Skip forward detected (-30)";
-                }
-            }
-            
-            // ✅ Final suspicious check based on score
-            if ($score < 30) {
-                $isSuspicious = true;
-            }
-
-            // Ensure score is in valid range (0-100)
-            $score = max(0, min(100, $score));
-
-            return [
-                'score' => $score, 
-                'is_suspicious' => $isSuspicious, 
-                'details' => $details,
-                'is_within_allowed_time' => $isWithinAllowedTime,
-                'active_playback_minutes' => $activePlaybackMinutes,
-                'allowed_time_minutes' => $allowedTimeMinutes,
-            ];
-
-        } catch (\Exception $e) {
-            return [
-                'score' => 0, 
-                'is_suspicious' => true, 
-                'details' => ['Error calculating score: ' . $e->getMessage()],
-                'is_within_allowed_time' => false,
-                'active_playback_minutes' => 0,
-                'allowed_time_minutes' => 0,
-            ];
+        } else {
+            Log::info('🪵 [ATTN] STEP 2 — Video duration pre-loaded by caller', [
+                'content_id'       => $contentId,
+                'duration_minutes' => $videoDurationMinutes,
+            ]);
         }
+
+        // ============================================================
+        // STEP 3: Allowed time = video duration × 2
+        // ============================================================
+        $allowedTimeMinutes  = $videoDurationMinutes ? ($videoDurationMinutes * 2) : 90;
+        $isWithinAllowedTime = $activePlaybackMinutes <= $allowedTimeMinutes;
+
+        Log::info('🪵 [ATTN] STEP 3 — Allowed time window', [
+            'video_duration_minutes'  => $videoDurationMinutes ?? 'N/A — using default 90',
+            'allowed_time_minutes'    => $allowedTimeMinutes,
+            'active_playback_minutes' => round($activePlaybackMinutes, 2),
+            'is_within_allowed_time'  => $isWithinAllowedTime,
+            'exceeds_by_minutes'      => $isWithinAllowedTime ? 0 : round($activePlaybackMinutes - $allowedTimeMinutes, 2),
+        ]);
+
+        // ============================================================
+        // STEP 4: Watch percentage scoring (up to +40)
+        // 100%      → +40
+        // 75–99%    → +30
+        // 50–74%    → +20
+        // 25–49%    → +10
+        // < 25%     →  +0
+        // Exceeded allowed time (> 2× video length) → suspicious, +0
+        // ============================================================
+        $watchPct = isset($sessionData->video_completion_percentage)
+            ? (float) $sessionData->video_completion_percentage
+            : 0;
+
+        Log::info('🪵 [ATTN] STEP 4 — Watch percentage scoring', [
+            'watch_pct'               => $watchPct,
+            'is_within_allowed_time'  => $isWithinAllowedTime,
+        ]);
+
+        if (!$isWithinAllowedTime) {
+            // Session time exceeded 2× video length → suspicious, no watch score
+            $isSuspicious = true;
+            $details[] = 'Exceeded allowed time window (2× video length) — SUSPICIOUS (+0)';
+            Log::warning('🪵 [ATTN] STEP 4 — ⚠️ EXCEEDED allowed time → SUSPICIOUS', [
+                'active_playback_minutes' => round($activePlaybackMinutes, 2),
+                'allowed_time_minutes'    => $allowedTimeMinutes,
+                'exceeded_by_minutes'     => round($activePlaybackMinutes - $allowedTimeMinutes, 2),
+            ]);
+        } elseif ($watchPct >= 100) {
+            $score += 50;
+            $details[] = 'Watched 100% of video (+50)';
+            Log::info('🪵 [ATTN] STEP 4 — +50 Full watch (100%)', ['watch_pct' => $watchPct]);
+        } elseif ($watchPct >= 75) {
+            $score += 40;
+            $details[] = 'Watched 75–99% of video (+40)';
+            Log::info('🪵 [ATTN] STEP 4 — +40 Good watch (75–99%)', ['watch_pct' => $watchPct]);
+        } elseif ($watchPct >= 50) {
+            $score += 30;
+            $details[] = 'Watched 50–74% of video (+30)';
+            Log::info('🪵 [ATTN] STEP 4 — +30 Acceptable watch (50–74%)', ['watch_pct' => $watchPct]);
+        } elseif ($watchPct >= 25) {
+            $score += 20;
+            $details[] = 'Watched 25–49% of video (+20)';
+            Log::warning('🪵 [ATTN] STEP 4 — +20 Low watch (25–49%)', ['watch_pct' => $watchPct]);
+        } else {
+            $details[] = 'Watched less than 25% of video (+0)';
+            Log::warning('🪵 [ATTN] STEP 4 — +0 Very low watch (< 25%)', ['watch_pct' => $watchPct]);
+        }
+
+        // ============================================================
+        // STEP 5: Session completed bonus (+5)
+        // ============================================================
+       if ($sessionEnd) {
+            $score += 10;
+            $details[] = 'Session completed (+10)';
+            Log::info('🪵 [ATTN] STEP 5 — +10 Session has end time');
+        } else {
+            Log::warning('🪵 [ATTN] STEP 5 — +0 No session_end (session still active?)');
+        }
+
+        // STEP 6: Pause & replay bonuses — REMOVED per client spec.
+        // These behaviors are no longer part of the scoring model.
+
+        // ============================================================
+        // STEP 7: Video completion bonus (up to +35)
+        // ============================================================
+        $completionPct = isset($sessionData->video_completion_percentage)
+            ? $sessionData->video_completion_percentage
+            : null;
+
+        Log::info('🪵 [ATTN] STEP 7 — Video completion', [
+            'video_completion_pct'    => $completionPct ?? 'NULL — not set',
+            'isset_completion'        => isset($sessionData->video_completion_percentage),
+        ]);
+
+         if ($sessionData && isset($sessionData->video_completion_percentage)) {
+            if ($completionPct >= 99) {
+                $score += 40; $details[] = 'Full video completion (+40)';
+                Log::info('🪵 [ATTN] STEP 7 — +40 Full completion (99-100%)', ['pct' => $completionPct]);
+            } elseif ($completionPct >= 80) {
+                $score += 30; $details[] = 'High video completion (+30)';
+                Log::info('🪵 [ATTN] STEP 7 — +30 High completion (80-98%)', ['pct' => $completionPct]);
+            } elseif ($completionPct >= 50) {
+                $score += 20; $details[] = 'Moderate video completion (+20)';
+                Log::info('🪵 [ATTN] STEP 7 — +20 Moderate completion (50-79%)', ['pct' => $completionPct]);
+            } else {
+                Log::warning('🪵 [ATTN] STEP 7 — +0 Low completion (< 50%)', ['pct' => $completionPct]);
+            }
+        } else {
+            Log::warning('🪵 [ATTN] STEP 7 — +0 video_completion_percentage not available');
+        }
+
+        // ============================================================
+        // STEP 8: Skip forward PENALTY (-30 + suspicious)
+        // ============================================================
+        $skipCount = $sessionData->video_skip_count ?? 0;
+
+        Log::info('🪵 [ATTN] STEP 8 — Skip check', [
+            'video_skip_count' => $skipCount,
+            'penalty_will_fire' => ($sessionData && $skipCount >= 1),
+        ]);
+
+        if ($sessionData && $skipCount >= 1) {
+            $scoreBefore = $score;
+            $score -= 30;
+            $isSuspicious = true;
+            $details[] = 'PENALTY: Skip forward detected (-30)';
+            Log::warning('🪵 [ATTN] STEP 8 — ⚠️ SKIP PENALTY FIRED', [
+                'skip_count'   => $skipCount,
+                'score_before' => $scoreBefore,
+                'score_after'  => $score,
+            ]);
+        } else {
+            Log::info('🪵 [ATTN] STEP 8 — No skip penalty', ['skip_count' => $skipCount]);
+        }
+
+        // STEP 9: "score < 30 = suspicious" rule — REMOVED per client spec.
+        // Suspicion is now determined only by: (1) skip forward, (2) exceeded 2× video length.
+
+        $scoreBeforeClamp = $score;
+        $score = max(0, min(100, $score));
+
+        // ============================================================
+        // FINAL SUMMARY LOG
+        // ============================================================
+        Log::info('🎯 [ATTN] ===== FINAL RESULT =====', [
+            'final_score'             => $score,
+            'score_before_clamp'      => $scoreBeforeClamp,
+            'is_suspicious'           => $isSuspicious,
+            'suspicious_reasons'      => array_values(array_filter([
+                ($isSuspicious && $skipCount >= 1)       ? '1_SKIP_FORWARD'         : null,
+                ($isSuspicious && !$isWithinAllowedTime) ? '2_EXCEEDED_ALLOWED_TIME' : null,
+            ])),
+            'is_within_allowed_time'  => $isWithinAllowedTime,
+            'active_playback_minutes' => round($activePlaybackMinutes, 2),
+            'allowed_time_minutes'    => round($allowedTimeMinutes, 2),
+            'video_duration_minutes'  => $videoDurationMinutes ? round($videoDurationMinutes, 2) : 'N/A',
+            'score_breakdown'         => $details,
+        ]);
+
+        return [
+            'score'                   => $score,
+            'is_suspicious'           => $isSuspicious,
+            'details'                 => $details,
+            'is_within_allowed_time'  => $isWithinAllowedTime,
+            'active_playback_minutes' => $activePlaybackMinutes,
+            'allowed_time_minutes'    => $allowedTimeMinutes,
+        ];
+
+    } catch (\Exception $e) {
+        Log::error('🪵 [ATTN] ❌ EXCEPTION THROWN INSIDE TRY BLOCK', [
+            'message' => $e->getMessage(),
+            'file'    => $e->getFile(),
+            'line'    => $e->getLine(),
+            'trace'   => $e->getTraceAsString(),
+        ]);
+
+        return [
+            'score'                   => 0,
+            'is_suspicious'           => true,
+            'details'                 => ['Error: ' . $e->getMessage()],
+            'is_within_allowed_time'  => false,
+            'active_playback_minutes' => 0,
+            'allowed_time_minutes'    => 0,
+        ];
     }
+}
 
     /**
      * 🔧 UPDATED: Process sessions with simulated attention scores
@@ -861,6 +994,15 @@ class CourseOnlineReportController extends Controller
                 'is_suspicious' => $isSuspicious,
                 'engagement_level' => $this->calculateEngagementLevel((($session->attention_score ?? 0) > 0) ? $session->attention_score : $simulatedAttention),
                 'score_details' => $attentionResult['details'] ?? [],
+                'skip_count'        => $fullSessionData->video_skip_count ?? 0,
+'seek_count'        => $fullSessionData->seek_count ?? 0,
+'pause_count'       => $fullSessionData->pause_count ?? 0,
+'replay_count'      => $fullSessionData->video_replay_count ?? 0,
+'video_completion'  => $fullSessionData->video_completion_percentage ?? 0,
+'cheating_score'    => $isSuspicious ? min(100, ($attentionResult['score'] < 30 ? (30 - $attentionResult['score']) * 2 : 10)) : 0,
+'cheating_risk'     => $isSuspicious
+    ? ($attentionResult['score'] < 20 ? 'High' : ($attentionResult['score'] < 30 ? 'Medium' : 'Low'))
+    : 'None',
             ];
         }
 
@@ -963,87 +1105,62 @@ class CourseOnlineReportController extends Controller
     private function calculateRealStatsWithSimulatedAttention()
     {
         try {
-            // Calculate REAL total learning time and SIMULATED attention
-            $totalRealMinutes = 0;
-            $totalStoredMinutes = 0;
-            $simulatedAttentionScores = [];
-            $suspiciousCount = 0;
+            // ✅ OPTIMIZED: Pure SQL aggregates — no PHP loop over all sessions
+            $sessionAgg = DB::table('learning_sessions')->selectRaw('
+                COUNT(*)                                          as total_sessions,
+                COALESCE(SUM(active_playback_time), 0)           as total_playback_seconds,
+                COALESCE(SUM(total_duration_minutes), 0)         as total_stored_minutes,
+                COALESCE(AVG(NULLIF(attention_score, 0)), 0)     as avg_attention,
+                COUNT(CASE WHEN is_suspicious_activity = 1 THEN 1 END) as suspicious_count,
+                COUNT(CASE WHEN video_skip_count >= 1 THEN 1 END) as skip_suspicious
+            ')->first();
 
-            $allSessions = DB::table('learning_sessions')
-                ->select(
-                    'id', 'session_start', 'session_end', 'total_duration_minutes', 'content_id',
-                    'video_skip_count', 'seek_count', 'pause_count', 'video_replay_count', 'video_completion_percentage', 'active_playback_time'
-                )
-                ->get();
+            // Suspicious = stored flag OR skip detected (matches our scoring rules)
+            $suspiciousCount = max($sessionAgg->suspicious_count, $sessionAgg->skip_suspicious);
 
-            foreach ($allSessions as $session) {
-                $activePlaybackTime = $session->active_playback_time ?? null;
-                $contentId = $session->content_id ?? null;
-                $realDuration = $this->getActualSessionDuration(
-                    $session->session_start, 
-                    $session->session_end,
-                    $activePlaybackTime,
-                    $session->id,
-                    $contentId
-                );
-                $storedDuration = $session->total_duration_minutes ?? 0;
+            $totalRealMinutes  = round($sessionAgg->total_playback_seconds / 60, 1);
+            $totalStoredMinutes = round($sessionAgg->total_stored_minutes, 1);
 
-                $totalRealMinutes += $realDuration;
-                $totalStoredMinutes += $storedDuration;
+            // Engagement distribution via SQL
+            $engDist = DB::table('learning_sessions')
+                ->where('attention_score', '>', 0)
+                ->selectRaw('
+                    COUNT(CASE WHEN attention_score >= 80 THEN 1 END) as high,
+                    COUNT(CASE WHEN attention_score >= 60 AND attention_score < 80 THEN 1 END) as medium,
+                    COUNT(CASE WHEN attention_score >= 40 AND attention_score < 60 THEN 1 END) as low,
+                    COUNT(CASE WHEN attention_score < 40 THEN 1 END) as very_low
+                ')->first();
 
-                // Generate simulated attention with video duration and skip/seek data
-                if ($realDuration > 0) {
-                    $attentionResult = $this->calculateSimulatedAttentionScore(
-                        $session->session_start,
-                        $session->session_end,
-                        $realDuration,
-                        $session->content_id,
-                        $session
-                    );
-                    $simulatedAttentionScores[] = $attentionResult['score'];
-                    
-                    if ($attentionResult['is_suspicious']) {
-                        $suspiciousCount++;
-                    }
-                }
-            }
-
-            $avgSimulatedAttention = count($simulatedAttentionScores) > 0
-                ? array_sum($simulatedAttentionScores) / count($simulatedAttentionScores)
-                : 0;
-
-            $stats = [
-                'total_assignments' => CourseOnlineAssignment::count(),
-                'completed_assignments' => CourseOnlineAssignment::where('status', 'completed')->count(),
-                'in_progress_assignments' => CourseOnlineAssignment::where('status', 'in_progress')->count(),
-                'average_completion_rate' => round(CourseOnlineAssignment::avg('progress_percentage') ?? 0, 1),
-                'stored_learning_hours' => round($totalStoredMinutes / 60, 1),
-                'total_learning_hours' => round($totalRealMinutes / 60, 1),
-                'total_users' => User::where('role', '!=', 'admin')->count(),
+            return [
+                'total_assignments'           => CourseOnlineAssignment::count(),
+                'completed_assignments'       => CourseOnlineAssignment::where('status', 'completed')->count(),
+                'in_progress_assignments'     => CourseOnlineAssignment::where('status', 'in_progress')->count(),
+                'average_completion_rate'     => round(CourseOnlineAssignment::avg('progress_percentage') ?? 0, 1),
+                'stored_learning_hours'       => round($totalStoredMinutes / 60, 1),
+                'total_learning_hours'        => round($totalRealMinutes / 60, 1),
+                'total_users'                 => User::where('role', '!=', 'admin')->count(),
                 'stored_average_attention_score' => 0,
-                'average_attention_score' => round($avgSimulatedAttention, 1),
-                'total_sessions' => LearningSession::count(),
-                'suspicious_sessions' => $suspiciousCount,
-                'engagement_distribution' => [
-                    'high_engagement' => count(array_filter($simulatedAttentionScores, fn($score) => $score >= 80)),
-                    'medium_engagement' => count(array_filter($simulatedAttentionScores, fn($score) => $score >= 60 && $score < 80)),
-                    'low_engagement' => count(array_filter($simulatedAttentionScores, fn($score) => $score >= 40 && $score < 60)),
-                    'very_low_engagement' => count(array_filter($simulatedAttentionScores, fn($score) => $score < 40)),
+                'average_attention_score'     => round($sessionAgg->avg_attention, 1),
+                'total_sessions'              => $sessionAgg->total_sessions,
+                'suspicious_sessions'         => $suspiciousCount,
+                'engagement_distribution'     => [
+                    'high_engagement'      => $engDist->high      ?? 0,
+                    'medium_engagement'    => $engDist->medium    ?? 0,
+                    'low_engagement'       => $engDist->low       ?? 0,
+                    'very_low_engagement'  => $engDist->very_low  ?? 0,
                 ],
             ];
 
-            return $stats;
-
         } catch (\Exception $e) {
             return [
-                'total_assignments' => 0,
-                'completed_assignments' => 0,
-                'in_progress_assignments' => 0,
-                'average_completion_rate' => 0,
-                'total_learning_hours' => 0,
-                'total_users' => 0,
-                'average_attention_score' => 0,
-                'suspicious_sessions' => 0,
+                'total_assignments'        => 0,
+                'completed_assignments'    => 0,
+                'in_progress_assignments'  => 0,
+                'average_completion_rate'  => 0,
+                'total_learning_hours'     => 0,
+                'total_users'              => 0,
+                'average_attention_score'  => 0,
+                'suspicious_sessions'      => 0,
             ];
         }
     }
@@ -1055,66 +1172,37 @@ class CourseOnlineReportController extends Controller
     private function calculateSessionStatsWithSimulatedAttention()
     {
         try {
-            $totalRealMinutes = 0;
-            $simulatedAttentionScores = [];
-            $suspiciousCount = 0;
+            // ✅ OPTIMIZED: Pure SQL aggregates — no PHP loop over all sessions
+            $agg = DB::table('learning_sessions')->selectRaw('
+                COUNT(*)                                                    as total_sessions,
+                COUNT(CASE WHEN session_end IS NOT NULL THEN 1 END)         as completed_sessions,
+                COUNT(CASE WHEN session_end IS NULL THEN 1 END)             as active_sessions,
+                COUNT(CASE WHEN is_suspicious_activity = 1 THEN 1 END)     as stored_suspicious,
+                COUNT(CASE WHEN video_skip_count >= 1 THEN 1 END)           as skip_suspicious,
+                COALESCE(AVG(NULLIF(total_duration_minutes, 0)), 0)         as avg_stored_duration,
+                COALESCE(AVG(NULLIF(active_playback_time, 0)) / 60, 0)     as avg_real_duration_minutes,
+                COALESCE(SUM(active_playback_time) / 60, 0)                as total_real_minutes,
+                COALESCE(AVG(NULLIF(attention_score, 0)), 0)               as avg_attention
+            ')->first();
 
-            $allSessions = DB::table('learning_sessions')
-                ->select(
-                    'id', 'session_start', 'session_end', 'total_duration_minutes', 'content_id',
-                    'video_skip_count', 'seek_count', 'pause_count', 'video_replay_count', 'video_completion_percentage', 'active_playback_time'
-                )
-                ->get();
-
-            foreach ($allSessions as $session) {
-                $activePlaybackTime = $session->active_playback_time ?? null;
-                $contentId = $session->content_id ?? null;
-                $duration = $this->getActualSessionDuration(
-                    $session->session_start, 
-                    $session->session_end,
-                    $activePlaybackTime,
-                    $session->id,
-                    $contentId
-                );
-                $totalRealMinutes += $duration;
-
-                if ($duration > 0) {
-                    $attentionResult = $this->calculateSimulatedAttentionScore(
-                        $session->session_start,
-                        $session->session_end,
-                        $duration,
-                        $session->content_id,
-                        $session
-                    );
-                    $simulatedAttentionScores[] = $attentionResult['score'];
-
-                    if ($attentionResult['is_suspicious']) {
-                        $suspiciousCount++;
-                    }
-                }
-            }
-
-            $avgRealDuration = $allSessions->count() > 0 ? $totalRealMinutes / $allSessions->count() : 0;
-            $avgSimulatedAttention = count($simulatedAttentionScores) > 0
-                ? array_sum($simulatedAttentionScores) / count($simulatedAttentionScores)
-                : 0;
+            $suspiciousCount = max($agg->stored_suspicious, $agg->skip_suspicious);
 
             return [
-                'total_sessions' => LearningSession::count(),
-                'completed_sessions' => LearningSession::whereNotNull('session_end')->count(),
-                'active_sessions' => LearningSession::whereNull('session_end')->count(),
-                'stored_suspicious_sessions' => LearningSession::where('is_suspicious_activity', true)->count(),
+                'total_sessions'              => $agg->total_sessions,
+                'completed_sessions'          => $agg->completed_sessions,
+                'active_sessions'             => $agg->active_sessions,
+                'stored_suspicious_sessions'  => $agg->stored_suspicious,
                 'simulated_suspicious_sessions' => $suspiciousCount,
-                'suspicious_sessions' => $suspiciousCount,
-                'stored_average_duration' => round(LearningSession::avg('total_duration_minutes') ?? 0, 1),
-                'real_average_duration' => round($avgRealDuration, 1),
-                // Backwards-compatible key expected by frontend
-                'average_session_duration' => round($avgRealDuration, 1),
-                'total_real_learning_hours' => round($totalRealMinutes / 60, 1),
-                'stored_average_attention' => 0,
-                'simulated_average_attention' => round($avgSimulatedAttention, 1),
-                'average_attention_score' => round($avgSimulatedAttention, 1),
+                'suspicious_sessions'         => $suspiciousCount,
+                'stored_average_duration'     => round(LearningSession::avg('total_duration_minutes') ?? 0, 1),
+                'real_average_duration'       => round($agg->avg_real_duration_minutes, 1),
+                'average_session_duration'    => round($agg->avg_real_duration_minutes, 1),
+                'total_real_learning_hours'   => round($agg->total_real_minutes / 60, 1),
+                'stored_average_attention'    => 0,
+                'simulated_average_attention' => round($agg->avg_attention, 1),
+                'average_attention_score'     => round($agg->avg_attention, 1),
             ];
+
         } catch (\Exception $e) {
             return [];
         }
@@ -2154,3 +2242,4 @@ class CourseOnlineReportController extends Controller
     }
 
 }
+

@@ -151,40 +151,107 @@ class LearningSession extends Model
         $this->is_suspicious_activity = $this->cheating_score > 70;
     }
 
-    private function calculateAttentionScore(): int
-    {
-        $score = 0;
+   private function calculateAttentionScore(): int
+{
+    $score        = 0;
+    $isSuspicious = false;
 
-        // Base score from video completion
-        if ($this->video_completion_percentage) {
-            $score += min($this->video_completion_percentage, 100) * 0.5;
+    // ----------------------------------------------------------
+    // STEP 1: Determine active playback minutes
+    // Priority: active_playback_time → timestamps → 0
+    // ----------------------------------------------------------
+    $activePlaybackMinutes = 0;
+
+    if (!empty($this->active_playback_time) && $this->active_playback_time > 0) {
+        $activePlaybackMinutes = $this->active_playback_time / 60;
+    } elseif ($this->session_start && $this->session_end) {
+        $minutes = $this->session_end->diffInMinutes($this->session_start);
+        if ($minutes >= 1 && $minutes <= 180) {
+            $activePlaybackMinutes = $minutes;
         }
-
-        // Session duration score (reasonable pace)
-        if ($this->total_duration_minutes && $this->video_total_duration) {
-            $expectedMinutes = $this->video_total_duration / 60; // Convert seconds to minutes
-            $paceRatio = $this->total_duration_minutes / $expectedMinutes;
-
-            // Optimal pace is 1.0-1.5x (taking time to absorb content)
-            if ($paceRatio >= 1.0 && $paceRatio <= 1.5) {
-                $score += 30; // Good pace
-            } elseif ($paceRatio >= 0.8 && $paceRatio < 2.0) {
-                $score += 20; // Acceptable pace
-            } else {
-                $score += 10; // Too fast or too slow
-            }
-        }
-
-        // Activity engagement score
-        if ($this->pause_count > 0) {
-            $score += 10; // Pausing shows engagement
-        }
-        if ($this->video_replay_count > 0) {
-            $score += 10; // Replaying shows attention to detail
-        }
-
-        return min(round($score), 100);
     }
+
+    // ----------------------------------------------------------
+    // STEP 1C: Completion-only fallback (no time data at all)
+    // ----------------------------------------------------------
+    if ($activePlaybackMinutes <= 0) {
+        $completionPct = (float) ($this->video_completion_percentage ?? 0);
+        if ($completionPct >= 95) return 60;
+        if ($completionPct >= 80) return 50;
+        if ($completionPct >= 60) return 40;
+        if ($completionPct > 0)   return 25;
+        return 0;
+    }
+
+    // ----------------------------------------------------------
+    // STEP 2: Allowed time window = video duration × 2
+    // ----------------------------------------------------------
+    $videoDurationMinutes = null;
+    if ($this->video_total_duration && $this->video_total_duration > 0) {
+        $videoDurationMinutes = $this->video_total_duration / 60;
+    }
+
+    $allowedTimeMinutes  = $videoDurationMinutes ? ($videoDurationMinutes * 2) : 90;
+    $isWithinAllowedTime = $activePlaybackMinutes <= $allowedTimeMinutes;
+
+    // ----------------------------------------------------------
+    // STEP 3: Watch percentage scoring (up to +50)
+    // 100%   → +50
+    // 75-99% → +40
+    // 50-74% → +30
+    // 25-49% → +20
+    // < 25%  →  +0
+    // ----------------------------------------------------------
+    $watchPct = (float) ($this->video_completion_percentage ?? 0);
+
+    if (!$isWithinAllowedTime) {
+        $isSuspicious = true;
+        // No watch score — exceeded allowed time
+    } elseif ($watchPct >= 100) {
+        $score += 50;
+    } elseif ($watchPct >= 75) {
+        $score += 40;
+    } elseif ($watchPct >= 50) {
+        $score += 30;
+    } elseif ($watchPct >= 25) {
+        $score += 20;
+    }
+
+    // ----------------------------------------------------------
+    // STEP 4: Session completed bonus (+10)
+    // ----------------------------------------------------------
+    if ($this->session_end) {
+        $score += 10;
+    }
+
+    // NOTE: Pause and replay bonuses REMOVED per client spec.
+
+    // ----------------------------------------------------------
+    // STEP 5: Video completion bonus (up to +40)
+    // 99-100% → +40
+    // 80-98%  → +30
+    // 50-79%  → +20
+    // < 50%   →  +0
+    // ----------------------------------------------------------
+    $completionPct = (float) ($this->video_completion_percentage ?? 0);
+
+    if ($completionPct >= 99)     $score += 40;
+    elseif ($completionPct >= 80) $score += 30;
+    elseif ($completionPct >= 50) $score += 20;
+
+    // ----------------------------------------------------------
+    // STEP 6: Skip forward PENALTY (-30)
+    // ----------------------------------------------------------
+    $skipCount = (int) ($this->video_skip_count ?? 0);
+    if ($skipCount >= 1) {
+        $score       -= 30;
+        $isSuspicious = true;
+    }
+
+    // NOTE: "score < 30 = suspicious" rule REMOVED per client spec.
+
+    return max(0, min(100, (int) $score));
+}
 
     private function calculateCheatScore(): int
     {

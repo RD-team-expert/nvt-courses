@@ -44,5 +44,9 @@ return [
         'api_key' => env('TRANSCODING_API_KEY'),
         'project_key' => env('TRANSCODING_PROJECT_KEY', 'school_project'),
     ],
+    'whisper' => [
+    'url' => env('WHISPER_URL', 'http://localhost:9000'),
+    'callback_url' => env('WHISPER_CALLBACK_URL', 'http://localhost:8000/api/subtitle/callback'),
 
+    ],
 ];

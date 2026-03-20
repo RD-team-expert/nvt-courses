@@ -88,56 +88,65 @@ class ModuleQuizController extends Controller
     /**
      * Start a new quiz attempt.
      */
-    public function start($courseOnline, CourseModule $courseModule)
-    {
-        $user = Auth::user();
+   public function start($courseOnline, CourseModule $courseModule)
+{
+    $user = Auth::user();
 
-        // Validate user can take quiz
-        $canTakeQuiz = $courseModule->canUserTakeQuiz($user->id);
-        if (!$canTakeQuiz['can_take']) {
-            return back()->with('error', $canTakeQuiz['message']);
-        }
-
-        $quiz = $courseModule->quiz;
-
-        DB::beginTransaction();
-        try {
-            // Get the next attempt number
-            $attemptNumber = QuizAttempt::where('quiz_id', $quiz->id)
-                ->where('user_id', $user->id)
-                ->count() + 1;
-
-            // Create new attempt
-            $attempt = QuizAttempt::create([
-                'quiz_id' => $quiz->id,
-                'user_id' => $user->id,
-                'attempt_number' => $attemptNumber,
-                'started_at' => now(),
-                'score' => 0,
-                'manual_score' => 0,
-                'total_score' => 0,
-                'passed' => false,
-            ]);
-
-            DB::commit();
-
-            return redirect()->route('courses-online.modules.quiz.take', [
-                'courseOnline' => $courseModule->course_online_id,
-                'courseModule' => $courseModule->id,
-                'attempt' => $attempt->id,
-            ]);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Failed to start quiz attempt: ' . $e->getMessage(), [
-                'user_id' => $user->id,
-                'module_id' => $courseModule->id,
-                'quiz_id' => $quiz->id,
-            ]);
-            return back()->with('error', 'Failed to start quiz. Please try again.');
-        }
+    $canTakeQuiz = $courseModule->canUserTakeQuiz($user->id);
+    if (!$canTakeQuiz['can_take']) {
+        return back()->with('error', $canTakeQuiz['message']);
     }
 
+    $quiz = $courseModule->quiz;
+
+    // ✅ FIX: Resume existing in-progress attempt instead of creating a new one
+    $existingAttempt = QuizAttempt::where('quiz_id', $quiz->id)
+        ->where('user_id', $user->id)
+        ->whereNull('completed_at')
+        ->latest()
+        ->first();
+
+    if ($existingAttempt) {
+        return redirect()->route('courses-online.modules.quiz.take', [
+            'courseOnline' => $courseModule->course_online_id,
+            'courseModule' => $courseModule->id,
+            'attempt' => $existingAttempt->id,
+        ]);
+    }
+
+    DB::beginTransaction();
+    try {
+        // ✅ FIX: Only count COMPLETED attempts for attempt number
+        $attemptNumber = QuizAttempt::where('quiz_id', $quiz->id)
+            ->where('user_id', $user->id)
+            ->whereNotNull('completed_at') // ← only completed ones
+            ->count() + 1;
+
+        $attempt = QuizAttempt::create([
+            'quiz_id' => $quiz->id,
+            'user_id' => $user->id,
+            'attempt_number' => $attemptNumber,
+            'started_at' => now(),
+            'score' => 0,
+            'manual_score' => 0,
+            'total_score' => 0,
+            // ✅ FIX: Do NOT set passed: false here — leave null until submitted
+        ]);
+
+        DB::commit();
+
+        return redirect()->route('courses-online.modules.quiz.take', [
+            'courseOnline' => $courseModule->course_online_id,
+            'courseModule' => $courseModule->id,
+            'attempt' => $attempt->id,
+        ]);
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        Log::error('Failed to start quiz attempt: ' . $e->getMessage());
+        return back()->with('error', 'Failed to start quiz. Please try again.');
+    }
+}
     /**
      * Display the quiz taking interface.
      */

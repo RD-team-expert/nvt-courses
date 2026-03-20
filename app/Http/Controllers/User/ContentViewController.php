@@ -14,6 +14,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\LearningSession;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class ContentViewController extends Controller
 {
@@ -90,6 +91,7 @@ class ContentViewController extends Controller
      */
     public function manageSession(Request $request, ModuleContent $content)
     {
+        // dd($request->all());
         $user = auth()->user();
         $action = $request->input('action');
 
@@ -156,6 +158,7 @@ class ContentViewController extends Controller
                     ]);
 
                 case 'end':
+                
                     $session = $this->sessionService->getActiveSession($user->id, $content->id);
 
                     if (!$session) {
@@ -198,7 +201,7 @@ class ContentViewController extends Controller
                     // Update progress with new watch time
                     $this->progressService->updateProgress(
                         $progress->id,
-                        $request->input('final_position', 0),
+                        $request->input('current_position', 0),
                         $request->input('completion_percentage', 0),
                         (int) $totalWatchTime
                     );

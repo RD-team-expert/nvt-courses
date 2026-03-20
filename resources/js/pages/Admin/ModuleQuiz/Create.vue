@@ -80,7 +80,7 @@ const form = useForm({
     description: '',
     status: 'draft',
     pass_threshold: 70,
-    required_to_proceed: true,
+    required_to_proceed: false,
     max_attempts: 3,
     retry_delay_hours: 0,
     show_correct_answers: 'after_pass',
@@ -336,17 +336,19 @@ function submitForm() {
                         </div>
 
                         <div class="flex items-center gap-3 pt-4 border-t">
-                            <Switch
-                                id="required_to_proceed"
-                                :checked="form.required_to_proceed"
-                                @update:checked="form.required_to_proceed = $event"
-                                :disabled="form.processing"
-                            />
+                           <Switch
+    id="required_to_proceed"
+    :checked="form.required_to_proceed"
+    :disabled="form.processing"
+    @click="form.required_to_proceed = !form.required_to_proceed"
+/>
                             <div>
                                 <Label for="required_to_proceed" class="cursor-pointer">Required to Proceed</Label>
                                 <p class="text-xs text-muted-foreground">
                                     Students must pass this quiz to unlock the next module
                                 </p>
+                                <p class="text-xs text-red-500">Debug: {{ form.required_to_proceed }}</p>
+
                             </div>
                         </div>
                     </CardContent>

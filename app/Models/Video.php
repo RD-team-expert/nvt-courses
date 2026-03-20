@@ -32,6 +32,8 @@ class Video extends Model
         
         // VPS TRANSCODING
         'transcode_status',
+        'subtitle_status',
+        'subtitle_vtt_path',
     ];
 
     protected $casts = [
@@ -327,5 +329,10 @@ class Video extends Model
 
         return $deletedMain && $deletedThumb && $deletedQualities;
     }
+
+    public function podcastPosts(): \Illuminate\Database\Eloquent\Relations\MorphMany
+{
+    return $this->morphMany(PodcastPost::class, 'mediable');
+}
 }
 

@@ -147,6 +147,7 @@
                                 <TableHead class="text-foreground">Video</TableHead>
                                 <TableHead class="text-foreground">Storage</TableHead> <!-- ✅ NEW COLUMN -->
                                 <TableHead class="text-foreground">Transcoding</TableHead> <!-- ✅ NEW COLUMN -->
+                                <TableHead class="text-foreground">Subtitle</TableHead> <!-- ✅ NEW COLUMN -->
                                 <TableHead class="text-foreground">Category</TableHead>
                                 <TableHead class="text-foreground">Duration</TableHead>
                                 <TableHead class="text-foreground">Status</TableHead>
@@ -228,7 +229,16 @@
                                     </div>
                                     <span v-else class="text-xs text-muted-foreground">N/A</span>
                                 </TableCell>
-
+<!-- Subtitle Status Column -->
+                                <TableCell>
+                                    <div v-if="video.storage_type === 'local'" class="space-y-1">
+                                        <Badge :variant="getSubtitleStatusVariant(video.subtitle_status)" class="gap-1">
+                                            <component :is="getSubtitleStatusIcon(video.subtitle_status)" class="h-3 w-3" />
+                                            {{ getSubtitleStatusLabel(video.subtitle_status) }}
+                                        </Badge>
+                                    </div>
+                                    <span v-else class="text-xs text-muted-foreground">N/A</span>
+                                </TableCell>
                                 <!-- Category -->
                                 <TableCell>
                                     <Badge v-if="video.category" variant="outline" class="gap-1 bg-background border-border text-foreground">
@@ -298,6 +308,22 @@
                                                 <Edit class="h-4 w-4 mr-2" />
                                                 Edit
                                             </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                v-if="video.storage_type === 'local' && video.subtitle_status === 'completed'"
+                                                @click="editSubtitle(video)"
+                                                class="text-popover-foreground hover:bg-accent hover:text-accent-foreground cursor-pointer"
+                                            >
+                                                <Captions class="h-4 w-4 mr-2" />
+                                                Edit Subtitles
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                v-if="video.storage_type === 'local' && (video.subtitle_status === 'failed' || video.subtitle_status === null)"
+                                                @click="retrySubtitle(video)"
+                                                class="text-popover-foreground hover:bg-accent hover:text-accent-foreground cursor-pointer"
+                                            >
+                                                <RefreshCw class="h-4 w-4 mr-2" />
+                                                Retry Subtitle
+                                            </DropdownMenuItem>
                                             <DropdownMenuSeparator class="bg-border" />
                                             <DropdownMenuItem
                                                 @click="toggleActive(video)"
@@ -321,7 +347,7 @@
 
                             <!-- Empty State -->
                             <TableRow v-if="videos.length === 0" class="border-border">
-                                <TableCell colspan="9" class="text-center py-16 text-muted-foreground">
+                                <TableCell colspan="10" class="text-center py-16 text-muted-foreground">
                                     <PlaySquare class="h-16 w-16 mx-auto text-muted-foreground mb-6" />
                                     <div class="text-lg font-medium mb-2 text-foreground">No video courses found</div>
                                     <p class="text-muted-foreground mb-4">
@@ -385,6 +411,8 @@ import {
     AlertCircle,  // ✅ NEW - for failed status
     CheckCircle2, // ✅ NEW - for completed status
     Circle,       // ✅ NEW - for pending status
+    Captions,
+    RefreshCw,
 } from 'lucide-vue-next'
 
 interface Video {
@@ -400,6 +428,8 @@ interface Video {
     formatted_file_size?: string                     // ✅ NEW
     transcode_status?: 'pending' | 'processing' | 'completed' | 'failed' | 'skipped'  // ✅ NEW
     available_qualities?: string[]                   // ✅ NEW
+    subtitle_status?: 'pending' | 'processing' | 'completed' | 'failed' | 'skipped'  // ✅ NEW
+    subtitle_vtt_path?: string                       // ✅ NEW
     category?: {
         id: number
         name: string
@@ -546,6 +576,49 @@ function getTranscodeStatusLabel(status?: string): string {
             return 'Skipped'
         default:
             return 'Unknown'
+    }
+}
+
+// Subtitle status helpers
+function getSubtitleStatusVariant(status?: string | null) {
+    switch (status) {
+        case 'completed':  return 'default'
+        case 'processing': return 'secondary'
+        case 'failed':     return 'destructive'
+        case 'pending':    return 'outline'
+        default:           return 'outline'
+    }
+}
+
+function getSubtitleStatusIcon(status?: string | null) {
+    switch (status) {
+        case 'completed':  return CheckCircle2
+        case 'processing': return Loader2
+        case 'failed':     return AlertCircle
+        case 'pending':    return Circle
+        default:           return Circle
+    }
+}
+
+function getSubtitleStatusLabel(status?: string | null): string {
+    switch (status) {
+        case 'completed':  return 'Done'
+        case 'processing': return 'Processing'
+        case 'failed':     return 'Failed'
+        case 'pending':    return 'Pending'
+        default:           return 'Not Started'
+    }
+}
+
+function editSubtitle(video: Video) {
+    router.visit(`/admin/videos/${video.id}/subtitle/edit`)
+}
+
+function retrySubtitle(video: Video) {
+    if (confirm(`Retry subtitle generation for "${video.name}"?`)) {
+        router.post(`/admin/videos/${video.id}/retry-subtitle`, {}, {
+            preserveScroll: true,
+        })
     }
 }
 </script>

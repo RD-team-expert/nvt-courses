@@ -161,7 +161,7 @@ class ModuleQuizController extends Controller
                 'total_points' => 0,
 
                 // Module quiz settings
-                'required_to_proceed' => $validated['required_to_proceed'] ?? true,
+                'required_to_proceed' => filter_var($request->input('required_to_proceed', false), FILTER_VALIDATE_BOOLEAN),
                 'max_attempts' => $validated['max_attempts'],
                 'retry_delay_hours' => $validated['retry_delay_hours'] ?? 0,
                 'show_correct_answers' => $validated['show_correct_answers'],
@@ -193,7 +193,8 @@ class ModuleQuizController extends Controller
             // Update module to indicate it has a quiz
             $courseModule->update([
                 'has_quiz' => true,
-                'quiz_required' => $validated['required_to_proceed'] ?? true,
+                'quiz_required' => filter_var($request->input('required_to_proceed', false), FILTER_VALIDATE_BOOLEAN),
+
             ]);
 
             DB::commit();
@@ -287,7 +288,7 @@ class ModuleQuizController extends Controller
                 'retry_delay_hours' => $quiz->retry_delay_hours,
                 'show_correct_answers' => $quiz->show_correct_answers,
                 'time_limit_minutes' => $quiz->time_limit_minutes,
-                'required_to_proceed' => $quiz->required_to_proceed,
+                'required_to_proceed' => (bool) $quiz->required_to_proceed,
                 'questions' => $quiz->questions->map(function ($question) {
                     return [
                         'id' => $question->id,
@@ -366,7 +367,7 @@ class ModuleQuizController extends Controller
                 'description' => $validated['description'],
                 'status' => $validated['status'],
                 'pass_threshold' => $validated['pass_threshold'],
-                'required_to_proceed' => $validated['required_to_proceed'] ?? true,
+                'required_to_proceed' => filter_var($request->input('required_to_proceed', false), FILTER_VALIDATE_BOOLEAN),
                 'max_attempts' => $validated['max_attempts'],
                 'retry_delay_hours' => $validated['retry_delay_hours'] ?? 0,
                 'show_correct_answers' => $validated['show_correct_answers'],
@@ -375,7 +376,7 @@ class ModuleQuizController extends Controller
 
             // Update module quiz_required flag
             $quiz->module->update([
-                'quiz_required' => $validated['required_to_proceed'] ?? true,
+                'quiz_required' => filter_var($request->input('required_to_proceed', false), FILTER_VALIDATE_BOOLEAN),
             ]);
 
             // Handle questions update

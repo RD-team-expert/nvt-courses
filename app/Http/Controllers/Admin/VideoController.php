@@ -57,6 +57,10 @@ class VideoController extends Controller
                     'available_qualities' => $video->getAvailableQualities(),
                     'has_multiple_qualities' => $video->hasMultipleQualities(),
 
+                    // Subtitle information
+                    'subtitle_status' => $video->subtitle_status,
+                    'subtitle_vtt_path' => $video->subtitle_vtt_path,
+
                     'category' => $video->category ? [
                         'id' => $video->category->id,
                         'name' => $video->category->name,
@@ -192,6 +196,7 @@ class VideoController extends Controller
         // Trigger transcoding for local videos (async - doesn't block response)
         if ($validated['storage_type'] === 'local') {
             app(\App\Services\VpsTranscodingService::class)->requestTranscoding($video);
+            // app(\App\Services\VpsSubtitleService::class)->requestSubtitle($video);
         }
 
         DB::commit();
@@ -599,4 +604,78 @@ class VideoController extends Controller
             $success ? 'Transcoding restarted' : 'Failed to restart transcoding'
         );
     }
+/**
+ * Show the subtitle VTT editor for a video
+ */
+public function editSubtitle(Video $video)
+{
+    $vttContent = '';
+
+    if ($video->subtitle_vtt_path && Storage::disk('public')->exists($video->subtitle_vtt_path)) {
+        $vttContent = Storage::disk('public')->get($video->subtitle_vtt_path);
+    }
+
+    return Inertia::render('Admin/Video/SubtitleEditor', [
+        'video' => [
+            'id'              => $video->id,
+            'name'            => $video->name,
+            'subtitle_status' => $video->subtitle_status,
+            'subtitle_vtt_path' => $video->subtitle_vtt_path,
+            'streaming_url'   => $video->streaming_url,
+            'file_path'       => $video->file_path ?? null,
+            'storage_type'    => $video->storage_type,
+        ],
+        'vttContent' => $vttContent,
+    ]);
+}
+
+/**
+ * Save updated VTT content for a video
+ */
+public function updateSubtitle(Request $request, Video $video)
+{
+    $request->validate([
+        'vtt_content' => 'required|string',
+    ]);
+
+    $vttContent = $request->input('vtt_content');
+
+    // Basic VTT format validation
+    if (!str_starts_with(trim($vttContent), 'WEBVTT')) {
+        return back()->with('error', 'Invalid VTT format. File must start with WEBVTT.');
+    }
+
+    $path = $video->subtitle_vtt_path
+        ?? 'subtitles/' . $video->id . '_ar.vtt';
+
+    Storage::disk('public')->put($path, $vttContent);
+
+    // Make sure DB is updated if path was null
+    if (!$video->subtitle_vtt_path) {
+        $video->update([
+            'subtitle_vtt_path' => $path,
+            'subtitle_status'   => 'completed',
+        ]);
+    }
+
+    return back()->with('success', 'Subtitle file updated successfully.');
+}
+
+/**
+ * Retry subtitle generation for a failed video
+ */
+public function retrySubtitle(Video $video)
+{
+    if (!$video->isLocal()) {
+        return back()->with('error', 'Only local videos can have subtitles generated.');
+    }
+
+    $success = app(\App\Services\VpsSubtitleService::class)->retrySubtitle($video);
+
+    return back()->with(
+        $success ? 'success' : 'error',
+        $success ? 'Subtitle generation restarted.' : 'Failed to restart subtitle generation.'
+    );
+}
+    
 }

@@ -262,13 +262,15 @@ class CourseOnlineController extends Controller
                             'is_active' => $contentData['is_active'] ?? true,
                         ];
 
-                        // Handle video content
-                        if ($contentData['content_type'] === 'video' && !empty($contentData['video_id'])) {
-                            $video = Video::find($contentData['video_id']);
-                            if ($video) {
-                                $contentFields['video_id'] = $video->id;
-                            }
-                        }
+                       // Handle video content
+if ($contentData['content_type'] === 'video' && !empty($contentData['video_id'])) {
+    $video = Video::find($contentData['video_id']);
+    if ($video) {
+        $contentFields['video_id'] = $video->id;
+        // ✅ FIX: Copy video duration into module_content.duration
+        $contentFields['duration'] = $video->duration;
+    }
+}
 
                         // ✅ SIMPLIFIED: Handle PDF content - admin provides page count
                         if ($contentData['content_type'] === 'pdf') {
@@ -723,9 +725,14 @@ class CourseOnlineController extends Controller
                             ];
 
                             // Handle video content
-                            if ($contentData['content_type'] === 'video' && !empty($contentData['video_id'])) {
-                                $contentFields['video_id'] = $contentData['video_id'];
-                            }
+if ($contentData['content_type'] === 'video' && !empty($contentData['video_id'])) {
+    $contentFields['video_id'] = $contentData['video_id'];
+    // ✅ FIX: Copy video duration into module_content.duration
+    $video = \App\Models\Video::find($contentData['video_id']);
+    if ($video) {
+        $contentFields['duration'] = $video->duration;
+    }
+}
 
                             // ✅ Handle PDF content updates with page count
                             if ($contentData['content_type'] === 'pdf') {
