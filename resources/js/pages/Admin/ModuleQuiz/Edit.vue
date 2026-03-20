@@ -286,8 +286,15 @@ function submitForm() {
                             </div>
                         </div>
                         <div class="flex items-center gap-3 pt-4 border-t">
-                            <Switch id="required" :checked="form.required_to_proceed" @update:checked="form.required_to_proceed = $event" :disabled="form.processing" />
-                            <Label for="required" class="cursor-pointer">Required to Proceed</Label>
+                          <!-- ✅ FIX -->
+                            <Switch 
+                                id="required"
+                                v-model="form.required_to_proceed"
+                                :disabled="form.processing"
+                            />           
+                          <Label for="required" class="cursor-pointer">Required to Proceed</Label>
+                            <p class="text-xs text-red-500">Debug: {{ form.required_to_proceed }}</p>
+
                         </div>
                     </CardContent>
                 </Card>

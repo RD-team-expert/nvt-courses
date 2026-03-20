@@ -28,6 +28,7 @@ return Application::configure(basePath: dirname(__DIR__))
          $middleware->validateCsrfTokens(except: [
             'content/*/session',  // Allow sendBeacon without CSRF token
             'api/transcode/callback',  // VPS webhook callback
+            'api/subtitle/callback',   // VPS subtitle callback
         ]);
 
         // Trust all proxies for ngrok

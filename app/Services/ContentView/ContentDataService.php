@@ -80,6 +80,10 @@ class ContentDataService
         'transcode_status' => $video->transcode_status,
         'available_qualities' => $video->getAvailableQualities(),
         'has_multiple_qualities' => $video->hasMultipleQualities(),
+        'subtitle_status'  => $video->subtitle_status,
+        'subtitle_vtt_url' => $video->subtitle_vtt_path
+        ? url('storage/' . $video->subtitle_vtt_path)
+        : null,
     ];
 }
 

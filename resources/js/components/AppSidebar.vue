@@ -33,7 +33,8 @@ import {
     Shield,
     UserCheck,
     History,
-    Volume2
+    Volume2,
+    Rss
 } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 import AppLogo from './AppLogo.vue';
@@ -76,6 +77,12 @@ const mainNavItems: NavItem[] = [
         icon: LayoutList
     },
     {
+        title: 'Blog',
+        href: '/blog',
+        icon: Rss,
+    },
+    
+    {
         title: 'Audio books',
         href: '/audio',
         icon: Clock,
@@ -90,7 +97,7 @@ const mainNavItems: NavItem[] = [
         href: '/my-feedback',
         icon: BookOpenCheck,
     },
-
+    
 ];
 
 // Reports & Analytics submenu items
@@ -171,7 +178,13 @@ const reportsSubItems = [
         href: '/admin/feedback',
         icon: UserCheck,
 
-    }
+    },
+    {
+        title: 'Blog Management',
+        href: '/admin/podcasts',
+        icon: Rss,
+    },
+
 
 ];
 

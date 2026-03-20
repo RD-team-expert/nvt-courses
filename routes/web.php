@@ -44,6 +44,7 @@ use App\Http\Controllers\VideoStreamController;
 use App\Http\Controllers\TranscodeCallbackController;
 use App\Models\Course;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\SubtitleCallbackController;
 
 // ==========================================
 // API ROUTES (JSON responses)
@@ -66,6 +67,9 @@ Route::post('/api/transcode/callback', [TranscodeCallbackController::class, 'han
 // ==========================================
 
 
+// VPS SUBTITLE CALLBACK (No auth - VPS calls this)
+Route::post('/api/subtitle/callback', [SubtitleCallbackController::class, 'handle'])
+    ->name('subtitle.callback');
 
 
 // Replace the previous test route with this corrected one
@@ -288,7 +292,18 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/video-bookmarks/{bookmark}', [VideoBookmarkController::class, 'update'])->name('video-bookmarks.update');
     Route::delete('/video-bookmarks/{bookmark}', [VideoBookmarkController::class, 'destroy'])->name('video-bookmarks.destroy');
 });
+// ===== BLOG (User) =====
+Route::middleware(['auth'])->group(function () {
+    Route::get('/blog', [App\Http\Controllers\User\PodcastController::class, 'index'])->name('blog.index');
+    Route::get('/blog/{slug}', [App\Http\Controllers\User\PodcastController::class, 'show'])->name('blog.show');
+});
 
+// ===== BLOG API (AJAX — likes & comments) =====
+Route::middleware(['auth'])->prefix('api/blog')->name('api.blog.')->group(function () {
+    Route::post('/{podcast}/like',           [App\Http\Controllers\User\PodcastController::class, 'toggleLike'])->name('like');
+    Route::post('/{podcast}/comments',       [App\Http\Controllers\User\PodcastController::class, 'storeComment'])->name('comments.store');
+    Route::delete('/comments/{comment}',     [App\Http\Controllers\User\PodcastController::class, 'destroyComment'])->name('comments.destroy');
+});
 // ==========================================
 // USER PROFILE & ORGANIZATIONAL INFO
 // ==========================================
@@ -514,6 +529,22 @@ Route::get('videos/{video}/streaming-url', [App\Http\Controllers\Admin\VideoCont
 Route::post('videos/batch-refresh-urls', [App\Http\Controllers\Admin\VideoController::class, 'batchRefreshUrls'])->name('videos.batch-refresh-urls');
 Route::post('videos/{video}/migrate-to-local', [App\Http\Controllers\Admin\VideoController::class, 'migrateToLocal'])->name('videos.migrate-to-local');
 Route::post('videos/{video}/retry-transcode', [App\Http\Controllers\Admin\VideoController::class, 'retryTranscode'])->name('videos.retry-transcode');
+Route::get('videos/{video}/subtitle/edit', [App\Http\Controllers\Admin\VideoController::class, 'editSubtitle'])->name('videos.subtitle.edit');
+Route::post('videos/{video}/subtitle/update', [App\Http\Controllers\Admin\VideoController::class, 'updateSubtitle'])->name('videos.subtitle.update');
+Route::post('videos/{video}/retry-subtitle', [App\Http\Controllers\Admin\VideoController::class, 'retrySubtitle'])->name('videos.retry-subtitle');
+
+// ===== BLOG / PODCAST MANAGEMENT =====
+Route::prefix('podcasts')->name('podcasts.')->group(function () {
+    Route::get('/',                [App\Http\Controllers\Admin\PodcastController::class, 'index'])->name('index');
+    Route::get('/create',          [App\Http\Controllers\Admin\PodcastController::class, 'create'])->name('create');
+    Route::post('/',               [App\Http\Controllers\Admin\PodcastController::class, 'store'])->name('store');
+    Route::get('/{podcast}/edit',  [App\Http\Controllers\Admin\PodcastController::class, 'edit'])->name('edit');
+    Route::post('/{podcast}',      [App\Http\Controllers\Admin\PodcastController::class, 'update'])->name('update');
+    Route::delete('/{podcast}',    [App\Http\Controllers\Admin\PodcastController::class, 'destroy'])->name('destroy');
+    Route::post('/{podcast}/toggle-status', [App\Http\Controllers\Admin\PodcastController::class, 'toggleStatus'])->name('toggle-status');
+});
+
+
 
     // ===== ASSIGNMENT MANAGEMENT =====
     Route::get('assignments', [App\Http\Controllers\Admin\AssignmentController::class, 'index'])->name('assignments.index');

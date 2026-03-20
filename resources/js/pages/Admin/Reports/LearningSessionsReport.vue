@@ -761,11 +761,11 @@ if (typeof window !== 'undefined') {
                                     <div class="text-sm text-muted-foreground">Seeks</div>
                                 </div>
                                 <div class="p-3 bg-muted rounded-lg">
-                                    <div class="text-2xl font-bold text-green-600">0</div>
+                                    <div class="text-2xl font-bold text-green-600">{{ selectedSession.pause_count || 0 }}</div>
                                     <div class="text-sm text-muted-foreground">Pauses</div>
                                 </div>
                                 <div class="p-3 bg-muted rounded-lg">
-                                    <div class="text-2xl font-bold text-purple-600">0</div>
+                                    <div class="text-2xl font-bold text-purple-600">{{ selectedSession.replay_count || 0 }}</div>
                                     <div class="text-sm text-muted-foreground">Replays</div>
                                 </div>
                             </div>
