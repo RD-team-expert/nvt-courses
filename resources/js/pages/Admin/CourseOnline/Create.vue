@@ -57,6 +57,8 @@ interface ContentItem {
     google_drive_pdf_url: string
     pdf_name?: string
     pdf_page_count: number | null
+    attachment_file: File | null
+    attachment_name: string
 }
 
 // UPDATED: Enhanced props
@@ -265,7 +267,9 @@ const addContentToModule = (moduleIndex: number) => {
         pdf_file: null,
         google_drive_pdf_url: '',
         pdf_name: '',
-        pdf_page_count: null
+        pdf_page_count: null,
+        attachment_file: null,
+        attachment_name: '',
     })
 }
 
@@ -286,6 +290,8 @@ const resetContentFields = (moduleIndex: number, contentIndex: number) => {
     content.pdf_source_type = 'upload'
     content.pdf_name = ''
     content.pdf_page_count = null
+    content.attachment_file = null
+    content.attachment_name = ''
 }
 
 const handlePdfUpload = (event: Event, moduleIndex: number, contentIndex: number) => {
@@ -295,6 +301,17 @@ const handlePdfUpload = (event: Event, moduleIndex: number, contentIndex: number
     if (file && file.type === 'application/pdf') {
         form.modules[moduleIndex].content[contentIndex].pdf_file = file
         form.modules[moduleIndex].content[contentIndex].pdf_name = file.name
+    }
+}
+
+const handleAttachmentUpload = (event: Event, moduleIndex: number, contentIndex: number) => {
+    const target = event.target as HTMLInputElement
+    const file = target.files?.[0]
+    if (file) {
+        form.modules[moduleIndex].content[contentIndex].attachment_file = file
+        if (!form.modules[moduleIndex].content[contentIndex].attachment_name) {
+            form.modules[moduleIndex].content[contentIndex].attachment_name = file.name
+        }
     }
 }
 
@@ -971,6 +988,30 @@ const submit = () => {
                                                                     </div>
                                                                 </div>
                                                             </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- Training File Attachment (video only, optional) -->
+                                                    <div v-if="content.content_type === 'video'" class="space-y-2 border-t pt-4 mt-2">
+                                                        <Label class="flex items-center gap-2">
+                                                            <svg class="h-4 w-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
+                                                            Training File <span class="text-muted-foreground font-normal">(optional)</span>
+                                                        </Label>
+                                                        <p class="text-xs text-muted-foreground">Users can download this while watching the video. Accepted: .docx, .doc, .xlsx, .xls, .pptx, .ppt (max 20MB)</p>
+                                                        <input
+                                                            type="file"
+                                                            accept=".docx,.doc,.xlsx,.xls,.pptx,.ppt"
+                                                            @change="handleAttachmentUpload($event, moduleIndex, contentIndex)"
+                                                            class="block w-full text-sm text-muted-foreground file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-medium file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100"
+                                                        />
+                                                        <div v-if="content.attachment_file" class="p-2 bg-amber-50 rounded-lg flex items-center gap-2 text-xs text-amber-800">
+                                                            <svg class="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
+                                                            <span class="font-medium">{{ content.attachment_file.name }}</span>
+                                                            <button type="button" @click="content.attachment_file = null; content.attachment_name = ''" class="ml-auto text-red-500 hover:text-red-700 font-medium">Remove</button>
+                                                        </div>
+                                                        <div v-if="content.attachment_file" class="space-y-1">
+                                                            <Label class="text-xs">Display Name (optional)</Label>
+                                                            <Input v-model="content.attachment_name" type="text" :placeholder="content.attachment_file.name" class="text-sm h-8" />
                                                         </div>
                                                     </div>
 

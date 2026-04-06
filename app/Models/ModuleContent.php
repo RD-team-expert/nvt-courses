@@ -27,6 +27,9 @@ class ModuleContent extends Model
         'order_number',
         'is_required',
         'is_active',
+        'attachment_path',
+        'attachment_name',
+        'attachment_extension',
     ];
 
     protected $casts = [
@@ -95,6 +98,11 @@ class ModuleContent extends Model
     public function getIsPdfAttribute(): bool
     {
         return $this->content_type === 'pdf';
+    }
+
+    public function getHasAttachmentAttribute(): bool
+    {
+        return !is_null($this->attachment_path);
     }
 
     public function getContentUrlAttribute(): ?string

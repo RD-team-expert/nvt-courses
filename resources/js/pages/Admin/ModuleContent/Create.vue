@@ -202,6 +202,35 @@
                         </div>
                     </div>
 
+                    <!-- Training File Attachment (video only, optional) -->
+                    <div v-if="contentType === 'video'" class="border border-amber-200 dark:border-amber-800 rounded-lg p-5 bg-amber-50/40 dark:bg-amber-900/10 space-y-3">
+                        <div class="flex items-center gap-2">
+                            <svg class="w-4 h-4 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
+                            <h3 class="text-sm font-medium text-gray-700 dark:text-foreground">Training File <span class="font-normal text-gray-500 dark:text-muted-foreground">(optional)</span></h3>
+                        </div>
+                        <p class="text-xs text-gray-500 dark:text-muted-foreground">Users can download this while watching the video. Accepted: .docx, .doc, .xlsx, .xls, .pptx, .ppt (max 20MB)</p>
+                        <input
+                            type="file"
+                            accept=".docx,.doc,.xlsx,.xls,.pptx,.ppt"
+                            @change="handleAttachmentUpload"
+                            class="block w-full text-sm text-gray-500 dark:text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-amber-100 dark:file:bg-amber-900/30 file:text-amber-700 dark:file:text-amber-400 hover:file:bg-amber-200 dark:hover:file:bg-amber-900/50"
+                        />
+                        <div v-if="form.attachment_file" class="flex items-center gap-2 p-2 bg-amber-100 dark:bg-amber-900/30 rounded text-xs text-amber-800 dark:text-amber-300">
+                            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                            <span class="flex-1 font-medium truncate">{{ form.attachment_file.name }}</span>
+                            <button type="button" @click="form.attachment_file = null; form.attachment_name = ''" class="text-red-500 hover:text-red-700 font-medium ml-1">Remove</button>
+                        </div>
+                        <div v-if="form.attachment_file">
+                            <label class="block text-xs font-medium text-gray-700 dark:text-foreground mb-1">Display Name (optional)</label>
+                            <input
+                                v-model="form.attachment_name"
+                                type="text"
+                                :placeholder="form.attachment_file?.name"
+                                class="w-full border border-gray-300 dark:border-border rounded-md px-3 py-2 text-sm bg-white dark:bg-background text-gray-900 dark:text-foreground focus:ring-2 focus:ring-amber-400 focus:border-transparent placeholder:text-gray-400"
+                            />
+                        </div>
+                    </div>
+
                     <!-- Common Fields -->
                     <div class="space-y-6">
                         <!-- Content Title -->
@@ -376,6 +405,10 @@ const form = useForm({
     // Video fields
     video_id: null,
 
+    // Attachment fields
+    attachment_file: null,
+    attachment_name: '',
+
     // PDF fields
     pdf_file: null,
     pdf_name: ''
@@ -442,6 +475,17 @@ const handlePDFUpload = (event) => {
         }
         if (!form.title) {
             form.title = fileName
+        }
+    }
+}
+
+// Attachment upload handling
+const handleAttachmentUpload = (event) => {
+    const file = event.target.files[0]
+    if (file) {
+        form.attachment_file = file
+        if (!form.attachment_name) {
+            form.attachment_name = file.name
         }
     }
 }

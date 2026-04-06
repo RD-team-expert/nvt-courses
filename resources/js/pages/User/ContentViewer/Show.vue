@@ -70,6 +70,9 @@ interface Content {
     pdf_page_count?: number | null
     has_pdf_page_count?: boolean
     estimated_reading_time?: number | null
+    attachment_url?: string | null
+    attachment_name?: string | null
+    attachment_extension?: string | null
 }
 
 interface Module {
@@ -2089,6 +2092,26 @@ watch(currentPage, (newPage) => {
                                     {{ isCompleted ? 'Completed' : 'In Progress' }}
                                 </span>
                             </div>
+                        </CardContent>
+                    </Card>
+
+                    <!-- Training File Download Card -->
+                    <Card v-if="content.attachment_url" class="border-amber-200 bg-amber-50/40 dark:bg-amber-900/10">
+                        <CardContent class="p-4">
+                            <div class="flex items-center gap-2 mb-3">
+                                <Download class="h-4 w-4 text-amber-600" />
+                                <span class="text-sm font-medium text-amber-800 dark:text-amber-300">Training File</span>
+                            </div>
+                            <a
+                                :href="content.attachment_url"
+                                :download="content.attachment_name || true"
+                                target="_blank"
+                                class="flex items-center gap-2 w-full px-3 py-2 rounded-md bg-amber-100 hover:bg-amber-200 dark:bg-amber-900/30 dark:hover:bg-amber-900/50 text-amber-800 dark:text-amber-300 text-sm font-medium transition-colors"
+                            >
+                                <Download class="h-4 w-4 flex-shrink-0" />
+                                <span class="truncate">{{ content.attachment_name || 'Download File' }}</span>
+                            </a>
+                            <p v-if="content.attachment_extension" class="text-xs text-muted-foreground mt-1 text-center uppercase">{{ content.attachment_extension }} file</p>
                         </CardContent>
                     </Card>
 

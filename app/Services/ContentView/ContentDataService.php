@@ -40,6 +40,9 @@ class ContentDataService
             'is_required' => $content->is_required,
             'duration' => $content->duration,
             'pdf_page_count' => $content->pdf_page_count,
+            'attachment_url' => $content->attachment_path ? Storage::url($content->attachment_path) : null,
+            'attachment_name' => $content->attachment_name,
+            'attachment_extension' => $content->attachment_extension,
 
             // ✅ FIXED: Complete module data - using loaded module
             'module' => [
