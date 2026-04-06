@@ -158,6 +158,8 @@ class CourseOnlineController extends Controller
             'modules.*.content.*.google_drive_pdf_url' => 'nullable|string|url',
             'modules.*.content.*.pdf_name' => 'nullable|string|max:255',
             'modules.*.content.*.pdf_page_count' => 'nullable|integer|min:1|max:1000',
+            'modules.*.content.*.attachment_file' => 'nullable|file|mimes:docx,doc,xlsx,xls,pptx,ppt|max:20480',
+            'modules.*.content.*.attachment_name' => 'nullable|string|max:255',
         ]);
 
         // ✅ CUSTOM: Smart validation after basic validation
@@ -269,6 +271,16 @@ if ($contentData['content_type'] === 'video' && !empty($contentData['video_id'])
         $contentFields['video_id'] = $video->id;
         // ✅ FIX: Copy video duration into module_content.duration
         $contentFields['duration'] = $video->duration;
+    }
+    // Handle optional training file attachment for video content
+    $attachmentKey = "modules.{$moduleIndex}.content.{$contentIndex}.attachment_file";
+    if ($request->hasFile($attachmentKey)) {
+        $attachmentData = $this->fileService->uploadContentAttachment(
+            $request->file($attachmentKey)
+        );
+        $contentFields['attachment_path'] = $attachmentData['path'];
+        $contentFields['attachment_name'] = $contentData['attachment_name'] ?? $attachmentData['original_name'];
+        $contentFields['attachment_extension'] = $attachmentData['extension'];
     }
 }
 
@@ -632,6 +644,8 @@ if ($contentData['content_type'] === 'video' && !empty($contentData['video_id'])
             'modules.*.content.*.google_drive_pdf_url' => 'nullable|string|url',
             'modules.*.content.*.pdf_name' => 'nullable|string|max:255',
             'modules.*.content.*.pdf_page_count' => 'nullable|integer|min:1|max:1000',
+            'modules.*.content.*.attachment_file' => 'nullable|file|mimes:docx,doc,xlsx,xls,pptx,ppt|max:20480',
+            'modules.*.content.*.attachment_name' => 'nullable|string|max:255',
         ]);
 
         DB::beginTransaction();
@@ -731,6 +745,16 @@ if ($contentData['content_type'] === 'video' && !empty($contentData['video_id'])
     $video = \App\Models\Video::find($contentData['video_id']);
     if ($video) {
         $contentFields['duration'] = $video->duration;
+    }
+    // Handle optional training file attachment for video content
+    $attachmentKey = "modules.{$moduleIndex}.content.{$contentIndex}.attachment_file";
+    if ($request->hasFile($attachmentKey)) {
+        $attachmentData = $this->fileService->uploadContentAttachment(
+            $request->file($attachmentKey)
+        );
+        $contentFields['attachment_path'] = $attachmentData['path'];
+        $contentFields['attachment_name'] = $contentData['attachment_name'] ?? $attachmentData['original_name'];
+        $contentFields['attachment_extension'] = $attachmentData['extension'];
     }
 }
 
