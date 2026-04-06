@@ -80,6 +80,52 @@ class FileUploadService
     }
 
     /**
+     * Upload training file attachment (Word, Excel, PowerPoint) for video content
+     */
+    public function uploadContentAttachment(UploadedFile $file): array
+    {
+        $allowedMimes = [
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',  // .docx
+            'application/msword',                                                        // .doc
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',        // .xlsx
+            'application/vnd.ms-excel',                                                  // .xls
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation', // .pptx
+            'application/vnd.ms-powerpoint',                                             // .ppt
+        ];
+
+        $maxSize = 20 * 1024 * 1024; // 20MB
+
+        if (!in_array($file->getMimeType(), $allowedMimes)) {
+            throw new \InvalidArgumentException('Invalid file type. Allowed: .docx, .doc, .xlsx, .xls, .pptx, .ppt');
+        }
+
+        if ($file->getSize() > $maxSize) {
+            throw new \InvalidArgumentException('Attachment file size exceeds the 20MB limit.');
+        }
+
+        if ($file->getError() !== UPLOAD_ERR_OK) {
+            throw new \InvalidArgumentException('File upload error: ' . $file->getErrorMessage());
+        }
+
+        $extension = strtolower($file->getClientOriginalExtension());
+        $timestamp = now()->format('Y-m-d_H-i-s');
+        $random = \Illuminate\Support\Str::random(8);
+        $filename = "attachment_{$timestamp}_{$random}.{$extension}";
+
+        $path = Storage::disk('public')->putFileAs(
+            'course-content/attachments',
+            $file,
+            $filename
+        );
+
+        return [
+            'path' => $path,
+            'original_name' => $file->getClientOriginalName(),
+            'extension' => $extension,
+        ];
+    }
+
+    /**
      * Delete uploaded file
      */
     public function deleteFile(string $path): bool

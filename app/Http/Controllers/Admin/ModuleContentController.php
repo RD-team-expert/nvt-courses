@@ -112,6 +112,10 @@ class ModuleContentController extends Controller
             // Video fields
             'video_id' => 'required_if:content_type,video|exists:videos,id',
 
+            // Attachment fields (optional, video only)
+            'attachment_file' => 'nullable|file|mimes:docx,doc,xlsx,xls,pptx,ppt|max:20480',
+            'attachment_name' => 'nullable|string|max:255',
+
             // PDF fields
             'pdf_file' => 'required_if:content_type,pdf|file|mimes:pdf|max:10240', // 10MB max
             'pdf_name' => 'required_if:content_type,pdf|string|max:255',
@@ -142,6 +146,16 @@ class ModuleContentController extends Controller
             $video = Video::find($validated['video_id']);
             $contentData['video_id'] = $video->id;
             $contentData['duration'] = $video->duration;
+
+            // Handle optional training file attachment
+            if ($request->hasFile('attachment_file')) {
+                $attachmentData = app(\App\Services\FileUploadService::class)->uploadContentAttachment(
+                    $request->file('attachment_file')
+                );
+                $contentData['attachment_path'] = $attachmentData['path'];
+                $contentData['attachment_name'] = $validated['attachment_name'] ?? $attachmentData['original_name'];
+                $contentData['attachment_extension'] = $attachmentData['extension'];
+            }
         } else {
             // Handle PDF upload
             $pdfPath = $request->file('pdf_file')->store('course-content/pdfs', 'public');
@@ -254,6 +268,18 @@ class ModuleContentController extends Controller
                 'is_active' => $moduleContent->is_active,
                 'video_id' => $moduleContent->video_id,
                 'pdf_name' => $moduleContent->pdf_name,
+                'attachment_path' => $moduleContent->attachment_path,
+                'attachment_name' => $moduleContent->attachment_name,
+                'attachment_extension' => $moduleContent->attachment_extension,
+                'attachment_url' => $moduleContent->attachment_path
+                    ? \Illuminate\Support\Facades\Storage::url($moduleContent->attachment_path)
+                    : null,
+                'video' => $moduleContent->video ? [
+                    'id' => $moduleContent->video->id,
+                    'name' => $moduleContent->video->name,
+                    'formatted_duration' => $moduleContent->video->formatted_duration,
+                    'thumbnail_url' => $moduleContent->video->thumbnail_url,
+                ] : null,
             ],
             'availableVideos' => $availableVideos,
         ]);
@@ -276,6 +302,11 @@ class ModuleContentController extends Controller
             // PDF fields (only if pdf content and new file uploaded)
             'pdf_file' => 'nullable|file|mimes:pdf|max:10240',
             'pdf_name' => $moduleContent->content_type === 'pdf' ? 'required|string|max:255' : '',
+
+            // Attachment fields (optional, video only)
+            'attachment_file' => 'nullable|file|mimes:docx,doc,xlsx,xls,pptx,ppt|max:20480',
+            'attachment_name' => 'nullable|string|max:255',
+            'remove_attachment' => 'boolean',
         ]);
 
         // Handle order number changes
@@ -294,6 +325,25 @@ class ModuleContentController extends Controller
             $video = Video::find($validated['video_id']);
             $updateData['video_id'] = $video->id;
             $updateData['duration'] = $video->duration;
+
+            // Handle attachment upload
+            if ($request->hasFile('attachment_file')) {
+                // Delete old attachment if exists
+                if ($moduleContent->attachment_path) {
+                    Storage::disk('public')->delete($moduleContent->attachment_path);
+                }
+                $attachmentData = app(\App\Services\FileUploadService::class)->uploadContentAttachment(
+                    $request->file('attachment_file')
+                );
+                $updateData['attachment_path'] = $attachmentData['path'];
+                $updateData['attachment_name'] = $validated['attachment_name'] ?? $attachmentData['original_name'];
+                $updateData['attachment_extension'] = $attachmentData['extension'];
+            } elseif ($request->boolean('remove_attachment') && $moduleContent->attachment_path) {
+                Storage::disk('public')->delete($moduleContent->attachment_path);
+                $updateData['attachment_path'] = null;
+                $updateData['attachment_name'] = null;
+                $updateData['attachment_extension'] = null;
+            }
         }
 
         if ($moduleContent->content_type === 'pdf') {
