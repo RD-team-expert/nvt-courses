@@ -92,7 +92,7 @@ class VideoCategoryController extends Controller
     public function update(Request $request, VideoCategory $videoCategory)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255|unique:video_categories,name,' . $videoCategory->id,
+            'name' => 'required|string|max:255|unique:content_categories,name,' . $videoCategory->id,
             'description' => 'nullable|string|max:1000',
             'is_active' => 'boolean',
             'sort_order' => 'nullable|integer|min:0|max:999',
