@@ -33,37 +33,47 @@ class CourseOnlineController extends Controller
         $courses = CourseOnline::with(['creator', 'modules', 'assignments'])
             ->withCount(['modules', 'assignments'])
             ->orderBy('created_at', 'desc')
-            ->paginate(15);
+            ->paginate(10);
 
         return Inertia::render('Admin/CourseOnline/Index', [
-            'courses' => $courses->through(fn($course) => [
-                'id' => $course->id,
-                'name' => $course->name,
-                'description' => $course->description,
-                'image_path' => $course->image_path ? asset('storage/' . $course->image_path) : null,
-                'thumbnails' => $course->image_path ? [
-                    'small' => $this->thumbnailService->getThumbnailUrl($course->image_path, 'small'),
-                    'medium' => $this->thumbnailService->getThumbnailUrl($course->image_path, 'medium'),
-                    'large' => $this->thumbnailService->getThumbnailUrl($course->image_path, 'large'),
-                ] : null,
-                'difficulty_level' => $course->difficulty_level,
-                'estimated_duration' => $course->estimated_duration,
-                'is_active' => $course->is_active,
-                // ✅ NEW: Include deadline information
-                'has_deadline' => $course->has_deadline,
-                'deadline' => $course->deadline?->toDateTimeString(),
-                'deadline_type' => $course->deadline_type,
-                'deadline_status' => $course->deadline_status,
-                'days_until_deadline' => $course->daysUntilDeadline(),
-                'creator' => $course->creator ? [
-                    'id' => $course->creator->id,
-                    'name' => $course->creator->name,
-                ] : null,
-                'modules_count' => $course->modules_count,
-                'assignments_count' => $course->assignments_count,
-                'completion_rate' => $this->calculateCourseCompletionRate($course),
-                'created_at' => $course->created_at->toDateTimeString(),
-            ])
+            'courses' => [
+                'data' => $courses->map(fn($course) => [
+                    'id' => $course->id,
+                    'name' => $course->name,
+                    'description' => $course->description,
+                    'image_path' => $course->image_path ? asset('storage/' . $course->image_path) : null,
+                    'thumbnails' => $course->image_path ? [
+                        'small' => $this->thumbnailService->getThumbnailUrl($course->image_path, 'small'),
+                        'medium' => $this->thumbnailService->getThumbnailUrl($course->image_path, 'medium'),
+                        'large' => $this->thumbnailService->getThumbnailUrl($course->image_path, 'large'),
+                    ] : null,
+                    'difficulty_level' => $course->difficulty_level,
+                    'estimated_duration' => $course->estimated_duration,
+                    'is_active' => $course->is_active,
+                    'has_deadline' => $course->has_deadline,
+                    'deadline' => $course->deadline?->toDateTimeString(),
+                    'deadline_type' => $course->deadline_type,
+                    'deadline_status' => $course->deadline_status,
+                    'days_until_deadline' => $course->daysUntilDeadline(),
+                    'creator' => $course->creator ? [
+                        'id' => $course->creator->id,
+                        'name' => $course->creator->name,
+                    ] : null,
+                    'modules_count' => $course->modules_count,
+                    'assignments_count' => $course->assignments_count,
+                    'completion_rate' => $this->calculateCourseCompletionRate($course),
+                    'created_at' => $course->created_at->toDateTimeString(),
+                ]),
+                'meta' => [
+                    'total'        => $courses->total(),
+                    'per_page'     => $courses->perPage(),
+                    'current_page' => $courses->currentPage(),
+                    'last_page'    => $courses->lastPage(),
+                    'from'         => $courses->firstItem() ?? 0,
+                    'to'           => $courses->lastItem() ?? 0,
+                ],
+                'links' => $courses->linkCollection()->toArray(),
+            ]
         ]);
     }
 

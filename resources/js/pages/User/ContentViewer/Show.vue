@@ -1204,12 +1204,13 @@ const onPlaying = () => {
 const onLoadedMetadata = () => {
     if (videoElement.value) {
         duration.value = videoElement.value.duration
-        const savedPosition = safeUserProgress.value.current_position || 0
+        // If the video is already completed, start from the beginning so the user can rewatch it
+        const savedPosition = isCompleted.value ? 0 : (safeUserProgress.value.current_position || 0)
         // ✅ Set flag BEFORE setting currentTime so onVideoSeeked ignores this
         isRestoringPosition = true
         previousSeekPosition = savedPosition
         videoElement.value.currentTime = savedPosition
-        console.log('📹 Video metadata loaded - Duration:', duration.value, 'seconds, restoring to:', savedPosition)
+        console.log('📹 Video metadata loaded - Duration:', duration.value, 'seconds, restoring to:', savedPosition, isCompleted.value ? '(completed - starting from beginning)' : '')
         const tracks = videoElement.value.textTracks
         if (tracks.length > 0) {
             tracks[0].mode = subtitlesEnabled.value ? 'showing' : 'hidden'
