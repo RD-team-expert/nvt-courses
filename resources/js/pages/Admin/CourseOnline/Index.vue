@@ -2,7 +2,7 @@
 import { Head, Link, router } from '@inertiajs/vue3'
 import { computed, ref } from 'vue'
 import AppLayout from '@/layouts/AppLayout.vue'
-import AppPagination from '@/components/AppPagination.vue'
+import Pagination2 from '@/components/Pagination2.vue'
 import { type BreadcrumbItem } from '@/types'
 
 // shadcn-vue components
@@ -879,7 +879,9 @@ const clearFilters = () => {
             </Tabs>
 
             <!-- Pagination -->
-            <AppPagination v-if="courses.meta" :meta="courses.meta" :links="courses.links" />
+            <div v-if="courses.links" class="flex justify-center mt-4">
+                <Pagination2 :links="courses.links" />
+            </div>
         </div>
 
         <!-- ✅ NEW: Delete Confirmation Dialog -->
